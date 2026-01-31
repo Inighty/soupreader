@@ -86,7 +86,6 @@ jobs:
           removeArtifacts: true
           replacesArtifacts: true
           makeLatest: true
-          prerelease: true
 
       # 上传 App Bundle 作为 Artifact (开发调试用)
       - name: Upload .app artifact
