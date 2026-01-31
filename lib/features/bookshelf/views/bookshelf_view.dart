@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import '../../../core/database/database_service.dart';
+import '../../../core/database/repositories/book_repository.dart';
 import '../models/book.dart';
 
 /// 书架页面 - 纯 iOS 原生风格
@@ -11,54 +13,43 @@ class BookshelfView extends StatefulWidget {
 
 class _BookshelfViewState extends State<BookshelfView> {
   bool _isGridView = true;
+  late final BookRepository _bookRepo;
+  List<Book> _books = [];
 
-  final List<Book> _books = [
-    Book(
-      id: '1',
-      title: '斗破苍穹',
-      author: '天蚕土豆',
-      currentChapter: 100,
-      totalChapters: 1500,
-      readProgress: 0.35,
-      addedTime: DateTime.now().subtract(const Duration(days: 7)),
-      lastReadTime: DateTime.now().subtract(const Duration(hours: 2)),
-    ),
-    Book(
-      id: '2',
-      title: '完美世界',
-      author: '辰东',
-      currentChapter: 50,
-      totalChapters: 2000,
-      readProgress: 0.12,
-      addedTime: DateTime.now().subtract(const Duration(days: 3)),
-      lastReadTime: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-    Book(
-      id: '3',
-      title: '遮天',
-      author: '辰东',
-      currentChapter: 0,
-      totalChapters: 1800,
-      readProgress: 0.0,
+  @override
+  void initState() {
+    super.initState();
+    _bookRepo = BookRepository(DatabaseService());
+    _loadBooks();
+  }
+
+  void _loadBooks() {
+    setState(() {
+      _books = _bookRepo.getAllBooks();
+    });
+  }
+
+  Future<void> _addTestBook() async {
+    final book = Book(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: '测试书籍 ${_books.length + 1}',
+      author: '测试作者',
       addedTime: DateTime.now(),
-    ),
-    Book(
-      id: '4',
-      title: '凡人修仙传',
-      author: '忘语',
-      currentChapter: 800,
-      totalChapters: 2446,
-      readProgress: 0.65,
-      addedTime: DateTime.now().subtract(const Duration(days: 30)),
-      lastReadTime: DateTime.now().subtract(const Duration(hours: 5)),
-    ),
-  ];
+    );
+    await _bookRepo.addBook(book);
+    _loadBooks();
+  }
 
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
         middle: const Text('书架'),
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: const Icon(CupertinoIcons.add),
+          onPressed: _addTestBook,
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -105,7 +96,7 @@ class _BookshelfViewState extends State<BookshelfView> {
           ),
           const SizedBox(height: 8),
           Text(
-            '前往发现页添加书籍',
+            '点击左上角 + 添加测试书籍',
             style: TextStyle(
               fontSize: 15,
               color: CupertinoColors.tertiaryLabel.resolveFrom(context),
@@ -165,7 +156,9 @@ class _BookshelfViewState extends State<BookshelfView> {
                     )
                   : Center(
                       child: Text(
-                        book.title.substring(0, 1),
+                        book.title.isNotEmpty
+                            ? book.title.substring(0, 1)
+                            : '?',
                         style: TextStyle(
                           color: CupertinoColors.secondaryLabel
                               .resolveFrom(context),
@@ -220,7 +213,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                   )
                 : Center(
                     child: Text(
-                      book.title.substring(0, 1),
+                      book.title.isNotEmpty ? book.title.substring(0, 1) : '?',
                       style: TextStyle(
                         color:
                             CupertinoColors.secondaryLabel.resolveFrom(context),
@@ -283,11 +276,10 @@ class _BookshelfViewState extends State<BookshelfView> {
           CupertinoActionSheetAction(
             isDestructiveAction: true,
             child: const Text('移除书籍'),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              setState(() {
-                _books.removeWhere((b) => b.id == book.id);
-              });
+              await _bookRepo.deleteBook(book.id);
+              _loadBooks();
             },
           ),
         ],

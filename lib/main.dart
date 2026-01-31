@@ -1,13 +1,19 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'core/database/database_service.dart';
 import 'features/bookshelf/views/bookshelf_view.dart';
 import 'features/source/views/source_list_view.dart';
 import 'features/settings/views/settings_view.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   // 设置状态栏样式
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+
+  // 初始化数据库
+  await DatabaseService().init();
+
   runApp(const SoupReaderApp());
 }
 
