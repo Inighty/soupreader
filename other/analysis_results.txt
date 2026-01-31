@@ -1,0 +1,161 @@
+Analysis Report - 8038 Records Analyzed
+==================================================
+
+### TOP DEMAND (High Engagement)
+- Score: 941 | Weight loss for ‘girl dinner’ types
+  Desc: The user is looking for a weight loss app tailored to low-effort, snack-based eating ('girl dinner') rather than complex cooking or hyper-focused tracking. This indicates a gap for a realistic, low-friction nutrition app for busy parents who lack the capacity for traditional meal prepping.
+  Subreddit: adhdwomen | URL: https://reddit.com/r/adhdwomen/comments/1qo4v4r/weight_loss_for_girl_dinner_types/
+
+- Score: 912 | Filters have ruined dating
+  Desc: The user is looking for an app that can detect filters on dating app photos to avoid being catfished. This suggests a demand, driven by dissatisfaction with online dating experiences, for a tool that enhances transparency and authenticity in online profiles.
+  Subreddit: Vent | URL: https://reddit.com/r/Vent/comments/1o4a9z9/filters_have_ruined_dating/
+
+- Score: 622 | Why is it acceptable to have a major train line out of action for 2 weeks with no compensation
+  Desc: The user is seeking an app to send alerts about disruptions to specific train lines they regularly use, in order to be notified automatically. This indicates a need for public transit alert apps with granular customization.
+  Subreddit: melbourne | URL: https://reddit.com/r/melbourne/comments/1nc28t3/why_is_it_acceptable_to_have_a_major_train_line/
+
+- Score: 608 | First bike!
+  Desc: New motorcycle rider seeks an app or website to find local trails. This shows demand for a trail finding application for motorcycle riders.
+  Subreddit: Dualsport | URL: https://reddit.com/r/Dualsport/comments/1mr32n5/first_bike/
+
+- Score: 544 | Is there anyway for me to see the cutscenes with my spartan again?
+  Desc: The user wants a way to view Halo 3 cutscenes with their specific Spartan character again, without needing the game or Xbox 360. This signifies a need for a program or app that allows users to view customized content from old games, focusing on nostalgia and personalization.
+  Subreddit: haloreach | URL: https://reddit.com/r/haloreach/comments/1mza8ps/is_there_anyway_for_me_to_see_the_cutscenes_with/
+
+- Score: 473 | My first iPad
+  Desc: User is looking for note-taking apps for their new iPad that do not consume too much battery. This suggests the need for well-optimized note-taking apps for iPad.
+  Subreddit: ipad | URL: https://reddit.com/r/ipad/comments/1n990q3/my_first_ipad/
+
+- Score: 469 | Some of us didn’t want an AI friend. We wanted a creative partner
+  Desc: The user is expressing a desire for an AI tool that serves as a creative partner rather than just a subservient tool, indicating a market for AI tools that prioritize collaboration and understanding of context and tone.
+  Subreddit: ChatGPT | URL: https://reddit.com/r/ChatGPT/comments/1mlnl30/some_of_us_didnt_want_an_ai_friend_we_wanted_a/
+
+- Score: 390 | I can't tell you how many times I've accidentally inserted a "v" into text box while attempting to change tools...
+  Desc: The user needs a way to mitigate accidental character insertion in text boxes while changing tools in InDesign, suggesting a utility to block or remap single-key shortcuts in InDesign.
+  Subreddit: indesign | URL: https://reddit.com/r/indesign/comments/1njmd6h/i_cant_tell_you_how_many_times_ive_accidentally/
+
+- Score: 380 | Any way to hide Adobe's Creative Cloud app multiplicity?
+  Desc: The user is seeking a way to hide or better organize the multiple Creative Cloud apps on their system, revealing a need for better app management or interface customization for Adobe products.
+  Subreddit: MacOS | URL: https://reddit.com/r/MacOS/comments/1ntkmg6/any_way_to_hide_adobes_creative_cloud_app/
+
+- Score: 379 | Is there a better way to do mockups? Been using excel
+  Desc: User is looking for a better way to create mockups, indicating a need for user-friendly design tools.
+  Subreddit: satisfactory | URL: https://reddit.com/r/satisfactory/comments/1mxfqtp/is_there_a_better_way_to_do_mockups_been_using/
+
+- Score: 345 | How can I stop my phone from listening to me?
+  Desc: Privacy-conscious consumers are seeking apps that can monitor and restrict background microphone usage to prevent perceived 'listening' by ad networks.
+  Subreddit: degoogle | URL: https://reddit.com/r/degoogle/comments/1ql3xe7/how_can_i_stop_my_phone_from_listening_to_me/
+
+- Score: 296 | How or why did my iPhone download 180gb overnight?
+  Desc: User wants a way to identify what caused their iPhone to download 180GB of data overnight, indicating a need for detailed data usage monitoring and reporting tools.
+  Subreddit: iphone | URL: https://reddit.com/r/iphone/comments/1nuguxd/how_or_why_did_my_iphone_download_180gb_overnight/
+
+- Score: 260 | Is there a tool to see Systems with free parking slot for Fleet Carrier?
+  Desc: User needs a tool to identify Elite Dangerous systems with free Fleet Carrier parking slots, revealing a need for better in-game information and navigation tools.
+  Subreddit: EliteDangerous | URL: https://reddit.com/r/EliteDangerous/comments/1mmflre/is_there_a_tool_to_see_systems_with_free_parking/
+
+- Score: 243 | Is there an app that prepares you to read stylized characters like this?
+  Desc: The user is looking for an app that prepares them to read stylized characters. This indicates a need for educational tools focused on deciphering specific character styles.
+  Subreddit: LearnJapanese | URL: https://reddit.com/r/LearnJapanese/comments/1o404wl/is_there_an_app_that_prepares_you_to_read/
+
+- Score: 240 | Can I monetise the amount of steps I walk everyday?
+  Desc: The user wants to monetize their daily steps through an app. This indicates a need for an application that rewards users with money or other incentives for achieving their fitness goals.
+  Subreddit: Fitness_India | URL: https://reddit.com/r/Fitness_India/comments/1n1gtjo/can_i_monetise_the_amount_of_steps_i_walk_everyday/
+
+- Score: 219 | What’s the most ridiculous app idea you’ve had that might work out?
+  Desc: The user jokingly suggests needing an app that prevents impulse purchases, possibly with personalized 'calling out'. While humorous, this highlights a potential market for a 'spending guard' app with behavioral nudges and reminders.
+  Subreddit: Startup_Ideas | URL: https://reddit.com/r/Startup_Ideas/comments/1mhlcor/whats_the_most_ridiculous_app_idea_youve_had_that/
+
+- Score: 199 | eDiscovery request for emails to be provided as PDFs
+  Desc: A dedicated MSG/PST to PDF conversion tool for legal eDiscovery. Small businesses need reliable, bulk conversion tools to meet subpoena requirements without manual processing.
+  Subreddit: sysadmin | URL: https://reddit.com/r/sysadmin/comments/1q8b6u9/ediscovery_request_for_emails_to_be_provided_as/
+
+- Score: 192 | How to prove IPv6 is disabled?
+  Desc: The user is looking for a tool to easily prove that IPv6 is disabled on Windows machines, indicating a demand for a utility that can verify IPv6 status in a way that satisfies management requirements.
+  Subreddit: sysadmin | URL: https://reddit.com/r/sysadmin/comments/1orv6ij/how_to_prove_ipv6_is_disabled/
+
+- Score: 187 | Cover screen use idea
+  Desc: Foldable phone users find inner screens large for one-handed use. A utility app that turns the cover screen into a touchpad for the main display is a specialized UX opportunity for foldables.
+  Subreddit: galaxyzflip | URL: https://reddit.com/r/galaxyzflip/comments/1q9s1qq/cover_screen_use_idea/
+
+- Score: 184 | Dating in Utah and not wanting children
+  Desc: The user is looking for an app or platform to find people in Utah who do not want children. This indicates a demand for niche dating apps or features that filter potential matches based on specific lifestyle choices and values.
+  Subreddit: SaltLakeCity | URL: https://reddit.com/r/SaltLakeCity/comments/1p0v0gl/dating_in_utah_and_not_wanting_children/
+
+### NICHE REQUESTS ('Is there an app...?')
+- Is there an app/utility that will always configure my display resolution and arrangement the same way? (Sub: mac)
+  Desc: A Mac user needs a utility to lock and persist display resolutions and arrangements when using KVM switches or docks. This is a niche productivity tool opportunity for professionals with complex multi-monitor setups.
+
+- Is there an app or program that can immediately translate the stuff which is spoken? (Sub: Chinese)
+  Desc: The user needs real-time, text-based translation for spoken livestreams (TikTok Chinese to English). This is a technical opportunity for an AI-powered audio-to-text translation overlay for social media.
+
+- Is there a Tool, that combines all my stats from every app into one Dashboard? (Sub: VibeCodeDevs)
+  Desc: A multi-app developer wants a unified dashboard to aggregate stats (errors, signups, tickets, revenue) from multiple separate projects. This indicates a demand for a 'centralized cockpit' for solo entrepreneurs and small SaaS teams who are currently forced to check multiple tools.
+
+- Is there an app the makes tracking sheets? (Sub: Gloomhaven)
+  Desc: A tabletop gamer wants an app that automatically generates scenario tracking sheets from text inputs. This is a niche productivity opportunity for the RPG community to automate manual game prep.
+
+- Is there an app/service that tracks event updates (Sub: ProductivityApps)
+  Desc: A no-code web monitor specifically for event tracking. This solves the problem of monitoring static web pages that lack RSS feeds or calendar sync, which is a common hurdle for professional networkers and hobbyists.
+
+- Is there an app like this fir SR2? (Sub: Slimerancher2)
+  Desc: A 'digital twin' or layout designer tool for specific sandbox games (Slime Rancher 2). Gaming communities often lack architectural planning tools for base-building, creating an opportunity for a dedicated web-based layout designer.
+
+- Is there an app that sends notifications from Bluesky without using an account? (Sub: BlueskySocial)
+  Desc: Seeking a third-party notification service for decentralized social networks (like Bluesky) that allows users to follow accounts via push alerts without creating a platform account.
+
+- Is there an app or website to watch local videos and music with friends online? (Sub: NoStupidQuestions)
+  Desc: Request for a bug-free app to synchronize the remote playback of local video and audio files with friends, a niche not covered by mainstream streaming watch-party tools.
+
+- Is there an app where I can upload a voice note or audio recording of a meeting and it summarizes it along with Q&amp;A? (Sub: macapps)
+  Desc: Need for an audio-upload meeting summarizer with Q&A functionality for users in strict corporate environments who cannot install software or use browser extensions.
+
+- Is there a tool to help find pokemon art released in all languages? (Sub: PokemonTCG)
+  Desc: Seeking a visual-search database for TCG collectors to identify the same card art across different languages and sets to find the most affordable versions.
+
+- Is there a tool to copy the last frame's lineart and "wiggle" it a little? (Sub: krita)
+  Desc: Seeking an animation plugin to automate the 'line boil' or 'wiggle' effect by slightly modifying previous frames, reducing manual tracing time by up to 50%.
+
+- Is there a tool to mass delete playlists? (Sub: youtube)
+  Desc: Need for a bulk-management utility to mass delete YouTube Music playlists, indicating a gap in native music streaming management tools.
+
+- Is there an app that logs everything done on your phone? (Sub: androidapps)
+  Desc: Seeking an activity logger that creates an audit trail of everything done on a phone when it is lent to others, addressing a specific mobile privacy and security concern.
+
+- Is there an app with a map of the train line and pins to make a route? (Sub: Interrail)
+  Desc: Demand for a map-based rail trip planner that allows users to visually plot stops along actual train lines rather than just choosing destinations and hotels.
+
+- Is there an app/site/something that’ll write out words with batchim rules applied? (Sub: Korean)
+  Desc: Korean language learners struggle with 'batchim' (pronunciation rules) where words are written differently than they are spoken. An AI tool that converts written Hangeul into its actual phonetic pronunciation would be a high-utility learning tool.
+
+### DEV/SAAS OPPORTUNITIES
+- My first iPad (Score: 473)
+  Desc: User is looking for note-taking apps for their new iPad that do not consume too much battery. This suggests the need for well-optimized note-taking apps for iPad.
+
+- Any way to hide Adobe's Creative Cloud app multiplicity? (Score: 380)
+  Desc: The user is seeking a way to hide or better organize the multiple Creative Cloud apps on their system, revealing a need for better app management or interface customization for Adobe products.
+
+- is there an AI notetaker for in-person meetings (Score: 146)
+  Desc: The user wants an AI note-taker app for in-person meetings that doesn't require integrations with meeting platforms (like Otter.ai or Fireflies) and avoids expensive hardware/subscription costs. This indicates a demand for a simple, offline, and affordable AI note-taking solution.
+
+- Is it just me or do ALL productivity systems secretly HATE ADHD brains? Asking for a friend (it's me, I'm the friend) (Score: 142)
+  Desc: The user is seeking productivity tools or systems that cater to ADHD brains, moving beyond traditional methods that don't work. This indicates a need for customized, ADHD-friendly productivity solutions.
+
+- Best apps for actually structuring your day? (Score: 137)
+  Desc: The user is seeking an app to structure their day and avoid wasting time, providing nudges and guidance to stay on track. This indicates a need for personalized and proactive time management tools that go beyond simple to-do lists.
+
+- MacBook Pro M4, 3.5mm output is WAY too loud. (Score: 134)
+  Desc: A macOS audio utility for fine-grained gain control, solving hardware sensitivity issues where the default minimum volume is too high for comfortable listening.
+
+- Is there an app to finely adjust brightness easily? (Score: 119)
+  Desc: User is seeking an app to finely adjust screen brightness easily. This indicates a need for more granular control over brightness levels than the native system provides.
+
+- Does anyone plan like this? Looking for an app that works this way (Score: 117)
+  Desc: The user is looking for an app that allows them to plan/track work and personal tasks using diagrams over a vertical planner, similar to a whiteboard. This indicates a need for visual and flexible planning tools.
+
+- An automatic bell that makes one brief sound at certain times each day (Score: 117)
+  Desc: The user is looking for a device that emits a single, brief sound (like a bell) at specific times each day to mark the start of work. This indicates a niche digital product opportunity for a customizable, minimalist timer or reminder device with a focus on auditory cues.
+
+- Custom themes for workflows? (Score: 81)
+  Desc: User is interested in custom themes for workflows, reflecting a desire for visually appealing and personalized productivity tools.
+
