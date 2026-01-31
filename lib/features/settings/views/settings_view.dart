@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:dio/dio.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../app/theme/colors.dart';
 
 /// 设置页面 - iOS 原生风格
@@ -401,6 +402,8 @@ class _SettingsViewState extends State<SettingsView> {
 
     try {
       final dio = Dio();
+      final prefs = await SharedPreferences.getInstance();
+
       // 使用自定义 Worker 代理 API
       final response = await dio.get(
         'https://github-action-cf.mcshr.workers.dev/latest',
@@ -416,20 +419,57 @@ class _SettingsViewState extends State<SettingsView> {
         final downloadUrl = data['downloadUrl'] as String?;
         final publishedAt = data['publishedAt'] as String?;
 
-        if (downloadUrl != null && downloadUrl.isNotEmpty) {
-          // 格式化发布时间
-          String releaseInfo = name ?? 'Nightly Build';
-          if (publishedAt != null) {
-            try {
-              final date = DateTime.parse(publishedAt);
-              releaseInfo +=
-                  '\n发布时间: ${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-            } catch (_) {}
-          }
-          _showUpdateDialog(tag ?? 'nightly', releaseInfo, downloadUrl);
-        } else {
+        if (downloadUrl == null || downloadUrl.isEmpty) {
           _showMessage('未找到安装包');
+          return;
         }
+
+        // 版本比较逻辑：基于发布时间
+        final lastIgnoredTime = prefs.getString('last_ignored_update_time');
+        final lastUpdatedTime = prefs.getString('last_updated_time');
+
+        if (publishedAt != null) {
+          final remoteReleaseTime = DateTime.tryParse(publishedAt);
+
+          if (remoteReleaseTime != null) {
+            // 检查是否已忽略此版本
+            if (lastIgnoredTime != null) {
+              final ignoredTime = DateTime.tryParse(lastIgnoredTime);
+              if (ignoredTime != null &&
+                  !remoteReleaseTime.isAfter(ignoredTime)) {
+                _showMessage('已是最新版本');
+                return;
+              }
+            }
+
+            // 检查是否已更新到此版本
+            if (lastUpdatedTime != null) {
+              final updatedTime = DateTime.tryParse(lastUpdatedTime);
+              if (updatedTime != null &&
+                  !remoteReleaseTime.isAfter(updatedTime)) {
+                _showMessage('已是最新版本');
+                return;
+              }
+            }
+          }
+        }
+
+        // 格式化发布时间
+        String releaseInfo = name ?? 'Nightly Build';
+        if (publishedAt != null) {
+          try {
+            final date = DateTime.parse(publishedAt);
+            releaseInfo +=
+                '\n发布时间: ${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+          } catch (_) {}
+        }
+
+        _showUpdateDialog(
+          tag ?? 'nightly',
+          releaseInfo,
+          downloadUrl,
+          publishedAt,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -458,7 +498,8 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  void _showUpdateDialog(String tagName, String body, String downloadUrl) {
+  void _showUpdateDialog(
+      String tagName, String body, String downloadUrl, String? publishedAt) {
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
@@ -469,14 +510,26 @@ class _SettingsViewState extends State<SettingsView> {
         ),
         actions: [
           CupertinoDialogAction(
-            child: const Text('取消'),
-            onPressed: () => Navigator.pop(context),
+            child: const Text('忽略本次'),
+            onPressed: () async {
+              // 保存忽略的版本时间
+              if (publishedAt != null) {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('last_ignored_update_time', publishedAt);
+              }
+              if (mounted) Navigator.pop(context);
+            },
           ),
           CupertinoDialogAction(
             isDefaultAction: true,
             child: const Text('下载更新'),
-            onPressed: () {
-              Navigator.pop(context);
+            onPressed: () async {
+              // 保存更新的版本时间
+              if (publishedAt != null) {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('last_updated_time', publishedAt);
+              }
+              if (mounted) Navigator.pop(context);
               launchUrl(Uri.parse(downloadUrl),
                   mode: LaunchMode.externalApplication);
             },
