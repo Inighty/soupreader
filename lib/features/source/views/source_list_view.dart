@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../models/book_source.dart';
 import '../../../app/theme/colors.dart';
 
-/// 书源管理页面
+/// 书源管理页面 - iOS 原生风格
 class SourceListView extends StatefulWidget {
   const SourceListView({super.key});
 
@@ -11,176 +11,122 @@ class SourceListView extends StatefulWidget {
 }
 
 class _SourceListViewState extends State<SourceListView> {
-  // 示例书源数据
+  String _selectedGroup = '全部';
+  final List<String> _groups = ['全部', '小说', '漫画', '有声', '失效'];
+
   final List<BookSource> _sources = [
     BookSource(
-      bookSourceName: '起点中文网',
-      bookSourceUrl: 'https://www.qidian.com',
-      bookSourceGroup: '正版',
-      enabled: true,
-      weight: 100,
-    ),
-    BookSource(
-      bookSourceName: '纵横中文网',
-      bookSourceUrl: 'https://www.zongheng.com',
-      bookSourceGroup: '正版',
-      enabled: true,
-      weight: 90,
-    ),
-    BookSource(
-      bookSourceName: '晋江文学城',
-      bookSourceUrl: 'https://www.jjwxc.net',
-      bookSourceGroup: '正版',
-      enabled: false,
-      weight: 80,
-    ),
-    BookSource(
+      bookSourceUrl: 'https://www.example1.com',
       bookSourceName: '笔趣阁',
-      bookSourceUrl: 'https://www.biquge.com',
-      bookSourceGroup: '盗版',
+      bookSourceGroup: '小说',
       enabled: true,
-      weight: 50,
+    ),
+    BookSource(
+      bookSourceUrl: 'https://www.example2.com',
+      bookSourceName: '起点中文网',
+      bookSourceGroup: '小说',
+      enabled: true,
+    ),
+    BookSource(
+      bookSourceUrl: 'https://www.example3.com',
+      bookSourceName: '番茄小说',
+      bookSourceGroup: '小说',
+      enabled: false,
+    ),
+    BookSource(
+      bookSourceUrl: 'https://www.example4.com',
+      bookSourceName: '喜马拉雅',
+      bookSourceGroup: '有声',
+      enabled: true,
     ),
   ];
 
-  String _searchQuery = '';
-  String? _selectedGroup;
-
   List<BookSource> get _filteredSources {
-    return _sources.where((source) {
-      final matchesSearch =
-          _searchQuery.isEmpty ||
-          source.bookSourceName.toLowerCase().contains(
-            _searchQuery.toLowerCase(),
-          ) ||
-          source.bookSourceUrl.toLowerCase().contains(
-            _searchQuery.toLowerCase(),
-          );
-
-      final matchesGroup =
-          _selectedGroup == null || source.bookSourceGroup == _selectedGroup;
-
-      return matchesSearch && matchesGroup;
-    }).toList();
-  }
-
-  List<String> get _groups {
-    return _sources
-        .map((s) => s.bookSourceGroup)
-        .where((g) => g != null)
-        .cast<String>()
-        .toSet()
-        .toList();
+    if (_selectedGroup == '全部') return _sources;
+    if (_selectedGroup == '失效') {
+      return _sources.where((s) => !s.enabled).toList();
+    }
+    return _sources.where((s) => s.bookSourceGroup == _selectedGroup).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('书源管理'),
-        actions: [
-          IconButton(icon: const Icon(Icons.search), onPressed: _showSearch),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: _onMenuSelected,
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'import',
-                child: Row(
-                  children: [
-                    Icon(Icons.file_download, size: 20),
-                    SizedBox(width: 12),
-                    Text('导入书源'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'export',
-                child: Row(
-                  children: [
-                    Icon(Icons.file_upload, size: 20),
-                    SizedBox(width: 12),
-                    Text('导出书源'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'network',
-                child: Row(
-                  children: [
-                    Icon(Icons.cloud_download, size: 20),
-                    SizedBox(width: 12),
-                    Text('网络导入'),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'enable_all',
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle_outline, size: 20),
-                    SizedBox(width: 12),
-                    Text('全部启用'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'disable_all',
-                child: Row(
-                  children: [
-                    Icon(Icons.cancel_outlined, size: 20),
-                    SizedBox(width: 12),
-                    Text('全部禁用'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: _buildGroupFilter(),
+    return CupertinoPageScaffold(
+      backgroundColor: CupertinoColors.black,
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('书源管理'),
+        backgroundColor: const Color(0xE6121212),
+        border: null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              child:
+                  const Icon(CupertinoIcons.plus, color: CupertinoColors.white),
+              onPressed: _showImportOptions,
+            ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: const Icon(CupertinoIcons.ellipsis_vertical,
+                  color: CupertinoColors.white),
+              onPressed: _showMoreOptions,
+            ),
+          ],
         ),
       ),
-      body: _filteredSources.isEmpty ? _buildEmptyState() : _buildSourceList(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addSource,
-        backgroundColor: AppColors.accent,
-        child: const Icon(Icons.add, color: Colors.white),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // 分组筛选
+            _buildGroupFilter(),
+            // 书源列表
+            Expanded(
+              child: _filteredSources.isEmpty
+                  ? _buildEmptyState()
+                  : _buildSourceList(),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildGroupFilter() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          _buildFilterChip('全部', null),
-          ..._groups.map((group) => _buildFilterChip(group, group)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String label, String? group) {
-    final isSelected = _selectedGroup == group;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (selected) {
-          setState(() {
-            _selectedGroup = selected ? group : null;
-          });
+    return Container(
+      height: 44,
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _groups.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final group = _groups[index];
+          final isSelected = group == _selectedGroup;
+          return GestureDetector(
+            onTap: () {
+              setState(() => _selectedGroup = group);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.accent : const Color(0xFF1C1C1E),
+                borderRadius: BorderRadius.circular(22),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                group,
+                style: TextStyle(
+                  color: isSelected
+                      ? CupertinoColors.black
+                      : CupertinoColors.white,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ),
+          );
         },
-        backgroundColor: Theme.of(context).cardColor,
-        selectedColor: AppColors.accent.withOpacity(0.2),
-        checkmarkColor: AppColors.accent,
-        labelStyle: TextStyle(color: isSelected ? AppColors.accent : null),
       ),
     );
   }
@@ -191,23 +137,22 @@ class _SourceListViewState extends State<SourceListView> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.source_outlined,
-            size: 80,
-            color: AppColors.textMuted.withOpacity(0.5),
+            CupertinoIcons.cloud,
+            size: 64,
+            color: CupertinoColors.systemGrey.withOpacity(0.5),
           ),
           const SizedBox(height: 16),
           Text(
             '暂无书源',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: AppColors.textMuted),
+            style: TextStyle(
+              fontSize: 17,
+              color: CupertinoColors.systemGrey,
+            ),
           ),
           const SizedBox(height: 8),
-          Text(
-            '点击右下角添加书源',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.textMuted.withOpacity(0.7),
-            ),
+          CupertinoButton(
+            child: const Text('导入书源'),
+            onPressed: _showImportOptions,
           ),
         ],
       ),
@@ -215,320 +160,210 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Widget _buildSourceList() {
-    return ReorderableListView.builder(
-      padding: const EdgeInsets.only(bottom: 80),
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: _filteredSources.length,
-      onReorder: _onReorder,
       itemBuilder: (context, index) {
         final source = _filteredSources[index];
-        return _buildSourceItem(source, key: ValueKey(source.id));
+        return _buildSourceItem(source);
       },
     );
   }
 
-  Widget _buildSourceItem(BookSource source, {Key? key}) {
-    return Card(
-      key: key,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: source.enabled
-                ? AppColors.accent.withOpacity(0.1)
-                : Colors.grey.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            Icons.language,
-            color: source.enabled ? AppColors.accent : Colors.grey,
-          ),
+  Widget _buildSourceItem(BookSource source) {
+    return GestureDetector(
+      onTap: () => _onSourceTap(source),
+      onLongPress: () => _onSourceLongPress(source),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1C1C1E),
+          borderRadius: BorderRadius.circular(12),
         ),
-        title: Text(
-          source.bookSourceName,
-          style: TextStyle(color: source.enabled ? null : AppColors.textMuted),
-        ),
-        subtitle: Text(
-          source.bookSourceUrl,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.textMuted.withOpacity(source.enabled ? 1 : 0.5),
-          ),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
           children: [
-            if (source.bookSourceGroup != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  source.bookSourceGroup!,
-                  style: const TextStyle(fontSize: 10, color: AppColors.accent),
-                ),
+            // 图标
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: source.enabled
+                    ? AppColors.accent.withOpacity(0.15)
+                    : CupertinoColors.systemGrey.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
               ),
-            const SizedBox(width: 8),
-            Switch(
+              child: Icon(
+                CupertinoIcons.globe,
+                color: source.enabled
+                    ? AppColors.accent
+                    : CupertinoColors.systemGrey,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // 信息
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    source.bookSourceName,
+                    style: TextStyle(
+                      color: source.enabled
+                          ? CupertinoColors.white
+                          : CupertinoColors.systemGrey,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    source.bookSourceGroup ?? '未分组',
+                    style: TextStyle(
+                      color: CupertinoColors.systemGrey,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // 开关
+            CupertinoSwitch(
               value: source.enabled,
-              activeColor: AppColors.accent,
-              onChanged: (value) => _toggleSource(source, value),
+              activeTrackColor: AppColors.accent,
+              onChanged: (value) {
+                setState(() {
+                  final index = _sources.indexOf(source);
+                  _sources[index] = source.copyWith(enabled: value);
+                });
+              },
             ),
           ],
         ),
-        onTap: () => _editSource(source),
-        onLongPress: () => _showSourceActions(source),
       ),
     );
   }
 
-  void _onReorder(int oldIndex, int newIndex) {
-    setState(() {
-      if (newIndex > oldIndex) newIndex--;
-      final item = _sources.removeAt(oldIndex);
-      _sources.insert(newIndex, item);
-    });
-  }
-
-  void _showSearch() {
-    showSearch(
+  void _showImportOptions() {
+    showCupertinoModalPopup(
       context: context,
-      delegate: _SourceSearchDelegate(sources: _sources, onSelect: _editSource),
-    );
-  }
-
-  void _onMenuSelected(String value) {
-    switch (value) {
-      case 'import':
-        _importSources();
-        break;
-      case 'export':
-        _exportSources();
-        break;
-      case 'network':
-        _networkImport();
-        break;
-      case 'enable_all':
-        _setAllEnabled(true);
-        break;
-      case 'disable_all':
-        _setAllEnabled(false);
-        break;
-    }
-  }
-
-  void _importSources() {
-    // TODO: 实现导入功能
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('导入功能开发中...')));
-  }
-
-  void _exportSources() {
-    // TODO: 实现导出功能
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('导出功能开发中...')));
-  }
-
-  void _networkImport() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('网络导入'),
-        content: TextField(
-          decoration: const InputDecoration(
-            hintText: '输入书源URL或JSON',
-            border: OutlineInputBorder(),
-          ),
-          maxLines: 3,
-        ),
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('导入书源'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
+          CupertinoActionSheetAction(
+            child: const Text('从剪贴板导入'),
             onPressed: () {
               Navigator.pop(context);
-              // TODO: 解析并导入
             },
-            child: const Text('导入'),
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('从文件导入'),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('从网络导入'),
+            onPressed: () {
+              Navigator.pop(context);
+            },
           ),
         ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
     );
   }
 
-  void _setAllEnabled(bool enabled) {
-    setState(() {
-      for (int i = 0; i < _sources.length; i++) {
-        _sources[i] = _sources[i].copyWith(enabled: enabled);
-      }
-    });
-  }
-
-  void _toggleSource(BookSource source, bool enabled) {
-    setState(() {
-      final index = _sources.indexWhere((s) => s.id == source.id);
-      if (index != -1) {
-        _sources[index] = source.copyWith(enabled: enabled);
-      }
-    });
-  }
-
-  void _addSource() {
-    // TODO: 添加书源页面
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('添加书源功能开发中...')));
-  }
-
-  void _editSource(BookSource source) {
-    // TODO: 编辑书源页面
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('编辑书源: ${source.bookSourceName}')));
-  }
-
-  void _showSourceActions(BookSource source) {
-    showModalBottomSheet(
+  void _showMoreOptions() {
+    showCupertinoModalPopup(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('编辑'),
-              onTap: () {
-                Navigator.pop(context);
-                _editSource(source);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.copy),
-              title: const Text('复制'),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: 复制书源
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.bug_report),
-              title: const Text('测试'),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: 测试书源
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: AppColors.error),
-              title: const Text('删除', style: TextStyle(color: AppColors.error)),
-              onTap: () {
-                Navigator.pop(context);
-                _deleteSource(source);
-              },
-            ),
-          ],
+      builder: (context) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            child: const Text('全选'),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('导出书源'),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('检查可用性'),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            child: const Text('删除失效书源'),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+    );
+  }
+
+  void _onSourceTap(BookSource source) {
+    // TODO: 编辑书源
+  }
+
+  void _onSourceLongPress(BookSource source) {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: Text(source.bookSourceName),
+        actions: [
+          CupertinoActionSheetAction(
+            child: const Text('编辑书源'),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('置顶'),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('分享'),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            child: const Text('删除'),
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteSource(source);
+            },
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
     );
   }
 
   void _deleteSource(BookSource source) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('确定要删除书源「${source.bookSourceName}」吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _sources.removeWhere((s) => s.id == source.id);
-              });
-            },
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 书源搜索代理
-class _SourceSearchDelegate extends SearchDelegate<BookSource?> {
-  final List<BookSource> sources;
-  final Function(BookSource) onSelect;
-
-  _SourceSearchDelegate({required this.sources, required this.onSelect});
-
-  @override
-  List<Widget>? buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () {
-          query = '';
-        },
-      ),
-    ];
-  }
-
-  @override
-  Widget? buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () {
-        close(context, null);
-      },
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    return _buildSearchResults();
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    return _buildSearchResults();
-  }
-
-  Widget _buildSearchResults() {
-    final results = sources.where((source) {
-      return source.bookSourceName.toLowerCase().contains(
-            query.toLowerCase(),
-          ) ||
-          source.bookSourceUrl.toLowerCase().contains(query.toLowerCase());
-    }).toList();
-
-    return ListView.builder(
-      itemCount: results.length,
-      itemBuilder: (context, index) {
-        final source = results[index];
-        return ListTile(
-          leading: const Icon(Icons.language),
-          title: Text(source.bookSourceName),
-          subtitle: Text(source.bookSourceUrl),
-          onTap: () {
-            close(context, source);
-            onSelect(source);
-          },
-        );
-      },
-    );
+    setState(() {
+      _sources.removeWhere((s) => s.bookSourceUrl == source.bookSourceUrl);
+    });
   }
 }
