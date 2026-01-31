@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../app/theme/colors.dart';
 
 /// 设置页面
@@ -15,11 +18,27 @@ class _SettingsViewState extends State<SettingsView> {
   bool _autoUpdate = true;
   bool _wifiOnly = true;
   String _cacheSize = '256 MB';
+  String _version = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    setState(() {
+      _version = '${info.version}+${info.buildNumber}';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('设置')),
+      appBar: AppBar(
+        title: const Text('设置'),
+      ),
       body: ListView(
         children: [
           // 阅读设置
@@ -107,6 +126,12 @@ class _SettingsViewState extends State<SettingsView> {
           // 其他设置
           _buildSectionHeader('其他'),
           _buildListTile(
+            icon: Icons.system_update,
+            title: '检查更新',
+            subtitle: '获取最新开发版',
+            onTap: _checkUpdate,
+          ),
+          _buildListTile(
             icon: Icons.backup,
             title: '备份与恢复',
             subtitle: '导出/导入数据',
@@ -115,7 +140,7 @@ class _SettingsViewState extends State<SettingsView> {
           _buildListTile(
             icon: Icons.info_outline,
             title: '关于',
-            subtitle: 'SoupReader v1.0.0',
+            subtitle: 'SoupReader $_version',
             onTap: _showAbout,
           ),
         ],
@@ -129,9 +154,9 @@ class _SettingsViewState extends State<SettingsView> {
       child: Text(
         title,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: AppColors.accent,
-          fontWeight: FontWeight.w600,
-        ),
+              color: AppColors.accent,
+              fontWeight: FontWeight.w600,
+            ),
       ),
     );
   }
@@ -180,7 +205,10 @@ class _SettingsViewState extends State<SettingsView> {
           child: ListView(
             controller: scrollController,
             children: [
-              Text('阅读偏好设置', style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                '阅读偏好设置',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 24),
 
               // 主题选择
@@ -221,7 +249,10 @@ class _SettingsViewState extends State<SettingsView> {
                             const SizedBox(height: 4),
                             Text(
                               theme.name,
-                              style: TextStyle(color: theme.text, fontSize: 12),
+                              style: TextStyle(
+                                color: theme.text,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
@@ -232,8 +263,6 @@ class _SettingsViewState extends State<SettingsView> {
               ),
 
               const SizedBox(height: 24),
-
-              // 更多设置项...
               const Text('字体大小'),
               Slider(
                 value: 18,
@@ -281,15 +310,17 @@ class _SettingsViewState extends State<SettingsView> {
             child: const Text('取消'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+            ),
             onPressed: () {
               Navigator.pop(context);
               setState(() {
                 _cacheSize = '0 MB';
               });
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('缓存已清除')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('缓存已清除')),
+              );
             },
             child: const Text('清除缓存'),
           ),
@@ -311,7 +342,6 @@ class _SettingsViewState extends State<SettingsView> {
               subtitle: const Text('导出书架、阅读进度、书源等'),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: 导出数据
               },
             ),
             ListTile(
@@ -320,7 +350,6 @@ class _SettingsViewState extends State<SettingsView> {
               subtitle: const Text('从备份文件恢复'),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: 导入数据
               },
             ),
             ListTile(
@@ -329,7 +358,6 @@ class _SettingsViewState extends State<SettingsView> {
               subtitle: const Text('使用iCloud同步数据'),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: 云同步
               },
             ),
           ],
@@ -342,7 +370,7 @@ class _SettingsViewState extends State<SettingsView> {
     showAboutDialog(
       context: context,
       applicationName: 'SoupReader',
-      applicationVersion: '1.0.0',
+      applicationVersion: _version,
       applicationLegalese: '© 2026 SoupReader',
       children: [
         const SizedBox(height: 16),
@@ -350,6 +378,93 @@ class _SettingsViewState extends State<SettingsView> {
         const SizedBox(height: 8),
         const Text('支持自定义书源，兼容源阅格式'),
       ],
+    );
+  }
+
+  // 检查更新
+  Future<void> _checkUpdate() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('正在检查更新...')),
+    );
+
+    try {
+      final dio = Dio();
+      // 获取 latest release
+      final response = await dio.get(
+        'https://api.github.com/repos/Inighty/soupreader/releases/latest',
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        final tagName = data['tag_name'];
+        final body = data['body'];
+        final assets = data['assets'] as List;
+
+        // 寻找 IPA 下载链接
+        String? downloadUrl;
+        for (var asset in assets) {
+          if (asset['name'].toString().endsWith('.ipa')) {
+            downloadUrl = asset['browser_download_url'];
+            break;
+          }
+        }
+
+        if (!mounted) return;
+
+        if (downloadUrl != null) {
+          _showUpdateDialog(tagName, body ?? '修复了一些问题', downloadUrl);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('未找到安装包资产')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        // 如果是 404 可能是没有 release
+        if (e is DioException && e.response?.statusCode == 404) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('暂无新版本')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('检查更新失败: ${e.toString().split('\n').first}')),
+          );
+        }
+      }
+    }
+  }
+
+  void _showUpdateDialog(String tagName, String body, String downloadUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('发现新版本 $tagName'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(body),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              launchUrl(Uri.parse(downloadUrl),
+                  mode: LaunchMode.externalApplication);
+            },
+            child: const Text('下载更新'),
+          ),
+        ],
+      ),
     );
   }
 }

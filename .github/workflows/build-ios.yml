@@ -10,6 +10,9 @@ on:
     branches: [ main ]
   workflow_dispatch:  # 允许手动触发
 
+permissions:
+  contents: write
+
 jobs:
   build-ios:
     name: Build iOS IPA
@@ -44,14 +47,38 @@ jobs:
       # 构建 iOS（无签名）
       - name: Build iOS (No Codesign)
         run: flutter build ios --release --no-codesign
+          
+      # 创建未签名的 IPA (Release需要IPA文件)
+      - name: Create unsigned IPA
+        run: |
+          mkdir -p build/ios/ipa
+          cd build/ios/iphoneos
+          mkdir Payload
+          cp -r Runner.app Payload/
+          zip -r ../ipa/SoupReader-unsigned.ipa Payload
+          rm -rf Payload
 
-      # 上传 App Bundle 作为 Artifact
+      # 发布到 GitHub Releases
+      - name: Deploy to Releases
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          tag: nightly
+          name: Nightly Build
+          body: "最新构建: ${{ github.sha }}\n构建时间: ${{ github.event.head_commit.timestamp }}"
+          artifacts: "build/ios/ipa/SoupReader-unsigned.ipa"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          removeArtifacts: true
+          replacesArtifacts: true
+          makeLatest: true
+
+      # 上传 App Bundle 作为 Artifact (开发调试用)
       - name: Upload .app artifact
         uses: actions/upload-artifact@v4
         with:
           name: Runner.app
           path: build/ios/iphoneos/Runner.app
-          retention-days: 30
+          retention-days: 3
 
       # 上传 dSYM 文件（用于崩溃分析）
       - name: Upload dSYM
