@@ -74,13 +74,19 @@ jobs:
         with:
           allowUpdates: true
           tag: nightly
+          commit: ${{ github.sha }}
           name: Nightly Build
-          body: "最新构建: ${{ github.sha }}\n构建时间: ${{ github.event.head_commit.timestamp }}"
+          body: |
+            📦 最新构建
+            - Commit: ${{ github.sha }}
+            - 构建时间: ${{ github.event.head_commit.timestamp }}
+            - 触发者: ${{ github.actor }}
           artifacts: "build/ios/ipa/SoupReader-unsigned.ipa"
           token: ${{ secrets.GITHUB_TOKEN }}
           removeArtifacts: true
           replacesArtifacts: true
           makeLatest: true
+          prerelease: true
 
       # 上传 App Bundle 作为 Artifact (开发调试用)
       - name: Upload .app artifact
