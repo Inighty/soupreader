@@ -390,11 +390,11 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Future<void> _checkUpdate() async {
-    // 显示加载指示器
+    // 加载中
     showCupertinoDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
+      builder: (_) => const Center(
         child: CupertinoActivityIndicator(radius: 14),
       ),
     );
@@ -402,40 +402,48 @@ class _SettingsViewState extends State<SettingsView> {
     try {
       final dio = Dio();
       final response = await dio.get(
-        'https://api.github.com/repos/Inighty/soupreader/releases/latest',
+        'https://github-action-cf.mcshr.workers.dev/latest',
+        options: Options(
+          responseType: ResponseType.json,
+        ),
       );
 
       if (!mounted) return;
-      Navigator.pop(context); // 关闭加载
+      Navigator.pop(context); // 关闭 loading
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        final tagName = data['tag_name'];
-        final body = data['body'];
-        final assets = data['assets'] as List;
+      if (response.statusCode != 200) {
+        _showMessage('检查更新失败');
+        return;
+      }
 
-        String? downloadUrl;
-        for (var asset in assets) {
-          if (asset['name'].toString().endsWith('.ipa')) {
-            downloadUrl = asset['browser_download_url'];
-            break;
-          }
-        }
+      final data = response.data as Map<String, dynamic>;
 
-        if (downloadUrl != null) {
-          _showUpdateDialog(tagName, body ?? '修复了一些问题', downloadUrl);
-        } else {
-          _showMessage('未找到安装包');
-        }
+      final String? name = data['name'];
+      final String? tag = data['tag'];
+      final String? publishedAt = data['publishedAt'];
+      final String? downloadUrl = data['downloadUrl'];
+
+      if (downloadUrl == null || publishedAt == null) {
+        _showMessage('未找到可用更新');
+        return;
+      }
+
+      final remoteTime = DateTime.parse(publishedAt);
+
+      // 你需要在 App 里定义当前构建时间
+      if (remoteTime.isAfter(localBuildTime)) {
+        _showUpdateDialog(
+          name ?? tag ?? '发现新版本',
+          '有新版本可用',
+          downloadUrl,
+        );
+      } else {
+        _showMessage('已是最新版本');
       }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        if (e is DioException && e.response?.statusCode == 404) {
-          _showMessage('暂无新版本');
-        } else {
-          _showMessage('检查更新失败');
-        }
+        _showMessage('检查更新失败');
       }
     }
   }
