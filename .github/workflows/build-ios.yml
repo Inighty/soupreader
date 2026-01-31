@@ -32,30 +32,24 @@ jobs:
       - name: Flutter version
         run: flutter --version
 
-      # 进入项目目录并获取依赖
+      # 获取依赖
       - name: Get dependencies
-        working-directory: ./soupreader
         run: flutter pub get
 
       # 分析代码
       - name: Analyze code
-        working-directory: ./soupreader
         run: flutter analyze --no-fatal-infos
 
       # 运行测试
       - name: Run tests
-        working-directory: ./soupreader
         run: flutter test
 
       # 构建 iOS（无签名）
       - name: Build iOS (No Codesign)
-        working-directory: ./soupreader
-        run: |
-          flutter build ios --release --no-codesign
+        run: flutter build ios --release --no-codesign
           
       # 创建未签名的 IPA
       - name: Create unsigned IPA
-        working-directory: ./soupreader
         run: |
           mkdir -p build/ios/ipa
           cd build/ios/iphoneos
@@ -69,7 +63,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SoupReader-iOS-unsigned
-          path: soupreader/build/ios/ipa/SoupReader-unsigned.ipa
+          path: build/ios/ipa/SoupReader-unsigned.ipa
           retention-days: 30
 
       # 上传 dSYM 文件（用于崩溃分析）
@@ -77,6 +71,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SoupReader-iOS-dSYM
-          path: soupreader/build/ios/iphoneos/Runner.app.dSYM
+          path: build/ios/iphoneos/Runner.app.dSYM
           retention-days: 30
           if-no-files-found: ignore
