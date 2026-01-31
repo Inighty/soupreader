@@ -107,6 +107,19 @@ class AppTheme {
       // 图标主题
       iconTheme: const IconThemeData(color: AppColors.textLight, size: 24),
 
+      // 交互效果适配
+      splashFactory: NoSplash.splashFactory,
+      highlightColor: Colors.transparent,
+      splashColor: Colors.transparent,
+
+      // 页面转场
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: ZoomPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
+
       // 文本主题
       textTheme: _buildTextTheme(AppColors.textLight),
     );
@@ -119,7 +132,6 @@ class AppTheme {
       brightness: Brightness.light,
       primaryColor: AppColors.accent,
       scaffoldBackgroundColor: AppColors.backgroundLight,
-
       colorScheme: const ColorScheme.light(
         primary: AppColors.accent,
         secondary: AppColors.secondary,
@@ -130,7 +142,6 @@ class AppTheme {
         onSurface: AppColors.textPrimary,
         onError: Colors.white,
       ),
-
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.backgroundLight,
         foregroundColor: AppColors.textPrimary,
@@ -144,7 +155,6 @@ class AppTheme {
           color: AppColors.textPrimary,
         ),
       ),
-
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.cardLight,
         selectedItemColor: AppColors.accent,
@@ -152,7 +162,6 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),
-
       cardTheme: CardThemeData(
         color: AppColors.cardLight,
         elevation: 2,
@@ -166,7 +175,6 @@ class AppTheme {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
-
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surfaceLight,
@@ -179,14 +187,25 @@ class AppTheme {
           borderSide: const BorderSide(color: AppColors.accent, width: 2),
         ),
       ),
-
       dividerTheme: const DividerThemeData(
         color: AppColors.divider,
         thickness: 0.5,
       ),
-
       iconTheme: const IconThemeData(color: AppColors.textPrimary, size: 24),
+      // 交互效果适配
+      splashFactory: NoSplash.splashFactory,
+      highlightColor: Colors.transparent,
+      splashColor: Colors.transparent,
 
+      // 页面转场
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: ZoomPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
+
+      // 文本主题
       textTheme: _buildTextTheme(AppColors.textPrimary),
     );
   }
