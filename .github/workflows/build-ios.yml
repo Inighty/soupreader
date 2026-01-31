@@ -44,23 +44,13 @@ jobs:
       # 构建 iOS（无签名）
       - name: Build iOS (No Codesign)
         run: flutter build ios --release --no-codesign
-          
-      # 创建未签名的 IPA
-      - name: Create unsigned IPA
-        run: |
-          mkdir -p build/ios/ipa
-          cd build/ios/iphoneos
-          mkdir Payload
-          cp -r Runner.app Payload/
-          zip -r ../ipa/SoupReader-unsigned.ipa Payload
-          rm -rf Payload
 
-      # 上传 IPA 作为 Artifact
-      - name: Upload IPA artifact
+      # 上传 App Bundle 作为 Artifact
+      - name: Upload .app artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SoupReader-iOS-unsigned
-          path: build/ios/ipa/SoupReader-unsigned.ipa
+          name: Runner.app
+          path: build/ios/iphoneos/Runner.app
           retention-days: 30
 
       # 上传 dSYM 文件（用于崩溃分析）
