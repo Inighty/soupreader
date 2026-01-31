@@ -8,7 +8,7 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,14 +16,13 @@ permissions:
 jobs:
   build-ios:
     name: Build iOS IPA
-    runs-on: macos-latest
+    runs-on: macos-14  # M1 芯片，比 macos-latest 更快
     
     steps:
-      # 检出代码
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # 设置 Flutter
+      # Flutter 缓存（包含 SDK 和 pub 缓存）
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -31,45 +30,43 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # 显示 Flutter 版本信息
-      - name: Flutter version
-        run: flutter --version
+      # CocoaPods 缓存
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: ios/Pods
+          key: pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: pods-
 
-      # 获取依赖
+      # 获取依赖（并行安装 pods）
       - name: Get dependencies
-        run: flutter pub get
-
-      # 分析代码（仅警告不阻止构建）
-      - name: Analyze code
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
-        continue-on-error: true
-
-      # 禁用 Xcode 代码签名（CI 环境必需）
-      - name: Disable Code Signing
         run: |
-          # 修改 Xcode 项目配置以禁用签名
+          flutter pub get
+          cd ios && pod install --repo-update || pod install
+
+      # 禁用代码签名
+      - name: Disable Codesign
+        run: |
           sed -i '' 's/CODE_SIGNING_REQUIRED = YES/CODE_SIGNING_REQUIRED = NO/g' ios/Runner.xcodeproj/project.pbxproj
           sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' ios/Runner.xcodeproj/project.pbxproj
-          # 添加全局禁用配置
           echo 'CODE_SIGNING_ALLOWED=NO' >> ios/Flutter/Release.xcconfig
           echo 'CODE_SIGNING_REQUIRED=NO' >> ios/Flutter/Release.xcconfig
 
-      # 构建 iOS（无签名）
-      - name: Build iOS (No Codesign)
+      # 构建 iOS
+      - name: Build iOS
         run: flutter build ios --release --no-codesign
           
-      # 创建未签名的 IPA (Release需要IPA文件)
-      - name: Create unsigned IPA
+      # 创建 IPA
+      - name: Create IPA
         run: |
           mkdir -p build/ios/ipa
           cd build/ios/iphoneos
           mkdir Payload
           cp -r Runner.app Payload/
-          zip -r ../ipa/SoupReader-unsigned.ipa Payload
-          rm -rf Payload
+          zip -rq ../ipa/SoupReader-unsigned.ipa Payload
 
-      # 发布到 GitHub Releases
-      - name: Deploy to Releases
+      # 发布到 Releases
+      - name: Deploy
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
@@ -77,29 +74,10 @@ jobs:
           commit: ${{ github.sha }}
           name: Nightly Build
           body: |
-            📦 最新构建
-            - Commit: ${{ github.sha }}
-            - 构建时间: ${{ github.event.head_commit.timestamp }}
-            - 触发者: ${{ github.actor }}
+            📦 Commit: ${{ github.sha }}
+            ⏰ ${{ github.event.head_commit.timestamp }}
           artifacts: "build/ios/ipa/SoupReader-unsigned.ipa"
           token: ${{ secrets.GITHUB_TOKEN }}
           removeArtifacts: true
           replacesArtifacts: true
           makeLatest: true
-
-      # 上传 App Bundle 作为 Artifact (开发调试用)
-      - name: Upload .app artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Runner.app
-          path: build/ios/iphoneos/Runner.app
-          retention-days: 3
-
-      # 上传 dSYM 文件（用于崩溃分析）
-      - name: Upload dSYM
-        uses: actions/upload-artifact@v4
-        with:
-          name: SoupReader-iOS-dSYM
-          path: build/ios/iphoneos/Runner.app.dSYM
-          retention-days: 30
-          if-no-files-found: ignore
