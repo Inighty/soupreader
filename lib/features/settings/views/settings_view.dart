@@ -390,60 +390,55 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Future<void> _checkUpdate() async {
-    // 加载中
+    // 显示加载指示器
     showCupertinoDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(
+      builder: (context) => const Center(
         child: CupertinoActivityIndicator(radius: 14),
       ),
     );
 
     try {
       final dio = Dio();
+      // 使用自定义 Worker 代理 API
       final response = await dio.get(
         'https://github-action-cf.mcshr.workers.dev/latest',
-        options: Options(
-          responseType: ResponseType.json,
-        ),
       );
 
       if (!mounted) return;
-      Navigator.pop(context); // 关闭 loading
+      Navigator.pop(context); // 关闭加载
 
-      if (response.statusCode != 200) {
-        _showMessage('检查更新失败');
-        return;
-      }
+      if (response.statusCode == 200) {
+        final data = response.data;
+        final tag = data['tag'] as String?;
+        final name = data['name'] as String?;
+        final downloadUrl = data['downloadUrl'] as String?;
+        final publishedAt = data['publishedAt'] as String?;
 
-      final data = response.data as Map<String, dynamic>;
-
-      final String? name = data['name'];
-      final String? tag = data['tag'];
-      final String? publishedAt = data['publishedAt'];
-      final String? downloadUrl = data['downloadUrl'];
-
-      if (downloadUrl == null || publishedAt == null) {
-        _showMessage('未找到可用更新');
-        return;
-      }
-
-      final remoteTime = DateTime.parse(publishedAt);
-
-      // 你需要在 App 里定义当前构建时间
-      if (remoteTime.isAfter(localBuildTime)) {
-        _showUpdateDialog(
-          name ?? tag ?? '发现新版本',
-          '有新版本可用',
-          downloadUrl,
-        );
-      } else {
-        _showMessage('已是最新版本');
+        if (downloadUrl != null && downloadUrl.isNotEmpty) {
+          // 格式化发布时间
+          String releaseInfo = name ?? 'Nightly Build';
+          if (publishedAt != null) {
+            try {
+              final date = DateTime.parse(publishedAt);
+              releaseInfo +=
+                  '\n发布时间: ${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+            } catch (_) {}
+          }
+          _showUpdateDialog(tag ?? 'nightly', releaseInfo, downloadUrl);
+        } else {
+          _showMessage('未找到安装包');
+        }
       }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        _showMessage('检查更新失败');
+        if (e is DioException && e.response?.statusCode == 404) {
+          _showMessage('暂无新版本');
+        } else {
+          _showMessage('检查更新失败: ${e.toString().split('\n').first}');
+        }
       }
     }
   }
