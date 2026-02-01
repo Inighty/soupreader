@@ -198,17 +198,18 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       _lastSize = size;
     }
 
-    // 预渲染当前页
-    _curPagePicture ??= _recordPage(
-      _direction == _PageDirection.prev ? _factory.prevPage : _factory.curPage,
-      size,
-    );
-
-    // 预渲染目标页
-    _targetPagePicture ??= _recordPage(
-      _direction == _PageDirection.next ? _factory.nextPage : _factory.curPage,
-      size,
-    );
+    // NEXT: curPage翻起，露出nextPage
+    // PREV: prevPage从左边翻过来，覆盖curPage
+    if (_direction == _PageDirection.next) {
+      _curPagePicture ??= _recordPage(_factory.curPage, size);
+      _targetPagePicture ??= _recordPage(_factory.nextPage, size);
+    } else if (_direction == _PageDirection.prev) {
+      _curPagePicture ??= _recordPage(_factory.prevPage, size);
+      _targetPagePicture ??= _recordPage(_factory.curPage, size);
+    } else {
+      _curPagePicture ??= _recordPage(_factory.curPage, size);
+      _targetPagePicture = null;
+    }
   }
 
   void _onTap(Offset position) {
@@ -246,6 +247,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _direction = _PageDirection.prev;
 
     final size = MediaQuery.of(context).size;
+    // PREV 方向：从左下角开始，prevPage从左边翻过来覆盖curPage
     _startX = size.width * 0.1;
     _startY = size.height * 0.9;
     _touchX = _startX;
@@ -265,8 +267,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final screenHeight = size.height;
 
     // 目标点
+    // NEXT: 从右下角向左翻走
+    // PREV: 从左下角向右翻过来覆盖整个屏幕
     final targetX =
-        _direction == _PageDirection.next ? -screenWidth : screenWidth * 2;
+        _direction == _PageDirection.next ? -screenWidth : screenWidth + 50;
     final targetY = screenHeight;
 
     final startTouchX = _touchX;
@@ -303,20 +307,30 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   void _onAnimStop() {
-    if (_direction == _PageDirection.next) {
-      _factory.moveToNext();
-    } else if (_direction == _PageDirection.prev) {
-      _factory.moveToPrev();
-    }
+    // 先保存方向
+    final direction = _direction;
 
+    // 重置状态
     _dragOffset = 0;
     _touchX = 0;
     _touchY = 0;
     _direction = _PageDirection.none;
     _isAnimating = false;
+
+    // 更新 Factory（这会改变 curPage 的内容）
+    if (direction == _PageDirection.next) {
+      _factory.moveToNext();
+    } else if (direction == _PageDirection.prev) {
+      _factory.moveToPrev();
+    }
+
+    // 清除缓存，下次渲染时会重新生成正确的 Picture
     _invalidatePictures();
 
-    setState(() {});
+    // 使用 setState 触发重绘
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
