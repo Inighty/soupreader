@@ -3,14 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/reading_settings.dart';
 import 'page_factory.dart';
-import 'page_delegate/page_delegate.dart';
-import 'page_delegate/slide_delegate.dart';
-import 'page_delegate/cover_delegate.dart';
-import 'page_delegate/no_anim_delegate.dart';
-import 'page_delegate/simulation_delegate.dart';
+import 'simulation_page_painter.dart';
 
-/// 翻页阅读器组件（对标 Legado ReadView）
-/// 三页面预加载架构：prevPage / curPage / nextPage
+/// 翻页阅读器组件（对标 Legado ReadView + flutter_novel）
+/// 核心优化：使用 PictureRecorder 预渲染页面，避免截图开销
 class PagedReaderWidget extends StatefulWidget {
   final PageFactory pageFactory;
   final PageTurnMode pageTurnMode;
@@ -39,104 +35,68 @@ class PagedReaderWidget extends StatefulWidget {
 }
 
 class _PagedReaderWidgetState extends State<PagedReaderWidget>
-    with TickerProviderStateMixin {
-  late PageDelegate _delegate;
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
 
-  // 仿真翻页用的 Picture 缓存
+  // 翻页状态
+  double _dragOffset = 0;
+  bool _isDragging = false;
+  _PageDirection _direction = _PageDirection.none;
+  bool _isAnimating = false;
+
+  // 仿真翻页用的起始点和触摸点
+  double _startX = 0;
+  double _startY = 0;
+  double _touchX = 0;
+  double _touchY = 0;
+
+  // 页面 Picture 缓存（仿真模式用）
   ui.Picture? _curPagePicture;
-  ui.Picture? _nextPagePicture;
-  ui.Picture? _prevPagePicture;
-  ui.Image? _curPageImage;
+  ui.Picture? _targetPagePicture;
   Size? _lastSize;
 
   @override
   void initState() {
     super.initState();
-    _initDelegate();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
 
     widget.pageFactory.onContentChanged = () {
       if (mounted) {
-        _invalidateCache();
+        _invalidatePictures();
         setState(() {});
       }
     };
   }
 
-  void _initDelegate() {
-    _delegate = _createDelegate(widget.pageTurnMode);
-    _delegate.init(this, () {
-      if (mounted) setState(() {});
-    });
-
-    // 设置翻页回调
-    if (_delegate is SlidePageDelegate) {
-      (_delegate as SlidePageDelegate).onPageTurn = _onPageTurn;
-    } else if (_delegate is CoverPageDelegate) {
-      (_delegate as CoverPageDelegate).onPageTurn = _onPageTurn;
-    } else if (_delegate is SimulationDelegate) {
-      (_delegate as SimulationDelegate).onPageTurn = _onPageTurn;
-    }
-  }
-
-  PageDelegate _createDelegate(PageTurnMode mode) {
-    switch (mode) {
-      case PageTurnMode.slide:
-        return SlidePageDelegate();
-      case PageTurnMode.cover:
-        return CoverPageDelegate();
-      case PageTurnMode.simulation:
-        return SimulationDelegate();
-      case PageTurnMode.none:
-        return NoAnimPageDelegate();
-      default:
-        return SlidePageDelegate();
-    }
-  }
-
-  Future<bool> _onPageTurn(PageDirection direction) async {
-    if (direction == PageDirection.next) {
-      return widget.pageFactory.moveToNext();
-    } else if (direction == PageDirection.prev) {
-      return widget.pageFactory.moveToPrev();
-    }
-    return false;
-  }
-
   @override
   void didUpdateWidget(PagedReaderWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    if (oldWidget.pageTurnMode != widget.pageTurnMode) {
-      _delegate.dispose();
-      _initDelegate();
-    }
-
     if (oldWidget.pageFactory != widget.pageFactory ||
         oldWidget.textStyle != widget.textStyle ||
         oldWidget.backgroundColor != widget.backgroundColor) {
       widget.pageFactory.onContentChanged = () {
         if (mounted) {
-          _invalidateCache();
+          _invalidatePictures();
           setState(() {});
         }
       };
-      _invalidateCache();
+      _invalidatePictures();
     }
   }
 
   @override
   void dispose() {
-    _delegate.dispose();
-    _invalidateCache();
+    _animController.dispose();
+    _invalidatePictures();
     super.dispose();
   }
 
-  void _invalidateCache() {
+  void _invalidatePictures() {
     _curPagePicture = null;
-    _nextPagePicture = null;
-    _prevPagePicture = null;
-    _curPageImage?.dispose();
-    _curPageImage = null;
+    _targetPagePicture = null;
   }
 
   PageFactory get _factory => widget.pageFactory;
@@ -232,51 +192,27 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     return recorder.endRecording();
   }
 
-  /// 为仿真模式预渲染 Picture（同步）
-  void _ensureSimulationPictures(Size size) {
-    if (_delegate is! SimulationDelegate) return;
-
-    final simDelegate = _delegate as SimulationDelegate;
-    simDelegate.currentSize = size;
-    simDelegate.backgroundColor = widget.backgroundColor;
-
+  void _ensurePictures(Size size) {
     if (_lastSize != size) {
-      _invalidateCache();
+      _invalidatePictures();
       _lastSize = size;
     }
 
-    // 预渲染当前页 Picture（同步）
-    _curPagePicture ??= _recordPage(_factory.curPage, size);
-    simDelegate.curPagePicture = _curPagePicture;
+    // 预渲染当前页
+    _curPagePicture ??= _recordPage(
+      _direction == _PageDirection.prev ? _factory.prevPage : _factory.curPage,
+      size,
+    );
 
-    // 预渲染下一页 Picture（同步）
-    _nextPagePicture ??= _recordPage(_factory.nextPage, size);
-    simDelegate.nextPagePicture = _nextPagePicture;
-
-    // 预渲染上一页 Picture（同步）
-    _prevPagePicture ??= _recordPage(_factory.prevPage, size);
-    simDelegate.prevPagePicture = _prevPagePicture;
-
-    // 异步生成当前页 Image（用于背面渲染），不阻塞
-    if (_curPageImage == null && _curPagePicture != null) {
-      _curPagePicture!
-          .toImage(
-        size.width.toInt(),
-        size.height.toInt(),
-      )
-          .then((image) {
-        if (mounted) {
-          _curPageImage = image;
-          simDelegate.curPageImage = _curPageImage;
-          // 触发重绘
-          setState(() {});
-        }
-      });
-    }
+    // 预渲染目标页
+    _targetPagePicture ??= _recordPage(
+      _direction == _PageDirection.next ? _factory.nextPage : _factory.curPage,
+      size,
+    );
   }
 
   void _onTap(Offset position) {
-    if (_delegate.isAnimating) return;
+    if (_isAnimating) return;
 
     final screenWidth = MediaQuery.of(context).size.width;
     final xRate = position.dx / screenWidth;
@@ -292,39 +228,353 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   void _goNext() {
     if (!_factory.hasNext()) return;
-    _delegate.nextPage();
+    _direction = _PageDirection.next;
+
+    final size = MediaQuery.of(context).size;
+    _startX = size.width * 0.9;
+    _startY = size.height * 0.9;
+    _touchX = _startX;
+    _touchY = _startY;
+
+    _invalidatePictures();
+    _ensurePictures(size);
+    _startAnimation();
   }
 
   void _goPrev() {
     if (!_factory.hasPrev()) return;
-    _delegate.prevPage();
+    _direction = _PageDirection.prev;
+
+    final size = MediaQuery.of(context).size;
+    _startX = size.width * 0.1;
+    _startY = size.height * 0.9;
+    _touchX = _startX;
+    _touchY = _startY;
+
+    _invalidatePictures();
+    _ensurePictures(size);
+    _startAnimation();
+  }
+
+  void _startAnimation() {
+    if (_isAnimating) return;
+    _isAnimating = true;
+
+    final size = MediaQuery.of(context).size;
+    final screenWidth = size.width;
+    final screenHeight = size.height;
+
+    // 目标点
+    final targetX =
+        _direction == _PageDirection.next ? -screenWidth : screenWidth * 2;
+    final targetY = screenHeight;
+
+    final startTouchX = _touchX;
+    final startTouchY = _touchY;
+    final startDragOffset = _dragOffset;
+    final targetDragOffset =
+        _direction == _PageDirection.next ? -screenWidth : screenWidth;
+
+    _animController.reset();
+
+    void listener() {
+      if (mounted) {
+        final progress = Curves.easeOutCubic.transform(_animController.value);
+        _touchX = startTouchX + (targetX - startTouchX) * progress;
+        _touchY = startTouchY + (targetY - startTouchY) * progress;
+        _dragOffset =
+            startDragOffset + (targetDragOffset - startDragOffset) * progress;
+        // 使用 markNeedsPaint 而非 setState
+        (context as Element).markNeedsBuild();
+      }
+    }
+
+    void statusListener(AnimationStatus status) {
+      if (status == AnimationStatus.completed) {
+        _onAnimStop();
+        _animController.removeListener(listener);
+        _animController.removeStatusListener(statusListener);
+      }
+    }
+
+    _animController.addListener(listener);
+    _animController.addStatusListener(statusListener);
+    _animController.forward();
+  }
+
+  void _onAnimStop() {
+    if (_direction == _PageDirection.next) {
+      _factory.moveToNext();
+    } else if (_direction == _PageDirection.prev) {
+      _factory.moveToPrev();
+    }
+
+    _dragOffset = 0;
+    _touchX = 0;
+    _touchY = 0;
+    _direction = _PageDirection.none;
+    _isAnimating = false;
+    _invalidatePictures();
+
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
-    // 为仿真模式准备 Picture
-    if (_delegate is SimulationDelegate) {
-      _ensureSimulationPictures(size);
-    }
-
     return Container(
       color: widget.backgroundColor,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapUp: (d) => _onTap(d.globalPosition),
-        onHorizontalDragStart: _delegate.onDragStart,
-        onHorizontalDragUpdate: _delegate.onDragUpdate,
-        onHorizontalDragEnd: _delegate.onDragEnd,
-        child: _delegate.buildPageTransition(
-          currentPage: _buildPageWidget(_factory.curPage),
-          prevPage: _buildPageWidget(_factory.prevPage),
-          nextPage: _buildPageWidget(_factory.nextPage),
-          size: size,
+      child: _buildPageContent(),
+    );
+  }
+
+  Widget _buildPageContent() {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapUp: (d) => _onTap(d.globalPosition),
+      onHorizontalDragStart: _onDragStart,
+      onHorizontalDragUpdate: _onDragUpdate,
+      onHorizontalDragEnd: _onDragEnd,
+      child: _buildAnimatedPages(),
+    );
+  }
+
+  Widget _buildAnimatedPages() {
+    final size = MediaQuery.of(context).size;
+    final screenWidth = size.width;
+    final offset = _dragOffset.clamp(-screenWidth, screenWidth);
+
+    switch (widget.pageTurnMode) {
+      case PageTurnMode.slide:
+        return _buildSlideAnimation(screenWidth, offset);
+      case PageTurnMode.cover:
+        return _buildCoverAnimation(screenWidth, offset);
+      case PageTurnMode.simulation:
+        return _buildSimulationAnimation(size);
+      case PageTurnMode.none:
+        return _buildNoAnimation(screenWidth, offset);
+      default:
+        return _buildSlideAnimation(screenWidth, offset);
+    }
+  }
+
+  /// 滑动模式
+  Widget _buildSlideAnimation(double screenWidth, double offset) {
+    return Stack(
+      children: [
+        if (offset < 0)
+          Positioned(
+            left: screenWidth + offset,
+            top: 0,
+            bottom: 0,
+            width: screenWidth,
+            child: _buildPageWidget(_factory.nextPage),
+          ),
+        if (offset > 0)
+          Positioned(
+            left: offset - screenWidth,
+            top: 0,
+            bottom: 0,
+            width: screenWidth,
+            child: _buildPageWidget(_factory.prevPage),
+          ),
+        Positioned(
+          left: offset,
+          top: 0,
+          bottom: 0,
+          width: screenWidth,
+          child: _buildPageWidget(_factory.curPage),
         ),
+      ],
+    );
+  }
+
+  /// 覆盖模式
+  Widget _buildCoverAnimation(double screenWidth, double offset) {
+    final shadowOpacity = (offset.abs() / screenWidth * 0.4).clamp(0.0, 0.4);
+
+    return Stack(
+      children: [
+        if (offset < 0)
+          Positioned.fill(child: _buildPageWidget(_factory.nextPage)),
+        if (offset > 0)
+          Positioned.fill(child: _buildPageWidget(_factory.prevPage)),
+        Positioned(
+          left: offset,
+          top: 0,
+          bottom: 0,
+          width: screenWidth,
+          child: Container(
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: shadowOpacity),
+                  blurRadius: 20,
+                  spreadRadius: 5,
+                  offset: Offset(offset > 0 ? -8 : 8, 0),
+                ),
+              ],
+            ),
+            child: _buildPageWidget(_factory.curPage),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 仿真模式 - 使用 Picture 预渲染
+  Widget _buildSimulationAnimation(Size size) {
+    final isNext = _direction == _PageDirection.next;
+
+    // 确保 Picture 已预渲染
+    _ensurePictures(size);
+
+    // 计算角点
+    double cornerX;
+    double cornerY;
+
+    if (isNext) {
+      cornerX = _startX <= size.width / 2 ? 0 : size.width;
+      cornerY = _startY <= size.height / 2 ? 0 : size.height;
+      if (size.width / 2 > _startX) {
+        cornerX = size.width;
+      }
+    } else {
+      cornerX = _startX > size.width / 2 ? size.width : 0;
+      cornerY = size.height;
+    }
+
+    // 如果没有拖拽，静止状态显示当前页
+    if (!_isDragging && !_isAnimating) {
+      return CustomPaint(
+        size: size,
+        painter: _StaticPagePainter(
+          picture: _recordPage(_factory.curPage, size),
+        ),
+      );
+    }
+
+    return CustomPaint(
+      size: size,
+      painter: SimulationPagePainter(
+        curPagePicture: _curPagePicture,
+        nextPagePicture: _targetPagePicture,
+        touch: Offset(_touchX, _touchY),
+        viewSize: size,
+        isTurnToNext: isNext,
+        backgroundColor: widget.backgroundColor,
+        cornerX: cornerX,
+        cornerY: cornerY,
       ),
     );
+  }
+
+  /// 无动画模式
+  Widget _buildNoAnimation(double screenWidth, double offset) {
+    if (offset.abs() > screenWidth * 0.2 && !_isAnimating) {
+      if (offset < 0 && _factory.hasNext()) {
+        return _buildPageWidget(_factory.nextPage);
+      } else if (offset > 0 && _factory.hasPrev()) {
+        return _buildPageWidget(_factory.prevPage);
+      }
+    }
+    return _buildPageWidget(_factory.curPage);
+  }
+
+  void _onDragStart(DragStartDetails details) {
+    if (_isAnimating) return;
+    _isDragging = true;
+    _direction = _PageDirection.none;
+
+    _startX = details.localPosition.dx;
+    _startY = details.localPosition.dy;
+    _touchX = _startX;
+    _touchY = _startY;
+
+    _invalidatePictures();
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    if (!_isDragging || _isAnimating) return;
+
+    _dragOffset += details.delta.dx;
+    _touchX = details.localPosition.dx;
+    _touchY = details.localPosition.dy;
+
+    if (_direction == _PageDirection.none && _dragOffset.abs() > 10) {
+      _direction = _dragOffset > 0 ? _PageDirection.prev : _PageDirection.next;
+      _invalidatePictures();
+    }
+
+    if (_direction == _PageDirection.prev && !_factory.hasPrev()) {
+      _dragOffset = (_dragOffset * 0.3).clamp(-50, 50);
+    }
+    if (_direction == _PageDirection.next && !_factory.hasNext()) {
+      _dragOffset = (_dragOffset * 0.3).clamp(-50, 50);
+    }
+
+    // 使用 setState 触发重绘
+    setState(() {});
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    if (!_isDragging || _isAnimating) return;
+    _isDragging = false;
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final velocity = details.primaryVelocity ?? 0;
+
+    final shouldTurn =
+        _dragOffset.abs() > screenWidth * 0.25 || velocity.abs() > 800;
+
+    if (shouldTurn && _direction != _PageDirection.none) {
+      bool canTurn = _direction == _PageDirection.prev
+          ? _factory.hasPrev()
+          : _factory.hasNext();
+
+      if (canTurn) {
+        _startAnimation();
+        return;
+      }
+    }
+
+    _cancelDrag();
+  }
+
+  void _cancelDrag() {
+    _isAnimating = true;
+    final startOffset = _dragOffset;
+    final startTouchX = _touchX;
+    final startTouchY = _touchY;
+
+    _animController.reset();
+
+    void listener() {
+      if (mounted) {
+        final progress = Curves.easeOut.transform(_animController.value);
+        _dragOffset = startOffset * (1 - progress);
+        _touchX = startTouchX + (_startX - startTouchX) * progress;
+        _touchY = startTouchY + (_startY - startTouchY) * progress;
+        setState(() {});
+      }
+    }
+
+    void statusListener(AnimationStatus status) {
+      if (status == AnimationStatus.completed) {
+        _dragOffset = 0;
+        _touchX = 0;
+        _touchY = 0;
+        _direction = _PageDirection.none;
+        _isAnimating = false;
+        _invalidatePictures();
+        setState(() {});
+        _animController.removeListener(listener);
+        _animController.removeStatusListener(statusListener);
+      }
+    }
+
+    _animController.addListener(listener);
+    _animController.addStatusListener(statusListener);
+    _animController.forward();
   }
 
   Widget _buildPageWidget(String content) {
@@ -402,3 +652,22 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     );
   }
 }
+
+/// 静态页面绘制器
+class _StaticPagePainter extends CustomPainter {
+  final ui.Picture picture;
+
+  _StaticPagePainter({required this.picture});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawPicture(picture);
+  }
+
+  @override
+  bool shouldRepaint(covariant _StaticPagePainter oldDelegate) {
+    return picture != oldDelegate.picture;
+  }
+}
+
+enum _PageDirection { none, prev, next }
