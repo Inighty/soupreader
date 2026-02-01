@@ -440,7 +440,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       );
     }
 
-    // 准备截图用的隐藏组件
+    // 准备截图用的组件
     return Stack(
       children: [
         // 当前页（用于截图）- NEXT时是curPage，PREV时是prevPage
@@ -452,9 +452,13 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                 : _factory.curPage,
           ),
         ),
-        // 目标页（隐藏，用于截图）- NEXT时是nextPage，PREV时是curPage
-        Offstage(
-          offstage: true,
+        // 目标页（隐藏但可截图）- NEXT时是nextPage，PREV时是curPage
+        // 使用 Visibility 而非 Offstage，保持组件可截图
+        Visibility(
+          visible: false,
+          maintainState: true,
+          maintainSize: true,
+          maintainAnimation: true,
           child: RepaintBoundary(
             key: _targetPageKey,
             child: _buildPageWidget(
