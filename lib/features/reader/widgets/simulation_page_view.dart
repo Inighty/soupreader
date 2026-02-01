@@ -823,12 +823,12 @@ class _BookPagePainter extends CustomPainter {
 
     canvas.save();
 
-    // 裁剪出 C 区域
+    // 裁剪出 C 区域（对标 BookPage: clipPath(pathA) + clipPath(getPathC(), REVERSE_DIFFERENCE)）
     final pathC = _getPathC();
     final pathCMinusA = Path.combine(PathOperation.difference, pathC, pathA);
     canvas.clipPath(pathCMinusA);
 
-    // 计算镜像变换
+    // 计算镜像变换（对标 BookPage drawPathCContent）
     final eh = math.sqrt(math.pow(f.x - e.x, 2) + math.pow(h.y - f.y, 2));
     if (eh < 0.001) {
       canvas.restore();
@@ -838,35 +838,45 @@ class _BookPagePainter extends CustomPainter {
     final sin0 = (f.x - e.x) / eh;
     final cos0 = (h.y - f.y) / eh;
 
+    // 镜像矩阵元素（对标 BookPage mMatrixArray）
+    // mMatrixArray[0] = -(1-2*sin0*sin0)  即 a11
+    // mMatrixArray[1] = 2*sin0*cos0       即 a12 (Android是行主序，所以这是第0行第1列)
+    // mMatrixArray[3] = 2*sin0*cos0       即 a21 (第1行第0列)
+    // mMatrixArray[4] = 1-2*sin0*sin0     即 a22
     final a11 = -(1 - 2 * sin0 * sin0);
     final a12 = 2 * sin0 * cos0;
     final a21 = 2 * sin0 * cos0;
     final a22 = 1 - 2 * sin0 * sin0;
 
-    // 构建变换矩阵
+    // 构建变换矩阵：T(e) * M * T(-e)
+    // 对标 BookPage:
+    //   mMatrix.setValues(mMatrixArray);
+    //   mMatrix.preTranslate(-e.x, -e.y);  // 先平移到原点
+    //   mMatrix.postTranslate(e.x, e.y);   // 后平移回来
+    //
+    // Flutter Matrix4 是列主序，构造参数是按列排列：
+    // Matrix4(col0_row0, col0_row1, col0_row2, col0_row3, col1_row0, ...)
+    // 即：Matrix4(m00, m10, m20, m30, m01, m11, m21, m31, ...)
+    //
+    // 合并后的变换矩阵 M' = T(e) * M * T(-e):
+    // | a11  a12  tx |   其中 tx = e.x - a11*e.x - a12*e.y
+    // | a21  a22  ty |   其中 ty = e.y - a21*e.x - a22*e.y
+    // | 0    0    1  |
+
+    final tx = e.x - a11 * e.x - a12 * e.y;
+    final ty = e.y - a21 * e.x - a22 * e.y;
+
     final matrix = Matrix4(
-      a11,
-      a21,
-      0,
-      0,
-      a12,
-      a22,
-      0,
-      0,
-      0,
-      0,
-      1,
-      0,
-      e.x - a11 * e.x - a12 * e.y,
-      e.y - a21 * e.x - a22 * e.y,
-      0,
-      1,
+      a11, a21, 0, 0, // 第0列: (m00=a11, m10=a21, m20=0, m30=0)
+      a12, a22, 0, 0, // 第1列: (m01=a12, m11=a22, m21=0, m31=0)
+      0, 0, 1, 0, // 第2列: (m02=0, m12=0, m22=1, m32=0)
+      tx, ty, 0, 1, // 第3列: (m03=tx, m13=ty, m23=0, m33=1)
     );
 
     canvas.transform(matrix.storage);
     canvas.drawImage(currentPageBitmap!, Offset.zero, Paint());
 
-    // 添加半透明遮罩
+    // 添加半透明遮罩模拟纸张背面
     canvas.drawPaint(Paint()..color = backgroundColor.withValues(alpha: 0.3));
 
     canvas.restore();
