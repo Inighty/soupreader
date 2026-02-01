@@ -134,7 +134,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
   }
 
-  Future<void> _loadChapter(int index, {bool restoreOffset = false}) async {
+  Future<void> _loadChapter(int index,
+      {bool restoreOffset = false, bool goToLastPage = false}) async {
     if (index < 0 || index >= _chapters.length) return;
 
     setState(() {
@@ -148,6 +149,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_settings.pageTurnMode != PageTurnMode.scroll) {
         _paginateContent();
+
+        // 跳转到最后一页（从上一章滑动过来时）
+        if (goToLastPage && _contentPages.isNotEmpty) {
+          setState(() {
+            _currentPageIndex = _contentPages.length - 1;
+          });
+        }
       }
 
       if (_scrollController.hasClients) {
@@ -158,7 +166,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             return;
           }
         }
-        _scrollController.jumpTo(0);
+        // 跳转到最后（从上一章滑动过来时）
+        if (goToLastPage && _settings.pageTurnMode == PageTurnMode.scroll) {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        } else {
+          _scrollController.jumpTo(0);
+        }
       }
     });
 
@@ -384,7 +397,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         fontFamily: _currentFontFamily,
       ),
       backgroundColor: _currentTheme.background,
-      // 对标 flutter_reader: margin: EdgeInsets.fromLTRB(15, topSafeHeight + topOffset, 10, bottomSafeHeight + bottomOffset)
       padding: EdgeInsets.symmetric(horizontal: _settings.marginHorizontal),
       onPageChanged: (pageIndex) {
         setState(() {
@@ -393,7 +405,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       },
       onPrevChapter: () {
         if (_currentChapterIndex > 0) {
-          _loadChapter(_currentChapterIndex - 1);
+          _loadChapter(_currentChapterIndex - 1, goToLastPage: true);
         }
       },
       onNextChapter: () {
@@ -408,6 +420,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       },
       showStatusBar: _settings.showStatusBar,
       chapterTitle: _currentTitle,
+      // 章节信息：用于判断是否可以滑动跨章节
+      hasPrevChapter: _currentChapterIndex > 0,
+      hasNextChapter: _currentChapterIndex < _chapters.length - 1,
     );
   }
 
