@@ -2,8 +2,18 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
-/// 仿真翻页绘制器（对标 flutter_novel SimulationTurnPageAnimation）
-/// 核心优化：直接Canvas绘制，避免截图开销
+/// 仿真翻页绘制器（对标 AnliaLee/BookPage）
+/// 使用完整的11点坐标系统实现真实书页翻转效果
+///
+/// 控制点说明：
+/// - a: 触摸点
+/// - f: 翻页起始角（右下/右上）
+/// - g: a和f的中点
+/// - e: 贝塞尔曲线控制点（下边缘）
+/// - h: 贝塞尔曲线控制点（右边缘）
+/// - c,j: 贝塞尔曲线起点
+/// - b,k: 贝塞尔曲线与对角线交点
+/// - d,i: 贝塞尔曲线顶点（用于阴影计算）
 class SimulationPagePainter extends CustomPainter {
   /// 当前页面 Picture（被翻起的页面）
   final ui.Picture? curPagePicture;
@@ -11,7 +21,7 @@ class SimulationPagePainter extends CustomPainter {
   /// 目标页面 Picture（底下露出的页面）
   final ui.Picture? nextPagePicture;
 
-  /// 触摸点
+  /// 触摸点坐标
   final Offset touch;
 
   /// 视图尺寸
@@ -40,430 +50,479 @@ class SimulationPagePainter extends CustomPainter {
     required this.cornerY,
   });
 
-  // 贝塞尔曲线控制点
-  late Offset mTouch;
-  late double mCornerX;
-  late double mCornerY;
-  late bool mIsRTandLB;
-  late double mMiddleX;
-  late double mMiddleY;
-  late double mMaxLength;
-  late double mTouchToCornerDis;
+  // 11个控制点（对标 BookPage）
+  late Offset a; // 触摸点
+  late Offset f; // 翻页起始角
+  late Offset g; // a和f的中点
+  late Offset e; // 贝塞尔控制点（下边缘）
+  late Offset h; // 贝塞尔控制点（右边缘）
+  late Offset c; // 贝塞尔起点（下边缘）
+  late Offset j; // 贝塞尔起点（右边缘）
+  late Offset b; // 交点
+  late Offset k; // 交点
+  late Offset d; // 贝塞尔顶点（用于阴影）
+  late Offset i; // 贝塞尔顶点（用于阴影）
 
-  late Offset mBezierStart1;
-  late Offset mBezierControl1;
-  late Offset mBezierVertex1;
-  late Offset mBezierEnd1;
-  late Offset mBezierStart2;
-  late Offset mBezierControl2;
-  late Offset mBezierVertex2;
-  late Offset mBezierEnd2;
+  // 阴影距离参数
+  late double lPathAShadowDis;
+  late double rPathAShadowDis;
 
   // Path 对象
-  Path mTopPagePath = Path();
-  Path mBottomPagePath = Path();
-  Path mTopBackAreaPagePath = Path();
+  Path pathA = Path();
+  Path pathB = Path();
+  Path pathC = Path();
 
   @override
   void paint(Canvas canvas, Size size) {
     if (curPagePicture == null) return;
-    if (touch.dx == 0 && touch.dy == 0) {
-      // 静止状态，直接画当前页
+
+    // 初始化 a 和 f 点
+    a = touch;
+    f = Offset(cornerX, cornerY);
+
+    // 如果触摸点无效，直接画当前页
+    if (a.dx <= 0 && a.dy <= 0) {
       canvas.drawPicture(curPagePicture!);
       return;
     }
 
-    // 初始化
-    mTouch = touch;
-    mCornerX = cornerX;
-    mCornerY = cornerY;
+    // 限制触摸点范围，确保c点x坐标不小于0
+    a = _adjustTouchPoint(a, f);
 
-    // 判断是否右上左下
-    mIsRTandLB = (mCornerX == 0 && mCornerY == viewSize.height) ||
-        (mCornerX == viewSize.width && mCornerY == 0);
+    // 计算所有控制点坐标
+    _calcPointsXY();
 
-    // 计算贝塞尔曲线点
-    _calBezierPoint();
-
-    // 按照 flutter_novel 的绘制顺序
-    _drawTopPageCanvas(canvas);
-    _drawBottomPageCanvas(canvas);
-    _drawTopPageBackArea(canvas);
+    // 绘制三个区域
+    _drawPathAContent(canvas);
+    _drawPathCContent(canvas);
+    _drawPathBContent(canvas);
   }
 
-  /// 计算贝塞尔曲线各点
-  void _calBezierPoint() {
-    mMiddleX = (mTouch.dx + mCornerX) / 2;
-    mMiddleY = (mTouch.dy + mCornerY) / 2;
+  /// 调整触摸点，确保c点x坐标不小于0
+  Offset _adjustTouchPoint(Offset touch, Offset corner) {
+    // 计算c点x坐标
+    final gx = (touch.dx + corner.dx) / 2;
+    final gy = (touch.dy + corner.dy) / 2;
 
-    mMaxLength =
-        math.sqrt(math.pow(viewSize.width, 2) + math.pow(viewSize.height, 2));
-
-    mBezierControl1 = Offset(
-      mMiddleX -
-          (mCornerY - mMiddleY) * (mCornerY - mMiddleY) / (mCornerX - mMiddleX),
-      mCornerY,
-    );
-
-    double f4 = mCornerY - mMiddleY;
-    if (f4 == 0) {
-      mBezierControl2 = Offset(
-        mCornerX,
-        mMiddleY - (mCornerX - mMiddleX) * (mCornerX - mMiddleX) / 0.1,
-      );
+    double ex;
+    if ((corner.dx - gx).abs() < 0.001) {
+      ex = gx;
     } else {
-      mBezierControl2 = Offset(
-        mCornerX,
-        mMiddleY -
-            (mCornerX - mMiddleX) *
-                (mCornerX - mMiddleX) /
-                (mCornerY - mMiddleY),
-      );
+      ex = gx - (corner.dy - gy) * (corner.dy - gy) / (corner.dx - gx);
     }
+    final cx = ex - (corner.dx - ex) / 2;
 
-    mBezierStart1 = Offset(
-      mBezierControl1.dx - (mCornerX - mBezierControl1.dx) / 2,
-      mCornerY,
-    );
+    if (cx < 0) {
+      // 如果c点x坐标小于0，重新计算a点
+      final w0 = viewSize.width - cx;
+      final w1 = (corner.dx - touch.dx).abs();
+      final w2 = viewSize.width * w1 / w0;
+      final newAx = (corner.dx - w2).abs();
 
-    // 边界修正
-    if (mTouch.dx > 0 && mTouch.dx < viewSize.width) {
-      if (mBezierStart1.dx < 0 || mBezierStart1.dx > viewSize.width) {
-        if (mBezierStart1.dx < 0) {
-          mBezierStart1 =
-              Offset(viewSize.width - mBezierStart1.dx, mBezierStart1.dy);
-        }
+      final h1 = (corner.dy - touch.dy).abs();
+      final h2 = w2 * h1 / w1;
+      final newAy = (corner.dy - h2).abs();
 
-        double f1 = (mCornerX - mTouch.dx).abs();
-        double f2 = viewSize.width * f1 / mBezierStart1.dx;
-        mTouch = Offset((mCornerX - f2).abs(), mTouch.dy);
-
-        double f3 =
-            (mCornerX - mTouch.dx).abs() * (mCornerY - mTouch.dy).abs() / f1;
-        mTouch = Offset((mCornerX - f2).abs(), (mCornerY - f3).abs());
-
-        mMiddleX = (mTouch.dx + mCornerX) / 2;
-        mMiddleY = (mTouch.dy + mCornerY) / 2;
-
-        mBezierControl1 = Offset(
-          mMiddleX -
-              (mCornerY - mMiddleY) *
-                  (mCornerY - mMiddleY) /
-                  (mCornerX - mMiddleX),
-          mCornerY,
-        );
-
-        double f5 = mCornerY - mMiddleY;
-        if (f5 == 0) {
-          mBezierControl2 = Offset(
-            mCornerX,
-            mMiddleY - (mCornerX - mMiddleX) * (mCornerX - mMiddleX) / 0.1,
-          );
-        } else {
-          mBezierControl2 = Offset(
-            mCornerX,
-            mMiddleY -
-                (mCornerX - mMiddleX) *
-                    (mCornerX - mMiddleX) /
-                    (mCornerY - mMiddleY),
-          );
-        }
-
-        mBezierStart1 = Offset(
-          mBezierControl1.dx - (mCornerX - mBezierControl1.dx) / 2,
-          mBezierStart1.dy,
-        );
-      }
+      return Offset(newAx, newAy);
     }
-
-    mBezierStart2 = Offset(
-      mCornerX,
-      mBezierControl2.dy - (mCornerY - mBezierControl2.dy) / 2,
-    );
-
-    mTouchToCornerDis = math.sqrt(
-        math.pow(mTouch.dx - mCornerX, 2) + math.pow(mTouch.dy - mCornerY, 2));
-
-    mBezierEnd1 =
-        _getCross(mTouch, mBezierControl1, mBezierStart1, mBezierStart2);
-    mBezierEnd2 =
-        _getCross(mTouch, mBezierControl2, mBezierStart1, mBezierStart2);
-
-    mBezierVertex1 = Offset(
-      (mBezierStart1.dx + 2 * mBezierControl1.dx + mBezierEnd1.dx) / 4,
-      (2 * mBezierControl1.dy + mBezierStart1.dy + mBezierEnd1.dy) / 4,
-    );
-
-    mBezierVertex2 = Offset(
-      (mBezierStart2.dx + 2 * mBezierControl2.dx + mBezierEnd2.dx) / 4,
-      (2 * mBezierControl2.dy + mBezierStart2.dy + mBezierEnd2.dy) / 4,
-    );
+    return touch;
   }
 
-  /// 获取交点
-  Offset _getCross(Offset p1, Offset p2, Offset p3, Offset p4) {
-    double k1 = (p2.dy - p1.dy) / (p2.dx - p1.dx);
-    double b1 = ((p1.dx * p2.dy) - (p2.dx * p1.dy)) / (p1.dx - p2.dx);
-    double k2 = (p4.dy - p3.dy) / (p4.dx - p3.dx);
-    double b2 = ((p3.dx * p4.dy) - (p4.dx * p3.dy)) / (p3.dx - p4.dx);
-    return Offset((b2 - b1) / (k1 - k2), k1 * ((b2 - b1) / (k1 - k2)) + b1);
-  }
+  /// 计算所有控制点坐标（对标 BookPage calcPointsXY）
+  void _calcPointsXY() {
+    // g点：a和f的中点
+    g = Offset((a.dx + f.dx) / 2, (a.dy + f.dy) / 2);
 
-  /// 画在最顶上的那页
-  void _drawTopPageCanvas(Canvas canvas) {
-    mTopPagePath.reset();
+    // e点：贝塞尔控制点（沿下边缘）
+    double ex;
+    if ((f.dx - g.dx).abs() < 0.001) {
+      ex = g.dx;
+    } else {
+      ex = g.dx - (f.dy - g.dy) * (f.dy - g.dy) / (f.dx - g.dx);
+    }
+    e = Offset(ex, f.dy);
 
-    mTopPagePath.moveTo(mCornerX == 0 ? viewSize.width : 0, mCornerY);
-    mTopPagePath.lineTo(mBezierStart1.dx, mBezierStart1.dy);
-    mTopPagePath.quadraticBezierTo(
-        mBezierControl1.dx, mBezierControl1.dy, mBezierEnd1.dx, mBezierEnd1.dy);
-    mTopPagePath.lineTo(mTouch.dx, mTouch.dy);
-    mTopPagePath.lineTo(mBezierEnd2.dx, mBezierEnd2.dy);
-    mTopPagePath.quadraticBezierTo(mBezierControl2.dx, mBezierControl2.dy,
-        mBezierStart2.dx, mBezierStart2.dy);
-    mTopPagePath.lineTo(mCornerX, mCornerY == 0 ? viewSize.height : 0);
-    mTopPagePath.lineTo(mCornerX == 0 ? viewSize.width : 0,
-        mCornerY == 0 ? viewSize.height : 0);
-    mTopPagePath.close();
+    // h点：贝塞尔控制点（沿右边缘）
+    double hy;
+    if ((f.dy - g.dy).abs() < 0.001) {
+      hy = g.dy;
+    } else {
+      hy = g.dy - (f.dx - g.dx) * (f.dx - g.dx) / (f.dy - g.dy);
+    }
+    h = Offset(f.dx, hy);
 
-    // 去掉PATH圈在屏幕外的区域
-    mTopPagePath = Path.combine(
-      PathOperation.intersect,
-      Path()
-        ..moveTo(0, 0)
-        ..lineTo(viewSize.width, 0)
-        ..lineTo(viewSize.width, viewSize.height)
-        ..lineTo(0, viewSize.height)
-        ..close(),
-      mTopPagePath,
+    // c点：贝塞尔起点（下边缘）
+    c = Offset(e.dx - (f.dx - e.dx) / 2, f.dy);
+
+    // j点：贝塞尔起点（右边缘）
+    j = Offset(f.dx, h.dy - (f.dy - h.dy) / 2);
+
+    // b点和k点：贝塞尔曲线与对角线的交点
+    b = _getIntersectionPoint(a, e, c, j);
+    k = _getIntersectionPoint(a, h, c, j);
+
+    // d点和i点：贝塞尔曲线顶点
+    d = Offset(
+      (c.dx + 2 * e.dx + b.dx) / 4,
+      (2 * e.dy + c.dy + b.dy) / 4,
+    );
+    i = Offset(
+      (j.dx + 2 * h.dx + k.dx) / 4,
+      (2 * h.dy + j.dy + k.dy) / 4,
     );
 
+    // 计算阴影距离
+    // d点到ae的距离
+    final lA = a.dy - e.dy;
+    final lB = e.dx - a.dx;
+    final lC = a.dx * e.dy - e.dx * a.dy;
+    lPathAShadowDis =
+        (lA * d.dx + lB * d.dy + lC).abs() / math.sqrt(lA * lA + lB * lB);
+
+    // i点到ah的距离
+    final rA = a.dy - h.dy;
+    final rB = h.dx - a.dx;
+    final rC = a.dx * h.dy - h.dx * a.dy;
+    rPathAShadowDis =
+        (rA * i.dx + rB * i.dy + rC).abs() / math.sqrt(rA * rA + rB * rB);
+  }
+
+  /// 计算两线段交点
+  Offset _getIntersectionPoint(Offset p1, Offset p2, Offset p3, Offset p4) {
+    final x1 = p1.dx, y1 = p1.dy;
+    final x2 = p2.dx, y2 = p2.dy;
+    final x3 = p3.dx, y3 = p3.dy;
+    final x4 = p4.dx, y4 = p4.dy;
+
+    final denominator = (x3 - x4) * (y1 - y2) - (x1 - x2) * (y3 - y4);
+    if (denominator.abs() < 0.001) {
+      return Offset((x1 + x2 + x3 + x4) / 4, (y1 + y2 + y3 + y4) / 4);
+    }
+
+    final pointX =
+        ((x1 - x2) * (x3 * y4 - x4 * y3) - (x3 - x4) * (x1 * y2 - x2 * y1)) /
+            denominator;
+    final pointY =
+        ((y1 - y2) * (x3 * y4 - x4 * y3) - (x1 * y2 - x2 * y1) * (y3 - y4)) /
+            ((y1 - y2) * (x3 - x4) - (x1 - x2) * (y3 - y4));
+
+    return Offset(pointX, pointY);
+  }
+
+  /// 获取A区域路径（当前页可见区域）
+  Path _getPathA() {
+    pathA.reset();
+    final isTopRight = f.dy == 0;
+
+    if (isTopRight) {
+      // f点在右上角
+      pathA.moveTo(0, 0);
+      pathA.lineTo(c.dx, c.dy);
+      pathA.quadraticBezierTo(e.dx, e.dy, b.dx, b.dy);
+      pathA.lineTo(a.dx, a.dy);
+      pathA.lineTo(k.dx, k.dy);
+      pathA.quadraticBezierTo(h.dx, h.dy, j.dx, j.dy);
+      pathA.lineTo(viewSize.width, viewSize.height);
+      pathA.lineTo(0, viewSize.height);
+      pathA.close();
+    } else {
+      // f点在右下角
+      pathA.moveTo(0, 0);
+      pathA.lineTo(0, viewSize.height);
+      pathA.lineTo(c.dx, c.dy);
+      pathA.quadraticBezierTo(e.dx, e.dy, b.dx, b.dy);
+      pathA.lineTo(a.dx, a.dy);
+      pathA.lineTo(k.dx, k.dy);
+      pathA.quadraticBezierTo(h.dx, h.dy, j.dx, j.dy);
+      pathA.lineTo(viewSize.width, 0);
+      pathA.close();
+    }
+    return pathA;
+  }
+
+  /// 获取C区域路径（翻起的背面）
+  Path _getPathC() {
+    pathC.reset();
+    pathC.moveTo(i.dx, i.dy);
+    pathC.lineTo(d.dx, d.dy);
+    pathC.lineTo(b.dx, b.dy);
+    pathC.lineTo(a.dx, a.dy);
+    pathC.lineTo(k.dx, k.dy);
+    pathC.close();
+    return pathC;
+  }
+
+  /// 绘制A区域内容（当前页）
+  void _drawPathAContent(Canvas canvas) {
     canvas.save();
-    canvas.clipPath(mTopPagePath);
+    canvas.clipPath(_getPathA());
     canvas.drawPicture(curPagePicture!);
-    _drawTopPageShadow(canvas);
+
+    // 绘制A区域阴影
+    _drawPathALeftShadow(canvas);
+    _drawPathARightShadow(canvas);
+
     canvas.restore();
   }
 
-  /// 画顶部页的阴影
-  void _drawTopPageShadow(Canvas canvas) {
-    int dx = mCornerX == 0 ? 5 : -5;
-    int dy = mCornerY == 0 ? 5 : -5;
+  /// 绘制A区域左侧阴影
+  void _drawPathALeftShadow(Canvas canvas) {
+    canvas.save();
 
-    Path shadowPath = Path.combine(
-      PathOperation.intersect,
-      Path()
-        ..moveTo(0, 0)
-        ..lineTo(viewSize.width, 0)
-        ..lineTo(viewSize.width, viewSize.height)
-        ..lineTo(0, viewSize.height)
-        ..close(),
-      Path()
-        ..moveTo(mTouch.dx + dx, mTouch.dy + dy)
-        ..lineTo(mBezierControl2.dx + dx, mBezierControl2.dy + dy)
-        ..lineTo(mBezierControl1.dx + dx, mBezierControl1.dy + dy)
-        ..close(),
+    final isTopRight = f.dy == 0;
+    final shadowWidth = lPathAShadowDis / 2;
+
+    // 创建阴影区域
+    Path shadowPath = Path();
+    shadowPath.moveTo(
+        a.dx - math.max(rPathAShadowDis, lPathAShadowDis) / 2, a.dy);
+    shadowPath.lineTo(d.dx, d.dy);
+    shadowPath.lineTo(e.dx, e.dy);
+    shadowPath.lineTo(a.dx, a.dy);
+    shadowPath.close();
+
+    canvas.clipPath(shadowPath);
+
+    final mDegrees = math.atan2(e.dx - a.dx, a.dy - e.dy);
+    canvas.translate(e.dx, e.dy);
+    canvas.rotate(mDegrees);
+
+    final colors = isTopRight
+        ? [const Color(0x01333333), const Color(0x33333333)]
+        : [const Color(0x33333333), const Color(0x01333333)];
+
+    final shadowPaint = Paint()
+      ..shader = LinearGradient(colors: colors).createShader(
+        Rect.fromLTRB(
+          isTopRight ? -shadowWidth : 0,
+          0,
+          isTopRight ? 0 : shadowWidth,
+          viewSize.height,
+        ),
+      );
+
+    canvas.drawRect(
+      Rect.fromLTRB(-shadowWidth, 0, shadowWidth, viewSize.height),
+      shadowPaint,
     );
 
-    canvas.drawShadow(shadowPath, Colors.black, 5, true);
+    canvas.restore();
   }
 
-  /// 画翻起来的底下那页
-  void _drawBottomPageCanvas(Canvas canvas) {
+  /// 绘制A区域右侧阴影
+  void _drawPathARightShadow(Canvas canvas) {
+    canvas.save();
+
+    final isTopRight = f.dy == 0;
+    final shadowWidth = rPathAShadowDis / 2;
+    final viewDiagonalLength = math.sqrt(
+        viewSize.width * viewSize.width + viewSize.height * viewSize.height);
+
+    // 创建阴影区域
+    Path shadowPath = Path();
+    shadowPath.moveTo(
+        a.dx - math.max(rPathAShadowDis, lPathAShadowDis) / 2, a.dy);
+    shadowPath.lineTo(h.dx, h.dy);
+    shadowPath.lineTo(a.dx, a.dy);
+    shadowPath.close();
+
+    canvas.clipPath(shadowPath);
+
+    final mDegrees = math.atan2(a.dy - h.dy, a.dx - h.dx);
+    canvas.translate(h.dx, h.dy);
+    canvas.rotate(mDegrees);
+
+    final colors = isTopRight
+        ? [
+            const Color(0x22333333),
+            const Color(0x01333333),
+            const Color(0x01333333)
+          ]
+        : [
+            const Color(0x01333333),
+            const Color(0x01333333),
+            const Color(0x22333333)
+          ];
+
+    final shadowPaint = Paint()
+      ..shader = LinearGradient(colors: colors).createShader(
+        Rect.fromLTRB(0, isTopRight ? -shadowWidth : 0, viewDiagonalLength * 10,
+            isTopRight ? 0 : shadowWidth),
+      );
+
+    canvas.drawRect(
+      Rect.fromLTRB(0, -shadowWidth, viewDiagonalLength * 10, shadowWidth),
+      shadowPaint,
+    );
+
+    canvas.restore();
+  }
+
+  /// 绘制B区域内容（底层页面）
+  void _drawPathBContent(Canvas canvas) {
     if (nextPagePicture == null) return;
 
-    mBottomPagePath.reset();
-    mBottomPagePath.moveTo(mCornerX, mCornerY);
-    mBottomPagePath.lineTo(mBezierStart1.dx, mBezierStart1.dy);
-    mBottomPagePath.quadraticBezierTo(
-        mBezierControl1.dx, mBezierControl1.dy, mBezierEnd1.dx, mBezierEnd1.dy);
-    mBottomPagePath.lineTo(mBezierEnd2.dx, mBezierEnd2.dy);
-    mBottomPagePath.quadraticBezierTo(mBezierControl2.dx, mBezierControl2.dy,
-        mBezierStart2.dx, mBezierStart2.dy);
-    mBottomPagePath.close();
-
-    // 排除三角形区域
-    Path extraRegion = Path();
-    extraRegion.moveTo(mTouch.dx, mTouch.dy);
-    extraRegion.lineTo(mBezierVertex1.dx, mBezierVertex1.dy);
-    extraRegion.lineTo(mBezierVertex2.dx, mBezierVertex2.dy);
-    extraRegion.close();
-
-    mBottomPagePath =
-        Path.combine(PathOperation.difference, mBottomPagePath, extraRegion);
-
-    // 去掉PATH圈在屏幕外的区域
-    mBottomPagePath = Path.combine(
-      PathOperation.intersect,
-      Path()
-        ..moveTo(0, 0)
-        ..lineTo(viewSize.width, 0)
-        ..lineTo(viewSize.width, viewSize.height)
-        ..lineTo(0, viewSize.height)
-        ..close(),
-      mBottomPagePath,
-    );
-
     canvas.save();
-    canvas.clipPath(mBottomPagePath, doAntiAlias: false);
+
+    // 裁剪出B区域：整个页面 - A区域 - C区域
+    final fullPath = Path()
+      ..addRect(Rect.fromLTWH(0, 0, viewSize.width, viewSize.height));
+
+    final pathACombined =
+        Path.combine(PathOperation.union, _getPathA(), _getPathC());
+    final pathB =
+        Path.combine(PathOperation.difference, fullPath, pathACombined);
+
+    canvas.clipPath(pathB);
     canvas.drawPicture(nextPagePicture!);
-    _drawBottomPageShadow(canvas);
+
+    // 绘制B区域阴影
+    _drawPathBShadow(canvas);
+
     canvas.restore();
   }
 
-  /// 画底下那页的阴影
-  void _drawBottomPageShadow(Canvas canvas) {
-    double left;
-    double right;
-    List<Color> colors;
+  /// 绘制B区域阴影
+  void _drawPathBShadow(Canvas canvas) {
+    canvas.save();
 
-    if (mIsRTandLB) {
-      left = 0;
-      right = mTouchToCornerDis / 4;
-      colors = [const Color(0xAA000000), Colors.transparent];
-    } else {
-      left = -mTouchToCornerDis / 4;
-      right = 0;
-      colors = [Colors.transparent, const Color(0xAA000000)];
-    }
+    final isTopRight = f.dy == 0;
+    final aTof = math.sqrt(math.pow(a.dx - f.dx, 2) + math.pow(a.dy - f.dy, 2));
+    final viewDiagonalLength = math.sqrt(
+        viewSize.width * viewSize.width + viewSize.height * viewSize.height);
 
-    canvas.translate(mBezierStart1.dx, mBezierStart1.dy);
-    canvas.rotate(math.atan2(
-        mBezierControl1.dx - mCornerX, mBezierControl2.dy - mCornerY));
+    final shadowWidth = aTof / 4;
+
+    final colors = isTopRight
+        ? [const Color(0x55111111), const Color(0x00111111)]
+        : [const Color(0x00111111), const Color(0x55111111)];
 
     final shadowPaint = Paint()
-      ..isAntiAlias = false
-      ..style = PaintingStyle.fill
-      ..shader = LinearGradient(colors: colors)
-          .createShader(Rect.fromLTRB(left, 0, right, mMaxLength));
+      ..shader = LinearGradient(colors: colors).createShader(
+        Rect.fromLTRB(
+          isTopRight ? 0 : -shadowWidth,
+          0,
+          isTopRight ? shadowWidth : 0,
+          viewDiagonalLength,
+        ),
+      );
 
-    canvas.drawRect(Rect.fromLTRB(left, 0, right, mMaxLength), shadowPaint);
+    final rotateDegrees = math.atan2(e.dx - f.dx, h.dy - f.dy);
+    canvas.translate(c.dx, c.dy);
+    canvas.rotate(rotateDegrees);
+
+    canvas.drawRect(
+      Rect.fromLTRB(-shadowWidth, 0, shadowWidth, viewDiagonalLength),
+      shadowPaint,
+    );
+
+    canvas.restore();
   }
 
-  /// 画在最顶上的那页的翻转过来的部分
-  void _drawTopPageBackArea(Canvas canvas) {
-    if (curPagePicture == null) return;
-
-    mBottomPagePath.reset();
-    mBottomPagePath.moveTo(mCornerX, mCornerY);
-    mBottomPagePath.lineTo(mBezierStart1.dx, mBezierStart1.dy);
-    mBottomPagePath.quadraticBezierTo(
-        mBezierControl1.dx, mBezierControl1.dy, mBezierEnd1.dx, mBezierEnd1.dy);
-    mBottomPagePath.lineTo(mTouch.dx, mTouch.dy);
-    mBottomPagePath.lineTo(mBezierEnd2.dx, mBezierEnd2.dy);
-    mBottomPagePath.quadraticBezierTo(mBezierControl2.dx, mBezierControl2.dy,
-        mBezierStart2.dx, mBezierStart2.dy);
-    mBottomPagePath.close();
-
-    Path tempBackAreaPath = Path();
-    tempBackAreaPath.moveTo(mBezierVertex1.dx, mBezierVertex1.dy);
-    tempBackAreaPath.lineTo(mBezierVertex2.dx, mBezierVertex2.dy);
-    tempBackAreaPath.lineTo(mTouch.dx, mTouch.dy);
-    tempBackAreaPath.close();
-
-    // 取path相交部分
-    mTopBackAreaPagePath = Path.combine(
-        PathOperation.intersect, tempBackAreaPath, mBottomPagePath);
-
-    // 去掉PATH圈在屏幕外的区域
-    mTopBackAreaPagePath = Path.combine(
-      PathOperation.intersect,
-      Path()
-        ..moveTo(0, 0)
-        ..lineTo(viewSize.width, 0)
-        ..lineTo(viewSize.width, viewSize.height)
-        ..lineTo(0, viewSize.height)
-        ..close(),
-      mTopBackAreaPagePath,
-    );
-
+  /// 绘制C区域内容（翻起页的背面）
+  void _drawPathCContent(Canvas canvas) {
     canvas.save();
-    canvas.clipPath(mTopBackAreaPagePath);
 
-    // 先画背景色
-    canvas.drawPaint(Paint()..color = backgroundColor);
+    // 裁剪出C区域（C区域 - A区域的交集的补集部分）
+    final pathCMinusA =
+        Path.combine(PathOperation.difference, _getPathC(), _getPathA());
+    canvas.clipPath(pathCMinusA);
 
-    canvas.save();
-    canvas.translate(mBezierControl1.dx, mBezierControl1.dy);
+    // 计算镜像变换矩阵
+    final eh = math.sqrt(math.pow(f.dx - e.dx, 2) + math.pow(h.dy - f.dy, 2));
+    if (eh < 0.001) {
+      canvas.restore();
+      return;
+    }
 
-    // 矩阵变换实现镜像翻转
-    double dis = math.sqrt(math.pow(mCornerX - mBezierControl1.dx, 2) +
-        math.pow(mBezierControl2.dy - mCornerY, 2));
-    double sinAngle = (mCornerX - mBezierControl1.dx) / dis;
-    double cosAngle = (mBezierControl2.dy - mCornerY) / dis;
+    final sin0 = (f.dx - e.dx) / eh;
+    final cos0 = (h.dy - f.dy) / eh;
 
-    // 使用镜像变换矩阵
-    final a = -(1 - 2 * sinAngle * sinAngle);
-    final b = 2 * sinAngle * cosAngle;
-    final c = 2 * sinAngle * cosAngle;
-    final d = 1 - 2 * sinAngle * sinAngle;
+    // 设置翻转和旋转矩阵
+    final a11 = -(1 - 2 * sin0 * sin0);
+    final a12 = 2 * sin0 * cos0;
+    final a21 = 2 * sin0 * cos0;
+    final a22 = 1 - 2 * sin0 * sin0;
 
-    Matrix4 matrix4 = Matrix4(
-      a,
-      c,
+    // 构建变换矩阵：先平移到原点，翻转旋转，再平移回来
+    // M = T(e) * R * T(-e) 其中 R 是镜像矩阵
+    final matrix = Matrix4(
+      a11,
+      a21,
       0,
       0,
-      b,
-      d,
+      a12,
+      a22,
       0,
       0,
       0,
       0,
       1,
       0,
-      -mBezierControl1.dx * a - mBezierControl1.dy * b,
-      -mBezierControl1.dx * c - mBezierControl1.dy * d,
+      e.dx - a11 * e.dx - a12 * e.dy,
+      e.dy - a21 * e.dx - a22 * e.dy,
       0,
       1,
     );
-    canvas.transform(matrix4.storage);
 
-    // 绘制翻转的页面
+    canvas.transform(matrix.storage);
     canvas.drawPicture(curPagePicture!);
 
-    // 添加半透明遮罩模拟纸张背面
-    canvas.drawPaint(Paint()..color = backgroundColor.withValues(alpha: 0.67));
+    // 绘制半透明遮罩模拟纸张背面
+    canvas.drawPaint(Paint()..color = backgroundColor.withValues(alpha: 0.4));
 
+    // 重置变换
     canvas.restore();
+    canvas.save();
+    canvas.clipPath(pathCMinusA);
 
-    _drawTopPageBackAreaShadow(canvas);
+    // 绘制C区域阴影
+    _drawPathCShadow(canvas);
+
     canvas.restore();
   }
 
-  /// 画翻起页的阴影
-  void _drawTopPageBackAreaShadow(Canvas canvas) {
-    double i = (mBezierStart1.dx + mBezierControl1.dx) / 2;
-    double f1 = (i - mBezierControl1.dx).abs();
-    double i1 = (mBezierStart2.dy + mBezierControl2.dy) / 2;
-    double f2 = (i1 - mBezierControl2.dy).abs();
-    double f3 = math.min(f1, f2);
+  /// 绘制C区域阴影
+  void _drawPathCShadow(Canvas canvas) {
+    canvas.save();
 
-    double left;
-    double right;
-    double width;
+    final isTopRight = f.dy == 0;
+    final viewDiagonalLength = math.sqrt(
+        viewSize.width * viewSize.width + viewSize.height * viewSize.height);
 
-    if (mIsRTandLB) {
-      left = mBezierStart1.dx - 1;
-      right = mBezierStart1.dx + f3 + 1;
-      width = right - left;
-    } else {
-      left = mBezierStart1.dx - f3 - 1;
-      right = mBezierStart1.dx + 1;
-      width = left - right;
-    }
+    final midpointCE = (c.dx + e.dx) / 2;
+    final midpointJH = (j.dy + h.dy) / 2;
+    final minDisToControlPoint = math.min(
+      (midpointCE - e.dx).abs(),
+      (midpointJH - h.dy).abs(),
+    );
 
-    canvas.translate(mBezierStart1.dx, mBezierStart1.dy);
-    canvas.rotate(math.atan2(
-        mBezierControl1.dx - mCornerX, mBezierControl2.dy - mCornerY));
+    final colors = isTopRight
+        ? [const Color(0x00333333), const Color(0x55333333)]
+        : [const Color(0x55333333), const Color(0x00333333)];
+
+    final shadowWidth = minDisToControlPoint;
 
     final shadowPaint = Paint()
-      ..isAntiAlias = true
-      ..style = PaintingStyle.fill
-      ..shader = const LinearGradient(
-        colors: [Colors.transparent, Color(0xAA000000)],
-      ).createShader(Rect.fromLTRB(0, 0, width, mMaxLength));
+      ..shader = LinearGradient(colors: colors).createShader(
+        Rect.fromLTRB(
+          isTopRight ? 0 : -shadowWidth,
+          0,
+          isTopRight ? shadowWidth : 0,
+          viewDiagonalLength,
+        ),
+      );
 
-    canvas.drawRect(Rect.fromLTRB(0, 0, width, mMaxLength), shadowPaint);
+    final mDegrees = math.atan2(e.dx - f.dx, h.dy - f.dy);
+    canvas.translate(c.dx, c.dy);
+    canvas.rotate(mDegrees);
+
+    canvas.drawRect(
+      Rect.fromLTRB(-shadowWidth - 30, 0, shadowWidth + 1, viewDiagonalLength),
+      shadowPaint,
+    );
+
+    canvas.restore();
   }
 
   @override
