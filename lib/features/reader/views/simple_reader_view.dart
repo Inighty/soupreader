@@ -13,6 +13,7 @@ import '../models/reading_settings.dart';
 import '../widgets/auto_pager.dart';
 import '../widgets/bookmark_dialog.dart';
 import '../widgets/click_action_config_dialog.dart';
+import '../widgets/paged_reader_widget.dart';
 
 /// 简洁阅读器 - Cupertino 风格 (增强版)
 class SimpleReaderView extends StatefulWidget {
@@ -59,6 +60,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   // 当前书籍信息
   String _bookAuthor = '';
+
+  // 翻页模式相关
+  List<String> _contentPages = [];
+  int _currentPageIndex = 0;
 
   @override
   void initState() {
@@ -135,12 +140,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _currentChapterIndex = index;
       _currentTitle = _chapters[index].title;
       _currentContent = _chapters[index].content ?? '';
+      _currentPageIndex = 0;
     });
 
-    // 等待一帧让内容渲染后再设置偏移
+    // 如果是非滚动模式，需要在build后进行分页
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_settings.pageTurnMode != PageTurnMode.scroll) {
+        _paginateContent();
+      }
+
       if (_scrollController.hasClients) {
-        if (restoreOffset) {
+        if (restoreOffset && _settings.pageTurnMode == PageTurnMode.scroll) {
           final offset = _settingsService.getScrollOffset(widget.bookId);
           if (offset > 0) {
             _scrollController.jumpTo(offset);
@@ -152,6 +162,70 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     });
 
     await _saveProgress();
+  }
+
+  /// 将内容分页（简单按行数分页）
+  void _paginateContent() {
+    if (!mounted) return;
+
+    // 获取屏幕可用高度
+    final screenHeight = MediaQuery.of(context).size.height;
+    final safeArea = MediaQuery.of(context).padding;
+    final availableHeight =
+        screenHeight - safeArea.top - safeArea.bottom - 80; // 减去边距和状态栏
+
+    // 估算每页可容纳的行数
+    final lineHeight = _settings.fontSize * _settings.lineHeight;
+    final linesPerPage = (availableHeight / lineHeight).floor() - 2;
+
+    // 按段落分割
+    final paragraphs = _currentContent.split(RegExp(r'\n\s*\n|\n'));
+    final List<String> pages = [];
+    StringBuffer currentPage = StringBuffer();
+    int currentLines = 0;
+
+    // 第一页包含标题
+    currentPage.writeln(_currentTitle);
+    currentPage.writeln();
+    currentLines += 3;
+
+    for (final paragraph in paragraphs) {
+      final trimmed = paragraph.trim();
+      if (trimmed.isEmpty) continue;
+
+      final text = '　　$trimmed';
+      // 估算这段需要多少行
+      final charsPerLine = (MediaQuery.of(context).size.width -
+              _settings.marginHorizontal * 2) ~/
+          _settings.fontSize;
+      final estLines = (text.length / charsPerLine).ceil() + 1;
+
+      if (currentLines + estLines > linesPerPage && currentPage.isNotEmpty) {
+        // 开启新页
+        pages.add(currentPage.toString());
+        currentPage = StringBuffer();
+        currentLines = 0;
+      }
+
+      currentPage.writeln(text);
+      currentPage.writeln();
+      currentLines += estLines;
+    }
+
+    // 添加最后一页
+    if (currentPage.isNotEmpty) {
+      pages.add(currentPage.toString());
+    }
+
+    // 确保至少有一页
+    if (pages.isEmpty) {
+      pages.add(_currentTitle.isNotEmpty ? _currentTitle : '暂无内容');
+    }
+
+    setState(() {
+      _contentPages = pages;
+      _currentPageIndex = 0;
+    });
   }
 
   /// 更新设置
@@ -304,6 +378,63 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   Widget _buildReadingContent() {
+    // 根据翻页模式选择渲染方式
+    if (_settings.pageTurnMode != PageTurnMode.scroll) {
+      return _buildPagedContent();
+    }
+
+    // 滚动模式
+    return _buildScrollContent();
+  }
+
+  /// 翻页模式内容
+  Widget _buildPagedContent() {
+    return SafeArea(
+      bottom: false,
+      child: PagedReaderWidget(
+        pages: _contentPages.isEmpty ? [_currentTitle] : _contentPages,
+        initialPage: _currentPageIndex,
+        pageTurnMode: _settings.pageTurnMode,
+        textStyle: TextStyle(
+          fontSize: _settings.fontSize,
+          height: _settings.lineHeight,
+          color: _currentTheme.text,
+          letterSpacing: _settings.letterSpacing,
+          fontFamily: _currentFontFamily,
+        ),
+        backgroundColor: _currentTheme.background,
+        padding: EdgeInsets.only(
+          left: _settings.marginHorizontal,
+          right: _settings.marginHorizontal,
+          top: _settings.marginVertical,
+          bottom: _settings.showStatusBar ? 30 : _settings.marginVertical,
+        ),
+        onPageChanged: (pageIndex) {
+          setState(() {
+            _currentPageIndex = pageIndex;
+          });
+        },
+        onPrevChapter: () {
+          if (_currentChapterIndex > 0) {
+            _loadChapter(_currentChapterIndex - 1);
+          }
+        },
+        onNextChapter: () {
+          if (_currentChapterIndex < _chapters.length - 1) {
+            _loadChapter(_currentChapterIndex + 1);
+          }
+        },
+        onTap: () {
+          setState(() {
+            _showMenu = !_showMenu;
+          });
+        },
+      ),
+    );
+  }
+
+  /// 滚动模式内容
+  Widget _buildScrollContent() {
     return SafeArea(
       bottom: false,
       child: Padding(
