@@ -81,6 +81,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // Shader Program
   static ui.FragmentProgram? pageCurlProgram;
+  static ui.FragmentProgram? pageCurlMirrorProgram;
   ui.Image? _curPageImage;
   ui.Image? _targetPageImage;
 
@@ -115,6 +116,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     try {
       pageCurlProgram = await ui.FragmentProgram.fromAsset(
           'lib/features/reader/shaders/page_curl.frag');
+      pageCurlMirrorProgram = await ui.FragmentProgram.fromAsset(
+          'lib/features/reader/shaders/page_curl_mirror.frag');
       if (mounted) {
         setState(() {});
       }
@@ -733,27 +736,29 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 静止状态直接返回当前页面Widget，不使用 CustomPaint
     // 这样避免了状态切换时的闪烁
     final isRunning = _isMoved || _isRunning;
-    if (!isRunning || pageCurlProgram == null || _curPageImage == null) {
+    if (!isRunning ||
+        pageCurlProgram == null ||
+        pageCurlMirrorProgram == null ||
+        _curPageImage == null) {
       return _buildPageWidget(_factory.curPage);
     }
 
     final isNext = _direction == _PageDirection.next;
 
-    // === P6: 仿真逻辑修正 ===
-    // 恢复为"揭开当前页"模式，使用 Shader 内部的镜像逻辑处理上一页
-    // Next: 揭开当前页(Top)，露出下一页(Bottom)
-    // Prev: 揭开当前页(Top)，露出上一页(Bottom)
+    // === 恢复统一逻辑：无论是上一页还是下一页，都表现为"揭开当前页" ===
+    // Next: 揭开当前页(Current)，露出下一页(Target). 使用标准Shader.
+    // Prev: 揭开当前页(Current)，露出上一页(Target). 使用镜像Shader (从左到右揭开).
 
     ui.Image? imageToCurl = _curPageImage;
-    ui.Picture? bottomPicture;
-    double effectiveCornerX = _cornerX;
-
-    // 底层总是 Target (NextPage or PrevPage)
-    bottomPicture = _targetPagePicture;
+    // 底层永远是目标页
+    ui.Picture? bottomPicture = _targetPagePicture;
 
     if (imageToCurl == null) {
       return _buildPageWidget(_factory.curPage);
     }
+
+    // 选择对应的 Shader
+    final program = isNext ? pageCurlProgram! : pageCurlMirrorProgram!;
 
     return CustomPaint(
       size: size,
@@ -766,9 +771,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         viewSize: size,
         isTurnToNext: isNext,
         backgroundColor: widget.backgroundColor,
-        cornerX: effectiveCornerX,
+        cornerX: _cornerX,
         cornerY: _cornerY,
-        shaderProgram: pageCurlProgram!,
+        shaderProgram: program,
         curPageImage: imageToCurl,
         devicePixelRatio: MediaQuery.of(context).devicePixelRatio,
       ),

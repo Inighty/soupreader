@@ -36,59 +36,43 @@ vec2 pointOnCircle(vec2 center, vec2 startPoint, float currentRadius, float arcL
 }
 
 void main() {
-    vec2 fragCoord = FlutterFragCoord().xy;
+    // === HORIZONTAL MIRROR LOGIC ===
+    // We invert the X coordinate of the fragment and the mouse input.
+    // This makes the logic behave as if it's curling from the Right (standard),
+    // but visually it processes pixels from the Left.
+    
+    vec2 fragCoordRaw = FlutterFragCoord().xy;
+    // Invert Fragment X
+    vec2 fragCoord = vec2(resolution.x - fragCoordRaw.x, fragCoordRaw.y);
+    
     float aspect = resolution.x / resolution.y;
     vec2 uv = fragCoord * vec2(aspect, 1.0) / resolution.xy;
-    vec4 currentMouse = iMouse;
     
-    // iMouse: x=touchX, y=touchY, z=cornerX, w=cornerY
-    // Determine curl direction: if cornerX > width/2, it's Right-to-Left (Next Page).
-    // Else it's Left-to-Right (Prev Page).
+    // Invert Mouse X
+    vec4 currentMouse = vec4(resolution.x - iMouse.x, iMouse.y, resolution.x - iMouse.z, iMouse.w);
+    
+    // === REUSE ORIGINAL LOGIC BELOW (Variable names kept same) ===
+    
+    // Determine curl direction: (Inverted logic: if original MouseZ > Width/2, it means RightCurl)
+    // But since we inverted MouseZ, a Left Click (Small Z) becomes Big Z in inverted space.
+    // So logic holds: We want 'Right Curl Logic' to run.
     bool isRightCurl = (currentMouse.z > resolution.x / 2.0);
     
-    // cornerFrom: The corner where curl starts.
-    // If RightCurl: x=aspect. If LeftCurl: x=0.0.
     float cornerX = isRightCurl ? aspect : 0.0;
     vec2 cornerFrom = vec2(cornerX, (currentMouse.w < resolution.y/2.0) ? 0.0 : 1.0);
-    
-    // Spine (Binding edge):
-    // If RightCurl (Next Page), spine is at x=0.0.
-    // If LeftCurl (Prev Page), spine is at x=aspect (because PrevPage comes from Left covering Current, 
-    // wait... logical spine for PrevPage curl is the Right edge? 
-    // Actually, "Prev Page" animation is: A new page enters from Left.
-    // So its "Spine" (unmoving part) is the RIGHT edge of the screen?
-    // Let's think: When we turn to Prev, we grab the Left edge of the NEW page and pull it Right.
-    // So the "Spine" is the Right edge. YES.
     vec2 spineAnchor = vec2(isRightCurl ? 0.0 : aspect, cornerFrom.y==0.0?0.0:1.0);
 
     // 归一化鼠标坐标
     vec2 mouse = currentMouse.xy * vec2(aspect, 1.0) / resolution.xy;
     
-    // 鼠标位置跟 Spine 的距离大于 aspect，才会发生翻页范围大于屏幕 (Page Detachment Constraint)
-    // distance from mouse to SpineAnchor's X-line.
-    // Spine line is x=0 (RightCurl) or x=aspect (LeftCurl).
-    // Simply: distance(mouse.xy, spineAnchor) > aspect ?
     if (distance(mouse.xy, spineAnchor) > aspect) {
         vec2 startPoint = spineAnchor;
         vec2 vector = normalize(vec2(0.5, 0.5*tan(pi/3.0))); 
-        // For LeftCurl, vector x direction might need inversion? 
-        // Logic below assumes startPoint is (0,y). If startPoint is (aspect,y), vector x should be -0.5?
-        // Let's generalize.
-        // Actually the constraint logic tries to keep the page attached.
-        // Juejin code assumes startPoint=(0,y).
-        // Let's transform mouse to "Standard Space" (RightCurl) for calculation, then transform back?
-        // Or just adapt the math.
-        
-        // Let's skip the complex constraint adaptation for now and stick to simple clamping if safe,
-        // or just apply it only for RightCurl.
-        // For LeftCurl, let's try to mirroring the X for calculation.
-        
         vec2 calcMouse = mouse;
         if (!isRightCurl) calcMouse.x = aspect - calcMouse.x;
         
-        vec2 calcStart = vec2(0.0, cornerFrom.y==0.0?0.0:1.0); // Standard Binding at 0
+        vec2 calcStart = vec2(0.0, cornerFrom.y==0.0?0.0:1.0);
         
-        // ... (Original Logic with calcMouse) ...
         vec2 targetMouse = calcMouse;
         vec2 v = targetMouse - calcStart;
         float proj_length = dot(v, vector);
@@ -99,24 +83,18 @@ void main() {
         float actual_distance = min(abs(base_line_distance), abs(arc_distance));
         
         vec2 currentMouse_arc_proj = calcStart + normalize(calcMouse - calcStart)*aspect;
-        vec2 newPoint_arc_proj = pointOnCircle(calcStart, currentMouse_arc_proj, aspect, actual_distance/2.0, calcMouse.y<=tan(pi/3.0)*calcMouse.x); // approx tan check
+        vec2 newPoint_arc_proj = pointOnCircle(calcStart, currentMouse_arc_proj, aspect, actual_distance/2.0, calcMouse.y<=tan(pi/3.0)*calcMouse.x);
         
         calcMouse = newPoint_arc_proj;
         
-        // Transform back
         if (!isRightCurl) calcMouse.x = aspect - calcMouse.x;
         mouse = calcMouse;
 
         currentMouse.xy = mouse * resolution.xy / vec2(aspect, 1.0);
     }
     
-    // 鼠标方向的向量
     vec2 mouseDir = normalize(abs(cornerFrom * resolution.xy / vec2(aspect, 1.0)) - currentMouse.xy);
-    
-    // 翻页辅助计算点起点
     vec2 origin = clamp(mouse - mouseDir * mouse.x / mouseDir.x, 0.0, 1.0);
-    
-    // 鼠标辅助计算距离
     float mouseDist = distance(mouse, origin);
     if (mouseDir.x < 0.0) {
         mouseDist = distance(mouse, origin);
@@ -127,7 +105,6 @@ void main() {
     
     vec2 curlAxisLinePoint = uv - dist * mouseDir;
     
-    // 让翻页页脚能跟随触摸点
     float actualDist = distance(mouse, cornerFrom);
     if (actualDist >= pi*radius) {
         float params = (actualDist - pi*radius)/2.0;
@@ -138,19 +115,27 @@ void main() {
     if (dist > radius) {
         fragColor = vec4(0.0, 0.0, 0.0, (1.0 - pow(clamp((dist - radius)*pi, 0.0, 1.0), 0.2)));
     } else if (dist >= 0.0) {
-        // map to cylinder point
         float theta = asin(dist / radius);
         vec2 p2 = curlAxisLinePoint + mouseDir * (pi - theta) * radius;
         vec2 p1 = curlAxisLinePoint + mouseDir * theta * radius;
         
         if (p2.x <= aspect && p2.y <= 1.0 && p2.x > 0.0 && p2.y > 0.0) {
             uv = p2;
-            fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
-            // fragColor.rgb = mix(fragColor.rgb, vec3(1.0), 0.0);
-            // fragColor.rgb *= pow(clamp((radius - dist) / radius, 0.0, 1.0), 0.2);
+            // === UN-MIRROR UV FOR SAMPLING ===
+            // The calculated uv is in inverted space. We must revert it to sample correct image pixel.
+            // Aspect ratio scaling is involved in calculation, but texture lookup expects 0..1
+            // Let's normalize first:
+            vec2 normUV = uv * vec2(1.0 / aspect, 1.0);
+            // Invert X
+            normUV.x = 1.0 - normUV.x;
+            fragColor = texture(image, normUV);
         } else {
             uv = p1;
-            fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
+            // === UN-MIRROR UV FOR SAMPLING ===
+            vec2 normUV = uv * vec2(1.0 / aspect, 1.0);
+            normUV.x = 1.0 - normUV.x;
+            fragColor = texture(image, normUV);
+            
             if (p2.x <= aspect+shadowWidth && p2.y <= 1.0+shadowWidth && p2.x > 0.0-shadowWidth && p2.y > 0.0-shadowWidth) {
                 float shadow = calShadow(p2, aspect);
                 fragColor = vec4(fragColor.r*shadow, fragColor.g*shadow, fragColor.b*shadow, fragColor.a);
@@ -160,16 +145,20 @@ void main() {
         vec2 p = curlAxisLinePoint + mouseDir * (abs(dist) + pi * radius);
         if (p.x <= aspect && p.y <= 1.0 && p.x > 0.0 && p.y > 0.0) {
             uv = p;
-            fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
-            // fragColor.rgb = mix(fragColor.rgb, vec3(1.0), 0.0);
+            // === UN-MIRROR UV FOR SAMPLING ===
+            vec2 normUV = uv * vec2(1.0 / aspect, 1.0);
+            normUV.x = 1.0 - normUV.x; // Invert X
+            fragColor = texture(image, normUV);
         } else {
-            fragColor = texture(image, uv * vec2(1.0 / aspect, 1.0));
+            // === UN-MIRROR UV FOR SAMPLING ===
+            vec2 normUV = uv * vec2(1.0 / aspect, 1.0);
+            normUV.x = 1.0 - normUV.x; // Invert X
+            fragColor = texture(image, normUV);
+            
             if (p.x <= aspect+shadowWidth && p.y <= 1.0+shadowWidth && p.x > 0.0-shadowWidth && p.y > 0.0-shadowWidth) {
                 float shadow = calShadow(p, aspect);
                 fragColor = vec4(fragColor.r*shadow, fragColor.g*shadow, fragColor.b*shadow, fragColor.a);
             }
         }
     }
-    
-
 }
