@@ -84,48 +84,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   ui.Image? _curPageImage;
   ui.Image? _targetPageImage;
 
-  // ... (initState and loadShader omitted as they are unchanged)
 
-  void _invalidatePictures() {
-    _curPagePicture = null;
-    _targetPagePicture = null;
-    _curPageImage?.dispose();
-    _curPageImage = null;
-    _targetPageImage?.dispose();
-    _targetPageImage = null;
-  }
-
-  // ... (PageFactory getter and recordPage omitted)
-
-  void _ensurePictures(Size size) {
-    if (_lastSize != size) {
-      _invalidatePictures();
-      _lastSize = size;
-    }
-
-    if (_curPagePicture == null) {
-      _curPagePicture = _recordPage(_factory.curPage, size);
-      _curPagePicture!.toImage(size.width.toInt(), size.height.toInt()).then((img) {
-        if (mounted) setState(() { _curPageImage = img; });
-      });
-    }
-
-    if (_direction == _PageDirection.next) {
-      if (_targetPagePicture == null) {
-        _targetPagePicture = _recordPage(_factory.nextPage, size);
-        _targetPagePicture!.toImage(size.width.toInt(), size.height.toInt()).then((img) {
-          if (mounted) setState(() { _targetPageImage = img; });
-        });
-      }
-    } else if (_direction == _PageDirection.prev) {
-      if (_targetPagePicture == null) {
-        _targetPagePicture = _recordPage(_factory.prevPage, size);
-        _targetPagePicture!.toImage(size.width.toInt(), size.height.toInt()).then((img) {
-          if (mounted) setState(() { _targetPageImage = img; });
-        });
-      }
-    }
-  }
 
   @override
   void initState() {
