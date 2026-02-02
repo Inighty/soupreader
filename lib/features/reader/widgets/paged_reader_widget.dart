@@ -256,6 +256,24 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _targetPageImage = null;
   }
 
+  Future<ui.Image> _convertToHighResImage(ui.Picture picture, Size size) async {
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final int w = (size.width * dpr).toInt();
+    final int h = (size.height * dpr).toInt();
+    
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.scale(dpr);
+    canvas.drawPicture(picture);
+    final highResPicture = recorder.endRecording();
+    
+    final img = await highResPicture.toImage(w, h);
+    // highResPicture.dispose(); // Picture.toImage consumes or we can dispose? 
+    // Actually ui.Picture.toImage doesn't consume, but we should dispose the picture after use.
+    highResPicture.dispose();
+    return img;
+  }
+
   void _ensurePictures(Size size) {
     if (_lastSize != size) {
       _invalidatePictures();
@@ -265,14 +283,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 对标 flutter_novel：当前页永远是翻起的页面
     if (_curPagePicture == null) {
       _curPagePicture = _recordPage(_factory.curPage, size);
-      
-      // Get DPR to generate high-res texture
-      final dpr = MediaQuery.of(context).devicePixelRatio;
-      final int w = (size.width * dpr).toInt();
-      final int h = (size.height * dpr).toInt();
-
-      // toImage is async but acceptable here.
-      _curPagePicture!.toImage(w, h).then((img) {
+      _convertToHighResImage(_curPagePicture!, size).then((img) {
         if (mounted) setState(() { _curPageImage = img; });
       });
     }
@@ -280,16 +291,14 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (_direction == _PageDirection.next) {
       if (_targetPagePicture == null) {
         _targetPagePicture = _recordPage(_factory.nextPage, size);
-        final dpr = MediaQuery.of(context).devicePixelRatio;
-        _targetPagePicture!.toImage((size.width * dpr).toInt(), (size.height * dpr).toInt()).then((img) {
+        _convertToHighResImage(_targetPagePicture!, size).then((img) {
           if (mounted) setState(() { _targetPageImage = img; });
         });
       }
     } else if (_direction == _PageDirection.prev) {
       if (_targetPagePicture == null) {
         _targetPagePicture = _recordPage(_factory.prevPage, size);
-        final dpr = MediaQuery.of(context).devicePixelRatio;
-        _targetPagePicture!.toImage((size.width * dpr).toInt(), (size.height * dpr).toInt()).then((img) {
+        _convertToHighResImage(_targetPagePicture!, size).then((img) {
           if (mounted) setState(() { _targetPageImage = img; });
         });
       }
