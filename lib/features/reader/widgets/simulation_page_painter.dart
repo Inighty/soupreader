@@ -245,12 +245,29 @@ class SimulationPagePainter extends CustomPainter {
     canvas.restore();
   }
 
-  /// 画顶部页的阴影
+  /// 画顶部页的阴影（P6: 对标 Legado drawCurrentPageShadow）
+  /// 增强阴影效果，添加两条边缘阴影（水平和垂直方向）
   void _drawTopPageShadow(Canvas canvas) {
-    int dx = mCornerX == 0 ? 5 : -5;
-    int dy = mCornerY == 0 ? 5 : -5;
-
-    Path shadowPath = Path.combine(
+    // === 第一条阴影：对应 Legado 的第一个 mPath1 ===
+    final double degree = mIsRTandLB
+        ? math.pi / 4 - math.atan2(mBezierControl1.dy - mTouch.dy, mTouch.dx - mBezierControl1.dx)
+        : math.pi / 4 - math.atan2(mTouch.dy - mBezierControl1.dy, mTouch.dx - mBezierControl1.dx);
+    
+    final double d1 = 25.0 * 1.414 * math.cos(degree);
+    final double d2 = 25.0 * 1.414 * math.sin(degree);
+    final double x = mTouch.dx + d1;
+    final double y = mIsRTandLB ? (mTouch.dy + d2) : (mTouch.dy - d2);
+    
+    // 第一条阴影路径
+    Path shadowPath1 = Path()
+      ..moveTo(x, y)
+      ..lineTo(mTouch.dx, mTouch.dy)
+      ..lineTo(mBezierControl1.dx, mBezierControl1.dy)
+      ..lineTo(mBezierStart1.dx, mBezierStart1.dy)
+      ..close();
+    
+    // 裁剪到屏幕内
+    shadowPath1 = Path.combine(
       PathOperation.intersect,
       Path()
         ..moveTo(0, 0)
@@ -258,14 +275,103 @@ class SimulationPagePainter extends CustomPainter {
         ..lineTo(viewSize.width, viewSize.height)
         ..lineTo(0, viewSize.height)
         ..close(),
-      Path()
-        ..moveTo(mTouch.dx + dx, mTouch.dy + dy)
-        ..lineTo(mBezierControl2.dx + dx, mBezierControl2.dy + dy)
-        ..lineTo(mBezierControl1.dx + dx, mBezierControl1.dy + dy)
-        ..close(),
+      shadowPath1,
     );
-
-    canvas.drawShadow(shadowPath, Colors.black, 5, true);
+    
+    // 排除 mTopPagePath 区域
+    shadowPath1 = Path.combine(
+      PathOperation.difference,
+      shadowPath1,
+      mTopPagePath,
+    );
+    
+    canvas.save();
+    canvas.clipPath(shadowPath1);
+    
+    // 绘制第一条阴影
+    double leftX = mIsRTandLB ? mBezierControl1.dx : (mBezierControl1.dx - 25);
+    double rightX = mIsRTandLB ? (mBezierControl1.dx + 25) : (mBezierControl1.dx + 1);
+    List<Color> colors1 = mIsRTandLB
+        ? [const Color(0x80111111), Colors.transparent]
+        : [Colors.transparent, const Color(0x80111111)];
+    
+    double rotateDegrees = math.atan2(
+      mTouch.dx - mBezierControl1.dx,
+      mBezierControl1.dy - mTouch.dy,
+    );
+    
+    canvas.translate(mBezierControl1.dx, mBezierControl1.dy);
+    canvas.rotate(rotateDegrees);
+    
+    final paint1 = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.fill
+      ..shader = LinearGradient(colors: colors1)
+          .createShader(Rect.fromLTRB(leftX - mBezierControl1.dx, -mMaxLength, 
+                                      rightX - mBezierControl1.dx, 0));
+    
+    canvas.drawRect(
+      Rect.fromLTRB(leftX - mBezierControl1.dx, -mMaxLength, 
+                    rightX - mBezierControl1.dx, 0),
+      paint1,
+    );
+    canvas.restore();
+    
+    // === 第二条阴影：对应 Legado 的第二个 mPath1 ===
+    Path shadowPath2 = Path()
+      ..moveTo(x, y)
+      ..lineTo(mTouch.dx, mTouch.dy)
+      ..lineTo(mBezierControl2.dx, mBezierControl2.dy)
+      ..lineTo(mBezierStart2.dx, mBezierStart2.dy)
+      ..close();
+    
+    shadowPath2 = Path.combine(
+      PathOperation.intersect,
+      Path()
+        ..moveTo(0, 0)
+        ..lineTo(viewSize.width, 0)
+        ..lineTo(viewSize.width, viewSize.height)
+        ..lineTo(0, viewSize.height)
+        ..close(),
+      shadowPath2,
+    );
+    
+    shadowPath2 = Path.combine(
+      PathOperation.difference,
+      shadowPath2,
+      mTopPagePath,
+    );
+    
+    canvas.save();
+    canvas.clipPath(shadowPath2);
+    
+    double topY = mIsRTandLB ? mBezierControl2.dy : (mBezierControl2.dy - 25);
+    double bottomY = mIsRTandLB ? (mBezierControl2.dy + 25) : (mBezierControl2.dy + 1);
+    List<Color> colors2 = mIsRTandLB
+        ? [const Color(0x80111111), Colors.transparent]
+        : [Colors.transparent, const Color(0x80111111)];
+    
+    double rotateDegrees2 = math.atan2(
+      mBezierControl2.dy - mTouch.dy,
+      mBezierControl2.dx - mTouch.dx,
+    );
+    
+    canvas.translate(mBezierControl2.dx, mBezierControl2.dy);
+    canvas.rotate(rotateDegrees2);
+    
+    final paint2 = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.fill
+      ..shader = LinearGradient(colors: colors2)
+          .createShader(Rect.fromLTRB(-mMaxLength, topY - mBezierControl2.dy, 
+                                      0, bottomY - mBezierControl2.dy));
+    
+    canvas.drawRect(
+      Rect.fromLTRB(-mMaxLength, topY - mBezierControl2.dy, 
+                    0, bottomY - mBezierControl2.dy),
+      paint2,
+    );
+    canvas.restore();
   }
 
   /// 画翻起来的底下那页

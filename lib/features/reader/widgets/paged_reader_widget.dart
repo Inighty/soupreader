@@ -59,8 +59,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   double _startY = 0;
   double _lastX = 0; // 上一帧触摸点
   double _lastY = 0;
-  double _touchX = 0; // 当前触摸点
-  double _touchY = 0;
+  double _touchX = 0.1; // 当前触摸点（P1: 不让x,y为0,否则在点计算时会有问题）
+  double _touchY = 0.1;
+
+  // === P2: 角点状态变量（对标 Legado mCornerX, mCornerY）===
+  double _cornerX = 0;
+  double _cornerY = 0;
 
   // === Scroller 风格动画（对标 Legado Scroller） ===
   double _scrollStartX = 0;
@@ -303,9 +307,35 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // === 对标 Legado: setDirection ===
   void _setDirection(_PageDirection direction) {
     _direction = direction;
-    _invalidatePictures();
     final size = MediaQuery.of(context).size;
+    
+    // === P2/P4: 在方向确定时计算角点（对标 Legado SimulationPageDelegate.setDirection）===
+    if (direction == _PageDirection.prev) {
+      // 上一页滑动不出现对角（对标 Legado: 强制使用底边）
+      if (_startX > size.width / 2) {
+        _calcCornerXY(_startX, size.height);
+      } else {
+        // P4: 左半边镜像处理
+        _calcCornerXY(size.width - _startX, size.height);
+      }
+    } else if (direction == _PageDirection.next) {
+      if (size.width / 2 > _startX) {
+        // 左半边点击时，强制使用右边角点
+        _calcCornerXY(size.width - _startX, _startY);
+      } else {
+        _calcCornerXY(_startX, _startY);
+      }
+    }
+    
+    _invalidatePictures();
     _ensurePictures(size);
+  }
+  
+  // === P2: 计算角点（对标 Legado calcCornerXY）===
+  void _calcCornerXY(double x, double y) {
+    final size = MediaQuery.of(context).size;
+    _cornerX = x <= size.width / 2 ? 0 : size.width;
+    _cornerY = y <= size.height / 2 ? 0 : size.height;
   }
 
   // === 对标 Legado: abortAnim ===
@@ -356,7 +386,19 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   // === 对标 Legado: startScroll ===
-  void _startScroll(double startX, double startY, double dx, double dy, int duration) {
+  // P5: 动态动画时长计算（对标 Legado PageDelegate.startScroll）
+  void _startScroll(double startX, double startY, double dx, double dy, int animationSpeed) {
+    final size = MediaQuery.of(context).size;
+    // 根据移动距离动态计算时长
+    int duration;
+    if (dx != 0) {
+      duration = (animationSpeed * dx.abs() / size.width).toInt();
+    } else {
+      duration = (animationSpeed * dy.abs() / size.height).toInt();
+    }
+    // 限制在合理范围内
+    duration = duration.clamp(100, 600);
+    
     _scrollStartX = startX;
     _scrollStartY = startY;
     _scrollDx = dx;
@@ -627,20 +669,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 确保 Picture 已预渲染
     _ensurePictures(size);
 
-    // 计算角点（对标 Legado calcCornerXY）
-    double cornerX;
-    double cornerY;
-
-    if (isNext) {
-      cornerX = _startX <= size.width / 2 ? 0 : size.width;
-      cornerY = _startY <= size.height / 2 ? 0 : size.height;
-      if (size.width / 2 > _startX) {
-        cornerX = size.width;
-      }
-    } else {
-      cornerX = _startX > size.width / 2 ? size.width : 0;
-      cornerY = size.height;
-    }
+    // P2: 使用预先计算的角点，而非在绘制时计算
+    // 角点已经在 _setDirection 中通过 _calcCornerXY 计算好了
 
     return CustomPaint(
       size: size,
@@ -651,8 +681,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         viewSize: size,
         isTurnToNext: isNext,
         backgroundColor: widget.backgroundColor,
-        cornerX: cornerX,
-        cornerY: cornerY,
+        cornerX: _cornerX,
+        cornerY: _cornerY,
       ),
     );
   }
@@ -717,6 +747,23 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     if (_isMoved) {
+      final size = MediaQuery.of(context).size;
+      
+      // === P3: 中间区域Y坐标强制调整（对标 Legado SimulationPageDelegate.onTouch）===
+      double adjustedY = focusY;
+      if (widget.pageTurnMode == PageTurnMode.simulation) {
+        // 中间区域或上一页：强制使用底边
+        if ((_startY > size.height / 3 && _startY < size.height * 2 / 3)
+            || _direction == _PageDirection.prev) {
+          adjustedY = size.height;
+        }
+        // 中间偏上区域且是下一页：强制使用顶边
+        if (_startY > size.height / 3 && _startY < size.height / 2
+            && _direction == _PageDirection.next) {
+          adjustedY = 1.0;
+        }
+      }
+      
       // 判断是否取消（方向改变）
       _isCancel = _direction == _PageDirection.next
           ? focusX > _lastX
@@ -724,7 +771,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       _isRunning = true;
 
       // 设置触摸点
-      _setTouchPoint(focusX, focusY);
+      _setTouchPoint(focusX, adjustedY);
       setState(() {});
     }
   }
