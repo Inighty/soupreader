@@ -542,23 +542,25 @@ class SimulationPagePainter extends CustomPainter {
     double right;
     List<Color> colors;
 
-    // 阴影颜色配置：Legado 使用的是 0x333333 (深色) -> 0xB0333333 (浅色/透明)
-    // 这里使用半透明黑到透明
-    const Color shadowColor = Color(0xAA000000);
-    const Color transparentColor = Colors.transparent;
+    // 阴影颜色配置：Legado 使用的是 0x333333 (透明) -> 0xB0333333 (深色)
+    // 也就是从折痕(Start1)向外变深，模拟圆柱体的光照效果(折痕处是高光)
+    const Color shadowColor = Color(0xAA000000); // 对应 Legado 的 -0x4fcccccd (approx)
+    const Color transparentColor = Colors.transparent; // 对应 Legado 的 0x333333
 
     if (mIsRTandLB) {
       // 阴影在折痕右侧 (0 -> f3)
-      left = -1; // 为了防止边缘缝隙，稍微向左延伸一点
+      left = -1;
       right = f3 + 1;
-      // 从左(折痕)到右(外部)渐变：深 -> 浅
-      colors = [shadowColor, transparentColor];
+      // Legado (LL): Left(Near/Fold) -> Right(Far). Colors: [Transp, Dark]
+      colors = [transparentColor, shadowColor];
     } else {
       // 阴影在折痕左侧 (-f3 -> 0)
       left = -f3 - 1;
-      right = 1; // 为了防止边缘缝隙，稍微向右延伸一点
-      // 从左(外部)到右(折痕)渐变：浅 -> 深
-      colors = [transparentColor, shadowColor];
+      right = 1;
+      // Legado (RL): Right(Near/Fold) -> Left(Far). Colors: [Transp, Dark]
+      // Canvas Gradient is Left->Right.
+      // So Left(Far)=Dark, Right(Near)=Transp.
+      colors = [shadowColor, transparentColor];
     }
 
     canvas.translate(mBezierStart1.dx, mBezierStart1.dy);
