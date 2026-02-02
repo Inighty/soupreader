@@ -79,9 +79,58 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   ui.Picture? _targetPagePicture;
   Size? _lastSize;
 
+  // Shader Program
+  static ui.FragmentProgram? pageCurlProgram;
+  ui.Image? _curPageImage;
+  ui.Image? _targetPageImage;
+
+  // ... (initState and loadShader omitted as they are unchanged)
+
+  void _invalidatePictures() {
+    _curPagePicture = null;
+    _targetPagePicture = null;
+    _curPageImage?.dispose();
+    _curPageImage = null;
+    _targetPageImage?.dispose();
+    _targetPageImage = null;
+  }
+
+  // ... (PageFactory getter and recordPage omitted)
+
+  void _ensurePictures(Size size) {
+    if (_lastSize != size) {
+      _invalidatePictures();
+      _lastSize = size;
+    }
+
+    if (_curPagePicture == null) {
+      _curPagePicture = _recordPage(_factory.curPage, size);
+      _curPagePicture!.toImage(size.width.toInt(), size.height.toInt()).then((img) {
+        if (mounted) setState(() { _curPageImage = img; });
+      });
+    }
+
+    if (_direction == _PageDirection.next) {
+      if (_targetPagePicture == null) {
+        _targetPagePicture = _recordPage(_factory.nextPage, size);
+        _targetPagePicture!.toImage(size.width.toInt(), size.height.toInt()).then((img) {
+          if (mounted) setState(() { _targetPageImage = img; });
+        });
+      }
+    } else if (_direction == _PageDirection.prev) {
+      if (_targetPagePicture == null) {
+        _targetPagePicture = _recordPage(_factory.prevPage, size);
+        _targetPagePicture!.toImage(size.width.toInt(), size.height.toInt()).then((img) {
+          if (mounted) setState(() { _targetPageImage = img; });
+        });
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _loadShader();
     _animController = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: widget.animDuration),
@@ -102,6 +151,17 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         setState(() {});
       }
     };
+  }
+
+  Future<void> _loadShader() async {
+    if (pageCurlProgram != null) return;
+    try {
+      pageCurlProgram = await ui.FragmentProgram.fromAsset(
+          'lib/features/reader/shaders/page_curl.frag');
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('Failed to load shader: $e');
+    }
   }
 
   @override
@@ -131,10 +191,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     super.dispose();
   }
 
-  void _invalidatePictures() {
-    _curPagePicture = null;
-    _targetPagePicture = null;
-  }
+
 
   PageFactory get _factory => widget.pageFactory;
 
@@ -229,23 +286,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     return recorder.endRecording();
   }
 
-  void _ensurePictures(Size size) {
-    if (_lastSize != size) {
-      _invalidatePictures();
-      _lastSize = size;
-    }
 
-    // 对标 flutter_novel：当前页永远是翻起的页面
-    // drawTopPageCanvas: 画 getCurrentPage() - 当前页
-    // drawBottomPageCanvas: 画 isTurnToNext ? getNextPage() : getPrePage()
-    _curPagePicture ??= _recordPage(_factory.curPage, size);
-
-    if (_direction == _PageDirection.next) {
-      _targetPagePicture ??= _recordPage(_factory.nextPage, size);
-    } else if (_direction == _PageDirection.prev) {
-      _targetPagePicture ??= _recordPage(_factory.prevPage, size);
-    }
-  }
 
   // === 对标 Legado: setStartPoint ===
   void _setStartPoint(double x, double y) {
@@ -666,7 +707,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 静止状态直接返回当前页面Widget，不使用 CustomPaint
     // 这样避免了状态切换时的闪烁
     final isRunning = _isMoved || _isRunning;
-    if (!isRunning) {
+    if (!isRunning || pageCurlProgram == null || _curPageImage == null) {
       return _buildPageWidget(_factory.curPage);
     }
 
@@ -675,8 +716,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     // 确保 Picture 已预渲染
     _ensurePictures(size);
 
-    // P2: 使用预先计算的角点，而非在绘制时计算
-    // 角点已经在 _setDirection 中通过 _calcCornerXY 计算好了
+    // 对于 Previous 翻页，我们需要 "Target Page" 作为捲起的页面
+    // check if we have the necessary image
+    ui.Image? imageToCurl = isNext ? _curPageImage : _targetPageImage;
+    if (imageToCurl == null) {
+      return _buildPageWidget(_factory.curPage);
+    }
 
     return CustomPaint(
       size: size,
@@ -689,6 +734,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         backgroundColor: widget.backgroundColor,
         cornerX: _cornerX,
         cornerY: _cornerY,
+        shaderProgram: pageCurlProgram!,
+        curPageImage: imageToCurl,
+        devicePixelRatio: MediaQuery.of(context).devicePixelRatio,
       ),
     );
   }
