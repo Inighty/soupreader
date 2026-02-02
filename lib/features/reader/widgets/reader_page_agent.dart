@@ -29,6 +29,7 @@ class ReaderPageAgent {
 
       TextPainter textPainter = TextPainter(
         textDirection: TextDirection.ltr,
+        textAlign: TextAlign.justify,
         text: TextSpan(
           text: tempStr,
           style: TextStyle(

@@ -211,8 +211,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         safeArea.top -
         topOffset -
         safeArea.bottom -
-        bottomOffset -
-        40; // Padded to prevent text cutoff (was 20)
+        bottomOffset; // Metrics fixed, no extra buffer needed
     final contentWidth =
         screenWidth - _settings.marginHorizontal - _settings.marginHorizontal;
 
