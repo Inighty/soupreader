@@ -540,22 +540,26 @@ class SimulationPagePainter extends CustomPainter {
 
     double left;
     double right;
-    double width;
+    List<Color> colors;
+
+    // 阴影颜色配置：Legado 使用的是 0x333333 (深色) -> 0xB0333333 (浅色/透明)
+    // 这里使用半透明黑到透明
+    const Color shadowColor = Color(0xAA000000);
+    const Color transparentColor = Colors.transparent;
 
     if (mIsRTandLB) {
-      left = mBezierStart1.dx - 1;
-      right = mBezierStart1.dx + f3 + 1;
+      // 阴影在折痕右侧 (0 -> f3)
+      left = -1; // 为了防止边缘缝隙，稍微向左延伸一点
+      right = f3 + 1;
+      // 从左(折痕)到右(外部)渐变：深 -> 浅
+      colors = [shadowColor, transparentColor];
     } else {
-      left = mBezierStart1.dx - f3 - 1;
-      right = mBezierStart1.dx + 1;
+      // 阴影在折痕左侧 (-f3 -> 0)
+      left = -f3 - 1;
+      right = 1; // 为了防止边缘缝隙，稍微向右延伸一点
+      // 从左(外部)到右(折痕)渐变：浅 -> 深
+      colors = [transparentColor, shadowColor];
     }
-    // 确保 left <= right，避免负宽度
-    if (left > right) {
-      final temp = left;
-      left = right;
-      right = temp;
-    }
-    width = right - left;
 
     canvas.translate(mBezierStart1.dx, mBezierStart1.dy);
     canvas.rotate(math.atan2(
@@ -564,11 +568,11 @@ class SimulationPagePainter extends CustomPainter {
     final shadowPaint = Paint()
       ..isAntiAlias = true
       ..style = PaintingStyle.fill
-      ..shader = const LinearGradient(
-        colors: [Colors.transparent, Color(0xAA000000)],
-      ).createShader(Rect.fromLTRB(0, 0, width, mMaxLength));
+      ..shader = LinearGradient(
+        colors: colors,
+      ).createShader(Rect.fromLTRB(left, 0, right, mMaxLength));
 
-    canvas.drawRect(Rect.fromLTRB(0, 0, width, mMaxLength), shadowPaint);
+    canvas.drawRect(Rect.fromLTRB(left, 0, right, mMaxLength), shadowPaint);
   }
 
   @override
