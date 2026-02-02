@@ -112,7 +112,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   Future<void> _loadShader() async {
-    if (pageCurlProgram != null) return;
+    if (pageCurlProgram != null && pageCurlMirrorProgram != null) return;
     try {
       pageCurlProgram = await ui.FragmentProgram.fromAsset(
           'lib/features/reader/shaders/page_curl.frag');
