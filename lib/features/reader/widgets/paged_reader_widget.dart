@@ -258,9 +258,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _direction = _PageDirection.prev;
 
     final size = MediaQuery.of(context).size;
-    // PREV 方向：从右下角翻起，向右翻露出左边的 prevPage
-    // 起始点和 NEXT 相同，但目标点向右
-    _startX = size.width * 0.9;
+    // PREV 方向：仿真模式需要从左下角翻起，向右翻露出左边的 prevPage
+    // 起始点设置为左侧边缘
+    _startX = size.width * 0.1;
     _startY = size.height * 0.9;
     _touchX = _startX;
     _touchY = _startY;
