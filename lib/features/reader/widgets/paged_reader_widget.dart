@@ -47,17 +47,28 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
 
-  // 翻页状态
-  double _dragOffset = 0;
-  bool _isDragging = false;
-  _PageDirection _direction = _PageDirection.none;
-  bool _isAnimating = false;
+  // === 对标 Legado PageDelegate 的状态变量 ===
+  bool _isMoved = false; // 是否已移动（触发方向判断）
+  bool _isRunning = false; // 动画是否运行中（控制渲染）
+  bool _isStarted = false; // Scroller 是否已启动
+  bool _isCancel = false; // 是否取消翻页
+  _PageDirection _direction = _PageDirection.none; // 翻页方向
 
-  // 仿真翻页用的起始点和触摸点
-  double _startX = 0;
+  // === 坐标系统（对标 Legado ReadView） ===
+  double _startX = 0; // 按下的起始点
   double _startY = 0;
-  double _touchX = 0;
+  double _lastX = 0; // 上一帧触摸点
+  double _lastY = 0;
+  double _touchX = 0; // 当前触摸点
   double _touchY = 0;
+
+  // === Scroller 风格动画（对标 Legado Scroller） ===
+  double _scrollStartX = 0;
+  double _scrollStartY = 0;
+  double _scrollDx = 0;
+  double _scrollDy = 0;
+  int _scrollDuration = 300;
+  DateTime? _scrollStartTime;
 
   // 页面 Picture 缓存（仿真模式用）
   ui.Picture? _curPagePicture;
@@ -71,6 +82,15 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       vsync: this,
       duration: Duration(milliseconds: widget.animDuration),
     );
+
+    // === 对标 Legado computeScroll ===
+    // 使用 AnimationController 的 listener 来驱动动画
+    _animController.addListener(_computeScroll);
+    _animController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _onAnimComplete();
+      }
+    });
 
     widget.pageFactory.onContentChanged = () {
       if (mounted) {
@@ -223,8 +243,26 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
   }
 
+  // === 对标 Legado: setStartPoint ===
+  void _setStartPoint(double x, double y) {
+    _startX = x;
+    _startY = y;
+    _lastX = x;
+    _lastY = y;
+    _touchX = x;
+    _touchY = y;
+  }
+
+  // === 对标 Legado: setTouchPoint ===
+  void _setTouchPoint(double x, double y) {
+    _lastX = _touchX;
+    _lastY = _touchY;
+    _touchX = x;
+    _touchY = y;
+  }
+
   void _onTap(Offset position) {
-    if (_isAnimating) return;
+    if (_isRunning) return;
 
     final screenWidth = MediaQuery.of(context).size.width;
     final xRate = position.dx / screenWidth;
@@ -232,124 +270,144 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (xRate > 0.33 && xRate < 0.66) {
       widget.onTap?.call();
     } else if (xRate >= 0.66) {
-      _goNext();
+      _nextPageByAnim();
     } else {
-      _goPrev();
+      _prevPageByAnim();
     }
   }
 
-  void _goNext() {
+  // === 对标 Legado: nextPageByAnim ===
+  void _nextPageByAnim() {
+    _abortAnim();
     if (!_factory.hasNext()) return;
-    _direction = _PageDirection.next;
+    _setDirection(_PageDirection.next);
 
     final size = MediaQuery.of(context).size;
-    _startX = size.width * 0.9;
-    _startY = size.height * 0.9;
-    _touchX = _startX;
-    _touchY = _startY;
-
-    _invalidatePictures();
-    _ensurePictures(size);
-    _startAnimation();
+    // 从右下角开始
+    _setStartPoint(size.width * 0.9, size.height * 0.9);
+    _onAnimStart();
   }
 
-  void _goPrev() {
+  // === 对标 Legado: prevPageByAnim ===
+  void _prevPageByAnim() {
+    _abortAnim();
     if (!_factory.hasPrev()) return;
-    _direction = _PageDirection.prev;
+    _setDirection(_PageDirection.prev);
 
     final size = MediaQuery.of(context).size;
-    // PREV 方向：仿真模式需要从左下角翻起，向右翻露出左边的 prevPage
-    // 起始点设置为左侧边缘
-    _startX = size.width * 0.1;
-    _startY = size.height * 0.9;
-    _touchX = _startX;
-    _touchY = _startY;
+    // 从左下角开始
+    _setStartPoint(0, size.height);
+    _onAnimStart();
+  }
 
+  // === 对标 Legado: setDirection ===
+  void _setDirection(_PageDirection direction) {
+    _direction = direction;
     _invalidatePictures();
-    _ensurePictures(size);
-    _startAnimation();
-  }
-
-  void _startAnimation() {
-    if (_isAnimating) return;
-    _isAnimating = true;
-
     final size = MediaQuery.of(context).size;
-    final screenWidth = size.width;
-    final screenHeight = size.height;
-
-    // 目标点
-    // NEXT: 从右下角向左翻走
-    // PREV: 从左下角向右翻过来覆盖整个屏幕
-    final targetX =
-        _direction == _PageDirection.next ? -screenWidth : screenWidth + 50;
-    final targetY = screenHeight;
-
-    final startTouchX = _touchX;
-    final startTouchY = _touchY;
-    final startDragOffset = _dragOffset;
-    final targetDragOffset =
-        _direction == _PageDirection.next ? -screenWidth : screenWidth;
-
-    _animController.reset();
-
-    void listener() {
-      if (mounted) {
-        final progress = Curves.easeOutCubic.transform(_animController.value);
-        _touchX = startTouchX + (targetX - startTouchX) * progress;
-        _touchY = startTouchY + (targetY - startTouchY) * progress;
-        _dragOffset =
-            startDragOffset + (targetDragOffset - startDragOffset) * progress;
-        // 使用 markNeedsPaint 而非 setState
-        (context as Element).markNeedsBuild();
-      }
-    }
-
-    void statusListener(AnimationStatus status) {
-      if (status == AnimationStatus.completed) {
-        _onAnimStop();
-        _animController.removeListener(listener);
-        _animController.removeStatusListener(statusListener);
-      }
-    }
-
-    _animController.addListener(listener);
-    _animController.addStatusListener(statusListener);
-    _animController.forward();
+    _ensurePictures(size);
   }
 
+  // === 对标 Legado: abortAnim ===
+  void _abortAnim() {
+    _isStarted = false;
+    _isMoved = false;
+    _isRunning = false;
+    if (_animController.isAnimating) {
+      _animController.stop();
+      if (!_isCancel) {
+        _fillPage(_direction);
+      }
+    }
+  }
+
+  // === 对标 Legado: onAnimStart (SimulationPageDelegate) ===
+  void _onAnimStart() {
+    final size = MediaQuery.of(context).size;
+    double dx, dy;
+
+    if (_isCancel) {
+      // 取消翻页，回到原位
+      if (_direction == _PageDirection.next) {
+        dx = size.width - _touchX;
+      } else {
+        dx = -_touchX;
+      }
+      dy = size.height - _touchY;
+    } else {
+      // 完成翻页
+      if (_direction == _PageDirection.next) {
+        dx = -(size.width + _touchX);
+      } else {
+        dx = size.width - _touchX;
+      }
+      dy = size.height - _touchY;
+    }
+
+    _startScroll(_touchX, _touchY, dx, dy, widget.animDuration);
+  }
+
+  // === 对标 Legado: startScroll ===
+  void _startScroll(double startX, double startY, double dx, double dy, int duration) {
+    _scrollStartX = startX;
+    _scrollStartY = startY;
+    _scrollDx = dx;
+    _scrollDy = dy;
+    _scrollDuration = duration;
+    _scrollStartTime = DateTime.now();
+    _isRunning = true;
+    _isStarted = true;
+    _animController.duration = Duration(milliseconds: duration);
+    _animController.forward(from: 0);
+  }
+
+  // === 对标 Legado: computeScroll (由 AnimationController 驱动) ===
+  void _computeScroll() {
+    if (!_isStarted || !mounted) return;
+
+    final progress = Curves.easeOutCubic.transform(_animController.value);
+    _touchX = _scrollStartX + _scrollDx * progress;
+    _touchY = _scrollStartY + _scrollDy * progress;
+
+    // 触发重绘
+    (context as Element).markNeedsBuild();
+  }
+
+  // === 动画完成回调 ===
+  void _onAnimComplete() {
+    if (!_isStarted) return;
+    _onAnimStop();
+    _stopScroll();
+  }
+
+  // === 对标 Legado: onAnimStop (SimulationPageDelegate) ===
   void _onAnimStop() {
-    // === 对标 Legado: onAnimStop + stopScroll ===
-    // Legado 的关键：先更新内容，再用 post{} 延迟重置状态
-    // 确保内容更新和状态重置不在同一帧，避免闪烁
+    if (!_isCancel) {
+      _fillPage(_direction);
+    }
+  }
 
-    // 1. 保存方向
-    final direction = _direction;
-
-    // 2. 更新 Factory（fillPage）
+  // === 对标 Legado: fillPage ===
+  void _fillPage(_PageDirection direction) {
     if (direction == _PageDirection.next) {
       _factory.moveToNext();
     } else if (direction == _PageDirection.prev) {
       _factory.moveToPrev();
     }
+  }
 
-    // 3. 清除缓存
-    _invalidatePictures();
-
-    // 4. 立即重置状态并触发重绘（显示新页面）
-    _dragOffset = 0;
-    _touchX = 0;
-    _touchY = 0;
-    _direction = _PageDirection.none;
-
-    if (mounted) {
-      setState(() {});
-    }
-
-    // 5. 延迟到下一帧再设置 isAnimating = false（对标 Legado 的 post{}）
+  // === 对标 Legado: stopScroll ===
+  void _stopScroll() {
+    _isStarted = false;
+    // 延迟重置状态（对标 Legado 的 post{}）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _isAnimating = false;
+        _isMoved = false;
+        _isRunning = false;
+        _isCancel = false;
+        _direction = _PageDirection.none;
+        _invalidatePictures();
+        setState(() {});
       }
     });
   }
@@ -385,9 +443,14 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final screenHeight = size.height;
     final isVertical = widget.pageDirection == PageDirection.vertical;
 
-    // 根据方向选择限制范围
-    final maxOffset = isVertical ? screenHeight : screenWidth;
-    final offset = _dragOffset.clamp(-maxOffset, maxOffset);
+    // 计算偏移量（基于触摸点相对于起始点的位移）
+    // 对于滑动/覆盖模式使用
+    final double offset;
+    if (isVertical) {
+      offset = (_touchY - _startY).clamp(-screenHeight, screenHeight);
+    } else {
+      offset = (_touchX - _startX).clamp(-screenWidth, screenWidth);
+    }
 
     switch (widget.pageTurnMode) {
       case PageTurnMode.slide:
@@ -399,7 +462,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
             ? _buildVerticalCoverAnimation(screenHeight, offset)
             : _buildCoverAnimation(screenWidth, offset);
       case PageTurnMode.simulation:
-        // 仿真模式暂不支持垂直，使用滑动模式替代
+        // 仿真模式使用 touchX/touchY
         return isVertical
             ? _buildVerticalSlideAnimation(screenHeight, offset)
             : _buildSimulationAnimation(size);
@@ -588,7 +651,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   /// 无动画模式
   Widget _buildNoAnimation(double screenWidth, double offset) {
-    if (offset.abs() > screenWidth * 0.2 && !_isAnimating) {
+    if (offset.abs() > screenWidth * 0.2 && !_isRunning) {
       if (offset < 0 && _factory.hasNext()) {
         return _buildPageWidget(_factory.nextPage);
       } else if (offset > 0 && _factory.hasPrev()) {
@@ -598,201 +661,142 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     return _buildPageWidget(_factory.curPage);
   }
 
+  // === 对标 Legado HorizontalPageDelegate.onTouch ===
   void _onDragStart(DragStartDetails details) {
-    if (_isAnimating) return;
-    _isDragging = true;
+    if (_isRunning) return;
+    _abortAnim();
+    _setStartPoint(details.localPosition.dx, details.localPosition.dy);
+    _isMoved = false;
+    _isCancel = false;
     _direction = _PageDirection.none;
-
-    _startX = details.localPosition.dx;
-    _startY = details.localPosition.dy;
-    _touchX = _startX;
-    _touchY = _startY;
-
-    _invalidatePictures();
   }
 
+  // === 对标 Legado HorizontalPageDelegate.onScroll ===
   void _onDragUpdate(DragUpdateDetails details) {
-    if (!_isDragging || _isAnimating) return;
+    if (_isRunning) return;
 
-    _dragOffset += details.delta.dx;
-    _touchX = details.localPosition.dx;
-    _touchY = details.localPosition.dy;
+    final focusX = details.localPosition.dx;
+    final focusY = details.localPosition.dy;
 
-    if (_direction == _PageDirection.none && _dragOffset.abs() > 10) {
-      _direction = _dragOffset > 0 ? _PageDirection.prev : _PageDirection.next;
-      _invalidatePictures();
+    // 判断是否移动了
+    if (!_isMoved) {
+      final deltaX = (focusX - _startX).abs();
+      final deltaY = (focusY - _startY).abs();
+      final distance = deltaX * deltaX + deltaY * deltaY;
+      final slopSquare = 20.0 * 20.0; // 触发阈值
+
+      _isMoved = distance > slopSquare;
+
+      if (_isMoved) {
+        if (focusX - _startX > 0) {
+          // 向右滑动 = 上一页
+          if (!_factory.hasPrev()) {
+            return;
+          }
+          _setDirection(_PageDirection.prev);
+        } else {
+          // 向左滑动 = 下一页
+          if (!_factory.hasNext()) {
+            return;
+          }
+          _setDirection(_PageDirection.next);
+        }
+        // 设置起始点为当前位置
+        _setStartPoint(focusX, focusY);
+      }
     }
 
-    if (_direction == _PageDirection.prev && !_factory.hasPrev()) {
-      _dragOffset = (_dragOffset * 0.3).clamp(-50, 50);
-    }
-    if (_direction == _PageDirection.next && !_factory.hasNext()) {
-      _dragOffset = (_dragOffset * 0.3).clamp(-50, 50);
-    }
+    if (_isMoved) {
+      // 判断是否取消（方向改变）
+      _isCancel = _direction == _PageDirection.next
+          ? focusX > _lastX
+          : focusX < _lastX;
+      _isRunning = true;
 
-    // 使用 setState 触发重绘
-    setState(() {});
+      // 设置触摸点
+      _setTouchPoint(focusX, focusY);
+      setState(() {});
+    }
   }
 
+  // === 对标 Legado HorizontalPageDelegate.onTouch ACTION_UP ===
   void _onDragEnd(DragEndDetails details) {
-    if (!_isDragging || _isAnimating) return;
-    _isDragging = false;
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    final velocity = details.primaryVelocity ?? 0;
-
-    // 使用配置的灵敏度 (pageTouchSlop 是百分比 0-100)
-    final threshold = screenWidth * (widget.pageTouchSlop / 100);
-    final shouldTurn = _dragOffset.abs() > threshold || velocity.abs() > 800;
-
-    if (shouldTurn && _direction != _PageDirection.none) {
-      bool canTurn = _direction == _PageDirection.prev
-          ? _factory.hasPrev()
-          : _factory.hasNext();
-
-      if (canTurn) {
-        _startAnimation();
-        return;
-      }
+    if (!_isMoved) {
+      _direction = _PageDirection.none;
+      return;
     }
 
-    _cancelDrag();
+    // 开始动画（完成翻页或取消）
+    _onAnimStart();
   }
 
+  // === 取消动画（不再需要，使用 _isCancel 控制） ===
   void _cancelDrag() {
-    _isAnimating = true;
-    final startOffset = _dragOffset;
-    final startTouchX = _touchX;
-    final startTouchY = _touchY;
-
-    _animController.reset();
-
-    void listener() {
-      if (mounted) {
-        final progress = Curves.easeOut.transform(_animController.value);
-        _dragOffset = startOffset * (1 - progress);
-        _touchX = startTouchX + (_startX - startTouchX) * progress;
-        _touchY = startTouchY + (_startY - startTouchY) * progress;
-        setState(() {});
-      }
-    }
-
-    void statusListener(AnimationStatus status) {
-      if (status == AnimationStatus.completed) {
-        _dragOffset = 0;
-        _touchX = 0;
-        _touchY = 0;
-        _direction = _PageDirection.none;
-        _isAnimating = false;
-        _invalidatePictures();
-        setState(() {});
-        _animController.removeListener(listener);
-        _animController.removeStatusListener(statusListener);
-      }
-    }
-
-    _animController.addListener(listener);
-    _animController.addStatusListener(statusListener);
-    _animController.forward();
+    _isCancel = true;
+    _onAnimStart();
   }
 
-  // === 垂直翻页手势处理 ===
+  // === 垂直翻页手势处理（对标水平方式） ===
   void _onVerticalDragStart(DragStartDetails details) {
-    if (_isAnimating) return;
-    _isDragging = true;
+    if (_isRunning) return;
+    _abortAnim();
+    _setStartPoint(details.localPosition.dx, details.localPosition.dy);
+    _isMoved = false;
+    _isCancel = false;
     _direction = _PageDirection.none;
-
-    _startX = details.localPosition.dx;
-    _startY = details.localPosition.dy;
-    _touchX = _startX;
-    _touchY = _startY;
-
-    _invalidatePictures();
   }
 
   void _onVerticalDragUpdate(DragUpdateDetails details) {
-    if (!_isDragging || _isAnimating) return;
+    if (_isRunning) return;
 
-    // 垂直方向：向上滑动为下一页，向下滑动为上一页
-    _dragOffset += details.delta.dy;
-    _touchX = details.localPosition.dx;
-    _touchY = details.localPosition.dy;
+    final focusX = details.localPosition.dx;
+    final focusY = details.localPosition.dy;
 
-    if (_direction == _PageDirection.none && _dragOffset.abs() > 10) {
-      // 向上滑动（负值）= 下一页，向下滑动（正值）= 上一页
-      _direction = _dragOffset > 0 ? _PageDirection.prev : _PageDirection.next;
-      _invalidatePictures();
+    if (!_isMoved) {
+      final deltaX = (focusX - _startX).abs();
+      final deltaY = (focusY - _startY).abs();
+      final distance = deltaX * deltaX + deltaY * deltaY;
+      final slopSquare = 20.0 * 20.0;
+
+      _isMoved = distance > slopSquare;
+
+      if (_isMoved) {
+        if (focusY - _startY > 0) {
+          // 向下滑动 = 上一页
+          if (!_factory.hasPrev()) {
+            return;
+          }
+          _setDirection(_PageDirection.prev);
+        } else {
+          // 向上滑动 = 下一页
+          if (!_factory.hasNext()) {
+            return;
+          }
+          _setDirection(_PageDirection.next);
+        }
+        _setStartPoint(focusX, focusY);
+      }
     }
 
-    if (_direction == _PageDirection.prev && !_factory.hasPrev()) {
-      _dragOffset = (_dragOffset * 0.3).clamp(-50.0, 50.0);
+    if (_isMoved) {
+      _isCancel = _direction == _PageDirection.next
+          ? focusY > _lastY
+          : focusY < _lastY;
+      _isRunning = true;
+      _setTouchPoint(focusX, focusY);
+      setState(() {});
     }
-    if (_direction == _PageDirection.next && !_factory.hasNext()) {
-      _dragOffset = (_dragOffset * 0.3).clamp(-50.0, 50.0);
-    }
-
-    setState(() {});
   }
 
   void _onVerticalDragEnd(DragEndDetails details) {
-    if (!_isDragging || _isAnimating) return;
-    _isDragging = false;
-
-    final screenHeight = MediaQuery.of(context).size.height;
-    final velocity = details.primaryVelocity ?? 0;
-
-    // 使用配置的灵敏度
-    final threshold = screenHeight * (widget.pageTouchSlop / 100);
-    final shouldTurn = _dragOffset.abs() > threshold || velocity.abs() > 800;
-
-    if (shouldTurn && _direction != _PageDirection.none) {
-      bool canTurn = _direction == _PageDirection.prev
-          ? _factory.hasPrev()
-          : _factory.hasNext();
-
-      if (canTurn) {
-        _startVerticalAnimation();
-        return;
-      }
+    if (!_isMoved) {
+      _direction = _PageDirection.none;
+      return;
     }
-
-    _cancelDrag();
+    _onAnimStart();
   }
 
-  void _startVerticalAnimation() {
-    if (_isAnimating) return;
-    _isAnimating = true;
 
-    final size = MediaQuery.of(context).size;
-    final screenHeight = size.height;
-
-    final startDragOffset = _dragOffset;
-    final targetDragOffset =
-        _direction == _PageDirection.next ? -screenHeight : screenHeight;
-
-    _animController.reset();
-
-    void listener() {
-      if (mounted) {
-        final progress = Curves.easeOutCubic.transform(_animController.value);
-        _dragOffset =
-            startDragOffset + (targetDragOffset - startDragOffset) * progress;
-        (context as Element).markNeedsBuild();
-      }
-    }
-
-    void statusListener(AnimationStatus status) {
-      if (status == AnimationStatus.completed) {
-        _onAnimStop();
-        _animController.removeListener(listener);
-        _animController.removeStatusListener(statusListener);
-      }
-    }
-
-    _animController.addListener(listener);
-    _animController.addStatusListener(statusListener);
-    _animController.forward();
-  }
 
   Widget _buildPageWidget(String content) {
     if (content.isEmpty) {
