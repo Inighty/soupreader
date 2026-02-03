@@ -703,6 +703,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   Widget _buildCoverAnimation(double screenWidth, double offset) {
     final shadowOpacity = (offset.abs() / screenWidth * 0.4).clamp(0.0, 0.4);
 
+    // 如果偏移量极小，不渲染阴影层，直接显示当前页内容（无阴影容器）
+    // 这解决了动画结束后阴影可能残留 1 秒的问题
+    final showShadow = offset.abs() > 1.0;
+
     return Stack(
       children: [
         if (offset < 0)
@@ -714,19 +718,21 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           top: 0,
           bottom: 0,
           width: screenWidth,
-          child: Container(
-            decoration: BoxDecoration(
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: shadowOpacity),
-                  blurRadius: 20,
-                  spreadRadius: 5,
-                  offset: Offset(offset > 0 ? -8 : 8, 0),
-                ),
-              ],
-            ),
-            child: _buildPageWidget(_factory.curPage),
-          ),
+          child: showShadow
+              ? Container(
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: shadowOpacity),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                        offset: Offset(offset > 0 ? -8 : 8, 0),
+                      ),
+                    ],
+                  ),
+                  child: _buildPageWidget(_factory.curPage),
+                )
+              : _buildPageWidget(_factory.curPage),
         ),
       ],
     );
