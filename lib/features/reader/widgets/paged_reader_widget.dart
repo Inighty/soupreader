@@ -21,7 +21,6 @@ class PagedReaderWidget extends StatefulWidget {
   final PageDirection pageDirection; // 翻页方向
   final int pageTouchSlop; // 翻页触发灵敏度 (0-100)
 
-
   static const double topOffset = 37;
   static const double bottomOffset = 37;
 
@@ -349,7 +348,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (!_factory.hasNext()) return;
 
     final size = MediaQuery.of(context).size;
-    
+
     // 修正：点击翻页统一使用底部微偏位置，忽略点击的具体 Y 坐标
     // 固化为最佳体验值 0.96
     final y = size.height * 0.96;
@@ -498,15 +497,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // === 动画完成回调 ===
   void _onAnimComplete() {
     if (!_isStarted) return;
-    _onAnimStop();
     _stopScroll();
-  }
-
-  // === 对标 Legado: onAnimStop (SimulationPageDelegate) ===
-  void _onAnimStop() {
-    if (!_isCancel) {
-      _fillPage(_direction);
-    }
   }
 
   // === 对标 Legado: fillPage ===
@@ -521,17 +512,33 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // === 对标 Legado: stopScroll ===
   void _stopScroll() {
     _isStarted = false;
-    // 延迟重置状态（对标 Legado 的 post{}）
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _isMoved = false;
-        _isRunning = false;
-        _isCancel = false;
-        _direction = _PageDirection.none;
-        _invalidatePictures();
-        setState(() {});
+    _isRunning = false;
+    // 立即重置状态，确保在 _fillPage 触发 setState 之前 Offset 归零
+    // 从而避免上一页内容消失但新页内容尚未加载的闪烁
+    if (mounted) {
+      _isMoved = false;
+
+      final wasCancel = _isCancel;
+      _isCancel = false;
+
+      final direction = _direction;
+      _direction = _PageDirection.none;
+
+      // 重置坐标系统，使 offset = 0
+      _touchX = 0;
+      _startX = 0;
+      _lastX = 0;
+      _scrollDx = 0;
+
+      _invalidatePictures();
+
+      // 先重置视觉状态，再更新内容
+      if (!wasCancel) {
+        _fillPage(direction); // 触发内容更新 -> setState
+      } else {
+        setState(() {}); // 仅重置视觉
       }
-    });
+    }
   }
 
   @override
