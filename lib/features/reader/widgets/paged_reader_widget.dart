@@ -737,39 +737,21 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     final isNext = _direction == _PageDirection.next;
 
-    // === P6: 仿真逻辑修正 ===
-    // Next: Peel Current(Top) to reveal Next(Bottom). Curl from Right.
-    // Prev: Un-curl Prev(Top) to cover Current(Bottom). Curl from Right (simulating unrolling).
+    // === P6: 仿真逻辑统一 (Peel Current Page) ===
+    // 统一模型：永远是“掀起当前页(Top)”，露出“目标页(Bottom)”
+    // Next: 从右边掀起 (_cornerX = width)，露出 NextPage
+    // Prev: 从左边掀起 (_cornerX = 0)，露出 PrevPage
+    // 这样点击和拖拽逻辑完全一致，都是控制 Touch 点移动
 
-    ui.Image? imageToCurl;
-    ui.Picture? bottomPicture;
-    double effectiveCornerX;
-
-    if (isNext) {
-      imageToCurl = _curPageImage;
-      bottomPicture = _targetPagePicture;
-      effectiveCornerX = _cornerX;
-    } else {
-      // Prev: Use Target as the Curling Page (Top), Current as Background (Bottom)
-      imageToCurl = _targetPageImage;
-      bottomPicture = _curPagePicture;
-      // Force Corner to be Right side (simulating we are holding the right edge of the prev page)
-      effectiveCornerX = size.width;
-    }
+    // Top Layer: 永远是当前页
+    ui.Image? imageToCurl = _curPageImage;
+    // Bottom Layer: 目标页
+    ui.Picture? bottomPicture = _targetPagePicture;
+    // Corner: 跟随手势计算出的角点 (Prev时为0，Next时为width)
+    double effectiveCornerX = _cornerX;
 
     if (imageToCurl == null) {
       return _buildPageWidget(_factory.curPage);
-    }
-
-    double simulationTouchX = _touchX;
-    if (!isNext) {
-      // Prev: Apply coordinate mapping to ensure the page un-curls from the left edge (0)
-      // instead of starting half-open.
-      // Relationship: FoldX = (TouchX + CornerX) / 2
-      // We want FoldX = _touchX (approximately, for visual tracking).
-      // Since CornerX = width, we solve: _touchX = (VirtualTouchX + width) / 2
-      // => VirtualTouchX = 2 * _touchX - size.width
-      simulationTouchX = 2 * _touchX - size.width;
     }
 
     return CustomPaint(
@@ -779,7 +761,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         // We only care about 'nextPagePicture' which is the Bottom Layer.
         curPagePicture: null,
         nextPagePicture: bottomPicture,
-        touch: Offset(simulationTouchX, _touchY),
+        touch: Offset(_touchX, _touchY), // 直接使用真实触点
         viewSize: size,
         isTurnToNext: isNext,
         backgroundColor: widget.backgroundColor,
