@@ -47,7 +47,7 @@ class ReadingSettings {
   final int pageTouchSlop; // 翻页触发灵敏度 (0-100, 百分比)
   final bool volumeKeyPage; // 音量键翻页
   final bool mouseWheelPage; // 鼠标滚轮翻页
-  final double simulationClickBias; // 仿真翻页点击偏转 (0.0 - 1.0, 默认 0.96)
+
 
   const ReadingSettings({
     this.fontSize = 18.0,
@@ -87,7 +87,7 @@ class ReadingSettings {
     this.pageTouchSlop = 25,
     this.volumeKeyPage = true,
     this.mouseWheelPage = true,
-    this.simulationClickBias = 0.96,
+
   });
 
   /// 获取 padding（兼容旧代码）
@@ -142,8 +142,7 @@ class ReadingSettings {
       pageTouchSlop: json['pageTouchSlop'] as int? ?? 25,
       volumeKeyPage: json['volumeKeyPage'] as bool? ?? true,
       mouseWheelPage: json['mouseWheelPage'] as bool? ?? true,
-      simulationClickBias:
-          (json['simulationClickBias'] as num?)?.toDouble() ?? 0.96,
+
     );
   }
 
@@ -186,7 +185,7 @@ class ReadingSettings {
       'pageTouchSlop': pageTouchSlop,
       'volumeKeyPage': volumeKeyPage,
       'mouseWheelPage': mouseWheelPage,
-      'simulationClickBias': simulationClickBias,
+
     };
   }
 
@@ -228,7 +227,7 @@ class ReadingSettings {
     int? pageTouchSlop,
     bool? volumeKeyPage,
     bool? mouseWheelPage,
-    double? simulationClickBias,
+
   }) {
     return ReadingSettings(
       fontSize: fontSize ?? this.fontSize,
@@ -268,7 +267,7 @@ class ReadingSettings {
       pageTouchSlop: pageTouchSlop ?? this.pageTouchSlop,
       volumeKeyPage: volumeKeyPage ?? this.volumeKeyPage,
       mouseWheelPage: mouseWheelPage ?? this.mouseWheelPage,
-      simulationClickBias: simulationClickBias ?? this.simulationClickBias,
+
     );
   }
 }

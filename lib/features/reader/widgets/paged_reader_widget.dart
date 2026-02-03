@@ -20,7 +20,7 @@ class PagedReaderWidget extends StatefulWidget {
   final int animDuration; // 动画时长 (100-600ms)
   final PageDirection pageDirection; // 翻页方向
   final int pageTouchSlop; // 翻页触发灵敏度 (0-100)
-  final double simulationClickBias; // 仿真翻页点击偏转 (0.0 - 1.0)
+
 
   static const double topOffset = 37;
   static const double bottomOffset = 37;
@@ -38,7 +38,6 @@ class PagedReaderWidget extends StatefulWidget {
     this.animDuration = 300,
     this.pageDirection = PageDirection.horizontal,
     this.pageTouchSlop = 25,
-    this.simulationClickBias = 0.96,
   });
 
   @override
@@ -352,8 +351,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final size = MediaQuery.of(context).size;
     
     // 修正：点击翻页统一使用底部微偏位置，忽略点击的具体 Y 坐标
-    // 使用配置的 simulationClickBias
-    final y = size.height * widget.simulationClickBias;
+    // 固化为最佳体验值 0.96
+    final y = size.height * 0.96;
 
     // 修正：先更新坐标，再设置方向，确保角点计算正确
     _setStartPoint(size.width * 0.9, y);
@@ -369,8 +368,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final size = MediaQuery.of(context).size;
 
     // 修正：点击翻页统一使用底部微偏位置
-    // 使用配置的 simulationClickBias
-    final y = size.height * widget.simulationClickBias;
+    // 固化为最佳体验值 0.96
+    final y = size.height * 0.96;
 
     // 修正：先更新坐标，再设置方向
     _setStartPoint(0, y);
