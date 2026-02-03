@@ -740,21 +740,16 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     // === P6: 仿真逻辑修正 ===
     // Next: Peel Current(Top) to reveal Next(Bottom). Curl from Right.
-    // Prev: Un-curl Prev(Top) to cover Current(Bottom). Curl from Left (Native Left Curl).
+    // Prev: Peel Current(Top) to reveal Prev(Bottom). Curl from Left.
+    // 统一逻辑：始终卷起当前页 (Top)，露出目标页 (Bottom)
 
-    ui.Image? imageToCurl;
-    ui.Picture? bottomPicture;
+    ui.Image? imageToCurl = _curPageImage;
+    ui.Picture? bottomPicture = _targetPagePicture; // Bottom is always Target (Next or Prev)
     // Remove forced Right Corner for Prev. Let _cornerX decide.
     // _cornerX will be 0 for Prev in most cases (Left Curl).
 
-    if (isNext) {
-      imageToCurl = _curPageImage;
-      bottomPicture = _targetPagePicture;
-    } else {
-      // Prev: Use Target as the Curling Page (Top), Current as Background (Bottom)
-      imageToCurl = _targetPageImage;
-      bottomPicture = _curPagePicture;
-    }
+    // Old logic branch removed because both directions now use the same layer hierarchy.
+
 
     if (imageToCurl == null) {
       return _buildPageWidget(_factory.curPage);
