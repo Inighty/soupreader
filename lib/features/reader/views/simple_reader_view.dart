@@ -92,7 +92,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       }
     });
 
-    // 全屏沉浸模式
+    // 全屏沉浸
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 

@@ -17,7 +17,7 @@ class NoAnimPageDelegate extends PageDelegate {
 
   @override
   void onDragStart(DragStartDetails details) {
-    // 无动画模式不处理拖拽
+    // 无动画模式不处
   }
 
   @override
