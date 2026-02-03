@@ -347,15 +347,13 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _abortAnim();
     if (!_factory.hasNext()) return;
 
-    // 对标 Legado: 先 setDirection 后 setStartPoint
-    _setDirection(_PageDirection.next);
-
     final size = MediaQuery.of(context).size;
     // 从右下角开始，或者点击位置
     final y = startY ?? size.height * 0.9;
+
+    // 修正：先更新坐标，再设置方向，确保角点计算正确
     _setStartPoint(size.width * 0.9, y);
-    // 重新计算角点（因为 startPoint 变了）
-    _calcCornerXY(size.width * 0.9, y);
+    _setDirection(_PageDirection.next);
     _onAnimStart();
   }
 
@@ -364,15 +362,14 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _abortAnim();
     if (!_factory.hasPrev()) return;
 
-    // 对标 Legado: 先 setDirection 后 setStartPoint
-    _setDirection(_PageDirection.prev);
-
     final size = MediaQuery.of(context).size;
     // 从左下角开始，或者点击位置
-    final y = startY ?? size.height;
+    // 修正：使用 0.9 * height 以产生自然的倾斜角
+    final y = startY ?? size.height * 0.9;
+
+    // 修正：先更新坐标，再设置方向
     _setStartPoint(0, y);
-    // 重新计算角点：上一页不再强制使用右下角，而是跟随点击高度
-    _calcCornerXY(size.width, y);
+    _setDirection(_PageDirection.prev);
     _onAnimStart();
   }
 
@@ -737,21 +734,39 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     final isNext = _direction == _PageDirection.next;
 
-    // === P6: 仿真逻辑统一 (Peel Current Page) ===
-    // 统一模型：永远是“掀起当前页(Top)”，露出“目标页(Bottom)”
-    // Next: 从右边掀起 (_cornerX = width)，露出 NextPage
-    // Prev: 从左边掀起 (_cornerX = 0)，露出 PrevPage
-    // 这样点击和拖拽逻辑完全一致，都是控制 Touch 点移动
+    // === P6: 仿真逻辑修正 ===
+    // Next: Peel Current(Top) to reveal Next(Bottom). Curl from Right.
+    // Prev: Un-curl Prev(Top) to cover Current(Bottom). Curl from Right (simulating unrolling).
 
-    // Top Layer: 永远是当前页
-    ui.Image? imageToCurl = _curPageImage;
-    // Bottom Layer: 目标页
-    ui.Picture? bottomPicture = _targetPagePicture;
-    // Corner: 跟随手势计算出的角点 (Prev时为0，Next时为width)
-    double effectiveCornerX = _cornerX;
+    ui.Image? imageToCurl;
+    ui.Picture? bottomPicture;
+    double effectiveCornerX;
+
+    if (isNext) {
+      imageToCurl = _curPageImage;
+      bottomPicture = _targetPagePicture;
+      effectiveCornerX = _cornerX;
+    } else {
+      // Prev: Use Target as the Curling Page (Top), Current as Background (Bottom)
+      imageToCurl = _targetPageImage;
+      bottomPicture = _curPagePicture;
+      // Force Corner to be Right side (simulating we are holding the right edge of the prev page)
+      effectiveCornerX = size.width;
+    }
 
     if (imageToCurl == null) {
       return _buildPageWidget(_factory.curPage);
+    }
+
+    double simulationTouchX = _touchX;
+    if (!isNext) {
+      // Prev: Apply coordinate mapping to ensure the page un-curls from the left edge (0)
+      // instead of starting half-open.
+      // Relationship: FoldX = (TouchX + CornerX) / 2
+      // We want FoldX = _touchX (approximately, for visual tracking).
+      // Since CornerX = width, we solve: _touchX = (VirtualTouchX + width) / 2
+      // => VirtualTouchX = 2 * _touchX - size.width
+      simulationTouchX = 2 * _touchX - size.width;
     }
 
     return CustomPaint(
@@ -761,7 +776,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         // We only care about 'nextPagePicture' which is the Bottom Layer.
         curPagePicture: null,
         nextPagePicture: bottomPicture,
-        touch: Offset(_touchX, _touchY), // 直接使用真实触点
+        touch: Offset(simulationTouchX, _touchY),
         viewSize: size,
         isTurnToNext: isNext,
         backgroundColor: widget.backgroundColor,
@@ -850,14 +865,15 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       double adjustedY = focusY;
       if (widget.pageTurnMode == PageTurnMode.simulation) {
         // 中间区域：强制使用底边（仅保留中间区域点击的优化，移除上一页的强制锁定）
+        // Fixed: Use 0.9 * height to create cone effect (avoid TouchY == CornerY)
         if (_startY > size.height / 3 && _startY < size.height * 2 / 3) {
-          adjustedY = size.height;
+          adjustedY = size.height * 0.9;
         }
         // 中间偏上区域且是下一页：强制使用顶边
         if (_startY > size.height / 3 &&
             _startY < size.height / 2 &&
             _direction == _PageDirection.next) {
-          adjustedY = 1.0;
+          adjustedY = size.height * 0.1;
         }
       }
 
