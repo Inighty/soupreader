@@ -560,17 +560,23 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   Widget _buildPageContent() {
     final isVertical = widget.pageDirection == PageDirection.vertical;
+    // 只有启用手势时才允许滑动翻页
+    final enableDrag = widget.enableGestures;
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapUp: (d) => _onTap(d.globalPosition),
-      // 水平方向手势
-      onHorizontalDragStart: isVertical ? null : _onDragStart,
-      onHorizontalDragUpdate: isVertical ? null : _onDragUpdate,
-      onHorizontalDragEnd: isVertical ? null : _onDragEnd,
-      // 垂直方向手势
-      onVerticalDragStart: isVertical ? _onVerticalDragStart : null,
-      onVerticalDragUpdate: isVertical ? _onVerticalDragUpdate : null,
-      onVerticalDragEnd: isVertical ? _onVerticalDragEnd : null,
+      // 水平方向手势（仅在启用手势且为水平方向时）
+      onHorizontalDragStart: (!isVertical && enableDrag) ? _onDragStart : null,
+      onHorizontalDragUpdate:
+          (!isVertical && enableDrag) ? _onDragUpdate : null,
+      onHorizontalDragEnd: (!isVertical && enableDrag) ? _onDragEnd : null,
+      // 垂直方向手势（仅在启用手势且为垂直方向时）
+      onVerticalDragStart:
+          (isVertical && enableDrag) ? _onVerticalDragStart : null,
+      onVerticalDragUpdate:
+          (isVertical && enableDrag) ? _onVerticalDragUpdate : null,
+      onVerticalDragEnd: (isVertical && enableDrag) ? _onVerticalDragEnd : null,
       child: _buildAnimatedPages(),
     );
   }

@@ -154,9 +154,7 @@ class ReaderBottomMenu extends StatelessWidget {
                         inactiveColor:
                             CupertinoColors.systemGrey.withValues(alpha: 0.3),
                         onChanged: (value) {
-                          // TODO: 考虑添加防抖或仅更新 UI 显示
-                        },
-                        onChangeEnd: (value) {
+                          // 实时更新章节（拖动时立即跳转）
                           onChapterChanged(value.toInt());
                         },
                       ),
@@ -248,16 +246,15 @@ class ReaderBottomMenu extends StatelessWidget {
                         settings.copyWith(themeIndex: targetIndex));
                   }
                 }),
-                // 翻页模式切换（参考 flutter_novel）
-                _buildMenuBtn(_getPageTurnModeIcon(settings.pageTurnMode),
-                    settings.pageTurnMode.name, () {
-                  // 循环切换翻页模式
-                  final modes = PageTurnMode.values;
-                  final currentIndex = modes.indexOf(settings.pageTurnMode);
-                  final nextIndex = (currentIndex + 1) % modes.length;
-                  onSettingsChanged(
-                      settings.copyWith(pageTurnMode: modes[nextIndex]));
-                }),
+                // 翻页模式切换（点击弹窗选择）
+                Builder(
+                  builder: (context) => _buildMenuBtn(
+                      _getPageTurnModeIcon(settings.pageTurnMode),
+                      settings.pageTurnMode.name, () {
+                    _showPageTurnModeSheet(
+                        context, settings, onSettingsChanged);
+                  }),
+                ),
                 _buildMenuBtn(
                     CupertinoIcons.ellipsis_circle, '更多', onShowMoreMenu),
               ],
@@ -321,5 +318,64 @@ class ReaderBottomMenu extends StatelessWidget {
       case PageTurnMode.scroll:
         return CupertinoIcons.arrow_up_arrow_down;
     }
+  }
+
+  /// 显示翻页模式选择弹窗
+  void _showPageTurnModeSheet(
+    BuildContext context,
+    ReadingSettings settings,
+    ValueChanged<ReadingSettings> onSettingsChanged,
+  ) {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('选择翻页模式'),
+        actions: PageTurnMode.values.map((mode) {
+          final isSelected = mode == settings.pageTurnMode;
+          return CupertinoActionSheetAction(
+            onPressed: () {
+              onSettingsChanged(settings.copyWith(pageTurnMode: mode));
+              Navigator.pop(context);
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _getPageTurnModeIcon(mode),
+                  color: isSelected
+                      ? CupertinoColors.activeBlue
+                      : CupertinoColors.label,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  mode.name,
+                  style: TextStyle(
+                    color: isSelected
+                        ? CupertinoColors.activeBlue
+                        : CupertinoColors.label,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                if (isSelected) ...[
+                  const SizedBox(width: 8),
+                  const Icon(
+                    CupertinoIcons.checkmark,
+                    color: CupertinoColors.activeBlue,
+                    size: 18,
+                  ),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+      ),
+    );
   }
 }
