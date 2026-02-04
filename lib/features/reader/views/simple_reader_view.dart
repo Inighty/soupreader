@@ -590,14 +590,22 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             ),
           ),
           SizedBox(height: _settings.paragraphSpacing * 1.5),
-          // 正文内容
+          // 正文内容（参考 legado paragraphIndent 处理）
           ...paragraphs.map((paragraph) {
             final trimmed = paragraph.trim();
             if (trimmed.isEmpty) return const SizedBox.shrink();
+
+            // 智能检测缩进：如果原文已有缩进（全角/半角空格、制表符）则保留
+            final hasIndent = paragraph.startsWith('　') ||
+                paragraph.startsWith('  ') ||
+                paragraph.startsWith('\t');
+            // 根据是否已有缩进决定是否添加
+            final displayText = hasIndent ? trimmed : '　　$trimmed';
+
             return Padding(
               padding: EdgeInsets.only(bottom: _settings.paragraphSpacing),
               child: Text(
-                '　　$trimmed',
+                displayText,
                 style: TextStyle(
                   fontSize: _settings.fontSize,
                   height: _settings.lineHeight,

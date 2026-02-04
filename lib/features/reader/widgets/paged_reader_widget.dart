@@ -891,8 +891,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // === 对标 Legado HorizontalPageDelegate.onTouch ===
   void _onDragStart(DragStartDetails details) {
     if (!widget.enableGestures) return;
-    // 动画已启动时不开始新拖拽
-    if (_isStarted) return;
+    // 允许中断正在进行的动画，实现连续翻页
     _abortAnim();
     _setStartPoint(details.localPosition.dx, details.localPosition.dy);
     _isMoved = false;
@@ -902,8 +901,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   // === 对标 Legado HorizontalPageDelegate.onScroll ===
   void _onDragUpdate(DragUpdateDetails details) {
-    // 动画已启动时不处理拖拽
-    if (_isStarted) return;
+    // _onDragStart 已处理动画中断，此处直接处理拖拽
 
     final focusX = details.localPosition.dx;
     final focusY = details.localPosition.dy;
@@ -990,8 +988,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // === 垂直翻页手势处理（对标水平方式） ===
   void _onVerticalDragStart(DragStartDetails details) {
     if (!widget.enableGestures) return;
-    // 动画已启动时不开始新拖拽
-    if (_isStarted) return;
+    // 允许中断正在进行的动画，实现连续翻页
     _abortAnim();
     _setStartPoint(details.localPosition.dx, details.localPosition.dy);
     _isMoved = false;
@@ -1000,8 +997,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   void _onVerticalDragUpdate(DragUpdateDetails details) {
-    // 动画已启动时不处理拖拽
-    if (_isStarted) return;
+    // _onVerticalDragStart 已处理动画中断，此处直接处理拖拽
 
     final focusX = details.localPosition.dx;
     final focusY = details.localPosition.dy;
