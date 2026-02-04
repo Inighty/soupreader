@@ -85,7 +85,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
               child: _buildChapterSlider(),
             ),
 
-            // 底部 Tab 导航栏
+            // 底部 Tab 导航栏 (精简为4个：目录/日夜/界面/设置)
             Container(
               padding: EdgeInsets.only(
                 left: 8,
@@ -100,11 +100,9 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                       widget.onShowChapterList),
                   _buildTabItem(1, _getDayNightIcon(), _getDayNightLabel(),
                       _toggleDayNight),
-                  _buildTabItem(2, CupertinoIcons.paintbrush, '主题',
-                      _showThemePanel),
-                  _buildTabItem(3, CupertinoIcons.textformat, '界面',
+                  _buildTabItem(2, CupertinoIcons.textformat_size, '界面',
                       widget.onShowInterfaceSettings),
-                  _buildTabItem(4, CupertinoIcons.gear, '设置',
+                  _buildTabItem(3, CupertinoIcons.gear, '设置',
                       widget.onShowMoreMenu),
                 ],
               ),
@@ -120,74 +118,87 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     final maxPage = (widget.totalPages - 1).clamp(0, 9999);
     
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center, // 垂直居中对齐
       children: [
         // 上一章按钮
-        CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: widget.currentChapterIndex > 0
-              ? () => widget.onChapterChanged(widget.currentChapterIndex - 1)
-              : null,
-          child: Text(
-            '上一章',
-            style: TextStyle(
-              fontSize: 13,
-              color: widget.currentChapterIndex > 0
-                  ? CupertinoColors.activeBlue
-                  : CupertinoColors.systemGrey,
+        SizedBox(
+          width: 60,
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+
+            onPressed: widget.currentChapterIndex > 0
+                ? () => widget.onChapterChanged(widget.currentChapterIndex - 1)
+                : null,
+            child: Text(
+              '上一章',
+              style: TextStyle(
+                fontSize: 13,
+                color: widget.currentChapterIndex > 0
+                    ? CupertinoColors.activeBlue
+                    : CupertinoColors.systemGrey,
+              ),
             ),
           ),
         ),
 
         // 页码进度滑块
         Expanded(
-          child: Column(
-            children: [
-              SliderTheme(
-                data: SliderThemeData(
-                  trackHeight: 4,
-                  thumbShape:
-                      const RoundSliderThumbShape(enabledThumbRadius: 8),
-                  overlayShape:
-                      const RoundSliderOverlayShape(overlayRadius: 16),
-                  activeTrackColor: CupertinoColors.activeBlue,
-                  inactiveTrackColor:
-                      CupertinoColors.systemGrey.withValues(alpha: 0.3),
-                  thumbColor: CupertinoColors.white,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SliderTheme(
+                  data: SliderThemeData(
+                    trackHeight: 4,
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 8),
+                    overlayShape:
+                        const RoundSliderOverlayShape(overlayRadius: 16),
+                    activeTrackColor: CupertinoColors.activeBlue,
+                    inactiveTrackColor:
+                        CupertinoColors.systemGrey.withValues(alpha: 0.3),
+                    thumbColor: CupertinoColors.white,
+                  ),
+                  child: Slider(
+                    value: widget.currentPageIndex.toDouble().clamp(0, maxPage.toDouble()),
+                    min: 0,
+                    max: maxPage.toDouble(),
+                    onChanged: (value) {},
+                    onChangeEnd: (value) {
+                      widget.onPageChanged(value.toInt());
+                    },
+                  ),
                 ),
-                child: Slider(
-                  value: widget.currentPageIndex.toDouble().clamp(0, maxPage.toDouble()),
-                  min: 0,
-                  max: maxPage.toDouble(),
-                  onChanged: (value) {},
-                  onChangeEnd: (value) {
-                    widget.onPageChanged(value.toInt());
-                  },
+                Text(
+                  '${widget.currentPageIndex + 1} / ${widget.totalPages}',
+                  style: const TextStyle(
+                    color: CupertinoColors.systemGrey,
+                    fontSize: 11,
+                  ),
                 ),
-              ),
-              Text(
-                '${widget.currentPageIndex + 1} / ${widget.totalPages}',
-                style: const TextStyle(
-                  color: CupertinoColors.systemGrey,
-                  fontSize: 11,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
 
         // 下一章按钮
-        CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: widget.currentChapterIndex < widget.totalChapters - 1
-              ? () => widget.onChapterChanged(widget.currentChapterIndex + 1)
-              : null,
-          child: Text(
-            '下一章',
-            style: TextStyle(
-              fontSize: 13,
-              color: widget.currentChapterIndex < widget.totalChapters - 1
-                  ? CupertinoColors.activeBlue
-                  : CupertinoColors.systemGrey,
+        SizedBox(
+          width: 60,
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+
+            onPressed: widget.currentChapterIndex < widget.totalChapters - 1
+                ? () => widget.onChapterChanged(widget.currentChapterIndex + 1)
+                : null,
+            child: Text(
+              '下一章',
+              style: TextStyle(
+                fontSize: 13,
+                color: widget.currentChapterIndex < widget.totalChapters - 1
+                    ? CupertinoColors.activeBlue
+                    : CupertinoColors.systemGrey,
+              ),
             ),
           ),
         ),
@@ -265,142 +276,5 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
       widget.onSettingsChanged(widget.settings.copyWith(themeIndex: targetIndex));
     }
   }
-
-  /// 显示主题选择面板
-  void _showThemePanel() {
-    showCupertinoModalPopup(
-      context: context,
-      builder: (context) => _ThemeSelectorSheet(
-        currentThemeIndex: widget.settings.themeIndex,
-        onThemeChanged: (index) {
-          widget.onSettingsChanged(widget.settings.copyWith(themeIndex: index));
-        },
-      ),
-    );
-  }
 }
 
-/// 主题选择面板
-class _ThemeSelectorSheet extends StatelessWidget {
-  final int currentThemeIndex;
-  final ValueChanged<int> onThemeChanged;
-
-  const _ThemeSelectorSheet({
-    required this.currentThemeIndex,
-    required this.onThemeChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 16,
-        bottom: MediaQuery.of(context).padding.bottom + 16,
-      ),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 拖动指示器
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white24,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 标题
-          const Text(
-            '阅读主题',
-            style: TextStyle(
-              color: CupertinoColors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // 主题网格
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: List.generate(AppColors.readingThemes.length, (index) {
-              final theme = AppColors.readingThemes[index];
-              final isSelected = currentThemeIndex == index;
-
-              return GestureDetector(
-                onTap: () {
-                  onThemeChanged(index);
-                  Navigator.pop(context);
-                },
-                child: Container(
-                  width: 70,
-                  height: 90,
-                  decoration: BoxDecoration(
-                    color: theme.background,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected
-                          ? CupertinoColors.activeBlue
-                          : Colors.white12,
-                      width: isSelected ? 3 : 1,
-                    ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color:
-                                  CupertinoColors.activeBlue.withValues(alpha: 0.4),
-                              blurRadius: 8,
-                            )
-                          ]
-                        : null,
-                  ),
-                  child: Stack(
-                    children: [
-                      Center(
-                        child: Text(
-                          theme.name,
-                          style: TextStyle(
-                            color: theme.text,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      if (isSelected)
-                        Positioned(
-                          bottom: 6,
-                          right: 6,
-                          child: Container(
-                            width: 20,
-                            height: 20,
-                            decoration: const BoxDecoration(
-                              color: CupertinoColors.activeBlue,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              CupertinoIcons.checkmark,
-                              color: CupertinoColors.white,
-                              size: 12,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-}

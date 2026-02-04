@@ -284,54 +284,6 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
               '速度: ${widget.autoPager.speed}',
               style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
-            const SizedBox(height: 8),
-
-            // 模式切换
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildModeButton(
-                  '滚动',
-                  AutoPagerMode.scroll,
-                  Icons.swap_vert,
-                ),
-                const SizedBox(width: 16),
-                _buildModeButton(
-                  '翻页',
-                  AutoPagerMode.page,
-                  Icons.auto_stories,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModeButton(String label, AutoPagerMode mode, IconData icon) {
-    final isSelected = widget.autoPager.mode == mode;
-    return GestureDetector(
-      onTap: () => widget.autoPager.setMode(mode),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.amber : Colors.white24,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon,
-                color: isSelected ? Colors.black : Colors.white, size: 18),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.black : Colors.white,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
           ],
         ),
       ),

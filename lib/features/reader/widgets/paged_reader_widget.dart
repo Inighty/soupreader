@@ -333,16 +333,19 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   void _onTap(Offset position) {
-    if (!widget.enableGestures) return;
     final screenWidth = MediaQuery.of(context).size.width;
     final xRate = position.dx / screenWidth;
 
+    // 中间区域始终可以点击（用于显示/隐藏菜单）
     if (xRate > 0.33 && xRate < 0.66) {
       widget.onTap?.call();
-    } else if (xRate >= 0.66) {
-      _nextPageByAnim(startY: position.dy);
-    } else {
-      _prevPageByAnim(startY: position.dy);
+    } else if (widget.enableGestures) {
+      // 只有启用手势时才允许左右翻页
+      if (xRate >= 0.66) {
+        _nextPageByAnim(startY: position.dy);
+      } else {
+        _prevPageByAnim(startY: position.dy);
+      }
     }
   }
 

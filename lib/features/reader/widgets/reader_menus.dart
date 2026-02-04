@@ -5,11 +5,13 @@ import '../models/reading_settings.dart';
 
 class ReaderTopMenu extends StatelessWidget {
   final String bookTitle;
+  final String chapterTitle;
   final VoidCallback onShowChapterList;
 
   const ReaderTopMenu({
     super.key,
     required this.bookTitle,
+    required this.chapterTitle,
     required this.onShowChapterList,
   });
 
@@ -22,33 +24,70 @@ class ReaderTopMenu extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
         decoration: BoxDecoration(
-          color: CupertinoColors.black.withValues(alpha: 0.85),
+          color: const Color(0xFF1C1C1E).withValues(alpha: 0.95),
         ),
-        child: CupertinoNavigationBar(
-          backgroundColor: CupertinoColors.transparent,
-          border: null,
-          leading: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: () => Navigator.pop(context),
-            child:
-                const Icon(CupertinoIcons.back, color: CupertinoColors.white),
-          ),
-          middle: Text(
-            bookTitle,
-            style: const TextStyle(color: CupertinoColors.white, fontSize: 16),
-            overflow: TextOverflow.ellipsis,
-          ),
-          trailing: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: onShowChapterList,
-            child: const Icon(CupertinoIcons.list_bullet,
-                color: CupertinoColors.white),
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 顶部导航栏
+            SizedBox(
+              height: 44,
+              child: Row(
+                children: [
+                  // 返回按钮
+                  CupertinoButton(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Icon(CupertinoIcons.back, color: CupertinoColors.white),
+                  ),
+                  // 书名
+                  Expanded(
+                    child: Text(
+                      bookTitle,
+                      style: const TextStyle(
+                        color: CupertinoColors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  // 目录按钮
+                  CupertinoButton(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    onPressed: onShowChapterList,
+                    child: const Icon(CupertinoIcons.list_bullet, color: CupertinoColors.white),
+                  ),
+                ],
+              ),
+            ),
+            // 章节名
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: CupertinoColors.white.withValues(alpha: 0.1)),
+                ),
+              ),
+              child: Text(
+                chapterTitle,
+                style: TextStyle(
+                  color: CupertinoColors.white.withValues(alpha: 0.7),
+                  fontSize: 13,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
+
 
 class ReaderBottomMenu extends StatelessWidget {
   final int currentChapterIndex;

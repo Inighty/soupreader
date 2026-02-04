@@ -413,6 +413,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 if (_showMenu)
                   ReaderTopMenu(
                     bookTitle: widget.bookTitle,
+                    chapterTitle: _currentTitle,
                     onShowChapterList: _showChapterList,
                   ),
 
