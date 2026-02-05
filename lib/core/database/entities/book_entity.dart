@@ -134,6 +134,21 @@ class BookSourceEntity extends HiveObject {
   @HiveField(8)
   final String? ruleContentJson;
 
+  @HiveField(9)
+  final String? bookSourceComment;
+
+  @HiveField(10)
+  final int weight;
+
+  @HiveField(11)
+  final String? header;
+
+  @HiveField(12)
+  final String? loginUrl;
+
+  @HiveField(13)
+  final DateTime? lastUpdateTime;
+
   BookSourceEntity({
     required this.bookSourceUrl,
     required this.bookSourceName,
@@ -144,5 +159,10 @@ class BookSourceEntity extends HiveObject {
     this.ruleBookInfoJson,
     this.ruleTocJson,
     this.ruleContentJson,
+    this.bookSourceComment,
+    this.weight = 0,
+    this.header,
+    this.loginUrl,
+    this.lastUpdateTime,
   });
 }

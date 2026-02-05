@@ -22,6 +22,15 @@ class PageFactory {
   double _letterSpacing = 0;
   double _paragraphSpacing = 0;
   String? _fontFamily;
+  String _paragraphIndent = '';
+  TextAlign _textAlign = TextAlign.left;
+  double? _titleFontSize;
+  TextAlign _titleAlign = TextAlign.left;
+  double _titleTopSpacing = 0;
+  double _titleBottomSpacing = 0;
+  FontWeight? _fontWeight;
+  bool _underline = false;
+  bool _showTitle = true;
 
   // 回调
   VoidCallback? onContentChanged;
@@ -44,6 +53,15 @@ class PageFactory {
     double letterSpacing = 0,
     double paragraphSpacing = 0,
     String? fontFamily,
+    String paragraphIndent = '',
+    TextAlign textAlign = TextAlign.left,
+    double? titleFontSize,
+    TextAlign titleAlign = TextAlign.left,
+    double titleTopSpacing = 0,
+    double titleBottomSpacing = 0,
+    FontWeight? fontWeight,
+    bool underline = false,
+    bool showTitle = true,
   }) {
     _contentHeight = contentHeight;
     _contentWidth = contentWidth;
@@ -52,6 +70,15 @@ class PageFactory {
     _letterSpacing = letterSpacing;
     _paragraphSpacing = paragraphSpacing;
     _fontFamily = fontFamily;
+    _paragraphIndent = paragraphIndent;
+    _textAlign = textAlign;
+    _titleFontSize = titleFontSize;
+    _titleAlign = titleAlign;
+    _titleTopSpacing = titleTopSpacing;
+    _titleBottomSpacing = titleBottomSpacing;
+    _fontWeight = fontWeight;
+    _underline = underline;
+    _showTitle = showTitle;
   }
 
   /// 分页所有章节
@@ -75,7 +102,15 @@ class PageFactory {
       letterSpacing: _letterSpacing,
       paragraphSpacing: _paragraphSpacing,
       fontFamily: _fontFamily,
-      title: chapter.title,
+      title: _showTitle ? chapter.title : null,
+      paragraphIndent: _paragraphIndent,
+      textAlign: _textAlign,
+      titleFontSize: _titleFontSize,
+      titleAlign: _titleAlign,
+      titleTopSpacing: _titleTopSpacing,
+      titleBottomSpacing: _titleBottomSpacing,
+      fontWeight: _fontWeight,
+      underline: _underline,
     );
 
     if (chapterIndex == _currentChapterIndex - 1) {
@@ -224,6 +259,7 @@ class PageFactory {
   // ============ Getters ============
 
   int get currentChapterIndex => _currentChapterIndex;
+  int get totalChapters => _chapters.length;
   int get currentPageIndex => _currentPageIndex;
   int get totalPages => _currentChapterPages.length;
   String get currentChapterTitle =>

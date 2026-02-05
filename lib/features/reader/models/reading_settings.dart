@@ -25,6 +25,8 @@ class ReadingSettings {
   final String paragraphIndent; // 段落缩进字符，默认"　　"（两个全角空格）
   final int titleMode; // 0:居左 1:居中 2:隐藏
   final int titleSize; // 标题字体大小偏移 (-4 to +8)
+  final double titleTopSpacing; // 标题顶部间距
+  final double titleBottomSpacing; // 标题底部间距
   final bool textFullJustify; // 两端对齐
   final bool underline; // 下划线
 
@@ -87,6 +89,8 @@ class ReadingSettings {
     this.paragraphIndent = '　　',
     this.titleMode = 0,
     this.titleSize = 0,
+    this.titleTopSpacing = 0,
+    this.titleBottomSpacing = 0,
     this.textFullJustify = false,
     this.underline = false,
     this.paddingTop = 16.0,
@@ -152,6 +156,8 @@ class ReadingSettings {
       paragraphIndent: json['paragraphIndent'] as String? ?? '　　',
       titleMode: json['titleMode'] as int? ?? 0,
       titleSize: json['titleSize'] as int? ?? 0,
+      titleTopSpacing: (json['titleTopSpacing'] as num?)?.toDouble() ?? 0,
+      titleBottomSpacing: (json['titleBottomSpacing'] as num?)?.toDouble() ?? 0,
       textFullJustify: json['textFullJustify'] as bool? ?? false,
       underline: json['underline'] as bool? ?? false,
       paddingTop: (json['paddingTop'] as num?)?.toDouble() ?? 16.0,
@@ -211,6 +217,8 @@ class ReadingSettings {
       'paragraphIndent': paragraphIndent,
       'titleMode': titleMode,
       'titleSize': titleSize,
+      'titleTopSpacing': titleTopSpacing,
+      'titleBottomSpacing': titleBottomSpacing,
       'textFullJustify': textFullJustify,
       'underline': underline,
       'paddingTop': paddingTop,
@@ -266,6 +274,8 @@ class ReadingSettings {
     String? paragraphIndent,
     int? titleMode,
     int? titleSize,
+    double? titleTopSpacing,
+    double? titleBottomSpacing,
     bool? textFullJustify,
     bool? underline,
     double? paddingTop,
@@ -319,6 +329,8 @@ class ReadingSettings {
       paragraphIndent: paragraphIndent ?? this.paragraphIndent,
       titleMode: titleMode ?? this.titleMode,
       titleSize: titleSize ?? this.titleSize,
+      titleTopSpacing: titleTopSpacing ?? this.titleTopSpacing,
+      titleBottomSpacing: titleBottomSpacing ?? this.titleBottomSpacing,
       textFullJustify: textFullJustify ?? this.textFullJustify,
       underline: underline ?? this.underline,
       paddingTop: paddingTop ?? this.paddingTop,
@@ -361,6 +373,18 @@ class ClickAction {
   static const int prevChapter = 4;
   static const int addBookmark = 7;
   static const int openChapterList = 10;
+
+  static const Map<String, int> defaultZoneConfig = {
+    'tl': prevPage,
+    'tc': showMenu,
+    'tr': nextPage,
+    'ml': prevPage,
+    'mc': showMenu,
+    'mr': nextPage,
+    'bl': prevPage,
+    'bc': showMenu,
+    'br': nextPage,
+  };
 
   static String getName(int action) {
     switch (action) {

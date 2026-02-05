@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show Colors;
 
 /// 自动翻页器
 /// 支持滚动模式和翻页模式
@@ -173,11 +174,13 @@ enum AutoPagerMode {
 class AutoReadPanel extends StatefulWidget {
   final AutoPager autoPager;
   final VoidCallback? onClose;
+  final ValueChanged<int>? onSpeedChanged;
 
   const AutoReadPanel({
     super.key,
     required this.autoPager,
     this.onClose,
+    this.onSpeedChanged,
   });
 
   @override
@@ -208,7 +211,7 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.8),
+        color: const Color(0xFF1C1C1E).withValues(alpha: 0.98),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: SafeArea(
@@ -228,12 +231,14 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
                   onPressed: () {
                     widget.autoPager.stop();
                     widget.onClose?.call();
                   },
+                  child:
+                      const Icon(CupertinoIcons.xmark_circle_fill, color: Colors.white),
                 ),
               ],
             ),
@@ -243,15 +248,16 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(
-                  iconSize: 48,
-                  icon: Icon(
-                    widget.autoPager.isRunning
-                        ? Icons.pause_circle_filled
-                        : Icons.play_circle_filled,
-                    color: Colors.white,
-                  ),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
                   onPressed: widget.autoPager.toggle,
+                  child: Icon(
+                    widget.autoPager.isRunning
+                        ? CupertinoIcons.pause_circle_fill
+                        : CupertinoIcons.play_circle_fill,
+                    color: Colors.white,
+                    size: 54,
+                  ),
                 ),
               ],
             ),
@@ -260,22 +266,22 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
             // 速度调节
             Row(
               children: [
-                const Icon(Icons.slow_motion_video,
+                const Icon(CupertinoIcons.tortoise,
                     color: Colors.white70, size: 20),
                 Expanded(
-                  child: Slider(
+                  child: CupertinoSlider(
                     value: widget.autoPager.speed.toDouble(),
                     min: 1,
                     max: 100,
                     divisions: 99,
-                    activeColor: Colors.amber,
-                    inactiveColor: Colors.white24,
                     onChanged: (value) {
-                      widget.autoPager.setSpeed(value.round());
+                      final speed = value.round();
+                      widget.autoPager.setSpeed(speed);
+                      widget.onSpeedChanged?.call(speed);
                     },
                   ),
                 ),
-                const Icon(Icons.speed, color: Colors.white70, size: 20),
+                const Icon(CupertinoIcons.hare, color: Colors.white70, size: 20),
               ],
             ),
 

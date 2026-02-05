@@ -154,13 +154,18 @@ class BookSourceEntityAdapter extends TypeAdapter<BookSourceEntity> {
       ruleBookInfoJson: fields[6] as String?,
       ruleTocJson: fields[7] as String?,
       ruleContentJson: fields[8] as String?,
+      bookSourceComment: fields[9] as String?,
+      weight: fields[10] as int? ?? 0,
+      header: fields[11] as String?,
+      loginUrl: fields[12] as String?,
+      lastUpdateTime: fields[13] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, BookSourceEntity obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.bookSourceUrl)
       ..writeByte(1)
@@ -178,7 +183,17 @@ class BookSourceEntityAdapter extends TypeAdapter<BookSourceEntity> {
       ..writeByte(7)
       ..write(obj.ruleTocJson)
       ..writeByte(8)
-      ..write(obj.ruleContentJson);
+      ..write(obj.ruleContentJson)
+      ..writeByte(9)
+      ..write(obj.bookSourceComment)
+      ..writeByte(10)
+      ..write(obj.weight)
+      ..writeByte(11)
+      ..write(obj.header)
+      ..writeByte(12)
+      ..write(obj.loginUrl)
+      ..writeByte(13)
+      ..write(obj.lastUpdateTime);
   }
 
   @override

@@ -1,5 +1,5 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' show Colors;
 import '../models/reading_settings.dart';
 
 /// 点击区域配置对话框
@@ -31,17 +31,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   ];
 
   // 默认配置
-  static const Map<String, int> _defaultConfig = {
-    'tl': ClickAction.prevPage,
-    'tc': ClickAction.showMenu,
-    'tr': ClickAction.nextPage,
-    'ml': ClickAction.prevPage,
-    'mc': ClickAction.showMenu,
-    'mr': ClickAction.nextPage,
-    'bl': ClickAction.prevPage,
-    'bc': ClickAction.showMenu,
-    'br': ClickAction.nextPage,
-  };
+  static const Map<String, int> _defaultConfig = ClickAction.defaultZoneConfig;
 
   @override
   void initState() {
@@ -104,7 +94,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
       decoration: const BoxDecoration(
-        color: Color(0xFF1E1E1E),
+        color: Color(0xFF1C1C1E),
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
@@ -135,10 +125,9 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
                   const SizedBox(height: 16),
 
                   // 重置按钮
-                  TextButton.icon(
+                  CupertinoButton(
                     onPressed: _resetToDefault,
-                    icon: const Icon(Icons.refresh, color: Colors.white70),
-                    label: const Text('恢复默认',
+                    child: const Text('恢复默认',
                         style: TextStyle(color: Colors.white70)),
                   ),
                 ],
@@ -171,16 +160,20 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
           ),
           Row(
             children: [
-              TextButton(
+              CupertinoButton(
+                padding: EdgeInsets.zero,
                 onPressed: () {
                   widget.onSave(_config);
                   Navigator.pop(context);
                 },
-                child: const Text('保存', style: TextStyle(color: Colors.amber)),
+                child:
+                    const Text('保存', style: TextStyle(color: Colors.amber)),
               ),
-              IconButton(
-                icon: const Icon(Icons.close, color: Colors.white70),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
                 onPressed: () => Navigator.pop(context),
+                child: const Icon(CupertinoIcons.xmark_circle_fill,
+                    color: Colors.white70),
               ),
             ],
           ),
@@ -339,10 +332,8 @@ Future<void> showClickActionConfigDialog(
   required Map<String, int> currentConfig,
   required Function(Map<String, int>) onSave,
 }) {
-  return showModalBottomSheet(
+  return showCupertinoModalPopup(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
     builder: (context) => ClickActionConfigDialog(
       initialConfig: currentConfig,
       onSave: onSave,

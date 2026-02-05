@@ -6,9 +6,8 @@ import 'package:flutter/material.dart';
 /// 采用“逐行合成”(Line Composition) 算法，而非简单的整体截断
 class ReaderPageAgent {
   // === 配置参数 (对标 Legado) ===
-  static const String indentChar = '　'; // 全角空格
-  static const int indentSize = 2; // 缩进字符数
-  
+  static const String defaultIndent = '　　'; // 默认两个全角空格
+
   // 段间距因子：由 ReadingSettings 传入 paragraphSpacing 控制
   // 如果 paragraphSpacing > 0，则在每段结束增加高度
   static const double defaultParagraphSpacing = 0.0; 
@@ -24,6 +23,14 @@ class ReaderPageAgent {
     double paragraphSpacing = 0,
     String? fontFamily,
     String? title,
+    String paragraphIndent = defaultIndent,
+    TextAlign textAlign = TextAlign.left,
+    double? titleFontSize,
+    TextAlign titleAlign = TextAlign.left,
+    double titleTopSpacing = 0,
+    double titleBottomSpacing = 0,
+    FontWeight? fontWeight,
+    bool underline = false,
   }) {
     // 1. 准备画笔和通用样式
     final textStyle = TextStyle(
@@ -31,7 +38,14 @@ class ReaderPageAgent {
       height: lineHeight,
       letterSpacing: letterSpacing,
       fontFamily: fontFamily,
+      fontWeight: fontWeight,
+      decoration: underline ? TextDecoration.underline : TextDecoration.none,
       color: Colors.black, // 颜色不影响排版，但必须指定以避免 assert 错误
+    );
+    final titleStyle = textStyle.copyWith(
+      fontSize: titleFontSize ?? (fontSize + 4),
+      fontWeight: FontWeight.w600,
+      decoration: TextDecoration.none,
     );
 
     // 2. 预处理文本：按换行符分割段落，并进行清洗
@@ -98,12 +112,22 @@ class ReaderPageAgent {
       }
 
       // 添加缩进：标题不缩进，正文统一缩进
-      String indentedPara = isTitle ? paraText : (indentChar * indentSize) + paraText;
+      final indent = paragraphIndent;
+      String indentedPara =
+          isTitle || indent.isEmpty ? paraText : '$indent$paraText';
+
+      // 标题可设置顶部/底部间距
+      if (isTitle && titleTopSpacing > 0) {
+        if (currentY + titleTopSpacing > maxPageHeight) {
+          commitPage();
+        }
+        currentY += titleTopSpacing;
+      }
 
       final textPainter = TextPainter(
-        text: TextSpan(text: indentedPara, style: textStyle),
+        text: TextSpan(text: indentedPara, style: isTitle ? titleStyle : textStyle),
         textDirection: ui.TextDirection.ltr,
-        textAlign: TextAlign.justify,
+        textAlign: isTitle ? titleAlign : textAlign,
       );
       textPainter.layout(maxWidth: width);
 
@@ -133,7 +157,15 @@ class ReaderPageAgent {
         // 段落结束处理
         if (lineIndex == lines.length - 1) {
            currentPageContent.write('\n'); 
-           
+
+           if (isTitle && titleBottomSpacing > 0) {
+             if (currentY + titleBottomSpacing > maxPageHeight) {
+               commitPage();
+             } else {
+               currentY += titleBottomSpacing;
+             }
+           }
+
            // 段落间距逻辑：如果设置了段距且足够大，插入空行模拟
            if (paragraphSpacing > fontSize * 0.5) {
               double spacingHeight = fontSize * lineHeight; // 模拟一个空行的高度
@@ -158,4 +190,3 @@ class ReaderPageAgent {
     return pages;
   }
 }
-

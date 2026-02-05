@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'core/database/database_service.dart';
 import 'core/services/settings_service.dart';
 import 'features/bookshelf/views/bookshelf_view.dart';
+import 'features/search/views/search_view.dart';
 import 'features/source/views/source_list_view.dart';
 import 'features/settings/views/settings_view.dart';
 
@@ -80,7 +81,7 @@ class MainScreen extends StatelessWidget {
               case 0:
                 return const BookshelfView();
               case 1:
-                return const ExploreView();
+                return const SearchView();
               case 2:
                 return const SourceListView();
               case 3:

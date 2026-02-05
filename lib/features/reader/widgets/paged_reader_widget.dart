@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/reading_settings.dart';
+import 'package:battery_plus/battery_plus.dart';
 import 'page_factory.dart';
 import 'simulation_page_painter.dart';
 import 'simulation_page_painter2.dart';
@@ -16,6 +18,10 @@ class PagedReaderWidget extends StatefulWidget {
   final EdgeInsets padding;
   final VoidCallback? onTap;
   final bool showStatusBar;
+  final ReadingSettings settings;
+  final String bookTitle;
+  final Map<String, int> clickActions;
+  final ValueChanged<int>? onAction;
 
   // === 翻页动画增强 ===
   final int animDuration; // 动画时长 (100-600ms)
@@ -34,6 +40,10 @@ class PagedReaderWidget extends StatefulWidget {
     this.padding = const EdgeInsets.all(16),
     this.onTap,
     this.showStatusBar = true,
+    required this.settings,
+    required this.bookTitle,
+    this.clickActions = const {},
+    this.onAction,
     // 翻页动画增强默认值
     this.animDuration = 300,
     this.pageDirection = PageDirection.horizontal,
@@ -86,10 +96,16 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   ui.Image? _curPageImage;
   ui.Image? _targetPageImage;
 
+  // 电池状态
+  final Battery _battery = Battery();
+  int _batteryLevel = 100;
+  StreamSubscription<BatteryState>? _batteryStateSubscription;
+
   @override
   void initState() {
     super.initState();
     _loadShader();
+    _initBattery();
     _animController = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: widget.animDuration),
@@ -134,7 +150,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
     if (oldWidget.pageFactory != widget.pageFactory ||
         oldWidget.textStyle != widget.textStyle ||
-        oldWidget.backgroundColor != widget.backgroundColor) {
+        oldWidget.backgroundColor != widget.backgroundColor ||
+        oldWidget.padding != widget.padding ||
+        oldWidget.settings != widget.settings) {
       widget.pageFactory.onContentChanged = () {
         if (mounted) {
           _invalidatePictures();
@@ -147,12 +165,36 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   @override
   void dispose() {
+    _batteryStateSubscription?.cancel();
     _animController.dispose();
     _invalidatePictures();
     super.dispose();
   }
 
+  Future<void> _initBattery() async {
+    try {
+      _batteryLevel = await _battery.batteryLevel;
+      _batteryStateSubscription = _battery.onBatteryStateChanged.listen((state) {
+        setState(() {});
+        _updateBatteryLevel();
+      });
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
+  Future<void> _updateBatteryLevel() async {
+    try {
+      _batteryLevel = await _battery.batteryLevel;
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
   PageFactory get _factory => widget.pageFactory;
+
+  double get _topOffset =>
+      widget.settings.hideHeader ? 0.0 : PagedReaderWidget.topOffset;
+  double get _bottomOffset =>
+      widget.settings.hideFooter ? 0.0 : PagedReaderWidget.bottomOffset;
 
   /// 使用 PictureRecorder 预渲染页面内容
   ui.Picture _recordPage(String content, Size size) {
@@ -173,7 +215,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       final textPainter = TextPainter(
         text: TextSpan(text: content, style: widget.textStyle),
         textDirection: ui.TextDirection.ltr,
-        textAlign: TextAlign.justify,
+        textAlign:
+            widget.settings.textFullJustify ? TextAlign.justify : TextAlign.left,
       );
 
       final contentWidth =
@@ -184,65 +227,211 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         canvas,
         Offset(
           widget.padding.left,
-          topSafe + PagedReaderWidget.topOffset,
+          topSafe + _topOffset + widget.padding.top,
         ),
       );
     }
 
     // 绘制状态栏
     if (widget.showStatusBar) {
-      final time = DateFormat('HH:mm').format(DateTime.now());
-      final statusColor = widget.textStyle.color?.withValues(alpha: 0.4) ??
-          const Color(0xff8B7961);
-
-      // 章节标题
-      final titlePainter = TextPainter(
-        text: TextSpan(
-          text: _factory.currentChapterTitle,
-          style: widget.textStyle.copyWith(fontSize: 14, color: statusColor),
-        ),
-        textDirection: ui.TextDirection.ltr,
-        maxLines: 1,
-        ellipsis: '...',
-      );
-      titlePainter.layout(
-          maxWidth: size.width - widget.padding.left - widget.padding.right);
-      titlePainter.paint(canvas, Offset(widget.padding.left, 10 + topSafe));
-
-      // 时间
-      final timePainter = TextPainter(
-        text: TextSpan(
-          text: time,
-          style: widget.textStyle.copyWith(fontSize: 11, color: statusColor),
-        ),
-        textDirection: ui.TextDirection.ltr,
-      );
-      timePainter.layout();
-      timePainter.paint(
-        canvas,
-        Offset(widget.padding.left,
-            size.height - 10 - bottomSafe - timePainter.height),
-      );
-
-      // 页码
-      final pagePainter = TextPainter(
-        text: TextSpan(
-          text: '${_factory.currentPageIndex + 1}/${_factory.totalPages}',
-          style: widget.textStyle.copyWith(fontSize: 11, color: statusColor),
-        ),
-        textDirection: ui.TextDirection.ltr,
-      );
-      pagePainter.layout();
-      pagePainter.paint(
-        canvas,
-        Offset(
-          size.width - widget.padding.right - pagePainter.width,
-          size.height - 10 - bottomSafe - pagePainter.height,
-        ),
-      );
+      _paintHeaderFooter(canvas, size, topSafe, bottomSafe);
     }
 
     return recorder.endRecording();
+  }
+
+  void _paintHeaderFooter(
+      Canvas canvas, Size size, double topSafe, double bottomSafe) {
+    final statusColor = widget.textStyle.color?.withValues(alpha: 0.4) ??
+        const Color(0xff8B7961);
+    final headerStyle =
+        widget.textStyle.copyWith(fontSize: 12, color: statusColor);
+    final footerStyle =
+        widget.textStyle.copyWith(fontSize: 11, color: statusColor);
+
+    if (!widget.settings.hideHeader) {
+      final y = topSafe + 6;
+      _paintTipRow(
+        canvas,
+        size,
+        y,
+        headerStyle,
+        _tipTextForHeader(widget.settings.headerLeftContent),
+        _tipTextForHeader(widget.settings.headerCenterContent),
+        _tipTextForHeader(widget.settings.headerRightContent),
+      );
+      if (widget.settings.showHeaderLine) {
+        final lineY = y + headerStyle.fontSize!.toDouble() + 6;
+        final paint = Paint()
+          ..color = statusColor.withValues(alpha: 0.2)
+          ..strokeWidth = 0.5;
+        canvas.drawLine(
+          Offset(widget.padding.left, lineY),
+          Offset(size.width - widget.padding.right, lineY),
+          paint,
+        );
+      }
+    }
+
+    if (!widget.settings.hideFooter) {
+      final sample = _tipTextForFooter(widget.settings.footerLeftContent) ??
+          _tipTextForFooter(widget.settings.footerCenterContent) ??
+          _tipTextForFooter(widget.settings.footerRightContent) ??
+          '';
+      final samplePainter = TextPainter(
+        text: TextSpan(text: sample, style: footerStyle),
+        textDirection: ui.TextDirection.ltr,
+      )..layout();
+      final y = size.height - bottomSafe - 6 - samplePainter.height;
+      _paintTipRow(
+        canvas,
+        size,
+        y,
+        footerStyle,
+        _tipTextForFooter(widget.settings.footerLeftContent),
+        _tipTextForFooter(widget.settings.footerCenterContent),
+        _tipTextForFooter(widget.settings.footerRightContent),
+      );
+      if (widget.settings.showFooterLine) {
+        final lineY = y - 6;
+        final paint = Paint()
+          ..color = statusColor.withValues(alpha: 0.2)
+          ..strokeWidth = 0.5;
+        canvas.drawLine(
+          Offset(widget.padding.left, lineY),
+          Offset(size.width - widget.padding.right, lineY),
+          paint,
+        );
+      }
+    }
+  }
+
+  void _paintTipRow(
+    Canvas canvas,
+    Size size,
+    double y,
+    TextStyle style,
+    String? left,
+    String? center,
+    String? right,
+  ) {
+    if (left != null && left.isNotEmpty) {
+      final painter = TextPainter(
+        text: TextSpan(text: left, style: style),
+        textDirection: ui.TextDirection.ltr,
+      )..layout();
+      painter.paint(canvas, Offset(widget.padding.left, y));
+    }
+    if (center != null && center.isNotEmpty) {
+      final painter = TextPainter(
+        text: TextSpan(text: center, style: style),
+        textDirection: ui.TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: '...',
+      )..layout(maxWidth: size.width - widget.padding.left - widget.padding.right);
+      final x = (size.width - painter.width) / 2;
+      painter.paint(canvas, Offset(x, y));
+    }
+    if (right != null && right.isNotEmpty) {
+      final painter = TextPainter(
+        text: TextSpan(text: right, style: style),
+        textDirection: ui.TextDirection.ltr,
+      )..layout();
+      painter.paint(
+        canvas,
+        Offset(size.width - widget.padding.right - painter.width, y),
+      );
+    }
+  }
+
+  String? _tipTextForHeader(int type) {
+    return _tipText(
+      type,
+      isHeader: true,
+    );
+  }
+
+  String? _tipTextForFooter(int type) {
+    return _tipText(
+      type,
+      isHeader: false,
+    );
+  }
+
+  String? _tipText(int type, {required bool isHeader}) {
+    final time = DateFormat('HH:mm').format(DateTime.now());
+    final bookProgress = _bookProgress;
+    final chapterProgress = _chapterProgress;
+    switch (type) {
+      case 0:
+        return isHeader
+            ? widget.bookTitle
+            : _progressText(bookProgress, enabled: widget.settings.showProgress);
+      case 1:
+        return isHeader ? _factory.currentChapterTitle : _pageText(includeTotal: true);
+      case 2:
+        return isHeader ? '' : _timeText(time);
+      case 3:
+        return isHeader ? _timeText(time) : _batteryText();
+      case 4:
+        return isHeader ? _batteryText() : '';
+      case 5:
+        return isHeader
+            ? _progressText(bookProgress, enabled: widget.settings.showProgress)
+            : _factory.currentChapterTitle;
+      case 6:
+        return isHeader ? _pageText(includeTotal: true) : widget.bookTitle;
+      case 7:
+        return _progressText(chapterProgress,
+            enabled: widget.settings.showChapterProgress);
+      case 8:
+        return _pageText(includeTotal: true);
+      case 9:
+        return _timeBatteryText(time);
+      default:
+        return '';
+    }
+  }
+
+  String _pageText({bool includeTotal = true}) {
+    final current = _factory.currentPageIndex + 1;
+    final total = _factory.totalPages.clamp(1, 9999);
+    return includeTotal ? '$current/$total' : '$current';
+  }
+
+  String _progressText(double progress, {bool enabled = true}) {
+    if (!enabled) return '';
+    return '${(progress * 100).toStringAsFixed(1)}%';
+  }
+
+  String _batteryText() {
+    if (!widget.settings.showBattery) return '';
+    return '$_batteryLevel%';
+  }
+
+  String _timeText(String time) {
+    if (!widget.settings.showTime) return '';
+    return time;
+  }
+
+  String _timeBatteryText(String time) {
+    final parts = <String>[];
+    if (widget.settings.showTime) parts.add(time);
+    if (widget.settings.showBattery) parts.add('$_batteryLevel%');
+    return parts.join(' ');
+  }
+
+  double get _chapterProgress {
+    final total = _factory.totalPages;
+    if (total <= 0) return 0;
+    return ((_factory.currentPageIndex + 1) / total).clamp(0.0, 1.0);
+  }
+
+  double get _bookProgress {
+    final totalChapters = _factory.totalChapters;
+    if (totalChapters <= 0) return 0;
+    return ((_factory.currentChapterIndex + _chapterProgress) / totalChapters)
+        .clamp(0.0, 1.0);
   }
 
   void _invalidatePictures() {
@@ -334,20 +523,39 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   void _onTap(Offset position) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final xRate = position.dx / screenWidth;
-
-    // 中间区域始终可以点击（用于显示/隐藏菜单）
-    if (xRate > 0.33 && xRate < 0.66) {
-      widget.onTap?.call();
-    } else if (widget.enableGestures) {
-      // 只有启用手势时才允许左右翻页
-      if (xRate >= 0.66) {
-        _nextPageByAnim(startY: position.dy);
-      } else {
-        _prevPageByAnim(startY: position.dy);
-      }
+    final action = _resolveClickAction(position);
+    switch (action) {
+      case ClickAction.showMenu:
+        widget.onTap?.call();
+        break;
+      case ClickAction.nextPage:
+        if (widget.enableGestures) {
+          _nextPageByAnim(startY: position.dy);
+        }
+        break;
+      case ClickAction.prevPage:
+        if (widget.enableGestures) {
+          _prevPageByAnim(startY: position.dy);
+        }
+        break;
+      default:
+        widget.onAction?.call(action);
     }
+  }
+
+  int _resolveClickAction(Offset position) {
+    final size = MediaQuery.of(context).size;
+    final col = (position.dx / size.width * 3).floor().clamp(0, 2);
+    final row = (position.dy / size.height * 3).floor().clamp(0, 2);
+    const zones = [
+      ['tl', 'tc', 'tr'],
+      ['ml', 'mc', 'mr'],
+      ['bl', 'bc', 'br'],
+    ];
+    final zone = zones[row][col];
+    final config = Map<String, int>.from(ClickAction.defaultZoneConfig)
+      ..addAll(widget.clickActions);
+    return config[zone] ?? ClickAction.showMenu;
   }
 
   // === 对标 Legado: nextPageByAnim ===
@@ -911,7 +1119,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       final deltaX = (focusX - _startX).abs();
       final deltaY = (focusY - _startY).abs();
       final distance = deltaX * deltaX + deltaY * deltaY;
-      final slopSquare = 20.0 * 20.0; // 触发阈值
+      final slop = 5.0 + (widget.pageTouchSlop.clamp(0, 100) / 100) * 45.0;
+      final slopSquare = slop * slop; // 触发阈值
 
       _isMoved = distance > slopSquare;
 
@@ -1006,7 +1215,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       final deltaX = (focusX - _startX).abs();
       final deltaY = (focusY - _startY).abs();
       final distance = deltaX * deltaX + deltaY * deltaY;
-      final slopSquare = 20.0 * 20.0;
+      final slop = 5.0 + (widget.pageTouchSlop.clamp(0, 100) / 100) * 45.0;
+      final slopSquare = slop * slop;
 
       _isMoved = distance > slopSquare;
 
@@ -1061,13 +1271,15 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
             child: Padding(
               padding: EdgeInsets.fromLTRB(
                 widget.padding.left,
-                topSafe + PagedReaderWidget.topOffset,
+                topSafe + _topOffset + widget.padding.top,
                 widget.padding.right,
-                bottomSafe + PagedReaderWidget.bottomOffset,
+                bottomSafe + _bottomOffset + widget.padding.bottom,
               ),
               child: Text.rich(
                 TextSpan(text: content, style: widget.textStyle),
-                textAlign: TextAlign.justify,
+                textAlign: widget.settings.textFullJustify
+                    ? TextAlign.justify
+                    : TextAlign.left,
               ),
             ),
           ),
@@ -1078,7 +1290,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   Widget _buildOverlay(double topSafe, double bottomSafe) {
-    final time = DateFormat('HH:mm').format(DateTime.now());
+    if (widget.settings.hideHeader && widget.settings.hideFooter) {
+      return const SizedBox.shrink();
+    }
     final statusColor = widget.textStyle.color?.withValues(alpha: 0.4) ??
         const Color(0xff8B7961);
 
@@ -1086,38 +1300,82 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       child: Container(
         padding: EdgeInsets.fromLTRB(
           widget.padding.left,
-          10 + topSafe,
+          6 + topSafe,
           widget.padding.right,
-          10 + bottomSafe,
+          6 + bottomSafe,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              _factory.currentChapterTitle,
-              style:
-                  widget.textStyle.copyWith(fontSize: 14, color: statusColor),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const Expanded(child: SizedBox.shrink()),
-            Row(
-              children: [
-                Text(time,
-                    style: widget.textStyle
-                        .copyWith(fontSize: 11, color: statusColor)),
-                const Expanded(child: SizedBox.shrink()),
-                Text(
-                  '${_factory.currentPageIndex + 1}/${_factory.totalPages}',
-                  style: widget.textStyle
-                      .copyWith(fontSize: 11, color: statusColor),
+            if (!widget.settings.hideHeader)
+              _buildTipRowWidget(
+                _tipTextForHeader(widget.settings.headerLeftContent),
+                _tipTextForHeader(widget.settings.headerCenterContent),
+                _tipTextForHeader(widget.settings.headerRightContent),
+                widget.textStyle.copyWith(fontSize: 12, color: statusColor),
+              ),
+            if (!widget.settings.hideHeader && widget.settings.showHeaderLine)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Container(
+                  height: 0.5,
+                  color: statusColor.withValues(alpha: 0.2),
                 ),
-              ],
-            ),
+              ),
+            const Expanded(child: SizedBox.shrink()),
+            if (!widget.settings.hideFooter && widget.settings.showFooterLine)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Container(
+                  height: 0.5,
+                  color: statusColor.withValues(alpha: 0.2),
+                ),
+              ),
+            if (!widget.settings.hideFooter)
+              _buildTipRowWidget(
+                _tipTextForFooter(widget.settings.footerLeftContent),
+                _tipTextForFooter(widget.settings.footerCenterContent),
+                _tipTextForFooter(widget.settings.footerRightContent),
+                widget.textStyle.copyWith(fontSize: 11, color: statusColor),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildTipRowWidget(
+    String? left,
+    String? center,
+    String? right,
+    TextStyle style,
+  ) {
+    return Row(
+      children: [
+        _tipTextWidget(left, style),
+        const Expanded(child: SizedBox.shrink()),
+        if (center != null && center.isNotEmpty)
+          Expanded(
+            flex: 2,
+            child: Text(
+              center,
+              style: style,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          )
+        else
+          const Expanded(flex: 2, child: SizedBox.shrink()),
+        const Expanded(child: SizedBox.shrink()),
+        _tipTextWidget(right, style),
+      ],
+    );
+  }
+
+  Widget _tipTextWidget(String? text, TextStyle style) {
+    if (text == null || text.isEmpty) return const SizedBox.shrink();
+    return Text(text, style: style);
   }
 }
 
