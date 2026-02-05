@@ -24,6 +24,7 @@ import '../widgets/page_factory.dart';
 import '../widgets/reader_menus.dart';
 import '../widgets/reader_bottom_menu.dart';
 import '../widgets/reader_status_bar.dart';
+import '../widgets/typography_settings_dialog.dart';
 
 /// 简洁阅读器 - Cupertino 风格 (增强版)
 class SimpleReaderView extends StatefulWidget {
@@ -1491,6 +1492,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 const SizedBox(height: 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _buildSettingsScopeHeader(setPopupState),
+                ),
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: _buildSettingsTabs(
                     selectedTab,
                     (value) {
@@ -1513,6 +1519,126 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
+  Widget _buildSettingsScopeHeader(StateSetter setPopupState) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white10,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '设置范围',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                _useBookReadingSettings ? '本书设置' : '全局默认',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '本书独立设置',
+                  style: TextStyle(color: Colors.white, fontSize: 14),
+                ),
+              ),
+              CupertinoSwitch(
+                value: _useBookReadingSettings,
+                activeTrackColor: CupertinoColors.activeBlue,
+                onChanged: (value) {
+                  if (!value) {
+                    unawaited(_confirmDisableBookSettings(setPopupState));
+                    return;
+                  }
+                  unawaited(_setUseBookReadingSettings(true, setPopupState));
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: CupertinoButton(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(10),
+                  onPressed: () => unawaited(_applyCurrentToGlobal(setPopupState)),
+                  child: const Text(
+                    '保存为全局默认',
+                    style: TextStyle(color: Colors.white, fontSize: 13),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: CupertinoButton(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  color: _useBookReadingSettings ? Colors.white12 : Colors.white10,
+                  borderRadius: BorderRadius.circular(10),
+                  onPressed: _useBookReadingSettings
+                      ? () => unawaited(_confirmApplyGlobalToBook(setPopupState))
+                      : null,
+                  child: Text(
+                    '全局覆盖本书',
+                    style: TextStyle(
+                      color: _useBookReadingSettings
+                          ? Colors.white
+                          : Colors.white38,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDisableBookSettings(StateSetter setPopupState) async {
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('关闭本书独立设置？'),
+        content: const Text('\n关闭后将回到全局默认，本书独立设置会被清除。'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('取消'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            child: const Text('关闭'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      setPopupState(() {});
+      return;
+    }
+    await _setUseBookReadingSettings(false, setPopupState);
+  }
+
   Widget _buildSettingsTabs(int selectedTab, ValueChanged<int> onChanged) {
     Widget buildTab(String label, bool isSelected) {
       return Padding(
@@ -1533,12 +1659,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       backgroundColor: Colors.white12,
       thumbColor: CupertinoColors.activeBlue,
       children: {
-        0: buildTab('常用', selectedTab == 0),
+        0: buildTab('Aa', selectedTab == 0),
         1: buildTab('主题', selectedTab == 1),
-        2: buildTab('字体', selectedTab == 2),
-        3: buildTab('排版', selectedTab == 3),
-        4: buildTab('翻页', selectedTab == 4),
-        5: buildTab('更多', selectedTab == 5),
+        2: buildTab('翻页', selectedTab == 2),
+        3: buildTab('更多', selectedTab == 3),
       },
       onValueChanged: (value) {
         if (value == null) return;
@@ -1550,18 +1674,334 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Widget _buildSettingsTabBody(int tab, StateSetter setPopupState) {
     switch (tab) {
       case 0:
-        return _buildQuickSettingsTab(setPopupState);
+        return _buildTypographyMainTab(setPopupState);
       case 1:
         return _buildThemeSettingsTab(setPopupState);
       case 2:
-        return _buildFontSettingsTab(setPopupState);
-      case 3:
-        return _buildLayoutSettingsTab(setPopupState);
-      case 4:
         return _buildPageSettingsTab(setPopupState);
       default:
         return _buildMoreSettingsTab(setPopupState);
     }
+  }
+
+  /// Aa（排版）主面板：对标专业阅读器的“高频项集中”
+  ///
+  /// 原则：
+  /// - 第一屏优先：字号/行距/段距/缩进/对齐
+  /// - 字体与装饰留在同页下方
+  /// - 边距给预设 + “高级”入口，避免用户在四个滑条里迷路
+  Widget _buildTypographyMainTab(StateSetter setPopupState) {
+    return SingleChildScrollView(
+      key: const ValueKey('typography'),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSettingsCard(
+            title: '高频排版',
+            child: Column(
+              children: [
+                _buildSliderSetting(
+                  '字号',
+                  _settings.fontSize,
+                  10,
+                  40,
+                  (val) => _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(fontSize: val),
+                  ),
+                  displayFormat: (v) => v.toInt().toString(),
+                ),
+                const SizedBox(height: 8),
+                _buildSliderSetting(
+                  '行距',
+                  _settings.lineHeight,
+                  1.0,
+                  3.0,
+                  (val) => _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(lineHeight: val),
+                  ),
+                  displayFormat: (v) => v.toStringAsFixed(1),
+                ),
+                const SizedBox(height: 8),
+                _buildSliderSetting(
+                  '段距',
+                  _settings.paragraphSpacing,
+                  0,
+                  50,
+                  (val) => _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(paragraphSpacing: val),
+                  ),
+                  displayFormat: (v) => v.toInt().toString(),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildToggleBtn(
+                        label: '两端对齐',
+                        isActive: _settings.textFullJustify,
+                        onTap: () => _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(
+                            textFullJustify: !_settings.textFullJustify,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildToggleBtn(
+                        label: '段首缩进',
+                        isActive: _settings.paragraphIndent.isNotEmpty,
+                        onTap: () {
+                          final hasIndent = _settings.paragraphIndent.isNotEmpty;
+                          _updateSettingsFromSheet(
+                            setPopupState,
+                            _settings.copyWith(
+                              paragraphIndent: hasIndent ? '' : '　　',
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          _buildSettingsCard(
+            title: '字体与装饰',
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    showCupertinoModalPopup(
+                      context: context,
+                      builder: (ctx) => _buildFontSelectDialog(setPopupState),
+                    );
+                  },
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white10,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('字体: ${_currentFontFamily ?? "系统默认"}',
+                            style: const TextStyle(color: Colors.white)),
+                        const Icon(CupertinoIcons.chevron_right,
+                            color: Colors.white54, size: 16),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                CupertinoSlidingSegmentedControl<int>(
+                  groupValue: _settings.textBold,
+                  backgroundColor: Colors.white12,
+                  thumbColor: CupertinoColors.activeBlue,
+                  children: const {
+                    2: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: Text('细体',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                    0: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: Text('正常',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                    1: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: Text('粗体',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  },
+                  onValueChanged: (value) {
+                    if (value == null) return;
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(textBold: value),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildToggleBtn(
+                        label: '下划线',
+                        isActive: _settings.underline,
+                        onTap: () => _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(underline: !_settings.underline),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildToggleBtn(
+                        label: '字距',
+                        isActive: _settings.letterSpacing.abs() >= 0.1,
+                        onTap: () => _showLetterSpacingPicker(setPopupState),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          _buildSettingsCard(
+            title: '边距',
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildToggleBtn(
+                        label: '窄',
+                        isActive: _settings.paddingLeft <= 12,
+                        onTap: () => _applyPaddingPreset(
+                          setPopupState,
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildToggleBtn(
+                        label: '标准',
+                        isActive: _settings.paddingLeft > 12 &&
+                            _settings.paddingLeft < 24,
+                        onTap: () => _applyPaddingPreset(
+                          setPopupState,
+                          horizontal: 18,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildToggleBtn(
+                        label: '宽',
+                        isActive: _settings.paddingLeft >= 24,
+                        onTap: () => _applyPaddingPreset(
+                          setPopupState,
+                          horizontal: 28,
+                          vertical: 22,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () {
+                    showTypographySettingsDialog(
+                      context,
+                      settings: _settings,
+                      onSettingsChanged: (newSettings) {
+                        _updateSettingsFromSheet(setPopupState, newSettings);
+                      },
+                    );
+                  },
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white10,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('高级排版与边距',
+                            style: TextStyle(color: Colors.white)),
+                        Icon(CupertinoIcons.chevron_right,
+                            color: Colors.white54, size: 16),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  void _applyPaddingPreset(
+    StateSetter setPopupState, {
+    required double horizontal,
+    required double vertical,
+  }) {
+    _updateSettingsFromSheet(
+      setPopupState,
+      _settings.copyWith(
+        paddingLeft: horizontal,
+        paddingRight: horizontal,
+        paddingTop: vertical,
+        paddingBottom: vertical,
+        marginHorizontal: horizontal,
+        marginVertical: vertical,
+      ),
+    );
+  }
+
+  Future<void> _showLetterSpacingPicker(StateSetter setPopupState) async {
+    final controller =
+        TextEditingController(text: _settings.letterSpacing.toStringAsFixed(1));
+    final result = await showCupertinoDialog<double>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('字距'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            placeholder: '-2.0 ~ 5.0',
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('取消'),
+            onPressed: () => Navigator.pop(context),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: const Text('确定'),
+            onPressed: () {
+              final raw = double.tryParse(controller.text.trim());
+              Navigator.pop(context, raw);
+            },
+          ),
+        ],
+      ),
+    );
+    if (result == null) return;
+    _updateSettingsFromSheet(
+      setPopupState,
+      _settings.copyWith(letterSpacing: result.clamp(-2.0, 5.0)),
+    );
   }
 
   /// 常用设置：把高频项放在一个页面里，避免“到处点来点去”。
@@ -2418,31 +2858,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSettingsCard(
-            title: '设置范围',
-            child: Column(
-              children: [
-                _buildSwitchRow('本书独立设置', _useBookReadingSettings, (value) {
-                  unawaited(_setUseBookReadingSettings(value, setPopupState));
-                }),
-                _buildInfoRow(
-                  '当前编辑',
-                  _useBookReadingSettings ? '本书设置' : '全局默认',
-                ),
-                _buildOptionRow(
-                  '保存为全局默认',
-                  '保存',
-                  () => unawaited(_applyCurrentToGlobal(setPopupState)),
-                ),
-                if (_useBookReadingSettings)
-                  _buildOptionRow(
-                    '用全局默认覆盖本书',
-                    '应用',
-                    () => unawaited(_confirmApplyGlobalToBook(setPopupState)),
-                  ),
-              ],
-            ),
-          ),
-          _buildSettingsCard(
             title: '状态栏与显示',
             child: Column(
               children: [
@@ -2758,23 +3173,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: const TextStyle(color: Colors.white, fontSize: 14)),
-          Text(
-            value,
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showTipOptionPicker({
     required String title,
     required List<_TipOption> options,
@@ -2957,7 +3355,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   /// 显示更多设置
   void _showMoreSettingsSheet() {
-    _showReadingSettingsSheet(initialTab: 5);
+    _showReadingSettingsSheet(initialTab: 3);
   }
 
   Widget _buildSwitchRow(
