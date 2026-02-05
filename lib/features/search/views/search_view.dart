@@ -1,25 +1,42 @@
 import 'package:flutter/cupertino.dart';
-import '../../source/models/book_source.dart';
+import 'package:uuid/uuid.dart';
+import '../../../core/database/database_service.dart';
+import '../../../core/database/repositories/book_repository.dart';
+import '../../../core/database/repositories/source_repository.dart';
+import '../../bookshelf/models/book.dart';
 import '../../source/services/rule_parser_engine.dart';
 
 /// 搜索页面 - Cupertino 风格
 class SearchView extends StatefulWidget {
-  final List<BookSource> sources;
-
-  const SearchView({super.key, required this.sources});
+  const SearchView({super.key});
 
   @override
   State<SearchView> createState() => _SearchViewState();
 }
 
 class _SearchViewState extends State<SearchView> {
+  static const _uuid = Uuid();
+
   final TextEditingController _searchController = TextEditingController();
   final RuleParserEngine _engine = RuleParserEngine();
+  late final SourceRepository _sourceRepo;
+  late final BookRepository _bookRepo;
+  late final ChapterRepository _chapterRepo;
 
   List<SearchResult> _results = [];
   bool _isSearching = false;
+  bool _isImporting = false;
   String _searchingSource = '';
   int _completedSources = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final db = DatabaseService();
+    _sourceRepo = SourceRepository(db);
+    _bookRepo = BookRepository(db);
+    _chapterRepo = ChapterRepository(db);
+  }
 
   @override
   void dispose() {
@@ -31,7 +48,10 @@ class _SearchViewState extends State<SearchView> {
     final keyword = _searchController.text.trim();
     if (keyword.isEmpty) return;
 
-    final enabledSources = widget.sources.where((s) => s.enabled == true).toList();
+    final sources = _sourceRepo.getAllSources();
+    final enabledSources =
+        sources.where((source) => source.enabled == true).toList();
+
     if (enabledSources.isEmpty) {
       _showMessage('没有启用的书源');
       return;
@@ -43,9 +63,8 @@ class _SearchViewState extends State<SearchView> {
       _completedSources = 0;
     });
 
-    // 并发搜索所有书源
     for (final source in enabledSources) {
-      if (!_isSearching) break; // 支持取消
+      if (!_isSearching) break;
 
       setState(() {
         _searchingSource = source.bookSourceName;
@@ -59,8 +78,10 @@ class _SearchViewState extends State<SearchView> {
             _completedSources++;
           });
         }
-      } catch (e) {
-        debugPrint('搜索 ${source.bookSourceName} 失败: $e');
+      } catch (_) {
+        if (mounted) {
+          setState(() => _completedSources++);
+        }
       }
     }
 
@@ -72,11 +93,92 @@ class _SearchViewState extends State<SearchView> {
     }
   }
 
+  Future<void> _importBook(SearchResult result) async {
+    if (_isImporting) return;
+
+    final source = _sourceRepo.getSourceByUrl(result.sourceUrl);
+    if (source == null) {
+      _showMessage('书源不存在或已被删除');
+      return;
+    }
+
+    setState(() => _isImporting = true);
+
+    try {
+      final detail = await _engine.getBookInfo(source, result.bookUrl);
+      final tocUrl = detail?.tocUrl.isNotEmpty == true
+          ? detail!.tocUrl
+          : result.bookUrl;
+      final tocItems = await _engine.getToc(source, tocUrl);
+      if (tocItems.isEmpty) {
+        _showMessage('目录解析失败');
+        return;
+      }
+
+      final bookId = _uuid.v5(
+        Namespace.url.value,
+        '${source.bookSourceUrl}|${detail?.bookUrl ?? result.bookUrl}',
+      );
+
+      if (_bookRepo.hasBook(bookId)) {
+        _showMessage('已在书架中');
+        return;
+      }
+
+      final book = Book(
+        id: bookId,
+        title: detail?.name ?? result.name,
+        author: detail?.author ?? result.author,
+        coverUrl: detail?.coverUrl.isNotEmpty == true
+            ? detail!.coverUrl
+            : result.coverUrl,
+        intro: detail?.intro ?? result.intro,
+        sourceId: source.bookSourceUrl,
+        sourceUrl: source.bookSourceUrl,
+        latestChapter: detail?.lastChapter ?? result.lastChapter,
+        totalChapters: tocItems.length,
+        currentChapter: 0,
+        readProgress: 0,
+        lastReadTime: null,
+        addedTime: DateTime.now(),
+        isLocal: false,
+        localPath: null,
+      );
+
+      final chapters = tocItems.map((item) {
+        return Chapter(
+          id: _uuid.v5(
+            Namespace.url.value,
+            '$bookId|${item.index}|${item.url}',
+          ),
+          bookId: bookId,
+          title: item.name,
+          url: item.url,
+          index: item.index,
+          isDownloaded: false,
+          content: null,
+        );
+      }).toList();
+
+      await _bookRepo.addBook(book);
+      await _chapterRepo.addChapters(chapters);
+
+      _showMessage('已加入书架');
+    } catch (e) {
+      _showMessage('导入失败: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isImporting = false);
+      }
+    }
+  }
+
   void _showMessage(String message) {
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
-        content: Text(message),
+        title: const Text('提示'),
+        content: Text('\n$message'),
         actions: [
           CupertinoDialogAction(
             child: const Text('好'),
@@ -89,15 +191,18 @@ class _SearchViewState extends State<SearchView> {
 
   @override
   Widget build(BuildContext context) {
+    final totalSources = _sourceRepo
+        .getAllSources()
+        .where((source) => source.enabled == true)
+        .length;
+
     return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: const Text('搜索'),
-        previousPageTitle: '返回',
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('搜索'),
       ),
       child: SafeArea(
         child: Column(
           children: [
-            // 搜索框
             Padding(
               padding: const EdgeInsets.all(16),
               child: CupertinoSearchTextField(
@@ -106,8 +211,6 @@ class _SearchViewState extends State<SearchView> {
                 onSubmitted: (_) => _search(),
               ),
             ),
-
-            // 搜索进度
             if (_isSearching)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -117,7 +220,7 @@ class _SearchViewState extends State<SearchView> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        '正在搜索: $_searchingSource ($_completedSources/${widget.sources.where((s) => s.enabled == true).length})',
+                        '正在搜索: $_searchingSource ($_completedSources/$totalSources)',
                         style: TextStyle(
                           fontSize: 13,
                           color: CupertinoColors.secondaryLabel
@@ -133,8 +236,6 @@ class _SearchViewState extends State<SearchView> {
                   ],
                 ),
               ),
-
-            // 搜索结果
             Expanded(
               child: _results.isEmpty
                   ? _buildEmptyState()
@@ -144,6 +245,11 @@ class _SearchViewState extends State<SearchView> {
                           _buildResultItem(_results[index]),
                     ),
             ),
+            if (_isImporting)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: CupertinoActivityIndicator(),
+              ),
           ],
         ),
       ),
@@ -158,14 +264,22 @@ class _SearchViewState extends State<SearchView> {
           Icon(
             CupertinoIcons.search,
             size: 64,
-            color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            color: CupertinoColors.systemGrey,
           ),
           const SizedBox(height: 16),
           Text(
-            _isSearching ? '正在搜索...' : '输入关键词搜索书籍',
+            '搜索书籍',
             style: TextStyle(
-              fontSize: 17,
+              fontSize: 16,
               color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '输入书名或作者后回车',
+            style: TextStyle(
+              fontSize: 14,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
             ),
           ),
         ],
@@ -174,12 +288,10 @@ class _SearchViewState extends State<SearchView> {
   }
 
   Widget _buildResultItem(SearchResult result) {
-    return CupertinoListTile(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      leadingSize: 50,
+    return CupertinoListTile.notched(
       leading: Container(
-        width: 50,
-        height: 70,
+        width: 40,
+        height: 56,
         decoration: BoxDecoration(
           color: CupertinoColors.systemGrey5.resolveFrom(context),
           borderRadius: BorderRadius.circular(6),
@@ -229,13 +341,7 @@ class _SearchViewState extends State<SearchView> {
         ],
       ),
       trailing: const CupertinoListTileChevron(),
-      onTap: () => _onResultTap(result),
+      onTap: () => _importBook(result),
     );
-  }
-
-  void _onResultTap(SearchResult result) {
-    // TODO: 跳转到书籍详情页面
-    _showMessage(
-        '${result.name}\n作者: ${result.author}\n来源: ${result.sourceName}');
   }
 }

@@ -1,5 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../../../core/database/database_service.dart';
+import '../../../core/database/entities/book_entity.dart';
+import '../../../core/database/repositories/source_repository.dart';
 import '../models/book_source.dart';
+import '../services/source_import_export_service.dart';
 
 /// 书源管理页面 - 纯 iOS 原生风格
 class SourceListView extends StatefulWidget {
@@ -11,48 +19,30 @@ class SourceListView extends StatefulWidget {
 
 class _SourceListViewState extends State<SourceListView> {
   String _selectedGroup = '全部';
-  final List<String> _groups = ['全部', '小说', '漫画', '有声', '失效'];
+  late final SourceRepository _sourceRepo;
+  late final DatabaseService _db;
+  final SourceImportExportService _importExportService =
+      SourceImportExportService();
+  final TextEditingController _urlController = TextEditingController();
 
-  final List<BookSource> _sources = [
-    BookSource(
-      bookSourceUrl: 'https://www.example1.com',
-      bookSourceName: '笔趣阁',
-      bookSourceGroup: '小说',
-      enabled: true,
-    ),
-    BookSource(
-      bookSourceUrl: 'https://www.example2.com',
-      bookSourceName: '起点中文网',
-      bookSourceGroup: '小说',
-      enabled: true,
-    ),
-    BookSource(
-      bookSourceUrl: 'https://www.example3.com',
-      bookSourceName: '番茄小说',
-      bookSourceGroup: '小说',
-      enabled: false,
-    ),
-    BookSource(
-      bookSourceUrl: 'https://www.example4.com',
-      bookSourceName: '喜马拉雅',
-      bookSourceGroup: '有声',
-      enabled: true,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _db = DatabaseService();
+    _sourceRepo = SourceRepository(_db);
+  }
 
-  List<BookSource> get _filteredSources {
-    if (_selectedGroup == '全部') return _sources;
-    if (_selectedGroup == '失效') {
-      return _sources.where((s) => !s.enabled).toList();
-    }
-    return _sources.where((s) => s.bookSourceGroup == _selectedGroup).toList();
+  @override
+  void dispose() {
+    _urlController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: const Text('书源'),
+        middle: const Text('书源管理'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -64,40 +54,78 @@ class _SourceListViewState extends State<SourceListView> {
             CupertinoButton(
               padding: EdgeInsets.zero,
               onPressed: _showMoreOptions,
-              child: const Icon(CupertinoIcons.ellipsis_vertical),
+              child: const Icon(CupertinoIcons.ellipsis),
             ),
           ],
         ),
       ),
       child: SafeArea(
-        child: Column(
-          children: [
-            // 分组筛选
-            _buildGroupFilter(),
-            // 书源列表
-            Expanded(
-              child: _filteredSources.isEmpty
-                  ? _buildEmptyState()
-                  : _buildSourceList(),
-            ),
-          ],
+        child: ValueListenableBuilder<Box<BookSourceEntity>>(
+          valueListenable: _db.sourcesBox.listenable(),
+          builder: (context, box, _) {
+            final sources = _sourceRepo.fromEntities(box.values).toList()
+              ..sort((a, b) {
+                if (a.weight != b.weight) {
+                  return b.weight.compareTo(a.weight);
+                }
+                return a.bookSourceName.compareTo(b.bookSourceName);
+              });
+
+            final groups = _buildGroups(sources);
+            final activeGroup =
+                groups.contains(_selectedGroup) ? _selectedGroup : '全部';
+            final filteredSources = _filterSources(sources, activeGroup);
+
+            return Column(
+              children: [
+                _buildGroupFilter(groups, activeGroup),
+                Expanded(
+                  child: filteredSources.isEmpty
+                      ? _buildEmptyState()
+                      : _buildSourceList(filteredSources),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildGroupFilter() {
+  List<String> _buildGroups(List<BookSource> sources) {
+    final groups = <String>{};
+    for (final source in sources) {
+      final group = source.bookSourceGroup?.trim();
+      if (group != null && group.isNotEmpty) {
+        groups.add(group);
+      }
+    }
+    return ['全部', ...groups.toList()..sort(), '失效'];
+  }
+
+  List<BookSource> _filterSources(
+    List<BookSource> sources,
+    String activeGroup,
+  ) {
+    if (activeGroup == '全部') return sources;
+    if (activeGroup == '失效') {
+      return sources.where((s) => !s.enabled).toList();
+    }
+    return sources.where((s) => s.bookSourceGroup == activeGroup).toList();
+  }
+
+  Widget _buildGroupFilter(List<String> groups, String activeGroup) {
     return Container(
       height: 44,
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _groups.length,
+        itemCount: groups.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
-          final group = _groups[index];
-          final isSelected = group == _selectedGroup;
+          final group = groups[index];
+          final isSelected = group == activeGroup;
           return GestureDetector(
             onTap: () => setState(() => _selectedGroup = group),
             child: Container(
@@ -125,78 +153,54 @@ class _SourceListViewState extends State<SourceListView> {
     );
   }
 
+  Widget _buildSourceList(List<BookSource> sources) {
+    return ListView.builder(
+      itemCount: sources.length,
+      itemBuilder: (context, index) {
+        final source = sources[index];
+        return CupertinoListTile.notched(
+          title: Text(source.bookSourceName),
+          subtitle: Text(source.bookSourceUrl),
+          trailing: CupertinoSwitch(
+            value: source.enabled,
+            onChanged: (value) {
+              _sourceRepo.updateSource(source.copyWith(enabled: value));
+            },
+          ),
+          onTap: () => _onSourceTap(source),
+        );
+      },
+    );
+  }
+
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            CupertinoIcons.cloud,
+            CupertinoIcons.cloud_download,
             size: 64,
-            color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            color: CupertinoColors.systemGrey,
           ),
           const SizedBox(height: 16),
           Text(
             '暂无书源',
             style: TextStyle(
-              fontSize: 17,
+              fontSize: 16,
               color: CupertinoColors.secondaryLabel.resolveFrom(context),
             ),
           ),
-          const SizedBox(height: 16),
-          CupertinoButton.filled(
-            onPressed: _showImportOptions,
-            child: const Text('导入书源'),
+          const SizedBox(height: 8),
+          Text(
+            '点击右上角 + 导入书源',
+            style: TextStyle(
+              fontSize: 14,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildSourceList() {
-    return ListView.builder(
-      itemCount: _filteredSources.length,
-      itemBuilder: (context, index) {
-        final source = _filteredSources[index];
-        return CupertinoListTile(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: source.enabled
-                  ? CupertinoTheme.of(context).primaryColor.withValues(alpha: 0.1)
-                  : CupertinoColors.systemGrey5.resolveFrom(context),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              CupertinoIcons.globe,
-              color: source.enabled
-                  ? CupertinoTheme.of(context).primaryColor
-                  : CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
-          title: Text(
-            source.bookSourceName,
-            style: TextStyle(
-              color: source.enabled
-                  ? CupertinoColors.label.resolveFrom(context)
-                  : CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
-          subtitle: Text(source.bookSourceGroup ?? '未分组'),
-          trailing: CupertinoSwitch(
-            value: source.enabled,
-            onChanged: (value) {
-              setState(() {
-                final i = _sources.indexOf(source);
-                _sources[i] = source.copyWith(enabled: value);
-              });
-            },
-          ),
-          onTap: () => _onSourceTap(source),
-        );
-      },
     );
   }
 
@@ -208,15 +212,24 @@ class _SourceListViewState extends State<SourceListView> {
         actions: [
           CupertinoActionSheetAction(
             child: const Text('从剪贴板导入'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              _importFromClipboard();
+            },
           ),
           CupertinoActionSheetAction(
             child: const Text('从文件导入'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              _importFromFile();
+            },
           ),
           CupertinoActionSheetAction(
             child: const Text('从网络导入'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              _importFromUrl();
+            },
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
@@ -233,21 +246,26 @@ class _SourceListViewState extends State<SourceListView> {
       builder: (context) => CupertinoActionSheet(
         actions: [
           CupertinoActionSheetAction(
-            child: const Text('全选'),
-            onPressed: () => Navigator.pop(context),
-          ),
-          CupertinoActionSheetAction(
             child: const Text('导出书源'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              _exportSources();
+            },
           ),
           CupertinoActionSheetAction(
             child: const Text('检查可用性'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              _showMessage('暂未实现可用性检测');
+            },
           ),
           CupertinoActionSheetAction(
             isDestructiveAction: true,
             child: const Text('删除失效书源'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              _sourceRepo.deleteDisabledSources();
+            },
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
@@ -266,25 +284,34 @@ class _SourceListViewState extends State<SourceListView> {
         actions: [
           CupertinoActionSheetAction(
             child: const Text('编辑'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              _showMessage('暂未实现书源编辑');
+            },
           ),
           CupertinoActionSheetAction(
             child: const Text('置顶'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              _sourceRepo.updateSource(source.copyWith(weight: 9999));
+            },
           ),
           CupertinoActionSheetAction(
             child: const Text('分享'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              Clipboard.setData(
+                ClipboardData(text: json.encode(source.toJson())),
+              );
+              _showMessage('已复制书源 JSON');
+            },
           ),
           CupertinoActionSheetAction(
             isDestructiveAction: true,
             child: const Text('删除'),
             onPressed: () {
               Navigator.pop(context);
-              setState(() {
-                _sources.removeWhere(
-                    (s) => s.bookSourceUrl == source.bookSourceUrl);
-              });
+              _sourceRepo.deleteSource(source.bookSourceUrl);
             },
           ),
         ],
@@ -292,6 +319,96 @@ class _SourceListViewState extends State<SourceListView> {
           child: const Text('取消'),
           onPressed: () => Navigator.pop(context),
         ),
+      ),
+    );
+  }
+
+  Future<void> _importFromFile() async {
+    final result = await _importExportService.importFromFile();
+    if (!result.success) {
+      if (result.cancelled) return;
+      _showMessage(result.errorMessage ?? '导入失败');
+      return;
+    }
+    await _sourceRepo.addSources(result.sources);
+    _showMessage('成功导入 ${result.importCount} 条书源');
+  }
+
+  Future<void> _importFromClipboard() async {
+    final data = await Clipboard.getData('text/plain');
+    final text = data?.text?.trim();
+    if (text == null || text.isEmpty) {
+      _showMessage('剪贴板为空');
+      return;
+    }
+    final result = _importExportService.importFromJson(text);
+    if (!result.success) {
+      _showMessage(result.errorMessage ?? '导入失败');
+      return;
+    }
+    await _sourceRepo.addSources(result.sources);
+    _showMessage('成功导入 ${result.importCount} 条书源');
+  }
+
+  Future<void> _importFromUrl() async {
+    _urlController.clear();
+    await showCupertinoDialog<String>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('从网络导入'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: _urlController,
+            placeholder: '输入书源链接',
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('取消'),
+            onPressed: () => Navigator.pop(context),
+          ),
+          CupertinoDialogAction(
+            child: const Text('导入'),
+            onPressed: () => Navigator.pop(context, _urlController.text),
+          ),
+        ],
+      ),
+    ).then((value) async {
+      final url = value?.trim();
+      if (url == null || url.isEmpty) return;
+      final result = await _importExportService.importFromUrl(url);
+      if (!result.success) {
+        _showMessage(result.errorMessage ?? '导入失败');
+        return;
+      }
+      await _sourceRepo.addSources(result.sources);
+      _showMessage('成功导入 ${result.importCount} 条书源');
+    });
+  }
+
+  Future<void> _exportSources() async {
+    final sources = _sourceRepo.getAllSources();
+    if (sources.isEmpty) {
+      _showMessage('暂无可导出的书源');
+      return;
+    }
+    final success = await _importExportService.exportToFile(sources);
+    _showMessage(success ? '导出成功' : '导出取消');
+  }
+
+  void _showMessage(String message) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('提示'),
+        content: Text('\n$message'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('好'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
       ),
     );
   }
