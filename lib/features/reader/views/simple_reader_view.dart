@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart'
@@ -7,6 +8,7 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
+import '../../../core/services/screen_brightness_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/typography.dart';
@@ -44,6 +46,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   late final BookRepository _bookRepo;
   late final SourceRepository _sourceRepo;
   late final SettingsService _settingsService;
+  final ScreenBrightnessService _brightnessService =
+      ScreenBrightnessService.instance;
   final RuleParserEngine _ruleEngine = RuleParserEngine();
 
   List<Chapter> _chapters = [];
@@ -121,6 +125,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _currentChapterIndex = widget.initialChapter;
     _initReader();
 
+    // 应用亮度设置（首帧后，避免部分机型窗口未就绪）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncNativeBrightnessForSettings(
+        const ReadingSettings(),
+        _settings,
+        force: true,
+      );
+    });
+
     // 初始化自动翻页器
     _autoPager.setScrollController(_scrollController);
     _autoPager.setOnNextPage(() {
@@ -175,8 +188,32 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _scrollController.dispose();
     _keyboardFocusNode.dispose();
     _autoPager.dispose();
+    // 离开阅读器时恢复系统亮度（iOS 还原原始亮度；Android 还原窗口亮度为跟随系统）
+    unawaited(_brightnessService.resetToSystem());
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
+  }
+
+  void _syncNativeBrightnessForSettings(
+    ReadingSettings oldSettings,
+    ReadingSettings newSettings, {
+    bool force = false,
+  }) {
+    if (!_brightnessService.supportsNative) return;
+
+    final systemChanged =
+        oldSettings.useSystemBrightness != newSettings.useSystemBrightness;
+    final valueChanged = oldSettings.brightness != newSettings.brightness;
+
+    if (!force && !systemChanged && !valueChanged) return;
+
+    if (newSettings.useSystemBrightness) {
+      unawaited(_brightnessService.resetToSystem());
+      return;
+    }
+
+    // 手动亮度：仅在关闭“跟随系统”时生效
+    unawaited(_brightnessService.setBrightness(newSettings.brightness));
   }
 
   /// 保存进度：章节 + 滚动偏移
@@ -311,9 +348,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final safeArea = MediaQuery.of(context).padding;
 
     // 对标 flutter_reader 的布局计算
-    final topOffset = _settings.hideHeader ? 0.0 : PagedReaderWidget.topOffset;
-    final bottomOffset =
-        _settings.hideFooter ? 0.0 : PagedReaderWidget.bottomOffset;
+    final showHeader = _settings.showStatusBar && !_settings.hideHeader;
+    final showFooter = _settings.showStatusBar && !_settings.hideFooter;
+    final topOffset = showHeader ? PagedReaderWidget.topOffset : 0.0;
+    final bottomOffset = showFooter ? PagedReaderWidget.bottomOffset : 0.0;
 
     final contentHeight = screenHeight -
         safeArea.top -
@@ -415,6 +453,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           ? AutoPagerMode.scroll
           : AutoPagerMode.page);
     }
+    _syncNativeBrightnessForSettings(oldSettings, newSettings);
     _settingsService.saveReadingSettings(newSettings);
   }
 
@@ -808,6 +847,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       },
                     ),
                   ),
+                Positioned.fill(
+                  child: _buildBrightnessOverlay(),
+                ),
                   ],
                 ),
               ),
@@ -826,6 +868,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     // 滚动模式
     return _buildScrollContent();
+  }
+
+  Widget _buildBrightnessOverlay() {
+    if (_settings.useSystemBrightness) return const SizedBox.shrink();
+    // Android/iOS 使用原生亮度调节；仅在 Web/桌面端用遮罩模拟降低亮度。
+    if (_brightnessService.supportsNative) return const SizedBox.shrink();
+    final opacity = (1.0 - _settings.brightness).clamp(0.0, 1.0);
+    if (opacity <= 0) return const SizedBox.shrink();
+    return IgnorePointer(
+      child: Container(
+        color: Colors.black.withValues(alpha: opacity),
+      ),
+    );
   }
 
   /// 翻页模式内容（对标 Legado ReadView）
@@ -959,17 +1014,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           ],
           // 正文内容（参考 legado paragraphIndent 处理）
           ...paragraphs.map((paragraph) {
-            final trimmed = paragraph.trim();
-            if (trimmed.isEmpty) return const SizedBox.shrink();
+            final paragraphText = paragraph.trimRight();
+            final trimmedLeft = paragraphText.trimLeft();
+            if (trimmedLeft.isEmpty) return const SizedBox.shrink();
 
-            // 智能检测缩进：如果原文已有缩进（全角/半角空格、制表符）则保留
-            final hasIndent = paragraph.startsWith('　') ||
-                paragraph.startsWith('  ') ||
-                paragraph.startsWith('\t');
-            // 根据是否已有缩进决定是否添加
             final indent = _settings.paragraphIndent;
+            // 缩进策略：
+            // - 开启缩进：统一“去掉原文前导空白 + 添加缩进”，避免不同来源缩进不一致
+            // - 关闭缩进：保留原文前导空白，避免误删导致“首行缩进没了”
             final displayText =
-                (hasIndent || indent.isEmpty) ? trimmed : '$indent$trimmed';
+                indent.isEmpty ? paragraphText : '$indent$trimmedLeft';
 
             return Padding(
               padding: EdgeInsets.only(bottom: _settings.paragraphSpacing),

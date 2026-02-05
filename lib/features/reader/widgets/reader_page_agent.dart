@@ -49,9 +49,13 @@ class ReaderPageAgent {
     );
 
     // 2. 预处理文本：按换行符分割段落，并进行清洗
+    //
+    // 说明：
+    // - 不使用 `trim()`，避免用户关闭缩进时丢失原文前导空白
+    // - 当开启段首缩进时，会统一“去掉原文前导空白 + 重新添加缩进”，保证一致性
     String cleanContent = content.replaceAll('\r\n', '\n');
     final rawParagraphs = cleanContent.split('\n');
-    List<String> paragraphs = [];
+    final List<String> paragraphs = [];
     
     // 如果有标题，插入到最前面
     bool hasTitle = title != null && title.isNotEmpty;
@@ -60,15 +64,13 @@ class ReaderPageAgent {
       paragraphs.add(''); // 标题后的视觉空行
     }
     
-    // 清洗段落（去除首尾空白，去除空段落）
+    // 清洗段落（去除行尾空白，过滤空段落）
     for (var p in rawParagraphs) {
-      String trimmed = p.trim();
-      // 去除全角空格干扰
-      while (trimmed.startsWith('　')) {
-        trimmed = trimmed.substring(1).trim();
-      }
-      if (trimmed.isNotEmpty) {
-        paragraphs.add(trimmed);
+      final paragraphText = p.trimRight();
+      final trimmedLeft = paragraphText.trimLeft();
+      if (trimmedLeft.isNotEmpty) {
+        // 保留原文的前导空白（用于“关闭缩进时保留原格式”）
+        paragraphs.add(paragraphText);
       }
     }
 
@@ -111,10 +113,11 @@ class ReaderPageAgent {
         continue;
       }
 
-      // 添加缩进：标题不缩进，正文统一缩进
+      // 添加缩进：标题不缩进；正文在开启缩进时统一标准化（去前导空白 + 添加缩进）
       final indent = paragraphIndent;
-      String indentedPara =
-          isTitle || indent.isEmpty ? paraText : '$indent$paraText';
+      final trimmedLeft = paraText.trimLeft();
+      final normalizedPara =
+          (isTitle || indent.isEmpty) ? paraText : '$indent$trimmedLeft';
 
       // 标题可设置顶部/底部间距
       if (isTitle && titleTopSpacing > 0) {
@@ -125,13 +128,17 @@ class ReaderPageAgent {
       }
 
       final textPainter = TextPainter(
-        text: TextSpan(text: indentedPara, style: isTitle ? titleStyle : textStyle),
+        text: TextSpan(
+          text: normalizedPara,
+          style: isTitle ? titleStyle : textStyle,
+        ),
         textDirection: ui.TextDirection.ltr,
         textAlign: isTitle ? titleAlign : textAlign,
       );
       textPainter.layout(maxWidth: width);
 
       List<ui.LineMetrics> lines = textPainter.computeLineMetrics();
+      int boundaryOffset = 0;
       
       for (int lineIndex = 0; lineIndex < lines.length; lineIndex++) {
         final line = lines[lineIndex];
@@ -141,15 +148,19 @@ class ReaderPageAgent {
           commitPage(); 
         }
 
-        // 获取当前行文本
-        double lineTop = 0;
-        for (int k = 0; k < lineIndex; k++) {
-          lineTop += lines[k].height;
+        // 获取当前行文本（用 offset 递增的方式避免丢失行首空白）
+        var range = textPainter.getLineBoundary(
+          TextPosition(offset: boundaryOffset.clamp(0, normalizedPara.length)),
+        );
+        // 处理极端情况下 range 不前进导致死循环
+        if (range.end <= boundaryOffset && boundaryOffset < normalizedPara.length) {
+          boundaryOffset++;
+          range = textPainter.getLineBoundary(
+            TextPosition(offset: boundaryOffset.clamp(0, normalizedPara.length)),
+          );
         }
-        double lineCenterY = lineTop + lineH / 2;
-        int startOffset = textPainter.getPositionForOffset(Offset(0, lineCenterY)).offset;
-        var range = textPainter.getLineBoundary(TextPosition(offset: startOffset));
-        String lineText = indentedPara.substring(range.start, range.end);
+        final lineText = normalizedPara.substring(range.start, range.end);
+        boundaryOffset = range.end;
         
         currentPageContent.write(lineText);
         currentY += lineH;
