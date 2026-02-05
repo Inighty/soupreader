@@ -95,6 +95,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   static ui.FragmentProgram? pageCurlProgram;
   ui.Image? _curPageImage;
   ui.Image? _targetPageImage;
+  bool _isCurImageLoading = false;
+  bool _isTargetImageLoading = false;
 
   // 电池状态
   final Battery _battery = Battery();
@@ -191,10 +193,22 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   PageFactory get _factory => widget.pageFactory;
 
-  double get _topOffset =>
-      widget.settings.hideHeader ? 0.0 : PagedReaderWidget.topOffset;
+  bool get _needsPictureCache =>
+      widget.pageTurnMode == PageTurnMode.simulation ||
+      widget.pageTurnMode == PageTurnMode.simulation2 ||
+      widget.pageTurnMode == PageTurnMode.slide ||
+      widget.pageTurnMode == PageTurnMode.cover ||
+      widget.pageTurnMode == PageTurnMode.none;
+
+  bool get _needsShaderImages => widget.pageTurnMode == PageTurnMode.simulation;
+
+  double get _topOffset => (!widget.showStatusBar || widget.settings.hideHeader)
+      ? 0.0
+      : PagedReaderWidget.topOffset;
   double get _bottomOffset =>
-      widget.settings.hideFooter ? 0.0 : PagedReaderWidget.bottomOffset;
+      (!widget.showStatusBar || widget.settings.hideFooter)
+          ? 0.0
+          : PagedReaderWidget.bottomOffset;
 
   /// 使用 PictureRecorder 预渲染页面内容
   ui.Picture _recordPage(String content, Size size) {
@@ -435,12 +449,24 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   void _invalidatePictures() {
+    _curPagePicture?.dispose();
     _curPagePicture = null;
+    _targetPagePicture?.dispose();
     _targetPagePicture = null;
     _curPageImage?.dispose();
     _curPageImage = null;
     _targetPageImage?.dispose();
     _targetPageImage = null;
+    _isCurImageLoading = false;
+    _isTargetImageLoading = false;
+  }
+
+  void _invalidateTargetCache() {
+    _targetPagePicture?.dispose();
+    _targetPagePicture = null;
+    _targetPageImage?.dispose();
+    _targetPageImage = null;
+    _isTargetImageLoading = false;
   }
 
   Future<ui.Image> _convertToHighResImage(ui.Picture picture, Size size) async {
@@ -461,46 +487,73 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     return img;
   }
 
-  void _ensurePictures(Size size) {
+  void _ensurePagePictures(Size size) {
     if (_lastSize != size) {
       _invalidatePictures();
       _lastSize = size;
     }
 
-    // 对标 flutter_novel：当前页永远是翻起的页面
+    // 当前页
     if (_curPagePicture == null) {
       _curPagePicture = _recordPage(_factory.curPage, size);
-      _convertToHighResImage(_curPagePicture!, size).then((img) {
-        if (mounted) {
-          setState(() {
-            _curPageImage = img;
-          });
-        }
-      });
     }
 
+    // 目标页（只有在方向明确时才需要）
     if (_direction == _PageDirection.next && _factory.hasNext()) {
       if (_targetPagePicture == null) {
         _targetPagePicture = _recordPage(_factory.nextPage, size);
-        _convertToHighResImage(_targetPagePicture!, size).then((img) {
-          if (mounted) {
-            setState(() {
-              _targetPageImage = img;
-            });
-          }
-        });
       }
     } else if (_direction == _PageDirection.prev && _factory.hasPrev()) {
       if (_targetPagePicture == null) {
         _targetPagePicture = _recordPage(_factory.prevPage, size);
-        _convertToHighResImage(_targetPagePicture!, size).then((img) {
-          if (mounted) {
-            setState(() {
-              _targetPageImage = img;
-            });
-          }
-        });
       }
+    }
+  }
+
+  void _ensureShaderImages(Size size) {
+    _ensurePagePictures(size);
+    if (!_needsShaderImages) return;
+
+    // 当前页 Image
+    if (_curPagePicture != null &&
+        _curPageImage == null &&
+        !_isCurImageLoading) {
+      _isCurImageLoading = true;
+      _convertToHighResImage(_curPagePicture!, size).then((img) {
+        if (!mounted) {
+          img.dispose();
+          _isCurImageLoading = false;
+          return;
+        }
+        setState(() {
+          _curPageImage?.dispose();
+          _curPageImage = img;
+          _isCurImageLoading = false;
+        });
+      }).catchError((_) {
+        _isCurImageLoading = false;
+      });
+    }
+
+    // 目标页 Image
+    if (_targetPagePicture != null &&
+        _targetPageImage == null &&
+        !_isTargetImageLoading) {
+      _isTargetImageLoading = true;
+      _convertToHighResImage(_targetPagePicture!, size).then((img) {
+        if (!mounted) {
+          img.dispose();
+          _isTargetImageLoading = false;
+          return;
+        }
+        setState(() {
+          _targetPageImage?.dispose();
+          _targetPageImage = img;
+          _isTargetImageLoading = false;
+        });
+      }).catchError((_) {
+        _isTargetImageLoading = false;
+      });
     }
   }
 
@@ -616,8 +669,12 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       }
     }
 
-    _invalidatePictures();
-    _ensurePictures(size);
+    _invalidateTargetCache();
+    if (_needsShaderImages) {
+      _ensureShaderImages(size);
+    } else if (_needsPictureCache) {
+      _ensurePagePictures(size);
+    }
   }
 
   // === P2: 计算角点（对标 Legado calcCornerXY）===
@@ -794,6 +851,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final screenWidth = size.width;
     final screenHeight = size.height;
     final isVertical = widget.pageDirection == PageDirection.vertical;
+    final isRunning = _isMoved || _isRunning || _isStarted;
 
     // 计算偏移量（基于触摸点相对于起始点的位移）
     // 对于滑动/覆盖模式使用
@@ -806,15 +864,20 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     switch (widget.pageTurnMode) {
       case PageTurnMode.slide:
+        if (!isRunning) return _buildPageWidget(_factory.curPage);
+        if (_needsPictureCache) _ensurePagePictures(size);
         return isVertical
             ? _buildVerticalSlideAnimation(screenHeight, offset)
             : _buildSlideAnimation(screenWidth, offset);
       case PageTurnMode.cover:
+        if (!isRunning) return _buildPageWidget(_factory.curPage);
+        if (_needsPictureCache) _ensurePagePictures(size);
         return isVertical
             ? _buildVerticalCoverAnimation(screenHeight, offset)
             : _buildCoverAnimation(screenWidth, offset);
       case PageTurnMode.simulation:
         // 仿真模式使用 touchX/touchY (Shader)
+        if (_needsShaderImages) _ensureShaderImages(size);
         return isVertical
             ? _buildVerticalSlideAnimation(screenHeight, offset)
             : _buildSimulationAnimation(size);
@@ -824,6 +887,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
             ? _buildVerticalSlideAnimation(screenHeight, offset)
             : _buildSimulation2Animation(size);
       case PageTurnMode.none:
+        if (!isRunning) return _buildPageWidget(_factory.curPage);
+        if (_needsPictureCache) _ensurePagePictures(size);
         return _buildNoAnimation(screenWidth, offset);
       default:
         return isVertical
@@ -832,32 +897,38 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
   }
 
+  Widget _buildRecordedPage(ui.Picture? picture, String fallbackContent) {
+    if (picture == null) return _buildPageWidget(fallbackContent);
+    return RepaintBoundary(
+      child: SizedBox.expand(
+        child: CustomPaint(
+          painter: _PagePicturePainter(picture),
+        ),
+      ),
+    );
+  }
+
   /// 垂直滑动模式
   Widget _buildVerticalSlideAnimation(double screenHeight, double offset) {
+    if (_direction == _PageDirection.none) {
+      return _buildRecordedPage(_curPagePicture, _factory.curPage);
+    }
+    final clamped = offset.clamp(-screenHeight, screenHeight);
     return Stack(
       children: [
-        if (offset < 0)
-          Positioned(
-            left: 0,
-            right: 0,
-            top: screenHeight + offset,
-            height: screenHeight,
-            child: _buildPageWidget(_factory.nextPage),
+        if (_direction == _PageDirection.next)
+          Transform.translate(
+            offset: Offset(0, screenHeight + clamped),
+            child: _buildRecordedPage(_targetPagePicture, _factory.nextPage),
           ),
-        if (offset > 0)
-          Positioned(
-            left: 0,
-            right: 0,
-            top: offset - screenHeight,
-            height: screenHeight,
-            child: _buildPageWidget(_factory.prevPage),
+        if (_direction == _PageDirection.prev)
+          Transform.translate(
+            offset: Offset(0, clamped - screenHeight),
+            child: _buildRecordedPage(_targetPagePicture, _factory.prevPage),
           ),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: offset,
-          height: screenHeight,
-          child: _buildPageWidget(_factory.curPage),
+        Transform.translate(
+          offset: Offset(0, clamped),
+          child: _buildRecordedPage(_curPagePicture, _factory.curPage),
         ),
       ],
     );
@@ -865,19 +936,25 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   /// 垂直覆盖模式
   Widget _buildVerticalCoverAnimation(double screenHeight, double offset) {
-    final shadowOpacity = (offset.abs() / screenHeight * 0.4).clamp(0.0, 0.4);
+    if (_direction == _PageDirection.none) {
+      return _buildRecordedPage(_curPagePicture, _factory.curPage);
+    }
+    final clamped = offset.clamp(-screenHeight, screenHeight);
+    final shadowOpacity =
+        (clamped.abs() / screenHeight * 0.4).clamp(0.0, 0.4);
 
     return Stack(
       children: [
-        if (offset < 0)
-          Positioned.fill(child: _buildPageWidget(_factory.nextPage)),
-        if (offset > 0)
-          Positioned.fill(child: _buildPageWidget(_factory.prevPage)),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: offset,
-          height: screenHeight,
+        if (_direction == _PageDirection.next)
+          Positioned.fill(
+            child: _buildRecordedPage(_targetPagePicture, _factory.nextPage),
+          ),
+        if (_direction == _PageDirection.prev)
+          Positioned.fill(
+            child: _buildRecordedPage(_targetPagePicture, _factory.prevPage),
+          ),
+        Transform.translate(
+          offset: Offset(0, clamped),
           child: Container(
             decoration: BoxDecoration(
               boxShadow: [
@@ -885,11 +962,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                   color: Colors.black.withValues(alpha: shadowOpacity),
                   blurRadius: 20,
                   spreadRadius: 5,
-                  offset: Offset(0, offset > 0 ? -8 : 8),
+                  offset: Offset(0, clamped > 0 ? -8 : 8),
                 ),
               ],
             ),
-            child: _buildPageWidget(_factory.curPage),
+            child: _buildRecordedPage(_curPagePicture, _factory.curPage),
           ),
         ),
       ],
@@ -898,30 +975,25 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   /// 水平滑动模式
   Widget _buildSlideAnimation(double screenWidth, double offset) {
+    if (_direction == _PageDirection.none) {
+      return _buildRecordedPage(_curPagePicture, _factory.curPage);
+    }
+    final clamped = offset.clamp(-screenWidth, screenWidth);
     return Stack(
       children: [
-        if (offset < 0)
-          Positioned(
-            left: screenWidth + offset,
-            top: 0,
-            bottom: 0,
-            width: screenWidth,
-            child: _buildPageWidget(_factory.nextPage),
+        if (_direction == _PageDirection.next)
+          Transform.translate(
+            offset: Offset(screenWidth + clamped, 0),
+            child: _buildRecordedPage(_targetPagePicture, _factory.nextPage),
           ),
-        if (offset > 0)
-          Positioned(
-            left: offset - screenWidth,
-            top: 0,
-            bottom: 0,
-            width: screenWidth,
-            child: _buildPageWidget(_factory.prevPage),
+        if (_direction == _PageDirection.prev)
+          Transform.translate(
+            offset: Offset(clamped - screenWidth, 0),
+            child: _buildRecordedPage(_targetPagePicture, _factory.prevPage),
           ),
-        Positioned(
-          left: offset,
-          top: 0,
-          bottom: 0,
-          width: screenWidth,
-          child: _buildPageWidget(_factory.curPage),
+        Transform.translate(
+          offset: Offset(clamped, 0),
+          child: _buildRecordedPage(_curPagePicture, _factory.curPage),
         ),
       ],
     );
@@ -929,23 +1001,29 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   /// 覆盖模式
   Widget _buildCoverAnimation(double screenWidth, double offset) {
-    final shadowOpacity = (offset.abs() / screenWidth * 0.4).clamp(0.0, 0.4);
+    if (_direction == _PageDirection.none) {
+      return _buildRecordedPage(_curPagePicture, _factory.curPage);
+    }
+    final clamped = offset.clamp(-screenWidth, screenWidth);
+    final shadowOpacity =
+        (clamped.abs() / screenWidth * 0.4).clamp(0.0, 0.4);
 
     // 如果偏移量极小，不渲染阴影层，直接显示当前页内容（无阴影容器）
     // 这解决了动画结束后阴影可能残留 1 秒的问题
-    final showShadow = offset.abs() > 1.0;
+    final showShadow = clamped.abs() > 1.0;
 
     return Stack(
       children: [
-        if (offset < 0)
-          Positioned.fill(child: _buildPageWidget(_factory.nextPage)),
-        if (offset > 0)
-          Positioned.fill(child: _buildPageWidget(_factory.prevPage)),
-        Positioned(
-          left: offset,
-          top: 0,
-          bottom: 0,
-          width: screenWidth,
+        if (_direction == _PageDirection.next)
+          Positioned.fill(
+            child: _buildRecordedPage(_targetPagePicture, _factory.nextPage),
+          ),
+        if (_direction == _PageDirection.prev)
+          Positioned.fill(
+            child: _buildRecordedPage(_targetPagePicture, _factory.prevPage),
+          ),
+        Transform.translate(
+          offset: Offset(clamped, 0),
           child: showShadow
               ? Container(
                   decoration: BoxDecoration(
@@ -954,13 +1032,13 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                         color: Colors.black.withValues(alpha: shadowOpacity),
                         blurRadius: 20,
                         spreadRadius: 5,
-                        offset: Offset(offset > 0 ? -8 : 8, 0),
+                        offset: Offset(clamped > 0 ? -8 : 8, 0),
                       ),
                     ],
                   ),
-                  child: _buildPageWidget(_factory.curPage),
+                  child: _buildRecordedPage(_curPagePicture, _factory.curPage),
                 )
-              : _buildPageWidget(_factory.curPage),
+              : _buildRecordedPage(_curPagePicture, _factory.curPage),
         ),
       ],
     );
@@ -1044,7 +1122,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final isNext = _direction == _PageDirection.next;
 
     // 确保 Picture 已生成
-    _ensurePictures(size);
+    _ensurePagePictures(size);
 
     ui.Picture? pictureToCurl;
     ui.Picture? bottomPicture;
@@ -1086,14 +1164,19 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
   /// 无动画模式
   Widget _buildNoAnimation(double screenWidth, double offset) {
-    if (offset.abs() > screenWidth * 0.2 && !_isRunning) {
-      if (offset < 0 && _factory.hasNext()) {
-        return _buildPageWidget(_factory.nextPage);
-      } else if (offset > 0 && _factory.hasPrev()) {
-        return _buildPageWidget(_factory.prevPage);
-      }
+    // 无动画：拖拽超过阈值时直接显示目标页，否则显示当前页
+    final clamped = offset.clamp(-screenWidth, screenWidth);
+    if (_direction == _PageDirection.next &&
+        clamped.abs() > screenWidth * 0.2 &&
+        _factory.hasNext()) {
+      return _buildRecordedPage(_targetPagePicture, _factory.nextPage);
     }
-    return _buildPageWidget(_factory.curPage);
+    if (_direction == _PageDirection.prev &&
+        clamped.abs() > screenWidth * 0.2 &&
+        _factory.hasPrev()) {
+      return _buildRecordedPage(_targetPagePicture, _factory.prevPage);
+    }
+    return _buildRecordedPage(_curPagePicture, _factory.curPage);
   }
 
   // === 对标 Legado HorizontalPageDelegate.onTouch ===
@@ -1376,6 +1459,22 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   Widget _tipTextWidget(String? text, TextStyle style) {
     if (text == null || text.isEmpty) return const SizedBox.shrink();
     return Text(text, style: style);
+  }
+}
+
+class _PagePicturePainter extends CustomPainter {
+  final ui.Picture picture;
+
+  const _PagePicturePainter(this.picture);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawPicture(picture);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PagePicturePainter oldDelegate) {
+    return oldDelegate.picture != picture;
   }
 }
 
