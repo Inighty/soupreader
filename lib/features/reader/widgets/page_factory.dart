@@ -44,6 +44,23 @@ class PageFactory {
     _currentPageIndex = 0;
   }
 
+  /// 更新章节数据，但尽量保持当前阅读位置（章节/页码不重置）。
+  ///
+  /// 适用于：仅内容格式化发生变化（如缩进、繁简转换、净化标题）时刷新分页。
+  void replaceChaptersKeepingPosition(List<ChapterData> chapters) {
+    _chapters = chapters;
+    if (_chapters.isEmpty) {
+      _currentChapterIndex = 0;
+      _currentPageIndex = 0;
+      _prevChapterPages = [];
+      _currentChapterPages = [];
+      _nextChapterPages = [];
+      return;
+    }
+    _currentChapterIndex = _currentChapterIndex.clamp(0, _chapters.length - 1);
+    if (_currentPageIndex < 0) _currentPageIndex = 0;
+  }
+
   /// 设置布局参数
   void setLayoutParams({
     required double contentHeight,
@@ -86,6 +103,14 @@ class PageFactory {
     _paginateChapter(_currentChapterIndex - 1);
     _paginateChapter(_currentChapterIndex);
     _paginateChapter(_currentChapterIndex + 1);
+
+    // 内容/排版变化后，当前页码可能超出范围，进行一次安全夹取
+    if (_currentChapterPages.isEmpty) {
+      _currentPageIndex = 0;
+    } else {
+      _currentPageIndex =
+          _currentPageIndex.clamp(0, _currentChapterPages.length - 1);
+    }
   }
 
   void _paginateChapter(int chapterIndex) {

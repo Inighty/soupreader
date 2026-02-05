@@ -289,14 +289,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     await _saveProgress();
   }
 
-  void _syncPageFactoryChapters() {
+  void _syncPageFactoryChapters({bool keepPosition = false}) {
     final chapterDataList = _chapters
         .map((chapter) => ChapterData(
               title: chapter.title,
               content: _processContent(chapter.content ?? '', chapter.title),
             ))
         .toList();
-    _pageFactory.setChapters(chapterDataList, _currentChapterIndex);
+    if (keepPosition) {
+      _pageFactory.replaceChaptersKeepingPosition(chapterDataList);
+    } else {
+      _pageFactory.setChapters(chapterDataList, _currentChapterIndex);
+    }
   }
 
   Future<String> _fetchChapterContent(
@@ -374,7 +378,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       letterSpacing: _settings.letterSpacing,
       paragraphSpacing: _settings.paragraphSpacing, // 传递段间距
       fontFamily: _currentFontFamily,
-      paragraphIndent: _settings.paragraphIndent,
+      // 段首缩进已在 `_processContent` 中按 Legado 逻辑预处理，这里避免二次缩进
+      paragraphIndent: '',
       textAlign: _bodyTextAlign,
       titleFontSize: _settings.fontSize + _settings.titleSize,
       titleAlign: _titleTextAlign,
@@ -400,7 +405,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     final contentTransformChanged =
         oldSettings.cleanChapterTitle != newSettings.cleanChapterTitle ||
-            oldSettings.chineseTraditional != newSettings.chineseTraditional;
+            oldSettings.chineseTraditional != newSettings.chineseTraditional ||
+            oldSettings.paragraphIndent != newSettings.paragraphIndent;
 
     if (oldSettings.pageTurnMode == PageTurnMode.scroll &&
         newSettings.pageTurnMode != PageTurnMode.scroll) {
@@ -438,13 +444,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         final chapter = _chapters[_currentChapterIndex];
         _currentContent = _processContent(chapter.content ?? '', chapter.title);
       }
+      if (contentTransformChanged) {
+        _syncPageFactoryChapters(
+          keepPosition: newSettings.pageTurnMode != PageTurnMode.scroll,
+        );
+      }
       if (needRepaginate) {
         _paginateContentLogicOnly();
       }
     });
-    if (contentTransformChanged) {
-      _syncPageFactoryChapters();
-    }
     if (oldSettings.autoReadSpeed != newSettings.autoReadSpeed) {
       _autoPager.setSpeed(newSettings.autoReadSpeed);
     }
@@ -668,7 +676,48 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (_settings.chineseTraditional) {
       processed = _convertToTraditional(processed);
     }
+    processed = _formatContentLikeLegado(processed);
     return processed;
+  }
+
+  /// 参考 Legado 的正文处理方式，对章节内容进行“段落化 + 段首缩进”格式化：
+  /// - 清理段落首尾空白
+  /// - 压缩多余换行（段落之间仅保留一个换行）
+  /// - 开启缩进时：每段统一加上 `paragraphIndent`
+  ///
+  /// 额外兼容：清理常见 HTML 空白实体（&emsp; 等），避免缩进显示异常。
+  String _formatContentLikeLegado(String content) {
+    var text = content;
+
+    // 兼容常见 HTML 空白实体（部分书源会残留在纯文本中）
+    text = text
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&ensp;', ' ')
+        .replaceAll('&emsp;', ' ')
+        .replaceAll('&thinsp;', '')
+        .replaceAll('&zwnj;', '')
+        .replaceAll('&zwj;', '')
+        // 对应 Legado 的 noPrintRegex 中的几个常见字符
+        .replaceAll('\u2009', '')
+        .replaceAll('\u200C', '')
+        .replaceAll('\u200D', '');
+
+    text = text.replaceAll('\r\n', '\n');
+
+    // 等价于 Legado HtmlFormatter 的 `\\s*\\n+\\s*`：忽略多余空白与多换行
+    final rawParagraphs = text.split(RegExp(r'\s*\n+\s*'));
+    final paragraphs = rawParagraphs
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList(growable: false);
+
+    if (paragraphs.isEmpty) return '';
+
+    final indent = _settings.paragraphIndent;
+    if (indent.isEmpty) {
+      return paragraphs.join('\n');
+    }
+    return paragraphs.map((p) => '$indent$p').join('\n');
   }
 
   String _removeDuplicateTitle(String content, String title) {
@@ -1015,20 +1064,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           // 正文内容（参考 legado paragraphIndent 处理）
           ...paragraphs.map((paragraph) {
             final paragraphText = paragraph.trimRight();
-            final trimmedLeft = paragraphText.trimLeft();
-            if (trimmedLeft.isEmpty) return const SizedBox.shrink();
-
-            final indent = _settings.paragraphIndent;
-            // 缩进策略：
-            // - 开启缩进：统一“去掉原文前导空白 + 添加缩进”，避免不同来源缩进不一致
-            // - 关闭缩进：保留原文前导空白，避免误删导致“首行缩进没了”
-            final displayText =
-                indent.isEmpty ? paragraphText : '$indent$trimmedLeft';
+            if (paragraphText.trim().isEmpty) return const SizedBox.shrink();
 
             return Padding(
               padding: EdgeInsets.only(bottom: _settings.paragraphSpacing),
               child: Text(
-                displayText,
+                paragraphText,
                 textAlign: _bodyTextAlign,
                 style: TextStyle(
                   fontSize: _settings.fontSize,
