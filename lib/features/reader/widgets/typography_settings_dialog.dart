@@ -149,31 +149,31 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
                   const SizedBox(height: 12),
                   _buildSegmentRow(
                     '正文对齐',
-                    ['左对齐', '两端对齐', '右对齐'],
+                    ['左对齐', '两端对齐'],
                     _settings.textFullJustify ? 1 : 0,
-                    (index) {
-                      _updateSettings(
-                          _settings.copyWith(textFullJustify: index == 1));
-                    },
+                    (index) => _updateSettings(
+                      _settings.copyWith(textFullJustify: index == 1),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   _buildSegmentRow(
-                    '章节名对齐',
-                    ['左对齐', '两端对齐', '右对齐'],
+                    '章节名显示',
+                    ['居左', '居中', '隐藏'],
                     _settings.titleMode,
-                    (index) {
-                      _updateSettings(_settings.copyWith(titleMode: index));
-                    },
+                    (index) => _updateSettings(
+                      _settings.copyWith(titleMode: index),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   _buildSegmentRow(
                     '首行缩进',
-                    ['一个字', '两个字', '三个字'],
+                    ['无', '一个字', '两个字', '三个字'],
                     _getIndentIndex(),
                     (index) {
-                      final indents = ['　', '　　', '　　　'];
-                      _updateSettings(
-                          _settings.copyWith(paragraphIndent: indents[index]));
+                      final indents = ['', '　', '　　', '　　　'];
+                      _updateSettings(_settings.copyWith(
+                        paragraphIndent: indents[index],
+                      ));
                     },
                   ),
 
@@ -219,36 +219,6 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
                     displayValue: '${_settings.paddingRight.toInt()}',
                   ),
 
-                  const SizedBox(height: 24),
-
-                  // === 页眉页脚边距 ===
-                  _buildSectionHeader('页眉边距'),
-                  const SizedBox(height: 12),
-                  _buildSliderRow(
-                    '页眉上边距',
-                    _settings.marginVertical,
-                    0,
-                    40,
-                    (val) =>
-                        _updateSettings(_settings.copyWith(marginVertical: val)),
-                    displayValue: '${_settings.marginVertical.toInt()}',
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // === 页脚边距 ===
-                  _buildSectionHeader('页脚边距'),
-                  const SizedBox(height: 12),
-                  _buildSliderRow(
-                    '页脚下边距',
-                    _settings.marginVertical,
-                    0,
-                    40,
-                    (val) =>
-                        _updateSettings(_settings.copyWith(marginVertical: val)),
-                    displayValue: '${_settings.marginVertical.toInt()}',
-                  ),
-
                   const SizedBox(height: 40),
                 ],
               ),
@@ -261,9 +231,10 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
 
   int _getIndentIndex() {
     final indent = _settings.paragraphIndent;
-    if (indent.length >= 3) return 2;
-    if (indent.length >= 2) return 1;
-    return 0;
+    if (indent.isEmpty) return 0;
+    if (indent.length >= 3) return 3;
+    if (indent.length >= 2) return 2;
+    return 1;
   }
 
   Widget _buildSectionHeader(String title) {

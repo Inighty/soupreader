@@ -3,8 +3,14 @@ import 'package:dio/dio.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../app/theme/colors.dart';
+import '../../../core/database/database_service.dart';
+import '../../../core/database/repositories/book_repository.dart';
+import '../../../core/models/app_settings.dart';
+import '../../../core/services/backup_service.dart';
 import '../../../core/services/settings_service.dart';
+import '../../../core/utils/format_utils.dart';
 import '../../reader/models/reading_settings.dart';
+import '../../source/views/source_list_view.dart';
 import 'reading_preferences_view.dart';
 
 /// 设置页面 - 纯 iOS 原生风格
@@ -16,18 +22,40 @@ class SettingsView extends StatefulWidget {
 }
 
 class _SettingsViewState extends State<SettingsView> {
-  bool _darkMode = true;
-  bool _autoUpdate = true;
-  bool _wifiOnly = true;
   String _version = '';
   final SettingsService _settingsService = SettingsService();
+  final BackupService _backupService = BackupService();
+  late final DatabaseService _db;
+  late final ChapterRepository _chapterRepo;
   late ReadingSettings _readingSettings;
+  late AppSettings _appSettings;
+
+  int? _sourceCount;
+  ChapterCacheInfo _cacheInfo = const ChapterCacheInfo(bytes: 0, chapters: 0);
 
   @override
   void initState() {
     super.initState();
+    _db = DatabaseService();
+    _chapterRepo = ChapterRepository(_db);
     _readingSettings = _settingsService.readingSettings;
+    _appSettings = _settingsService.appSettings;
     _loadVersion();
+    _settingsService.appSettingsListenable.addListener(_onAppSettingsChanged);
+    _refreshStats();
+  }
+
+  @override
+  void dispose() {
+    _settingsService.appSettingsListenable.removeListener(_onAppSettingsChanged);
+    super.dispose();
+  }
+
+  void _onAppSettingsChanged() {
+    if (!mounted) return;
+    setState(() {
+      _appSettings = _settingsService.appSettings;
+    });
   }
 
   Future<void> _loadVersion() async {
@@ -45,6 +73,12 @@ class _SettingsViewState extends State<SettingsView> {
 
   @override
   Widget build(BuildContext context) {
+    final systemBrightness = MediaQuery.platformBrightnessOf(context);
+    final followSystem = _appSettings.appearanceMode == AppAppearanceMode.followSystem;
+    final effectiveIsDark = followSystem
+        ? systemBrightness == Brightness.dark
+        : _appSettings.appearanceMode == AppAppearanceMode.dark;
+
     return CupertinoPageScaffold(
       navigationBar: const CupertinoNavigationBar(
         middle: Text('设置'),
@@ -64,14 +98,93 @@ class _SettingsViewState extends State<SettingsView> {
                   trailing: const CupertinoListTileChevron(),
                   onTap: _openReadingPreferences,
                 ),
+              ],
+            ),
+
+            // 外观
+            CupertinoListSection.insetGrouped(
+              header: const Text('外观'),
+              children: [
                 CupertinoListTile.notched(
                   leading: _buildIconBox(
-                      CupertinoIcons.moon_fill, CupertinoColors.systemIndigo),
+                    CupertinoIcons.device_phone_portrait,
+                    CupertinoColors.systemIndigo,
+                  ),
+                  title: const Text('跟随系统外观'),
+                  trailing: CupertinoSwitch(
+                    value: followSystem,
+                    onChanged: (value) async {
+                      if (value) {
+                        await _settingsService.saveAppSettings(
+                          _appSettings.copyWith(
+                            appearanceMode: AppAppearanceMode.followSystem,
+                          ),
+                        );
+                        return;
+                      }
+
+                      // 关闭“跟随系统”时，用当前系统外观作为默认
+                      await _settingsService.saveAppSettings(
+                        _appSettings.copyWith(
+                          appearanceMode: systemBrightness == Brightness.dark
+                              ? AppAppearanceMode.dark
+                              : AppAppearanceMode.light,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(
+                    CupertinoIcons.moon_fill,
+                    CupertinoColors.systemIndigo,
+                  ),
                   title: const Text('深色模式'),
                   trailing: CupertinoSwitch(
-                    value: _darkMode,
-                    onChanged: (value) => setState(() => _darkMode = value),
+                    value: effectiveIsDark,
+                    onChanged: followSystem
+                        ? null
+                        : (value) async {
+                            await _settingsService.saveAppSettings(
+                              _appSettings.copyWith(
+                                appearanceMode: value
+                                    ? AppAppearanceMode.dark
+                                    : AppAppearanceMode.light,
+                              ),
+                            );
+                          },
                   ),
+                ),
+              ],
+            ),
+
+            // 书架
+            CupertinoListSection.insetGrouped(
+              header: const Text('书架'),
+              children: [
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(
+                    CupertinoIcons.square_grid_2x2,
+                    CupertinoColors.systemOrange,
+                  ),
+                  title: const Text('显示方式'),
+                  additionalInfo: Text(
+                    _appSettings.bookshelfViewMode == BookshelfViewMode.grid
+                        ? '网格'
+                        : '列表',
+                  ),
+                  trailing: const CupertinoListTileChevron(),
+                  onTap: _pickBookshelfViewMode,
+                ),
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(
+                    CupertinoIcons.arrow_up_arrow_down,
+                    CupertinoColors.systemOrange,
+                  ),
+                  title: const Text('排序'),
+                  additionalInfo: Text(_bookshelfSortLabel),
+                  trailing: const CupertinoListTileChevron(),
+                  onTap: _pickBookshelfSortMode,
                 ),
               ],
             ),
@@ -84,17 +197,21 @@ class _SettingsViewState extends State<SettingsView> {
                   leading: _buildIconBox(
                       CupertinoIcons.cloud_fill, CupertinoColors.systemCyan),
                   title: const Text('书源管理'),
-                  additionalInfo: const Text('4 个'),
+                  additionalInfo: Text(_sourceCount == null ? '—' : '${_sourceCount!} 个'),
                   trailing: const CupertinoListTileChevron(),
-                  onTap: () {},
+                  onTap: _openSourceManager,
                 ),
                 CupertinoListTile.notched(
                   leading: _buildIconBox(CupertinoIcons.arrow_2_circlepath,
                       CupertinoColors.systemGreen),
                   title: const Text('自动更新'),
                   trailing: CupertinoSwitch(
-                    value: _autoUpdate,
-                    onChanged: (value) => setState(() => _autoUpdate = value),
+                    value: _appSettings.autoUpdateSources,
+                    onChanged: (value) async {
+                      await _settingsService.saveAppSettings(
+                        _appSettings.copyWith(autoUpdateSources: value),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -109,15 +226,21 @@ class _SettingsViewState extends State<SettingsView> {
                       CupertinoIcons.wifi, CupertinoColors.systemBlue),
                   title: const Text('仅 Wi-Fi 下载'),
                   trailing: CupertinoSwitch(
-                    value: _wifiOnly,
-                    onChanged: (value) => setState(() => _wifiOnly = value),
+                    value: _appSettings.wifiOnlyDownload,
+                    onChanged: (value) async {
+                      await _settingsService.saveAppSettings(
+                        _appSettings.copyWith(wifiOnlyDownload: value),
+                      );
+                    },
                   ),
                 ),
                 CupertinoListTile.notched(
                   leading: _buildIconBox(
                       CupertinoIcons.trash_fill, CupertinoColors.systemRed),
                   title: const Text('清除缓存'),
-                  additionalInfo: const Text('256 MB'),
+                  additionalInfo: Text(
+                    _cacheInfo.bytes == 0 ? '0 B' : FormatUtils.formatBytes(_cacheInfo.bytes),
+                  ),
                   trailing: const CupertinoListTileChevron(),
                   onTap: _showCacheOptions,
                 ),
@@ -195,12 +318,152 @@ class _SettingsViewState extends State<SettingsView> {
     });
   }
 
+  String get _bookshelfSortLabel {
+    switch (_appSettings.bookshelfSortMode) {
+      case BookshelfSortMode.recentRead:
+        return '最近阅读';
+      case BookshelfSortMode.recentAdded:
+        return '最近加入';
+      case BookshelfSortMode.title:
+        return '书名';
+      case BookshelfSortMode.author:
+        return '作者';
+    }
+  }
+
+  Future<void> _pickBookshelfViewMode() async {
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('书架显示方式'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              await _settingsService.saveAppSettings(
+                _appSettings.copyWith(bookshelfViewMode: BookshelfViewMode.grid),
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('网格'),
+                if (_appSettings.bookshelfViewMode == BookshelfViewMode.grid) ...[
+                  const SizedBox(width: 8),
+                  const Icon(CupertinoIcons.checkmark,
+                      size: 18, color: CupertinoColors.activeBlue),
+                ],
+              ],
+            ),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              await _settingsService.saveAppSettings(
+                _appSettings.copyWith(bookshelfViewMode: BookshelfViewMode.list),
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('列表'),
+                if (_appSettings.bookshelfViewMode == BookshelfViewMode.list) ...[
+                  const SizedBox(width: 8),
+                  const Icon(CupertinoIcons.checkmark,
+                      size: 18, color: CupertinoColors.activeBlue),
+                ],
+              ],
+            ),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickBookshelfSortMode() async {
+    Widget action(BookshelfSortMode mode, String label) {
+      final selected = _appSettings.bookshelfSortMode == mode;
+      return CupertinoActionSheetAction(
+        onPressed: () async {
+          await _settingsService.saveAppSettings(
+            _appSettings.copyWith(bookshelfSortMode: mode),
+          );
+          if (mounted) Navigator.pop(context);
+        },
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(label),
+            if (selected) ...[
+              const SizedBox(width: 8),
+              const Icon(CupertinoIcons.checkmark,
+                  size: 18, color: CupertinoColors.activeBlue),
+            ],
+          ],
+        ),
+      );
+    }
+
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('书架排序'),
+        actions: [
+          action(BookshelfSortMode.recentRead, '最近阅读'),
+          action(BookshelfSortMode.recentAdded, '最近加入'),
+          action(BookshelfSortMode.title, '书名'),
+          action(BookshelfSortMode.author, '作者'),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSourceManager() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (context) => const SourceListView(),
+      ),
+    );
+    await _refreshStats();
+  }
+
+  Future<void> _refreshStats() async {
+    // 书源数量
+    final sourceCount = _db.sourcesBox.length;
+
+    // 缓存：保护本地导入书籍的章节内容（它们就是书本身，不应被“清除缓存”删掉）
+    final localBookIds = _db.booksBox.values
+        .where((b) => b.isLocal)
+        .map((b) => b.id)
+        .toSet();
+    final cacheInfo =
+        _chapterRepo.getDownloadedCacheInfo(protectBookIds: localBookIds);
+
+    if (!mounted) return;
+    setState(() {
+      _sourceCount = sourceCount;
+      _cacheInfo = cacheInfo;
+    });
+  }
+
   void _showCacheOptions() {
+    final sizeText = FormatUtils.formatBytes(_cacheInfo.bytes);
+    final chapterText = _cacheInfo.chapters == 0 ? '无' : '${_cacheInfo.chapters} 章';
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('清除缓存'),
-        content: const Text('\n当前缓存 256 MB\n\n这将删除所有已下载的章节，书架和阅读进度不受影响。'),
+        content: Text('\n当前缓存 $sizeText（$chapterText）\n\n这将删除在线书籍的章节缓存，本地导入书籍不受影响。'),
         actions: [
           CupertinoDialogAction(
             child: const Text('取消'),
@@ -209,7 +472,10 @@ class _SettingsViewState extends State<SettingsView> {
           CupertinoDialogAction(
             isDestructiveAction: true,
             child: const Text('清除'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _clearCache();
+            },
           ),
         ],
       ),
@@ -222,16 +488,40 @@ class _SettingsViewState extends State<SettingsView> {
       builder: (context) => CupertinoActionSheet(
         actions: [
           CupertinoActionSheetAction(
-            child: const Text('导出到文件'),
-            onPressed: () => Navigator.pop(context),
+            child: const Text('导出备份（推荐）'),
+            onPressed: () {
+              Navigator.pop(context);
+              _exportBackup(includeOnlineCache: false);
+            },
           ),
           CupertinoActionSheetAction(
-            child: const Text('从文件导入'),
-            onPressed: () => Navigator.pop(context),
+            child: const Text('导出（含在线缓存，体积大）'),
+            onPressed: () {
+              Navigator.pop(context);
+              _exportBackup(includeOnlineCache: true);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('从文件导入（合并）'),
+            onPressed: () {
+              Navigator.pop(context);
+              _importBackup(overwrite: false);
+            },
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            child: const Text('从文件导入（覆盖当前数据）'),
+            onPressed: () {
+              Navigator.pop(context);
+              _importBackup(overwrite: true);
+            },
           ),
           CupertinoActionSheetAction(
             child: const Text('iCloud 同步'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context);
+              _showMessage('暂未实现 iCloud 同步');
+            },
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
@@ -239,6 +529,88 @@ class _SettingsViewState extends State<SettingsView> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
+    );
+  }
+
+  Future<void> _clearCache() async {
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CupertinoActivityIndicator()),
+    );
+
+    try {
+      final localBookIds = _db.booksBox.values
+          .where((b) => b.isLocal)
+          .map((b) => b.id)
+          .toSet();
+      final result =
+          await _chapterRepo.clearDownloadedCache(protectBookIds: localBookIds);
+      if (mounted) Navigator.pop(context);
+      await _refreshStats();
+      _showMessage(result.chapters == 0
+          ? '没有可清理的缓存'
+          : '已清理 ${FormatUtils.formatBytes(result.bytes)}（${result.chapters} 章）');
+    } catch (_) {
+      if (mounted) Navigator.pop(context);
+      _showMessage('清理失败');
+    }
+  }
+
+  Future<void> _exportBackup({required bool includeOnlineCache}) async {
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CupertinoActivityIndicator()),
+    );
+    final result = await _backupService.exportToFile(
+      includeOnlineCache: includeOnlineCache,
+    );
+    if (!mounted) return;
+    Navigator.pop(context);
+    if (result.cancelled) return;
+    _showMessage(result.success ? '导出成功' : (result.errorMessage ?? '导出失败'));
+  }
+
+  Future<void> _importBackup({required bool overwrite}) async {
+    if (overwrite) {
+      final confirmed = await showCupertinoDialog<bool>(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('确认覆盖导入？'),
+          content: const Text('\n将清空当前书架、书源与缓存，再从备份恢复。此操作不可撤销。'),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('取消'),
+              onPressed: () => Navigator.pop(context, false),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              child: const Text('继续'),
+              onPressed: () => Navigator.pop(context, true),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CupertinoActivityIndicator()),
+    );
+    final result = await _backupService.importFromFile(overwrite: overwrite);
+    if (!mounted) return;
+    Navigator.pop(context);
+    if (result.cancelled) return;
+    if (!result.success) {
+      _showMessage(result.errorMessage ?? '导入失败');
+      return;
+    }
+    await _refreshStats();
+    _showMessage(
+      '导入完成：书源 ${result.sourcesImported} 条，书籍 ${result.booksImported} 本，章节 ${result.chaptersImported} 章',
     );
   }
 

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../../features/bookshelf/models/book.dart';
 import '../database_service.dart';
 import '../entities/book_entity.dart';
@@ -130,6 +132,51 @@ class ChapterRepository {
 
   ChapterRepository(this._db);
 
+  ChapterCacheInfo getDownloadedCacheInfo({Set<String> protectBookIds = const {}}) {
+    var bytes = 0;
+    var chapters = 0;
+    for (final entity in _db.chaptersBox.values) {
+      if (protectBookIds.contains(entity.bookId)) continue;
+      final content = entity.content;
+      if (!entity.isDownloaded || content == null || content.isEmpty) continue;
+      chapters++;
+      bytes += utf8.encode(content).length;
+    }
+    return ChapterCacheInfo(bytes: bytes, chapters: chapters);
+  }
+
+  /// 清除已下载章节的缓存内容（不删除章节条目，以保留目录/进度）
+  ///
+  /// - `protectBookIds`：需要保护的书籍（例如本地导入书籍），不清理其章节内容
+  Future<ChapterCacheInfo> clearDownloadedCache({
+    Set<String> protectBookIds = const {},
+  }) async {
+    var bytes = 0;
+    var chapters = 0;
+
+    for (final entity in _db.chaptersBox.values) {
+      if (protectBookIds.contains(entity.bookId)) continue;
+      final content = entity.content;
+      if (!entity.isDownloaded || content == null || content.isEmpty) continue;
+
+      chapters++;
+      bytes += utf8.encode(content).length;
+
+      final updated = ChapterEntity(
+        id: entity.id,
+        bookId: entity.bookId,
+        title: entity.title,
+        url: entity.url,
+        index: entity.index,
+        isDownloaded: false,
+        content: null,
+      );
+      await _db.chaptersBox.put(entity.id, updated);
+    }
+
+    return ChapterCacheInfo(bytes: bytes, chapters: chapters);
+  }
+
   /// 获取书籍的所有章节
   List<Chapter> getChaptersForBook(String bookId) {
     return _db.chaptersBox.values
@@ -195,4 +242,11 @@ class ChapterRepository {
       content: chapter.content,
     );
   }
+}
+
+class ChapterCacheInfo {
+  final int bytes;
+  final int chapters;
+
+  const ChapterCacheInfo({required this.bytes, required this.chapters});
 }

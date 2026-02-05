@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
+import '../../../core/models/app_settings.dart';
+import '../../../core/services/settings_service.dart';
 import '../../import/import_service.dart';
 import '../../reader/views/simple_reader_view.dart';
 import '../models/book.dart';
@@ -17,6 +19,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   bool _isGridView = true;
   late final BookRepository _bookRepo;
   late final ImportService _importService;
+  late final SettingsService _settingsService;
   List<Book> _books = [];
   bool _isImporting = false;
 
@@ -25,18 +28,40 @@ class _BookshelfViewState extends State<BookshelfView> {
     super.initState();
     _bookRepo = BookRepository(DatabaseService());
     _importService = ImportService();
+    _settingsService = SettingsService();
+    _isGridView =
+        _settingsService.appSettings.bookshelfViewMode == BookshelfViewMode.grid;
     _loadBooks();
   }
 
   void _loadBooks() {
     setState(() {
       _books = _bookRepo.getAllBooks();
-      // 按最后阅读时间排序
-      _books.sort((a, b) {
-        final aTime = a.lastReadTime ?? a.addedTime ?? DateTime(2000);
-        final bTime = b.lastReadTime ?? b.addedTime ?? DateTime(2000);
-        return bTime.compareTo(aTime);
-      });
+      _sortBooks(_settingsService.appSettings.bookshelfSortMode);
+    });
+  }
+
+  void _sortBooks(BookshelfSortMode mode) {
+    int compareDateTimeDesc(DateTime? a, DateTime? b) {
+      final aTime = a ?? DateTime(2000);
+      final bTime = b ?? DateTime(2000);
+      return bTime.compareTo(aTime);
+    }
+
+    _books.sort((a, b) {
+      switch (mode) {
+        case BookshelfSortMode.recentRead:
+          return compareDateTimeDesc(
+            a.lastReadTime ?? a.addedTime,
+            b.lastReadTime ?? b.addedTime,
+          );
+        case BookshelfSortMode.recentAdded:
+          return compareDateTimeDesc(a.addedTime, b.addedTime);
+        case BookshelfSortMode.title:
+          return a.title.compareTo(b.title);
+        case BookshelfSortMode.author:
+          return a.author.compareTo(b.author);
+      }
     });
   }
 
@@ -103,7 +128,16 @@ class _BookshelfViewState extends State<BookshelfView> {
                     ? CupertinoIcons.list_bullet
                     : CupertinoIcons.square_grid_2x2,
               ),
-              onPressed: () => setState(() => _isGridView = !_isGridView),
+              onPressed: () async {
+                final next = !_isGridView;
+                setState(() => _isGridView = next);
+                await _settingsService.saveAppSettings(
+                  _settingsService.appSettings.copyWith(
+                    bookshelfViewMode:
+                        next ? BookshelfViewMode.grid : BookshelfViewMode.list,
+                  ),
+                );
+              },
             ),
           ],
         ),
