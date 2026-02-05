@@ -8,18 +8,16 @@ import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/utils/format_utils.dart';
 import '../../reader/models/reading_settings.dart';
-import '../../source/views/source_list_view.dart';
-import 'about_settings_view.dart';
-import 'appearance_settings_view.dart';
-import 'backup_settings_view.dart';
-import 'global_reading_settings_view.dart';
-import 'storage_settings_view.dart';
+import 'function_settings_view.dart';
+import 'other_hub_view.dart';
+import 'other_settings_view.dart';
+import 'source_management_view.dart';
+import 'theme_settings_view.dart';
 
-/// 设置首页 - 以“分类入口 + 摘要”为主（对标 Legado/同级阅读器的 IA）
+/// 设置首页
 ///
-/// 设计目标：
-/// - 首页不堆细项，只做导航
-/// - 每个入口显示“当前状态摘要”，用户一眼知道设置作用域
+/// 信息架构对标你的示例：
+/// 1) 源管理 2) 主题 3) 功能&设置 4) 其它设置 5) 其它
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
 
@@ -88,6 +86,15 @@ class _SettingsViewState extends State<SettingsView> {
     }
   }
 
+  String get _themeSummary {
+    final themeIndex = _readingSettings.themeIndex;
+    final themeName = (themeIndex >= 0 &&
+            themeIndex < AppColors.readingThemes.length)
+        ? AppColors.readingThemes[themeIndex].name
+        : AppColors.readingThemes.first.name;
+    return '$_appearanceSummary · $themeName';
+  }
+
   String get _readingSummary {
     final fontSize = _readingSettings.fontSize.toInt();
     final lineHeight = _readingSettings.lineHeight.toStringAsFixed(1);
@@ -106,7 +113,7 @@ class _SettingsViewState extends State<SettingsView> {
     return '$count 个 · $auto';
   }
 
-  String get _storageSummary {
+  String get _otherSettingsSummary {
     final wifi = _settingsService.appSettings.wifiOnlyDownload ? '仅 Wi‑Fi' : '不限网络';
     final cache = FormatUtils.formatBytes(_cacheInfo.bytes);
     return '$wifi · 缓存 $cache';
@@ -126,62 +133,53 @@ class _SettingsViewState extends State<SettingsView> {
               children: [
                 CupertinoListTile.notched(
                   leading: _buildIconBox(
-                    CupertinoIcons.brightness_solid,
-                    CupertinoColors.systemIndigo,
-                  ),
-                  title: const Text('外观与通用'),
-                  additionalInfo: Text(_appearanceSummary),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openAppearance,
-                ),
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.book,
-                    CupertinoColors.systemBlue,
-                  ),
-                  title: const Text('阅读（全局默认）'),
-                  additionalInfo: Text(_readingSummary),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openGlobalReading,
-                ),
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
                     CupertinoIcons.cloud_fill,
                     CupertinoColors.systemCyan,
                   ),
-                  title: const Text('书源'),
+                  title: const Text('源管理'),
                   additionalInfo: Text(_sourceSummary),
                   trailing: const CupertinoListTileChevron(),
-                  onTap: _openSource,
+                  onTap: _openSourceManagement,
                 ),
                 CupertinoListTile.notched(
                   leading: _buildIconBox(
-                    CupertinoIcons.archivebox_fill,
+                    CupertinoIcons.paintbrush_fill,
+                    CupertinoColors.systemIndigo,
+                  ),
+                  title: const Text('主题'),
+                  additionalInfo: Text(_themeSummary),
+                  trailing: const CupertinoListTileChevron(),
+                  onTap: _openTheme,
+                ),
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(
+                    CupertinoIcons.slider_horizontal_3,
+                    CupertinoColors.systemBlue,
+                  ),
+                  title: const Text('功能 & 设置'),
+                  additionalInfo: Text(_readingSummary),
+                  trailing: const CupertinoListTileChevron(),
+                  onTap: _openFunctionSettings,
+                ),
+                CupertinoListTile.notched(
+                  leading: _buildIconBox(
+                    CupertinoIcons.gear_solid,
                     CupertinoColors.systemOrange,
                   ),
-                  title: const Text('下载与缓存'),
-                  additionalInfo: Text(_storageSummary),
+                  title: const Text('其它设置'),
+                  additionalInfo: Text(_otherSettingsSummary),
                   trailing: const CupertinoListTileChevron(),
-                  onTap: _openStorage,
+                  onTap: _openOtherSettings,
                 ),
                 CupertinoListTile.notched(
                   leading: _buildIconBox(
-                    CupertinoIcons.arrow_up_arrow_down_circle_fill,
-                    CupertinoColors.systemGreen,
-                  ),
-                  title: const Text('备份与恢复'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openBackup,
-                ),
-                CupertinoListTile.notched(
-                  leading: _buildIconBox(
-                    CupertinoIcons.info_circle_fill,
+                    CupertinoIcons.ellipsis_circle_fill,
                     CupertinoColors.systemGrey,
                   ),
-                  title: const Text('关于与诊断'),
+                  title: const Text('其它'),
                   additionalInfo: Text(_version.isEmpty ? '—' : _version),
                   trailing: const CupertinoListTileChevron(),
-                  onTap: _openAbout,
+                  onTap: _openOtherHub,
                 ),
               ],
             ),
@@ -204,55 +202,46 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  Future<void> _openAppearance() async {
+  Future<void> _openSourceManagement() async {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (context) => const AppearanceSettingsView(),
+        builder: (context) => const SourceManagementView(),
       ),
     );
     await _refreshStats();
   }
 
-  Future<void> _openGlobalReading() async {
+  Future<void> _openTheme() async {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (context) => const GlobalReadingSettingsView(),
+        builder: (context) => const ThemeSettingsView(),
       ),
     );
     await _refreshStats();
   }
 
-  Future<void> _openSource() async {
+  Future<void> _openFunctionSettings() async {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (context) => const SourceListView(),
+        builder: (context) => const FunctionSettingsView(),
       ),
     );
     await _refreshStats();
   }
 
-  Future<void> _openStorage() async {
+  Future<void> _openOtherSettings() async {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (context) => const StorageSettingsView(),
+        builder: (context) => const OtherSettingsView(),
       ),
     );
     await _refreshStats();
   }
 
-  Future<void> _openBackup() async {
+  Future<void> _openOtherHub() async {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (context) => const BackupSettingsView(),
-      ),
-    );
-    await _refreshStats();
-  }
-
-  Future<void> _openAbout() async {
-    await Navigator.of(context).push(
-      CupertinoPageRoute<void>(
-        builder: (context) => const AboutSettingsView(),
+        builder: (context) => const OtherHubView(),
       ),
     );
     await _refreshStats();
