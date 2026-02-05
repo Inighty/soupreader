@@ -2,6 +2,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:dio/dio.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../../../app/theme/colors.dart';
+import '../../../core/services/settings_service.dart';
+import '../../reader/models/reading_settings.dart';
+import 'reading_preferences_view.dart';
 
 /// 设置页面 - 纯 iOS 原生风格
 class SettingsView extends StatefulWidget {
@@ -16,10 +20,13 @@ class _SettingsViewState extends State<SettingsView> {
   bool _autoUpdate = true;
   bool _wifiOnly = true;
   String _version = '';
+  final SettingsService _settingsService = SettingsService();
+  late ReadingSettings _readingSettings;
 
   @override
   void initState() {
     super.initState();
+    _readingSettings = _settingsService.readingSettings;
     _loadVersion();
   }
 
@@ -53,9 +60,9 @@ class _SettingsViewState extends State<SettingsView> {
                   leading: _buildIconBox(
                       CupertinoIcons.textformat, CupertinoColors.systemBlue),
                   title: const Text('阅读偏好'),
-                  additionalInfo: const Text('默认'),
+                  additionalInfo: Text(_readingPreferencesSummary),
                   trailing: const CupertinoListTileChevron(),
-                  onTap: _openReadingSettings,
+                  onTap: _openReadingPreferences,
                 ),
                 CupertinoListTile.notched(
                   leading: _buildIconBox(
@@ -166,59 +173,26 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  void _openReadingSettings() {
-    showCupertinoModalPopup(
-      context: context,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.5,
-        decoration: BoxDecoration(
-          color: CupertinoColors.systemBackground.resolveFrom(context),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-        ),
-        child: Column(
-          children: [
-            // 拖动指示器
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              width: 36,
-              height: 5,
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey3.resolveFrom(context),
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                '阅读偏好',
-                style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
-              ),
-            ),
-            Expanded(
-              child: CupertinoListSection.insetGrouped(
-                children: [
-                  CupertinoListTile.notched(
-                    title: const Text('字体大小'),
-                    additionalInfo: const Text('18'),
-                    trailing: const CupertinoListTileChevron(),
-                  ),
-                  CupertinoListTile.notched(
-                    title: const Text('行距'),
-                    additionalInfo: const Text('1.8'),
-                    trailing: const CupertinoListTileChevron(),
-                  ),
-                  CupertinoListTile.notched(
-                    title: const Text('主题'),
-                    additionalInfo: const Text('夜间'),
-                    trailing: const CupertinoListTileChevron(),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+  String get _readingPreferencesSummary {
+    final fontSize = _readingSettings.fontSize.toInt();
+    final lineHeight = _readingSettings.lineHeight.toStringAsFixed(1);
+    final themeIndex = _readingSettings.themeIndex;
+    final themeName = (themeIndex >= 0 && themeIndex < AppColors.readingThemes.length)
+        ? AppColors.readingThemes[themeIndex].name
+        : AppColors.readingThemes.first.name;
+    return '$fontSize · $themeName · $lineHeight';
+  }
+
+  Future<void> _openReadingPreferences() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (context) => const ReadingPreferencesView(),
       ),
     );
+    // 返回后刷新一次展示摘要（设置保存由页面内部完成）
+    setState(() {
+      _readingSettings = _settingsService.readingSettings;
+    });
   }
 
   void _showCacheOptions() {

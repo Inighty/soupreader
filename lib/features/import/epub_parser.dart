@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:epubx/epubx.dart';
 import 'package:uuid/uuid.dart';
 import '../bookshelf/models/book.dart';
+import '../../core/utils/html_text_formatter.dart';
 
 
 /// EPUB 文件解析器
@@ -161,37 +162,9 @@ class EpubParser {
 
   /// 从 HTML 提取文本
   static String _extractTextFromHtml(String html) {
-    // 移除 script 和 style 标签及内容
-    html = html.replaceAll(
-        RegExp(r'<script[^>]*>[\s\S]*?</script>', caseSensitive: false), '');
-    html = html.replaceAll(
-        RegExp(r'<style[^>]*>[\s\S]*?</style>', caseSensitive: false), '');
-
-    // 转换换行标签
-    html = html.replaceAll(RegExp(r'<br\s*/?>'), '\n');
-    html = html.replaceAll(RegExp(r'<p[^>]*>'), '\n\n');
-    html = html.replaceAll(RegExp(r'</p>'), '');
-    html = html.replaceAll(RegExp(r'<div[^>]*>'), '\n');
-    html = html.replaceAll(RegExp(r'</div>'), '');
-
-    // 移除所有 HTML 标签
-    html = html.replaceAll(RegExp(r'<[^>]+>'), '');
-
-    // 解码 HTML 实体
-    html = html
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#39;', "'")
-        .replaceAll('&apos;', "'");
-
-    // 清理多余空白
-    html = html.replaceAll(RegExp(r'\n\s*\n+'), '\n\n');
-    html = html.replaceAll(RegExp(r' +'), ' ');
-
-    return html.trim();
+    // EPUB 内容通常为 HTML/XHTML：统一走“对标 legado”的 HTML -> 文本清理。
+    // 说明：段首缩进/段距等阅读排版策略不在此处做，留给阅读器层统一处理。
+    return HtmlTextFormatter.formatToPlainText(html);
   }
 }
 

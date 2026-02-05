@@ -104,7 +104,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                       widget.onShowChapterList),
                   _buildTabItem(1, _getDayNightIcon(), _getDayNightLabel(),
                       _toggleDayNight),
-                  _buildTabItem(2, CupertinoIcons.textformat_size, '界面',
+                  _buildTabItem(2, CupertinoIcons.textformat_size, '常用',
                       widget.onShowInterfaceSettings),
                   _buildTabItem(3, CupertinoIcons.gear, '设置',
                       widget.onShowMoreMenu),
@@ -291,4 +291,3 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     }
   }
 }
-

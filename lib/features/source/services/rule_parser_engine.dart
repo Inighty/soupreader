@@ -3,6 +3,7 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart';
 import '../models/book_source.dart';
 import 'package:flutter/foundation.dart';
+import '../../../core/utils/html_text_formatter.dart';
 
 /// 书源规则解析引擎
 /// 支持 CSS 选择器、XPath（简化版）和正则表达式
@@ -346,24 +347,8 @@ class RuleParserEngine {
 
   /// 清理正文内容
   String _cleanContent(String content) {
-    // 移除HTML标签
-    content = content.replaceAll(RegExp(r'<br\s*/?>'), '\n');
-    content = content.replaceAll(RegExp(r'<p[^>]*>'), '\n');
-    content = content.replaceAll(RegExp(r'</p>'), '\n');
-    content = content.replaceAll(RegExp(r'<[^>]+>'), '');
-
-    // 解码HTML实体
-    content = content
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&quot;', '"');
-
-    // 清理多余空白
-    content = content.replaceAll(RegExp(r'\n\s*\n+'), '\n\n');
-
-    return content.trim();
+    // 对齐 legado 的 HTML -> 文本清理策略（块级标签换行、不可见字符移除）
+    return HtmlTextFormatter.formatToPlainText(content);
   }
 }
 

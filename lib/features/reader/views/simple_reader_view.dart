@@ -707,7 +707,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     // 等价于 Legado HtmlFormatter 的 `\\s*\\n+\\s*`：忽略多余空白与多换行
     final rawParagraphs = text.split(RegExp(r'\s*\n+\s*'));
     final paragraphs = rawParagraphs
-        .map((p) => p.trim())
+        // 对齐 legado：trim 规则不仅去掉常规空白，也要去掉全角空格（U+3000，常用于缩进）
+        .map(_trimParagraphLikeLegado)
         .where((p) => p.isNotEmpty)
         .toList(growable: false);
 
@@ -718,6 +719,36 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       return paragraphs.join('\n');
     }
     return paragraphs.map((p) => '$indent$p').join('\n');
+  }
+
+  /// 对齐 legado 的段落 trim 行为：
+  /// - 去掉两端的 ASCII 控制字符/空格（<= 0x20）
+  /// - 去掉两端的全角空格 `　`（U+3000）
+  ///
+  /// 说明：部分书源/EPUB 章节会把缩进写成全角空格；如果不清理，会导致“缩进叠加/段首错位”。
+  String _trimParagraphLikeLegado(String input) {
+    if (input.isEmpty) return '';
+    var start = 0;
+    var end = input.length;
+    while (start < end) {
+      final ch = input[start];
+      final code = input.codeUnitAt(start);
+      if (code <= 0x20 || ch == '　') {
+        start++;
+      } else {
+        break;
+      }
+    }
+    while (end > start) {
+      final ch = input[end - 1];
+      final code = input.codeUnitAt(end - 1);
+      if (code <= 0x20 || ch == '　') {
+        end--;
+      } else {
+        break;
+      }
+    }
+    return input.substring(start, end);
   }
 
   String _removeDuplicateTitle(String content, String title) {
@@ -1375,11 +1406,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       backgroundColor: Colors.white12,
       thumbColor: CupertinoColors.activeBlue,
       children: {
-        0: buildTab('主题', selectedTab == 0),
-        1: buildTab('字体', selectedTab == 1),
-        2: buildTab('排版', selectedTab == 2),
-        3: buildTab('翻页', selectedTab == 3),
-        4: buildTab('更多', selectedTab == 4),
+        0: buildTab('常用', selectedTab == 0),
+        1: buildTab('主题', selectedTab == 1),
+        2: buildTab('字体', selectedTab == 2),
+        3: buildTab('排版', selectedTab == 3),
+        4: buildTab('翻页', selectedTab == 4),
+        5: buildTab('更多', selectedTab == 5),
       },
       onValueChanged: (value) {
         if (value == null) return;
@@ -1391,16 +1423,222 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Widget _buildSettingsTabBody(int tab, StateSetter setPopupState) {
     switch (tab) {
       case 0:
-        return _buildThemeSettingsTab(setPopupState);
+        return _buildQuickSettingsTab(setPopupState);
       case 1:
-        return _buildFontSettingsTab(setPopupState);
+        return _buildThemeSettingsTab(setPopupState);
       case 2:
-        return _buildLayoutSettingsTab(setPopupState);
+        return _buildFontSettingsTab(setPopupState);
       case 3:
+        return _buildLayoutSettingsTab(setPopupState);
+      case 4:
         return _buildPageSettingsTab(setPopupState);
       default:
         return _buildMoreSettingsTab(setPopupState);
     }
+  }
+
+  /// 常用设置：把高频项放在一个页面里，避免“到处点来点去”。
+  ///
+  /// 设计目标：
+  /// - 1 次打开就能调：字号 / 行距 / 段距 / 缩进 / 两端对齐 / 亮度 / 翻页模式
+  Widget _buildQuickSettingsTab(StateSetter setPopupState) {
+    return SingleChildScrollView(
+      key: const ValueKey('quick'),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSettingsCard(
+            title: '排版（常用）',
+            child: Column(
+              children: [
+                _buildSliderSetting(
+                  '字号',
+                  _settings.fontSize,
+                  10,
+                  40,
+                  (val) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(fontSize: val),
+                    );
+                  },
+                  displayFormat: (v) => v.toInt().toString(),
+                ),
+                const SizedBox(height: 8),
+                _buildSliderSetting(
+                  '行距',
+                  _settings.lineHeight,
+                  1.0,
+                  3.0,
+                  (val) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(lineHeight: val),
+                    );
+                  },
+                  displayFormat: (v) => v.toStringAsFixed(1),
+                ),
+                const SizedBox(height: 8),
+                _buildSliderSetting(
+                  '段距',
+                  _settings.paragraphSpacing,
+                  0,
+                  50,
+                  (val) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(paragraphSpacing: val),
+                    );
+                  },
+                  displayFormat: (v) => v.toInt().toString(),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildToggleBtn(
+                        label: '两端对齐',
+                        isActive: _settings.textFullJustify,
+                        onTap: () {
+                          _updateSettingsFromSheet(
+                            setPopupState,
+                            _settings.copyWith(
+                              textFullJustify: !_settings.textFullJustify,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildToggleBtn(
+                        label: '段首缩进',
+                        isActive: _settings.paragraphIndent.isNotEmpty,
+                        onTap: () {
+                          final hasIndent = _settings.paragraphIndent.isNotEmpty;
+                          _updateSettingsFromSheet(
+                            setPopupState,
+                            _settings.copyWith(
+                              paragraphIndent: hasIndent ? '' : '　　',
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          _buildSettingsCard(
+            title: '亮度与主题（常用）',
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Icon(CupertinoIcons.sun_min,
+                        color: Colors.white54, size: 20),
+                    Expanded(
+                      child: CupertinoSlider(
+                        value: _settings.brightness,
+                        min: 0.0,
+                        max: 1.0,
+                        activeColor: CupertinoColors.activeBlue,
+                        onChanged: (value) {
+                          _updateSettingsFromSheet(
+                            setPopupState,
+                            _settings.copyWith(brightness: value),
+                          );
+                        },
+                      ),
+                    ),
+                    const Icon(CupertinoIcons.sun_max,
+                        color: Colors.white54, size: 20),
+                  ],
+                ),
+                _buildSwitchRow(
+                  '跟随系统亮度',
+                  _settings.useSystemBrightness,
+                  (value) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(useSystemBrightness: value),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                // 快捷主题：日间/夜间/护眼/纯黑
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    AppColors.dayTheme,
+                    AppColors.nightTheme,
+                    AppColors.sepiaTheme,
+                    AppColors.amoledTheme,
+                  ].map((theme) {
+                    final index = AppColors.readingThemes.indexOf(theme);
+                    final isSelected = _settings.themeIndex == index;
+                    return ChoiceChip(
+                      label: Text(theme.name),
+                      selected: isSelected,
+                      selectedColor: CupertinoColors.activeBlue,
+                      backgroundColor: Colors.white10,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : Colors.white70,
+                        fontSize: 13,
+                      ),
+                      onSelected: (selected) {
+                        if (!selected) return;
+                        if (index < 0) return;
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(themeIndex: index),
+                        );
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          _buildSettingsCard(
+            title: '翻页（常用）',
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                PageTurnMode.scroll,
+                PageTurnMode.slide,
+                PageTurnMode.simulation2,
+                PageTurnMode.cover,
+              ].map((mode) {
+                final isSelected = _settings.pageTurnMode == mode;
+                return ChoiceChip(
+                  label: Text(mode.name),
+                  selected: isSelected,
+                  selectedColor: CupertinoColors.activeBlue,
+                  backgroundColor: Colors.white10,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white70,
+                    fontSize: 13,
+                  ),
+                  onSelected: (selected) {
+                    if (!selected) return;
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(pageTurnMode: mode),
+                    );
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
   }
 
   Widget _buildThemeSettingsTab(StateSetter setPopupState) {
@@ -2527,7 +2765,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   /// 显示更多设置
   void _showMoreSettingsSheet() {
-    _showReadingSettingsSheet(initialTab: 4);
+    _showReadingSettingsSheet(initialTab: 5);
   }
 
   Widget _buildSwitchRow(
