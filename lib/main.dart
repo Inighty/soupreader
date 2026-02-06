@@ -5,6 +5,7 @@ import 'core/models/app_settings.dart';
 import 'core/services/cookie_store.dart';
 import 'core/services/settings_service.dart';
 import 'features/bookshelf/views/bookshelf_view.dart';
+import 'features/discovery/views/discovery_view.dart';
 import 'features/search/views/search_view.dart';
 import 'features/source/views/source_list_view.dart';
 import 'features/settings/views/settings_view.dart';
@@ -122,6 +123,11 @@ class MainScreen extends StatelessWidget {
             label: '书架',
           ),
           BottomNavigationBarItem(
+            icon: Icon(CupertinoIcons.compass),
+            activeIcon: Icon(CupertinoIcons.compass_fill),
+            label: '发现',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(CupertinoIcons.search),
             label: '搜索',
           ),
@@ -144,10 +150,12 @@ class MainScreen extends StatelessWidget {
               case 0:
                 return const BookshelfView();
               case 1:
-                return const SearchView();
+                return const DiscoveryView();
               case 2:
-                return const SourceListView();
+                return const SearchView();
               case 3:
+                return const SourceListView();
+              case 4:
                 return const SettingsView();
               default:
                 return const BookshelfView();

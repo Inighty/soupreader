@@ -1,0 +1,331 @@
+import 'package:flutter/cupertino.dart';
+
+import '../../../core/database/database_service.dart';
+import '../../../core/database/repositories/source_repository.dart';
+import '../../bookshelf/services/book_add_service.dart';
+import '../../source/models/book_source.dart';
+import '../../source/services/rule_parser_engine.dart';
+
+/// 发现页（对标 Legado 的 exploreUrl / ruleExplore）
+///
+/// 目标：
+/// - 基于已导入的书源“发现规则”拉取列表
+/// - 展示聚合结果，支持“一键加入书架”
+/// - iOS（Cupertino）优先
+class DiscoveryView extends StatefulWidget {
+  const DiscoveryView({super.key});
+
+  @override
+  State<DiscoveryView> createState() => _DiscoveryViewState();
+}
+
+class _DiscoveryViewState extends State<DiscoveryView> {
+  final RuleParserEngine _engine = RuleParserEngine();
+  late final SourceRepository _sourceRepo;
+  late final BookAddService _addService;
+
+  bool _loading = false;
+  bool _cancelRequested = false;
+  bool _isImporting = false;
+
+  String _currentSourceName = '';
+  int _completedSources = 0;
+  int _totalSources = 0;
+
+  final List<SearchResult> _results = <SearchResult>[];
+  String? _lastError;
+
+  @override
+  void initState() {
+    super.initState();
+    final db = DatabaseService();
+    _sourceRepo = SourceRepository(db);
+    _addService = BookAddService(database: db, engine: _engine);
+
+    // 首次进入自动拉取一次
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+  }
+
+  List<BookSource> _eligibleSources() {
+    final all = _sourceRepo.getAllSources();
+    final eligible = all.where((s) {
+      final hasExplore = (s.exploreUrl ?? '').trim().isNotEmpty && s.ruleExplore != null;
+      return s.enabled && s.enabledExplore && hasExplore;
+    }).toList(growable: false);
+    eligible.sort((a, b) {
+      if (a.weight != b.weight) return b.weight.compareTo(a.weight);
+      return a.bookSourceName.compareTo(b.bookSourceName);
+    });
+    return eligible;
+  }
+
+  Future<void> _refresh() async {
+    if (_loading) return;
+
+    final sources = _eligibleSources();
+    setState(() {
+      _loading = true;
+      _cancelRequested = false;
+      _results.clear();
+      _lastError = null;
+      _currentSourceName = '';
+      _completedSources = 0;
+      _totalSources = sources.length;
+    });
+
+    if (sources.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _lastError = '没有可用的发现书源（需要 exploreUrl + ruleExplore 且启用发现）';
+      });
+      return;
+    }
+
+    for (final source in sources) {
+      if (_cancelRequested) break;
+
+      if (!mounted) return;
+      setState(() => _currentSourceName = source.bookSourceName);
+
+      try {
+        final items = await _engine.explore(source);
+        if (!mounted) return;
+        setState(() {
+          _results.addAll(items);
+          _completedSources++;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _completedSources++;
+          _lastError = '部分书源拉取失败：$e';
+        });
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _currentSourceName = '';
+    });
+  }
+
+  void _stop() {
+    setState(() {
+      _cancelRequested = true;
+      _loading = false;
+      _currentSourceName = '';
+    });
+  }
+
+  Future<void> _importBook(SearchResult result) async {
+    if (_isImporting) return;
+    setState(() => _isImporting = true);
+    try {
+      final addResult = await _addService.addFromSearchResult(result);
+      if (!mounted) return;
+      _showMessage(addResult.message);
+    } finally {
+      if (mounted) setState(() => _isImporting = false);
+    }
+  }
+
+  void _showMessage(String message) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('提示'),
+        content: Text('\n$message'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('好'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final eligibleCount = _eligibleSources().length;
+    return CupertinoPageScaffold(
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text('发现'),
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: _loading ? null : _refresh,
+          child: const Icon(CupertinoIcons.refresh),
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            if (_loading)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                child: Row(
+                  children: [
+                    const CupertinoActivityIndicator(),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _currentSourceName.isEmpty
+                            ? '正在加载…'
+                            : '正在发现: $_currentSourceName ($_completedSources/$_totalSources)',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: _stop,
+                      child: const Text('停止'),
+                    ),
+                  ],
+                ),
+              )
+            else if (_lastError != null && _results.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                child: Text(
+                  _lastError!,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: CupertinoColors.systemRed.resolveFrom(context),
+                  ),
+                ),
+              )
+            else
+              const SizedBox(height: 6),
+            Expanded(
+              child: _results.isEmpty
+                  ? _buildEmptyState(context, eligibleCount)
+                  : ListView.builder(
+                      itemCount: _results.length,
+                      itemBuilder: (context, index) =>
+                          _buildResultItem(_results[index]),
+                    ),
+            ),
+            if (_isImporting)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: CupertinoActivityIndicator(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, int eligibleCount) {
+    final subtitle = eligibleCount == 0
+        ? '没有可用的发现书源\n请先导入带 exploreUrl/ruleExplore 的 Legado 书源'
+        : '点击右上角刷新';
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            CupertinoIcons.compass,
+            size: 64,
+            color: CupertinoColors.systemGrey.resolveFrom(context),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '暂无发现内容',
+            style: TextStyle(
+              fontSize: 16,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultItem(SearchResult result) {
+    return CupertinoListTile.notched(
+      leading: Container(
+        width: 40,
+        height: 56,
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemGrey5.resolveFrom(context),
+          borderRadius: BorderRadius.circular(6),
+          image: result.coverUrl.isNotEmpty
+              ? DecorationImage(
+                  image: NetworkImage(result.coverUrl),
+                  fit: BoxFit.cover,
+                )
+              : null,
+        ),
+        child: result.coverUrl.isEmpty
+            ? Center(
+                child: Text(
+                  result.name.isNotEmpty ? result.name.substring(0, 1) : '?',
+                  style: TextStyle(
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              )
+            : null,
+      ),
+      title: Text(
+        result.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            result.author.isNotEmpty ? result.author : '未知作者',
+            style: TextStyle(
+              fontSize: 13,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '来源: ${result.sourceName}',
+            style: TextStyle(
+              fontSize: 12,
+              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+            ),
+          ),
+          if (result.lastChapter.trim().isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              '最新: ${result.lastChapter.trim()}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+              ),
+            ),
+          ],
+        ],
+      ),
+      trailing: const CupertinoListTileChevron(),
+      onTap: () => _importBook(result),
+    );
+  }
+}
+
