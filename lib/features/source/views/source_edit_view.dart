@@ -134,7 +134,8 @@ class _SourceEditViewState extends State<SourceEditView> {
   bool _debugLoading = false;
   String? _debugError;
   final List<_DebugLine> _debugLines = <_DebugLine>[];
-  int _debugConsoleMode = 0; // 0 分段 1 文本 2 逐行
+  final List<_DebugLine> _debugLinesAll = <_DebugLine>[];
+  int _debugConsoleMode = 1; // 0 分段 1 文本 2 逐行
   final Set<int> _expandedDebugBlocks = <int>{};
   String? _debugListSrcHtml; // state=10（搜索/发现列表页）
   String? _debugBookSrcHtml; // state=20（详情页）
@@ -725,7 +726,8 @@ class _SourceEditViewState extends State<SourceEditView> {
               title: const Text('导出调试包'),
               subtitle: const Text('包含：控制台、书源 JSON、源码、正文结果'),
               trailing: const CupertinoListTileChevron(),
-              onTap: _debugLines.isEmpty ? null : _showExportDebugBundleSheet,
+              onTap:
+                  _debugLinesAll.isEmpty ? null : _showExportDebugBundleSheet,
             ),
             CupertinoListTile.notched(
               title: const Text('清空控制台'),
@@ -734,7 +736,7 @@ class _SourceEditViewState extends State<SourceEditView> {
             ),
             CupertinoListTile.notched(
               title: const Text('复制控制台（全部）'),
-              additionalInfo: Text('${_debugLines.length} 行'),
+              additionalInfo: Text('${_debugLinesAll.length} 行'),
               trailing: const CupertinoListTileChevron(),
               onTap: _copyDebugConsole,
             ),
@@ -895,10 +897,13 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Widget _buildDebugConsoleSection() {
-    final hasLines = _debugLines.isNotEmpty;
+    final hasLines = _debugLinesAll.isNotEmpty;
     final mode = _debugConsoleMode;
     final modeLabel = mode == 0 ? '分段' : mode == 1 ? '文本' : '逐行';
-    final allText = hasLines ? _debugLines.map((e) => e.text).join('\n') : '';
+    final allText =
+        hasLines ? _debugLinesAll.map((e) => e.text).join('\n') : '';
+    final uiLines = _debugLines.length;
+    final totalLines = _debugLinesAll.length;
 
     final children = <Widget>[
       CupertinoListTile.notched(
@@ -918,7 +923,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       ),
       CupertinoListTile.notched(
         title: const Text('打开全文控制台'),
-        additionalInfo: Text('${_debugLines.length} 行'),
+        additionalInfo: Text('$totalLines 行'),
         trailing: const CupertinoListTileChevron(),
         onTap: hasLines ? () => _openDebugText(title: '控制台', text: allText) : null,
       ),
@@ -938,10 +943,10 @@ class _SourceEditViewState extends State<SourceEditView> {
 
     if (mode == 1) {
       const previewLines = 40;
-      final preview = _debugLines.length <= previewLines
+      final preview = _debugLinesAll.length <= previewLines
           ? allText
-          : _debugLines
-              .sublist(_debugLines.length - previewLines)
+          : _debugLinesAll
+              .sublist(_debugLinesAll.length - previewLines)
               .map((e) => e.text)
               .join('\n');
       children.add(
@@ -1063,7 +1068,11 @@ class _SourceEditViewState extends State<SourceEditView> {
     }
 
     return CupertinoListSection.insetGrouped(
-      header: Text('控制台（$modeLabel，${_debugLines.length}）'),
+      header: Text(
+        mode == 1
+            ? '控制台（$modeLabel，$totalLines）'
+            : '控制台（$modeLabel，仅展示最近 $uiLines/$totalLines）',
+      ),
       children: children,
     );
   }
@@ -1071,6 +1080,7 @@ class _SourceEditViewState extends State<SourceEditView> {
   void _clearDebugConsole() {
     setState(() {
       _debugLines.clear();
+      _debugLinesAll.clear();
       _expandedDebugBlocks.clear();
       _debugError = null;
       _debugListSrcHtml = null;
@@ -1082,19 +1092,19 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   void _copyDebugConsole() {
-    if (_debugLines.isEmpty) {
+    if (_debugLinesAll.isEmpty) {
       _showMessage('暂无日志可复制');
       return;
     }
-    final text = _debugLines.map((e) => e.text).join('\n');
+    final text = _debugLinesAll.map((e) => e.text).join('\n');
     Clipboard.setData(ClipboardData(text: text));
     _showMessage('已复制全部日志');
   }
 
   Map<String, dynamic> _buildDebugBundle({required bool includeRawSources}) {
     final now = DateTime.now().toIso8601String();
-    final consoleText = _debugLines.map((e) => e.text).join('\n');
-    final lines = _debugLines
+    final consoleText = _debugLinesAll.map((e) => e.text).join('\n');
+    final lines = _debugLinesAll
         .map((e) => <String, dynamic>{'state': e.state, 'text': e.text})
         .toList(growable: false);
 
@@ -1347,6 +1357,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       _debugLoading = true;
       _debugError = null;
       _debugLines.clear();
+      _debugLinesAll.clear();
       _debugListSrcHtml = null;
       _debugBookSrcHtml = null;
       _debugTocSrcHtml = null;
@@ -1396,11 +1407,13 @@ class _SourceEditViewState extends State<SourceEditView> {
     }
 
     setState(() {
-      _debugLines.add(_DebugLine(state: event.state, text: event.message));
-      // 防止日志无限增长
-      const maxLines = 240;
-      if (_debugLines.length > maxLines) {
-        _debugLines.removeRange(0, _debugLines.length - maxLines);
+      final line = _DebugLine(state: event.state, text: event.message);
+      _debugLinesAll.add(line);
+      _debugLines.add(line);
+      // UI 列表模式保持轻量：仅保留最近一部分；“全文控制台/导出调试包”使用全量日志。
+      const maxUiLines = 600;
+      if (_debugLines.length > maxUiLines) {
+        _debugLines.removeRange(0, _debugLines.length - maxUiLines);
       }
 
       if (event.state == -1) {

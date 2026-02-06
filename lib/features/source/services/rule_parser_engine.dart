@@ -21,36 +21,95 @@ class RuleParserEngine {
   static final RegExp _httpHeaderTokenRegex =
       RegExp(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$");
 
-  Map<String, String> _parseRequestHeaders(String? header) {
-    if (header == null) return const {};
+  _ParsedHeaders _parseRequestHeaders(String? header) {
+    if (header == null) return _ParsedHeaders.empty;
     final raw = header.trim();
-    if (raw.isEmpty) return const {};
+    if (raw.isEmpty) return _ParsedHeaders.empty;
+
+    String? warning;
+
+    Map<String, String> mapToHeaders(Map decoded) {
+      final m = <String, String>{};
+      decoded.forEach((k, v) {
+        final key = k.toString().trim();
+        if (key.isEmpty) return;
+        if (v == null) return;
+        if (_httpHeaderTokenRegex.hasMatch(key)) {
+          m[key] = v.toString();
+        } else {
+          warning ??= '存在非法 header key（已忽略）: $key';
+        }
+      });
+      return m;
+    }
+
+    String? normalizeMaybeDoubleEncoded(String text) {
+      final t = text.trim();
+      if (t.length >= 2 && t.startsWith('"') && t.endsWith('"')) {
+        try {
+          final decoded = jsonDecode(t);
+          if (decoded is String) return decoded;
+        } catch (_) {
+          // ignore
+        }
+      }
+      return null;
+    }
+
+    String? unescapeWeirdJsonObjectText(String text) {
+      final t = text.trim();
+      // 兼容少见情况：header 被“多转了一次字符串”，变成：
+      // {\"User-Agent\":\"xxx\"}
+      // 或 {\\\"User-Agent\\\":\\\"xxx\\\"}
+      if (!(t.startsWith('{') && t.contains(r'\"'))) return null;
+      var fixed = t;
+      // 先把 \\ -> \（避免后续 \" 仍然带双斜杠）
+      fixed = fixed.replaceAll(r'\\', '\\');
+      // 再把 \" -> "
+      fixed = fixed.replaceAll(r'\"', '"');
+      return fixed == t ? null : fixed;
+    }
 
     // Legado 的 header 常见格式是 JSON 字符串：
     // {"User-Agent":"xxx","Referer":"xxx"}
-    if (raw.startsWith('{') && raw.endsWith('}')) {
+    final doubleDecoded = normalizeMaybeDoubleEncoded(raw);
+    final normalizedRaw = doubleDecoded ?? raw;
+    if (normalizedRaw.startsWith('{') && normalizedRaw.endsWith('}')) {
       try {
-        final decoded = jsonDecode(raw);
+        final decoded = jsonDecode(normalizedRaw);
         if (decoded is Map) {
-          final m = <String, String>{};
-          decoded.forEach((k, v) {
-            final key = k.toString().trim();
-            if (key.isEmpty) return;
-            if (v == null) return;
-            if (_httpHeaderTokenRegex.hasMatch(key)) {
-              m[key] = v.toString();
-            }
-          });
-          return m;
+          return _ParsedHeaders(
+            headers: mapToHeaders(decoded),
+            warning: warning,
+          );
         }
       } catch (_) {
         // fallthrough: try other formats below
       }
 
+      // 兼容部分“二次转义”的 JSON 文本（常见于导入/粘贴路径）
+      final fixed = unescapeWeirdJsonObjectText(normalizedRaw);
+      if (fixed != null) {
+        try {
+          final decoded = jsonDecode(fixed);
+          if (decoded is Map) {
+            warning ??= 'header 似乎被二次转义，已自动修复解析';
+            return _ParsedHeaders(
+              headers: mapToHeaders(decoded),
+              warning: warning,
+            );
+          }
+        } catch (_) {
+          warning ??= 'header 看起来像 JSON，但解析失败（将尝试其它格式）';
+        }
+      } else {
+        warning ??= 'header 看起来像 JSON，但解析失败（将尝试其它格式）';
+      }
+
       // 一些导入/编辑路径可能把 Map 变成 Dart 的 toString 形式：
       // {User-Agent: xxx, Referer: yyy}
       // 这种不是 JSON，但我们也尽量解析，避免直接崩溃。
-      final inner = raw.substring(1, raw.length - 1).trim();
+      final inner = normalizedRaw.substring(1, normalizedRaw.length - 1).trim();
       if (inner.isNotEmpty && !inner.contains('"')) {
         final m = <String, String>{};
         for (final part in inner.split(',')) {
@@ -64,13 +123,15 @@ class RuleParserEngine {
           if (!_httpHeaderTokenRegex.hasMatch(key)) continue;
           m[key] = value;
         }
-        if (m.isNotEmpty) return m;
+        if (m.isNotEmpty) {
+          return _ParsedHeaders(headers: m, warning: warning);
+        }
       }
     }
 
     // 兼容编辑器里的“每行 key:value”格式
     final headers = <String, String>{};
-    for (final line in raw.split('\n')) {
+    for (final line in normalizedRaw.split('\n')) {
       final trimmed = line.trim();
       if (trimmed.isEmpty) continue;
       final idx = trimmed.indexOf(':');
@@ -81,7 +142,7 @@ class RuleParserEngine {
       if (!_httpHeaderTokenRegex.hasMatch(key)) continue;
       headers[key] = value;
     }
-    return headers;
+    return _ParsedHeaders(headers: headers, warning: warning);
   }
 
   /// 搜索书籍
@@ -117,16 +178,24 @@ class RuleParserEngine {
       final bookElements = _querySelectorAll(document, bookListRule);
 
       for (final element in bookElements) {
+        var bookUrl =
+            _parseRule(element, searchRule.bookUrl, source.bookSourceUrl);
+        if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+          bookUrl = _absoluteUrl(source.bookSourceUrl, bookUrl);
+        }
+        var coverUrl =
+            _parseRule(element, searchRule.coverUrl, source.bookSourceUrl);
+        if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+          coverUrl = _absoluteUrl(source.bookSourceUrl, coverUrl);
+        }
         final result = SearchResult(
           name: _parseRule(element, searchRule.name, source.bookSourceUrl),
           author: _parseRule(element, searchRule.author, source.bookSourceUrl),
-          coverUrl:
-              _parseRule(element, searchRule.coverUrl, source.bookSourceUrl),
+          coverUrl: coverUrl,
           intro: _parseRule(element, searchRule.intro, source.bookSourceUrl),
           lastChapter:
               _parseRule(element, searchRule.lastChapter, source.bookSourceUrl),
-          bookUrl:
-              _parseRule(element, searchRule.bookUrl, source.bookSourceUrl),
+          bookUrl: bookUrl,
           sourceUrl: source.bookSourceUrl,
           sourceName: source.bookSourceName,
         );
@@ -200,6 +269,9 @@ class RuleParserEngine {
         header: source.header,
         timeoutMs: source.respondTime,
       );
+      if (res.headersWarning != null && res.headersWarning!.trim().isNotEmpty) {
+        log('└请求头解析提示：${res.headersWarning}', state: 1, showTime: false);
+      }
       final status = res.statusCode;
       final statusText = status != null ? ' ($status)' : '';
       final isBadStatus = status != null && status >= 400;
@@ -382,6 +454,7 @@ class RuleParserEngine {
     }
 
     final results = <SearchResult>[];
+    var loggedSample = false;
     for (var i = 0; i < elements.length; i++) {
       final el = elements[i];
       final name = _parseRule(el, bookListRule.name, source.bookSourceUrl);
@@ -396,8 +469,9 @@ class RuleParserEngine {
         bookUrl = _absoluteUrl(source.bookSourceUrl, bookUrl);
       }
 
-      // 仅对第一条输出字段级日志，避免刷屏（对齐 legado 的 log 控制）
-      if (i == 0) {
+      // 对齐 legado：仅输出“一条有效样本”，避免 selector 命中广告/空节点导致样本全空而误导排查。
+      if (!loggedSample && name.isNotEmpty && bookUrl.isNotEmpty) {
+        loggedSample = true;
         log('┌获取书名');
         log('└$name');
         log('┌获取作者');
@@ -512,7 +586,12 @@ class RuleParserEngine {
     final lastChapter = getField('获取最新章节', rule.lastChapter);
     getField('获取简介', rule.intro);
     getField('获取封面', rule.coverUrl);
-    final tocUrl = getField('获取目录链接', rule.tocUrl);
+    var tocUrl = getField('获取目录链接', rule.tocUrl);
+    if (tocUrl.trim().isEmpty) {
+      // 对齐 legado 的容错：部分站点“详情页就是目录页”，tocUrl 规则为空/不匹配时允许直接用当前详情页继续。
+      log('≡目录链接为空，将使用详情页作为目录页', showTime: false);
+      tocUrl = fullUrl;
+    }
 
     if (name.isEmpty && author.isEmpty && lastChapter.isEmpty && tocUrl.isEmpty) {
       log('≡字段全为空，可能 ruleBookInfo 不匹配', state: -1);
@@ -550,18 +629,10 @@ class RuleParserEngine {
 
     final document = html_parser.parse(body);
 
-    var listRule = rule.chapterList ?? '';
-    var reverse = false;
-    if (listRule.startsWith('-')) {
-      reverse = true;
-      listRule = listRule.substring(1);
-    }
-    if (listRule.startsWith('+')) {
-      listRule = listRule.substring(1);
-    }
+    final normalized = _normalizeListRule(rule.chapterList);
 
     log('┌获取章节列表');
-    final elements = _querySelectorAll(document, listRule);
+    final elements = _querySelectorAll(document, normalized.selector);
     log('└列表大小:${elements.length}');
 
     var toc = <TocItem>[];
@@ -582,7 +653,7 @@ class RuleParserEngine {
       toc.add(TocItem(index: i, name: name, url: url));
     }
 
-    if (reverse) toc = toc.reversed.toList(growable: true);
+    if (normalized.reverse) toc = toc.reversed.toList(growable: true);
     log('◇章节总数:${toc.length}');
 
     if (toc.isEmpty) {
@@ -816,16 +887,24 @@ class RuleParserEngine {
       final bookElements = _querySelectorAll(document, bookListRule);
 
       for (final element in bookElements) {
+        var bookUrl =
+            _parseRule(element, exploreRule.bookUrl, source.bookSourceUrl);
+        if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+          bookUrl = _absoluteUrl(source.bookSourceUrl, bookUrl);
+        }
+        var coverUrl =
+            _parseRule(element, exploreRule.coverUrl, source.bookSourceUrl);
+        if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+          coverUrl = _absoluteUrl(source.bookSourceUrl, coverUrl);
+        }
         final result = SearchResult(
           name: _parseRule(element, exploreRule.name, source.bookSourceUrl),
           author: _parseRule(element, exploreRule.author, source.bookSourceUrl),
-          coverUrl:
-              _parseRule(element, exploreRule.coverUrl, source.bookSourceUrl),
+          coverUrl: coverUrl,
           intro: _parseRule(element, exploreRule.intro, source.bookSourceUrl),
           lastChapter:
               _parseRule(element, exploreRule.lastChapter, source.bookSourceUrl),
-          bookUrl:
-              _parseRule(element, exploreRule.bookUrl, source.bookSourceUrl),
+          bookUrl: bookUrl,
           sourceUrl: source.bookSourceUrl,
           sourceName: source.bookSourceName,
         );
@@ -985,15 +1064,29 @@ class RuleParserEngine {
 
       if (root == null) return null;
 
+      var tocUrl = _parseRule(root, bookInfoRule.tocUrl, source.bookSourceUrl);
+      if (tocUrl.trim().isEmpty && source.ruleToc != null) {
+        // 兼容 legado 常见用法：部分站点“详情页即目录页”，未配置 tocUrl 时默认使用当前详情页。
+        tocUrl = fullUrl;
+      } else if (tocUrl.isNotEmpty && !tocUrl.startsWith('http')) {
+        tocUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
+      }
+
+      var coverUrl =
+          _parseRule(root, bookInfoRule.coverUrl, source.bookSourceUrl);
+      if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+        coverUrl = _absoluteUrl(source.bookSourceUrl, coverUrl);
+      }
+
       return BookDetail(
         name: _parseRule(root, bookInfoRule.name, source.bookSourceUrl),
         author: _parseRule(root, bookInfoRule.author, source.bookSourceUrl),
-        coverUrl: _parseRule(root, bookInfoRule.coverUrl, source.bookSourceUrl),
+        coverUrl: coverUrl,
         intro: _parseRule(root, bookInfoRule.intro, source.bookSourceUrl),
         kind: _parseRule(root, bookInfoRule.kind, source.bookSourceUrl),
         lastChapter:
             _parseRule(root, bookInfoRule.lastChapter, source.bookSourceUrl),
-        tocUrl: _parseRule(root, bookInfoRule.tocUrl, source.bookSourceUrl),
+        tocUrl: tocUrl,
         bookUrl: fullUrl,
       );
     } catch (e) {
@@ -1064,14 +1157,21 @@ class RuleParserEngine {
       final name = _parseRule(root, bookInfoRule.name, source.bookSourceUrl);
       final author =
           _parseRule(root, bookInfoRule.author, source.bookSourceUrl);
-      final coverUrl =
+      var coverUrl =
           _parseRule(root, bookInfoRule.coverUrl, source.bookSourceUrl);
+      if (coverUrl.isNotEmpty && !coverUrl.startsWith('http')) {
+        coverUrl = _absoluteUrl(source.bookSourceUrl, coverUrl);
+      }
       final intro = _parseRule(root, bookInfoRule.intro, source.bookSourceUrl);
       final kind = _parseRule(root, bookInfoRule.kind, source.bookSourceUrl);
       final lastChapter =
           _parseRule(root, bookInfoRule.lastChapter, source.bookSourceUrl);
-      final tocUrl =
-          _parseRule(root, bookInfoRule.tocUrl, source.bookSourceUrl);
+      var tocUrl = _parseRule(root, bookInfoRule.tocUrl, source.bookSourceUrl);
+      if (tocUrl.trim().isEmpty && source.ruleToc != null) {
+        tocUrl = fullUrl;
+      } else if (tocUrl.isNotEmpty && !tocUrl.startsWith('http')) {
+        tocUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
+      }
 
       final detail = BookDetail(
         name: name,
@@ -1134,15 +1234,20 @@ class RuleParserEngine {
       final chapters = <TocItem>[];
 
       // 获取章节列表
-      final chapterListRule = tocRule.chapterList ?? '';
-      final chapterElements = _querySelectorAll(document, chapterListRule);
+      final normalized = _normalizeListRule(tocRule.chapterList);
+      final chapterElements = _querySelectorAll(document, normalized.selector);
 
       for (int i = 0; i < chapterElements.length; i++) {
         final element = chapterElements[i];
+        var url =
+            _parseRule(element, tocRule.chapterUrl, source.bookSourceUrl);
+        if (url.isNotEmpty && !url.startsWith('http')) {
+          url = _absoluteUrl(source.bookSourceUrl, url);
+        }
         final item = TocItem(
           index: i,
           name: _parseRule(element, tocRule.chapterName, source.bookSourceUrl),
-          url: _parseRule(element, tocRule.chapterUrl, source.bookSourceUrl),
+          url: url,
         );
 
         if (item.name.isNotEmpty && item.url.isNotEmpty) {
@@ -1150,7 +1255,9 @@ class RuleParserEngine {
         }
       }
 
-      return chapters;
+      return normalized.reverse
+          ? chapters.reversed.toList(growable: false)
+          : chapters;
     } catch (e) {
       debugPrint('获取目录失败: $e');
       return [];
@@ -1193,8 +1300,8 @@ class RuleParserEngine {
 
     try {
       final document = html_parser.parse(fetch.body);
-      final chapterListRule = tocRule.chapterList ?? '';
-      final chapterElements = _querySelectorAll(document, chapterListRule);
+      final normalized = _normalizeListRule(tocRule.chapterList);
+      final chapterElements = _querySelectorAll(document, normalized.selector);
 
       final chapters = <TocItem>[];
       Map<String, String> sample = const {};
@@ -1202,8 +1309,11 @@ class RuleParserEngine {
         final element = chapterElements[i];
         final name =
             _parseRule(element, tocRule.chapterName, source.bookSourceUrl);
-        final url =
+        var url =
             _parseRule(element, tocRule.chapterUrl, source.bookSourceUrl);
+        if (url.isNotEmpty && !url.startsWith('http')) {
+          url = _absoluteUrl(source.bookSourceUrl, url);
+        }
         if (chapters.isEmpty) {
           sample = <String, String>{'name': name, 'url': url};
         }
@@ -1216,9 +1326,11 @@ class RuleParserEngine {
         fetch: fetch,
         requestType: DebugRequestType.toc,
         requestUrlRule: tocUrl,
-        listRule: chapterListRule,
+        listRule: normalized.selector,
         listCount: chapterElements.length,
-        toc: chapters,
+        toc: normalized.reverse
+            ? chapters.reversed.toList(growable: false)
+            : chapters,
         fieldSample: sample,
         error: null,
       );
@@ -1234,6 +1346,19 @@ class RuleParserEngine {
         error: '解析失败: $e',
       );
     }
+  }
+
+  _NormalizedListRule _normalizeListRule(String? rawRule) {
+    var rule = (rawRule ?? '').trim();
+    var reverse = false;
+    if (rule.startsWith('-')) {
+      reverse = true;
+      rule = rule.substring(1);
+    }
+    if (rule.startsWith('+')) {
+      rule = rule.substring(1);
+    }
+    return _NormalizedListRule(selector: rule.trim(), reverse: reverse);
   }
 
   /// 获取正文
@@ -1358,7 +1483,8 @@ class RuleParserEngine {
         sendTimeout: timeout,
         receiveTimeout: timeout,
       );
-      final requestHeaders = _parseRequestHeaders(header);
+      final parsedHeaders = _parseRequestHeaders(header);
+      final requestHeaders = parsedHeaders.headers;
       if (requestHeaders.isNotEmpty) options.headers = requestHeaders;
 
       final response = await _dio.get(url, options: options);
@@ -1375,7 +1501,8 @@ class RuleParserEngine {
     int? timeoutMs,
   }) async {
     final sw = Stopwatch()..start();
-    final requestHeaders = _parseRequestHeaders(header);
+    final parsedHeaders = _parseRequestHeaders(header);
+    final requestHeaders = parsedHeaders.headers;
     try {
       final timeout =
           (timeoutMs != null && timeoutMs > 0) ? Duration(milliseconds: timeoutMs) : null;
@@ -1400,6 +1527,7 @@ class RuleParserEngine {
         responseLength: body?.length ?? 0,
         responseSnippet: _snippet(body),
         requestHeaders: requestHeaders,
+        headersWarning: parsedHeaders.warning,
         error: null,
         body: body,
       );
@@ -1412,6 +1540,7 @@ class RuleParserEngine {
         final finalUrl = response?.realUri.toString();
         final parts = <String>[
           'DioException(${e.type})',
+          if (parsedHeaders.warning != null) 'header警告=${parsedHeaders.warning}',
           if (e.message != null && e.message!.trim().isNotEmpty) e.message!.trim(),
           if (e.error != null) 'error=${e.error}',
         ];
@@ -1423,6 +1552,7 @@ class RuleParserEngine {
           responseLength: body?.length ?? 0,
           responseSnippet: _snippet(body),
           requestHeaders: requestHeaders,
+          headersWarning: parsedHeaders.warning,
           error: parts.join('：'),
           body: body,
         );
@@ -1435,6 +1565,7 @@ class RuleParserEngine {
         responseLength: 0,
         responseSnippet: null,
         requestHeaders: requestHeaders,
+        headersWarning: parsedHeaders.warning,
         error: e.toString(),
         body: null,
       );
@@ -1621,6 +1752,7 @@ class FetchDebugResult {
   final int responseLength;
   final String? responseSnippet;
   final Map<String, String> requestHeaders;
+  final String? headersWarning;
   final String? error;
 
   /// 原始响应体（仅用于编辑器调试；不要在普通 UI 中到处传递）
@@ -1634,6 +1766,7 @@ class FetchDebugResult {
     required this.responseLength,
     required this.responseSnippet,
     required this.requestHeaders,
+    required this.headersWarning,
     required this.error,
     required this.body,
   });
@@ -1647,10 +1780,39 @@ class FetchDebugResult {
       responseLength: 0,
       responseSnippet: null,
       requestHeaders: {},
+      headersWarning: null,
       error: null,
       body: null,
     );
   }
+}
+
+class _ParsedHeaders {
+  final Map<String, String> headers;
+  final String? warning;
+
+  const _ParsedHeaders({
+    required this.headers,
+    required this.warning,
+  });
+
+  static const empty = _ParsedHeaders(headers: {}, warning: null);
+
+  @override
+  String toString() => 'headers=$headers warning=$warning';
+}
+
+class _NormalizedListRule {
+  final String selector;
+  final bool reverse;
+
+  const _NormalizedListRule({
+    required this.selector,
+    required this.reverse,
+  });
+
+  @override
+  String toString() => 'selector=$selector reverse=$reverse';
 }
 
 class SearchDebugResult {
