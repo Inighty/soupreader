@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:dio_cookie_manager/dio_cookie_manager.dart';
+import 'package:cookie_jar/cookie_jar.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart';
 import 'dart:convert';
@@ -9,14 +11,40 @@ import '../../../core/utils/html_text_formatter.dart';
 /// 书源规则解析引擎
 /// 支持 CSS 选择器、XPath（简化版）和正则表达式
 class RuleParserEngine {
-  final Dio _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(seconds: 15),
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) '
-          'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
-    },
-  ));
+  static const Map<String, String> _defaultHeaders = {
+    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) '
+        'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+    'Accept':
+        'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+  };
+
+  late final Dio _dioPlain = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 15),
+      headers: _defaultHeaders,
+      // 书源站点很常见 30x 跳转（尤其从 http -> https）
+      followRedirects: true,
+      maxRedirects: 8,
+    ),
+  );
+
+  late final CookieJar _cookieJar = CookieJar();
+  late final Dio _dioCookie = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 15),
+      headers: _defaultHeaders,
+      followRedirects: true,
+      maxRedirects: 8,
+    ),
+  )..interceptors.add(CookieManager(_cookieJar));
+
+  Dio _selectDio({bool? enabledCookieJar}) {
+    final enabled = enabledCookieJar ?? true;
+    return enabled ? _dioCookie : _dioPlain;
+  }
 
   static final RegExp _httpHeaderTokenRegex =
       RegExp(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$");
@@ -166,6 +194,7 @@ class RuleParserEngine {
         searchUrl,
         header: source.header,
         timeoutMs: source.respondTime,
+        enabledCookieJar: source.enabledCookieJar,
       );
       if (response == null) return [];
 
@@ -268,6 +297,7 @@ class RuleParserEngine {
         url,
         header: source.header,
         timeoutMs: source.respondTime,
+        enabledCookieJar: source.enabledCookieJar,
       );
       if (res.headersWarning != null && res.headersWarning!.trim().isNotEmpty) {
         log('└请求头解析提示：${res.headersWarning}', state: 1, showTime: false);
@@ -284,6 +314,17 @@ class RuleParserEngine {
         rawHtml(rawState, res.body!);
         if (isBadStatus) {
           log('└HTTP 状态码异常：$status', state: -1, showTime: false);
+          final headerHint = _importantResponseHeaders(res.responseHeaders);
+          if (headerHint.isNotEmpty) {
+            log('└响应头：$headerHint', state: -1, showTime: false);
+          }
+          if (status == 403) {
+            log(
+              '└提示：403 多为反爬/需要 Referer/Cookie。可在书源 header 里补 Referer/Origin/Cookie，或开启 enabledCookieJar。',
+              state: -1,
+              showTime: false,
+            );
+          }
         }
       } else {
         log(
@@ -765,6 +806,7 @@ class RuleParserEngine {
       requestUrl,
       header: source.header,
       timeoutMs: source.respondTime,
+      enabledCookieJar: source.enabledCookieJar,
     );
     if (fetch.body == null) {
       return SearchDebugResult(
@@ -877,6 +919,7 @@ class RuleParserEngine {
         exploreUrl,
         header: source.header,
         timeoutMs: source.respondTime,
+        enabledCookieJar: source.enabledCookieJar,
       );
       if (response == null) return [];
 
@@ -951,6 +994,7 @@ class RuleParserEngine {
       requestUrl,
       header: source.header,
       timeoutMs: source.respondTime,
+      enabledCookieJar: source.enabledCookieJar,
     );
     if (fetch.body == null) {
       return ExploreDebugResult(
@@ -1051,6 +1095,7 @@ class RuleParserEngine {
         fullUrl,
         header: source.header,
         timeoutMs: source.respondTime,
+        enabledCookieJar: source.enabledCookieJar,
       );
       if (response == null) return null;
 
@@ -1118,6 +1163,7 @@ class RuleParserEngine {
       fullUrl,
       header: source.header,
       timeoutMs: source.respondTime,
+      enabledCookieJar: source.enabledCookieJar,
     );
     if (fetch.body == null) {
       return BookInfoDebugResult(
@@ -1227,6 +1273,7 @@ class RuleParserEngine {
         fullUrl,
         header: source.header,
         timeoutMs: source.respondTime,
+        enabledCookieJar: source.enabledCookieJar,
       );
       if (response == null) return [];
 
@@ -1284,6 +1331,7 @@ class RuleParserEngine {
       fullUrl,
       header: source.header,
       timeoutMs: source.respondTime,
+      enabledCookieJar: source.enabledCookieJar,
     );
     if (fetch.body == null) {
       return TocDebugResult(
@@ -1361,6 +1409,34 @@ class RuleParserEngine {
     return _NormalizedListRule(selector: rule.trim(), reverse: reverse);
   }
 
+  String _importantResponseHeaders(Map<String, String> headers) {
+    if (headers.isEmpty) return '';
+    final normalized = <String, String>{};
+    headers.forEach((k, v) => normalized[k.toLowerCase()] = v);
+
+    const keys = <String>[
+      'content-type',
+      'location',
+      'set-cookie',
+      'server',
+      'via',
+      'x-powered-by',
+      'cf-ray',
+      'cf-cache-status',
+      'x-cache',
+      'x-served-by',
+    ];
+
+    final parts = <String>[];
+    for (final k in keys) {
+      final v = normalized[k];
+      if (v == null || v.trim().isEmpty) continue;
+      final safe = v.length <= 200 ? v : '${v.substring(0, 200)}…';
+      parts.add('$k=$safe');
+    }
+    return parts.join('; ');
+  }
+
   /// 获取正文
   Future<String> getContent(BookSource source, String chapterUrl) async {
     final contentRule = source.ruleContent;
@@ -1372,6 +1448,7 @@ class RuleParserEngine {
         fullUrl,
         header: source.header,
         timeoutMs: source.respondTime,
+        enabledCookieJar: source.enabledCookieJar,
       );
       if (response == null) return '';
 
@@ -1420,6 +1497,7 @@ class RuleParserEngine {
       fullUrl,
       header: source.header,
       timeoutMs: source.respondTime,
+      enabledCookieJar: source.enabledCookieJar,
     );
     if (fetch.body == null) {
       return ContentDebugResult(
@@ -1474,6 +1552,7 @@ class RuleParserEngine {
     String url, {
     String? header,
     int? timeoutMs,
+    bool? enabledCookieJar,
   }) async {
     try {
       final timeout =
@@ -1487,7 +1566,8 @@ class RuleParserEngine {
       final requestHeaders = parsedHeaders.headers;
       if (requestHeaders.isNotEmpty) options.headers = requestHeaders;
 
-      final response = await _dio.get(url, options: options);
+      final response = await _selectDio(enabledCookieJar: enabledCookieJar)
+          .get(url, options: options);
       return response.data?.toString();
     } catch (e) {
       debugPrint('请求失败: $url - $e');
@@ -1499,6 +1579,7 @@ class RuleParserEngine {
     String url, {
     String? header,
     int? timeoutMs,
+    bool? enabledCookieJar,
   }) async {
     final sw = Stopwatch()..start();
     final parsedHeaders = _parseRequestHeaders(header);
@@ -1516,8 +1597,12 @@ class RuleParserEngine {
         options.headers = requestHeaders;
       }
 
-      final response = await _dio.get(url, options: options);
+      final response = await _selectDio(enabledCookieJar: enabledCookieJar)
+          .get(url, options: options);
       final body = response.data?.toString();
+      final respHeaders = response.headers.map.map(
+        (k, v) => MapEntry(k, v.join(', ')),
+      );
       sw.stop();
       return FetchDebugResult(
         requestUrl: url,
@@ -1528,6 +1613,7 @@ class RuleParserEngine {
         responseSnippet: _snippet(body),
         requestHeaders: requestHeaders,
         headersWarning: parsedHeaders.warning,
+        responseHeaders: respHeaders,
         error: null,
         body: body,
       );
@@ -1538,6 +1624,10 @@ class RuleParserEngine {
         final body = response?.data?.toString();
         final statusCode = response?.statusCode;
         final finalUrl = response?.realUri.toString();
+        final respHeaders = response?.headers.map.map(
+              (k, v) => MapEntry(k, v.join(', ')),
+            ) ??
+            const <String, String>{};
         final parts = <String>[
           'DioException(${e.type})',
           if (parsedHeaders.warning != null) 'header警告=${parsedHeaders.warning}',
@@ -1553,6 +1643,7 @@ class RuleParserEngine {
           responseSnippet: _snippet(body),
           requestHeaders: requestHeaders,
           headersWarning: parsedHeaders.warning,
+          responseHeaders: respHeaders,
           error: parts.join('：'),
           body: body,
         );
@@ -1566,6 +1657,7 @@ class RuleParserEngine {
         responseSnippet: null,
         requestHeaders: requestHeaders,
         headersWarning: parsedHeaders.warning,
+        responseHeaders: const <String, String>{},
         error: e.toString(),
         body: null,
       );
@@ -1753,6 +1845,7 @@ class FetchDebugResult {
   final String? responseSnippet;
   final Map<String, String> requestHeaders;
   final String? headersWarning;
+  final Map<String, String> responseHeaders;
   final String? error;
 
   /// 原始响应体（仅用于编辑器调试；不要在普通 UI 中到处传递）
@@ -1767,6 +1860,7 @@ class FetchDebugResult {
     required this.responseSnippet,
     required this.requestHeaders,
     required this.headersWarning,
+    required this.responseHeaders,
     required this.error,
     required this.body,
   });
@@ -1781,6 +1875,7 @@ class FetchDebugResult {
       responseSnippet: null,
       requestHeaders: {},
       headersWarning: null,
+      responseHeaders: {},
       error: null,
       body: null,
     );
