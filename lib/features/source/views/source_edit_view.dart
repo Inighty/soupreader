@@ -119,10 +119,14 @@ class _SourceEditViewState extends State<SourceEditView> {
   late final TextEditingController _tocChapterListCtrl;
   late final TextEditingController _tocChapterNameCtrl;
   late final TextEditingController _tocChapterUrlCtrl;
+  late final TextEditingController _tocNextTocUrlCtrl;
+  late final TextEditingController _tocPreUpdateJsCtrl;
+  late final TextEditingController _tocFormatJsCtrl;
 
   late final TextEditingController _contentContentCtrl;
   late final TextEditingController _contentTitleCtrl;
   late final TextEditingController _contentReplaceRegexCtrl;
+  late final TextEditingController _contentNextContentUrlCtrl;
 
   late final TextEditingController _jsonCtrl;
   String? _jsonError;
@@ -246,6 +250,12 @@ class _SourceEditViewState extends State<SourceEditView> {
         TextEditingController(text: source?.ruleToc?.chapterName ?? '');
     _tocChapterUrlCtrl =
         TextEditingController(text: source?.ruleToc?.chapterUrl ?? '');
+    _tocNextTocUrlCtrl =
+        TextEditingController(text: source?.ruleToc?.nextTocUrl ?? '');
+    _tocPreUpdateJsCtrl =
+        TextEditingController(text: source?.ruleToc?.preUpdateJs ?? '');
+    _tocFormatJsCtrl =
+        TextEditingController(text: source?.ruleToc?.formatJs ?? '');
 
     _contentContentCtrl =
         TextEditingController(text: source?.ruleContent?.content ?? '');
@@ -253,6 +263,8 @@ class _SourceEditViewState extends State<SourceEditView> {
         TextEditingController(text: source?.ruleContent?.title ?? '');
     _contentReplaceRegexCtrl =
         TextEditingController(text: source?.ruleContent?.replaceRegex ?? '');
+    _contentNextContentUrlCtrl =
+        TextEditingController(text: source?.ruleContent?.nextContentUrl ?? '');
 
     _validateJson(silent: true);
   }
@@ -304,9 +316,13 @@ class _SourceEditViewState extends State<SourceEditView> {
     _tocChapterListCtrl.dispose();
     _tocChapterNameCtrl.dispose();
     _tocChapterUrlCtrl.dispose();
+    _tocNextTocUrlCtrl.dispose();
+    _tocPreUpdateJsCtrl.dispose();
+    _tocFormatJsCtrl.dispose();
     _contentContentCtrl.dispose();
     _contentTitleCtrl.dispose();
     _contentReplaceRegexCtrl.dispose();
+    _contentNextContentUrlCtrl.dispose();
     _jsonCtrl.dispose();
     _debugKeyCtrl.dispose();
     super.dispose();
@@ -445,6 +461,12 @@ class _SourceEditViewState extends State<SourceEditView> {
                 placeholder: 'ruleToc.chapterName'),
             _buildTextFieldTile('章节链接', _tocChapterUrlCtrl,
                 placeholder: 'ruleToc.chapterUrl（@href）'),
+            _buildTextFieldTile('目录下一页', _tocNextTocUrlCtrl,
+                placeholder: 'ruleToc.nextTocUrl（可选，支持多候选）'),
+            _buildTextFieldTile('目录预处理JS', _tocPreUpdateJsCtrl,
+                placeholder: 'ruleToc.preUpdateJs（可选，JS）', maxLines: 4),
+            _buildTextFieldTile('标题格式化JS', _tocFormatJsCtrl,
+                placeholder: 'ruleToc.formatJs（可选，JS）', maxLines: 4),
           ],
         ),
         CupertinoListSection.insetGrouped(
@@ -454,6 +476,8 @@ class _SourceEditViewState extends State<SourceEditView> {
                 placeholder: 'ruleContent.title'),
             _buildTextFieldTile('正文', _contentContentCtrl,
                 placeholder: 'ruleContent.content（@text/@html）', maxLines: 4),
+            _buildTextFieldTile('正文下一页', _contentNextContentUrlCtrl,
+                placeholder: 'ruleContent.nextContentUrl（可选，支持多候选）'),
             _buildTextFieldTile('替换正则', _contentReplaceRegexCtrl,
                 placeholder: 'ruleContent.replaceRegex（regex##rep##...）',
                 maxLines: 4),
@@ -1499,20 +1523,28 @@ class _SourceEditViewState extends State<SourceEditView> {
       noTrimKeys: {'intro'},
     );
 
-    map['ruleToc'] = patchRule('ruleToc', {
-      'chapterList': _tocChapterListCtrl,
-      'chapterName': _tocChapterNameCtrl,
-      'chapterUrl': _tocChapterUrlCtrl,
-    });
+    map['ruleToc'] = patchRule(
+      'ruleToc',
+      {
+        'chapterList': _tocChapterListCtrl,
+        'chapterName': _tocChapterNameCtrl,
+        'chapterUrl': _tocChapterUrlCtrl,
+        'nextTocUrl': _tocNextTocUrlCtrl,
+        'preUpdateJs': _tocPreUpdateJsCtrl,
+        'formatJs': _tocFormatJsCtrl,
+      },
+      noTrimKeys: {'preUpdateJs', 'formatJs'},
+    );
 
     map['ruleContent'] = patchRule(
       'ruleContent',
       {
         'title': _contentTitleCtrl,
         'content': _contentContentCtrl,
+        'nextContentUrl': _contentNextContentUrlCtrl,
         'replaceRegex': _contentReplaceRegexCtrl,
       },
-      noTrimKeys: {'content', 'replaceRegex'},
+      noTrimKeys: {'content', 'replaceRegex', 'nextContentUrl'},
     );
 
     return map;
@@ -1833,6 +1865,9 @@ class _SourceEditViewState extends State<SourceEditView> {
       'chapterList': textOrNull(_tocChapterListCtrl),
       'chapterName': textOrNull(_tocChapterNameCtrl),
       'chapterUrl': textOrNull(_tocChapterUrlCtrl),
+      'nextTocUrl': textOrNull(_tocNextTocUrlCtrl),
+      'preUpdateJs': textOrNull(_tocPreUpdateJsCtrl, trimValue: false),
+      'formatJs': textOrNull(_tocFormatJsCtrl, trimValue: false),
     });
     if (ruleToc == null) {
       map.remove('ruleToc');
@@ -1843,6 +1878,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     final ruleContent = mergeRule(map['ruleContent'], {
       'title': textOrNull(_contentTitleCtrl),
       'content': textOrNull(_contentContentCtrl, trimValue: false),
+      'nextContentUrl': textOrNull(_contentNextContentUrlCtrl),
       'replaceRegex': textOrNull(_contentReplaceRegexCtrl, trimValue: false),
     });
     if (ruleContent == null) {
@@ -1919,9 +1955,13 @@ class _SourceEditViewState extends State<SourceEditView> {
       _tocChapterListCtrl.text = source.ruleToc?.chapterList ?? '';
       _tocChapterNameCtrl.text = source.ruleToc?.chapterName ?? '';
       _tocChapterUrlCtrl.text = source.ruleToc?.chapterUrl ?? '';
+      _tocNextTocUrlCtrl.text = source.ruleToc?.nextTocUrl ?? '';
+      _tocPreUpdateJsCtrl.text = source.ruleToc?.preUpdateJs ?? '';
+      _tocFormatJsCtrl.text = source.ruleToc?.formatJs ?? '';
 
       _contentTitleCtrl.text = source.ruleContent?.title ?? '';
       _contentContentCtrl.text = source.ruleContent?.content ?? '';
+      _contentNextContentUrlCtrl.text = source.ruleContent?.nextContentUrl ?? '';
       _contentReplaceRegexCtrl.text = source.ruleContent?.replaceRegex ?? '';
     });
     _validateJson();

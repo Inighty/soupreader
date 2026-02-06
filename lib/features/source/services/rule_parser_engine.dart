@@ -57,6 +57,242 @@ class RuleParserEngine {
   // 这里只用于“URL 参数处理”，不做复杂脚本引擎承诺。
   static final JavascriptRuntime _jsRuntime = getJavascriptRuntime(xhr: false);
 
+  String _evalJsMaybeString({
+    required String js,
+    String? jsLib,
+    Map<String, Object?> bindings = const {},
+  }) {
+    // 统一的 JS 执行入口（轻量版，对标 legado 的“返回值 toString”语义）
+    // - 通过 eval(jsText) 获取“脚本最后一个表达式”的值
+    // - 支持注入 jsLib（书源字段）
+    // - 支持注入 bindings（如 formatJs 的 title/index）
+    final lib = (jsLib ?? '').trim();
+    final safeLib = lib.isEmpty ? '' : '$lib\n';
+    final safeJs = jsonEncode(js);
+    final safeBindings = jsonEncode(bindings);
+    final wrapped = '''
+      (function(){
+        try {
+          $safeLib
+          var __b = $safeBindings || {};
+          for (var k in __b) { this[String(k)] = __b[k]; }
+          var __res = eval($safeJs);
+          if (__res === undefined || __res === null) {
+            try {
+              if (typeof chapter !== 'undefined' && chapter && typeof chapter.title === 'string' && chapter.title) {
+                return chapter.title;
+              }
+            } catch(e) {}
+            return '';
+          }
+          if (typeof __res === 'string') return __res;
+          try { return JSON.stringify(__res); } catch(e) { return String(__res); }
+        } catch (e) {
+          return '';
+        }
+      })()
+    ''';
+    try {
+      return _jsRuntime.evaluate(wrapped).stringResult;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _evalTocFormatJs({
+    required String js,
+    required String title,
+    required int index1Based,
+    String? jsLib,
+  }) {
+    final out = _evalJsMaybeString(
+      js: js,
+      jsLib: jsLib,
+      bindings: <String, Object?>{
+        'index': index1Based,
+        'title': title,
+        // 对标 legado bindings：有些 formatJs 会读/写 chapter.title
+        'chapter': <String, Object?>{'title': title},
+      },
+    ).trim();
+    return out.isEmpty ? title : out;
+  }
+
+  List<TocItem> _applyTocFormatJs({
+    required List<TocItem> toc,
+    required String? formatJs,
+    String? jsLib,
+  }) {
+    final js = (formatJs ?? '').trim();
+    if (js.isEmpty || toc.isEmpty) return toc;
+
+    final out = <TocItem>[];
+    for (var i = 0; i < toc.length; i++) {
+      final item = toc[i];
+      final newName = _evalTocFormatJs(
+        js: js,
+        title: item.name,
+        index1Based: i + 1,
+        jsLib: jsLib,
+      );
+      out.add(TocItem(index: item.index, name: newName, url: item.url));
+    }
+    return out;
+  }
+
+  List<String> _splitPossibleListValues(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return const <String>[];
+    // 常见情况：规则返回多行 URL 或用逗号拼接
+    final parts = t
+        .split(RegExp(r'[\r\n]+|,|，|;|；'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+    return parts.isEmpty ? <String>[t] : parts;
+  }
+
+  List<String> _parseStringListFromHtml({
+    required Element root,
+    required String rule,
+    required String baseUrl,
+    required bool isUrl,
+  }) {
+    final raw = rule.trim();
+    if (raw.isEmpty) return const <String>[];
+
+    // 多规则备选（||）
+    for (final candidate in raw.split('||')) {
+      final one = candidate.trim();
+      if (one.isEmpty) continue;
+
+      if (_looksLikeXPath(one)) {
+        final v = _parseXPathRule(root, one, baseUrl);
+        final values = _splitPossibleListValues(v);
+        if (values.isNotEmpty) {
+          return values
+              .map((e) => isUrl ? _absoluteUrl(baseUrl, e) : e)
+              .toList(growable: false);
+        }
+        continue;
+      }
+
+      if (_looksLikeRegexRule(one)) {
+        final v = _parseRegexRuleOnText(root.outerHtml, one);
+        final values = _splitPossibleListValues(v);
+        if (values.isNotEmpty) {
+          return values
+              .map((e) => isUrl ? _absoluteUrl(baseUrl, e) : e)
+              .toList(growable: false);
+        }
+        continue;
+      }
+
+      final parsed = _LegadoTextRule.parse(one, isExtractor: _isExtractorToken);
+      final targets = parsed.selectors.isEmpty
+          ? <Element>[root]
+          : _selectAllBySelectors(root, parsed.selectors);
+      if (targets.isEmpty) continue;
+
+      final out = <String>[];
+      for (final el in targets) {
+        var v = _extractWithFallbacks(
+          el,
+          parsed.extractors,
+          baseUrl: baseUrl,
+        );
+        v = _applyInlineReplacements(v, parsed.replacements).trim();
+        if (v.isEmpty) continue;
+        for (final item in _splitPossibleListValues(v)) {
+          final resolved = isUrl ? _absoluteUrl(baseUrl, item) : item;
+          if (resolved.trim().isEmpty) continue;
+          out.add(resolved);
+        }
+      }
+      if (out.isNotEmpty) {
+        final seen = <String>{};
+        final dedup = <String>[];
+        for (final u in out) {
+          final key = u.trim();
+          if (key.isEmpty || seen.contains(key)) continue;
+          seen.add(key);
+          dedup.add(key);
+        }
+        return dedup;
+      }
+    }
+
+    return const <String>[];
+  }
+
+  List<String> _parseStringListFromJson({
+    required dynamic json,
+    required String rule,
+    required String baseUrl,
+    required bool isUrl,
+  }) {
+    final raw = rule.trim();
+    if (raw.isEmpty) return const <String>[];
+
+    for (final candidate in raw.split('||')) {
+      final one = candidate.trim();
+      if (one.isEmpty) continue;
+
+      if (_looksLikeJsonPath(one)) {
+        final split = _splitExprAndReplacements(one);
+        var expr = split.expr.trim();
+        if (expr.startsWith('@Json:')) {
+          expr = expr.substring('@Json:'.length).trim();
+        }
+        if (expr.isEmpty) continue;
+        try {
+          final matches = JsonPath(expr).read(json).toList(growable: false);
+          if (matches.isEmpty) continue;
+          final out = <String>[];
+          for (final m in matches) {
+            final v = m.value;
+            if (v is List) {
+              for (final item in v) {
+                if (item == null) continue;
+                final s = _applyInlineReplacements(
+                  item.toString(),
+                  split.replacements,
+                ).trim();
+                if (s.isEmpty) continue;
+                for (final part in _splitPossibleListValues(s)) {
+                  out.add(isUrl ? _absoluteUrl(baseUrl, part) : part);
+                }
+              }
+            } else if (v != null) {
+              final s = _applyInlineReplacements(
+                v.toString(),
+                split.replacements,
+              ).trim();
+              if (s.isEmpty) continue;
+              for (final part in _splitPossibleListValues(s)) {
+                out.add(isUrl ? _absoluteUrl(baseUrl, part) : part);
+              }
+            }
+          }
+          if (out.isNotEmpty) return out;
+        } catch (_) {
+          // ignore
+        }
+        continue;
+      }
+
+      final v = _parseValueOnNode(json, one, baseUrl);
+      final values = _splitPossibleListValues(v);
+      if (values.isNotEmpty) {
+        return values
+            .map((e) => isUrl ? _absoluteUrl(baseUrl, e) : e)
+            .toList(growable: false);
+      }
+    }
+
+    return const <String>[];
+  }
+
   Dio _selectDio({bool? enabledCookieJar}) {
     final enabled = enabledCookieJar ?? true;
     return enabled ? _dioCookie : _dioPlain;
@@ -194,12 +430,21 @@ class RuleParserEngine {
   static final RegExp _httpHeaderTokenRegex =
       RegExp(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$");
 
-  _ParsedHeaders _parseRequestHeaders(String? header) {
+  _ParsedHeaders _parseRequestHeaders(
+    String? header, {
+    String? jsLib,
+  }) {
     if (header == null) return _ParsedHeaders.empty;
     final raw = header.trim();
     if (raw.isEmpty) return _ParsedHeaders.empty;
 
     String? warning;
+
+    String? evalHeaderJs(String js) {
+      // 对标 legado：header 支持 @js: / <js>，执行后得到 JSON 文本。
+      final out = _evalJsMaybeString(js: js, jsLib: jsLib).trim();
+      return out.isEmpty ? null : out;
+    }
 
     Map<String, String> mapToHeaders(Map decoded) {
       final m = <String, String>{};
@@ -243,10 +488,35 @@ class RuleParserEngine {
       return fixed == t ? null : fixed;
     }
 
+    // 对标 legado：header 支持 @js: / <js> 语法，执行后得到 JSON
+    String normalizedRaw = raw;
+    if (raw.length >= 4 && raw.toLowerCase().startsWith('@js:')) {
+      final js = raw.substring(4).trim();
+      final out = js.isEmpty ? null : evalHeaderJs(js);
+      if (out != null) {
+        warning ??= 'header 使用 @js: 生成';
+        normalizedRaw = out;
+      } else {
+        warning ??= 'header @js: 执行失败（将按原文本解析）';
+      }
+    } else if (raw.length >= 4 && raw.toLowerCase().startsWith('<js>')) {
+      var js = raw.substring(4);
+      final lastTag = js.lastIndexOf('<');
+      if (lastTag > 0) js = js.substring(0, lastTag);
+      js = js.trim();
+      final out = js.isEmpty ? null : evalHeaderJs(js);
+      if (out != null) {
+        warning ??= 'header 使用 <js> 生成';
+        normalizedRaw = out;
+      } else {
+        warning ??= 'header <js> 执行失败（将按原文本解析）';
+      }
+    }
+
     // Legado 的 header 常见格式是 JSON 字符串：
     // {"User-Agent":"xxx","Referer":"xxx"}
-    final doubleDecoded = normalizeMaybeDoubleEncoded(raw);
-    final normalizedRaw = doubleDecoded ?? raw;
+    final doubleDecoded = normalizeMaybeDoubleEncoded(normalizedRaw);
+    normalizedRaw = doubleDecoded ?? normalizedRaw;
     if (normalizedRaw.startsWith('{') && normalizedRaw.endsWith('}')) {
       try {
         final decoded = jsonDecode(normalizedRaw);
@@ -521,6 +791,7 @@ class RuleParserEngine {
       final response = await _fetch(
         searchUrl,
         header: source.header,
+        jsLib: source.jsLib,
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
       );
@@ -666,6 +937,7 @@ class RuleParserEngine {
       final res = await _fetchDebug(
         url,
         header: source.header,
+        jsLib: source.jsLib,
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
       );
@@ -1183,7 +1455,7 @@ class RuleParserEngine {
           ? _tryDecodeJsonValue(body)
           : null;
 
-      String? nextUrl;
+      List<String> nextCandidates = const <String>[];
 
       log('┌获取章节列表');
       if (jsonRoot != null && _looksLikeJsonPath(normalized.selector)) {
@@ -1205,9 +1477,17 @@ class RuleParserEngine {
           if (name.isEmpty || url.isEmpty) continue;
           toc.add(TocItem(index: toc.length, name: name, url: url));
         }
-        if (tocRule.nextTocUrl != null &&
-            tocRule.nextTocUrl!.trim().isNotEmpty) {
-          nextUrl = _parseValueOnNode(jsonRoot, tocRule.nextTocUrl, currentUrl);
+        if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
+          nextCandidates = _parseStringListFromJson(
+            json: jsonRoot,
+            rule: tocRule.nextTocUrl!,
+            baseUrl: currentUrl,
+            isUrl: true,
+          );
+          if (nextCandidates.isNotEmpty) {
+            log('┌获取目录下一页');
+            log('└${nextCandidates.join('\n')}');
+          }
         }
       } else {
         final document = html_parser.parse(body);
@@ -1229,27 +1509,49 @@ class RuleParserEngine {
           if (name.isEmpty || url.isEmpty) continue;
           toc.add(TocItem(index: toc.length, name: name, url: url));
         }
-        if (tocRule.nextTocUrl != null &&
-            tocRule.nextTocUrl!.trim().isNotEmpty) {
+        if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
           final root = document.documentElement;
           if (root != null) {
-            nextUrl = _parseRule(root, tocRule.nextTocUrl, currentUrl);
+            nextCandidates = _parseStringListFromHtml(
+              root: root,
+              rule: tocRule.nextTocUrl!,
+              baseUrl: currentUrl,
+              isUrl: true,
+            );
+            if (nextCandidates.isNotEmpty) {
+              log('┌获取目录下一页');
+              log('└${nextCandidates.join('\n')}');
+            }
           }
         }
       }
 
-      if (nextUrl == null || nextUrl.trim().isEmpty) break;
-      var resolved = nextUrl.trim();
-      if (!resolved.startsWith('http')) {
-        resolved = _absoluteUrl(currentUrl, resolved);
+      if (nextCandidates.isEmpty) break;
+      String? picked;
+      for (final c in nextCandidates) {
+        final u = c.trim();
+        if (u.isEmpty) continue;
+        if (u == currentUrl) continue;
+        if (visited.contains(u)) continue;
+        picked = u;
+        break;
       }
-      if (resolved == currentUrl) break;
-      currentUrl = resolved;
+      if (picked == null) break;
+      currentUrl = picked;
       page++;
     }
 
     var out = toc;
     if (normalized.reverse) out = out.reversed.toList(growable: true);
+    out = <TocItem>[
+      for (var i = 0; i < out.length; i++)
+        TocItem(index: i, name: out[i].name, url: out[i].url),
+    ];
+    out = _applyTocFormatJs(
+      toc: out,
+      formatJs: tocRule.formatJs,
+      jsLib: source.jsLib,
+    );
     log('◇章节总数:${out.length}');
 
     if (out.isEmpty) {
@@ -1308,12 +1610,21 @@ class RuleParserEngine {
           : null;
 
       String extracted;
-      String? nextUrl;
+      List<String> nextCandidates = const <String>[];
 
       if (jsonRoot != null && rule.content != null && _looksLikeJsonPath(rule.content!)) {
         extracted = _parseValueOnNode(jsonRoot, rule.content, currentUrl);
         if (rule.nextContentUrl != null && rule.nextContentUrl!.trim().isNotEmpty) {
-          nextUrl = _parseValueOnNode(jsonRoot, rule.nextContentUrl, currentUrl);
+          nextCandidates = _parseStringListFromJson(
+            json: jsonRoot,
+            rule: rule.nextContentUrl!,
+            baseUrl: currentUrl,
+            isUrl: true,
+          );
+          if (nextCandidates.isNotEmpty) {
+            log('┌获取正文下一页');
+            log('└${nextCandidates.join('\n')}');
+          }
         }
       } else {
         final document = html_parser.parse(body);
@@ -1331,7 +1642,16 @@ class RuleParserEngine {
         }
 
         if (rule.nextContentUrl != null && rule.nextContentUrl!.trim().isNotEmpty) {
-          nextUrl = _parseRule(root, rule.nextContentUrl, currentUrl);
+          nextCandidates = _parseStringListFromHtml(
+            root: root,
+            rule: rule.nextContentUrl!,
+            baseUrl: currentUrl,
+            isUrl: true,
+          );
+          if (nextCandidates.isNotEmpty) {
+            log('┌获取正文下一页');
+            log('└${nextCandidates.join('\n')}');
+          }
         }
       }
 
@@ -1344,13 +1664,18 @@ class RuleParserEngine {
       final cleaned = _cleanContent(processed);
       if (cleaned.trim().isNotEmpty) parts.add(cleaned);
 
-      if (nextUrl == null || nextUrl.trim().isEmpty) break;
-      var resolved = nextUrl.trim();
-      if (!resolved.startsWith('http')) {
-        resolved = _absoluteUrl(currentUrl, resolved);
+      if (nextCandidates.isEmpty) break;
+      String? picked;
+      for (final c in nextCandidates) {
+        final u = c.trim();
+        if (u.isEmpty) continue;
+        if (u == currentUrl) continue;
+        if (visited.contains(u)) continue;
+        picked = u;
+        break;
       }
-      if (resolved == currentUrl) break;
-      currentUrl = resolved;
+      if (picked == null) break;
+      currentUrl = picked;
       page++;
     }
 
@@ -1400,6 +1725,7 @@ class RuleParserEngine {
     final fetch = await _fetchDebug(
       requestUrl,
       header: source.header,
+      jsLib: source.jsLib,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
     );
@@ -1570,6 +1896,7 @@ class RuleParserEngine {
       final response = await _fetch(
         exploreUrl,
         header: source.header,
+        jsLib: source.jsLib,
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
       );
@@ -1685,6 +2012,7 @@ class RuleParserEngine {
     final fetch = await _fetchDebug(
       requestUrl,
       header: source.header,
+      jsLib: source.jsLib,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
     );
@@ -1841,6 +2169,7 @@ class RuleParserEngine {
       final response = await _fetch(
         fullUrl,
         header: source.header,
+        jsLib: source.jsLib,
         timeoutMs: source.respondTime,
         enabledCookieJar: source.enabledCookieJar,
       );
@@ -1941,6 +2270,7 @@ class RuleParserEngine {
     final fetch = await _fetchDebug(
       fullUrl,
       header: source.header,
+      jsLib: source.jsLib,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
     );
@@ -2122,6 +2452,7 @@ class RuleParserEngine {
         final response = await _fetch(
           currentUrl,
           header: source.header,
+          jsLib: source.jsLib,
           timeoutMs: source.respondTime,
           enabledCookieJar: source.enabledCookieJar,
         );
@@ -2133,7 +2464,7 @@ class RuleParserEngine {
                 ? _tryDecodeJsonValue(response)
                 : null;
 
-        String? nextUrl;
+        List<String> nextCandidates = const <String>[];
 
         if (jsonRoot != null && _looksLikeJsonPath(normalized.selector)) {
           final nodes = _selectJsonList(jsonRoot, normalized.selector);
@@ -2148,10 +2479,13 @@ class RuleParserEngine {
             chapters.add(TocItem(index: chapters.length, name: name, url: url));
           }
 
-          if (tocRule.nextTocUrl != null &&
-              tocRule.nextTocUrl!.trim().isNotEmpty) {
-            nextUrl =
-                _parseValueOnNode(jsonRoot, tocRule.nextTocUrl, currentUrl);
+          if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
+            nextCandidates = _parseStringListFromJson(
+              json: jsonRoot,
+              rule: tocRule.nextTocUrl!,
+              baseUrl: currentUrl,
+              isUrl: true,
+            );
           }
         } else {
           final document = html_parser.parse(response);
@@ -2171,26 +2505,44 @@ class RuleParserEngine {
             chapters.add(TocItem(index: chapters.length, name: name, url: url));
           }
 
-          if (tocRule.nextTocUrl != null &&
-              tocRule.nextTocUrl!.trim().isNotEmpty) {
-            nextUrl = _parseRule(root, tocRule.nextTocUrl, currentUrl);
+          if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
+            nextCandidates = _parseStringListFromHtml(
+              root: root,
+              rule: tocRule.nextTocUrl!,
+              baseUrl: currentUrl,
+              isUrl: true,
+            );
           }
         }
 
-        if (nextUrl == null || nextUrl.trim().isEmpty) break;
-        var resolved = nextUrl.trim();
-        if (!resolved.startsWith('http')) {
-          resolved = _absoluteUrl(currentUrl, resolved);
+        if (nextCandidates.isEmpty) break;
+        String? picked;
+        for (final c in nextCandidates) {
+          final u = c.trim();
+          if (u.isEmpty) continue;
+          if (u == currentUrl) continue;
+          if (visited.contains(u)) continue;
+          picked = u;
+          break;
         }
-        if (resolved == currentUrl) break;
-        currentUrl = resolved;
+        if (picked == null) break;
+        currentUrl = picked;
         page++;
       }
 
-      final out = normalized.reverse
+      final ordered = normalized.reverse
           ? chapters.reversed.toList(growable: false)
           : chapters;
-      return out;
+      final reIndexed = <TocItem>[
+        for (var i = 0; i < ordered.length; i++)
+          TocItem(index: i, name: ordered[i].name, url: ordered[i].url),
+      ];
+      final formatted = _applyTocFormatJs(
+        toc: reIndexed,
+        formatJs: tocRule.formatJs,
+        jsLib: source.jsLib,
+      );
+      return formatted;
     } catch (e) {
       debugPrint('获取目录失败: $e');
       return [];
@@ -2216,6 +2568,7 @@ class RuleParserEngine {
     final fetch = await _fetchDebug(
       fullUrl,
       header: source.header,
+      jsLib: source.jsLib,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
     );
@@ -2262,9 +2615,14 @@ class RuleParserEngine {
           }
         }
         if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
-          final next = _parseValueOnNode(jsonRoot, tocRule.nextTocUrl, fullUrl);
-          if (next.trim().isNotEmpty) {
-            sample = <String, String>{...sample, 'nextTocUrl': next};
+          final nextList = _parseStringListFromJson(
+            json: jsonRoot,
+            rule: tocRule.nextTocUrl!,
+            baseUrl: fullUrl,
+            isUrl: true,
+          );
+          if (nextList.isNotEmpty) {
+            sample = <String, String>{...sample, 'nextTocUrl': nextList.join('\n')};
           }
         }
       } else {
@@ -2291,12 +2649,36 @@ class RuleParserEngine {
         if (tocRule.nextTocUrl != null && tocRule.nextTocUrl!.trim().isNotEmpty) {
           final root = document.documentElement;
           if (root != null) {
-            final next = _parseRule(root, tocRule.nextTocUrl, fullUrl);
-            if (next.trim().isNotEmpty) {
-              sample = <String, String>{...sample, 'nextTocUrl': next};
+            final nextList = _parseStringListFromHtml(
+              root: root,
+              rule: tocRule.nextTocUrl!,
+              baseUrl: fullUrl,
+              isUrl: true,
+            );
+            if (nextList.isNotEmpty) {
+              sample = <String, String>{...sample, 'nextTocUrl': nextList.join('\n')};
             }
           }
         }
+      }
+
+      final ordered = normalized.reverse
+          ? chapters.reversed.toList(growable: false)
+          : chapters;
+      final reIndexed = <TocItem>[
+        for (var i = 0; i < ordered.length; i++)
+          TocItem(index: i, name: ordered[i].name, url: ordered[i].url),
+      ];
+      final formatted = _applyTocFormatJs(
+        toc: reIndexed,
+        formatJs: tocRule.formatJs,
+        jsLib: source.jsLib,
+      );
+      if (formatted.isNotEmpty && sample.isNotEmpty) {
+        sample = <String, String>{
+          ...sample,
+          'nameAfterFormat': formatted.first.name,
+        };
       }
 
       return TocDebugResult(
@@ -2305,9 +2687,7 @@ class RuleParserEngine {
         requestUrlRule: tocUrl,
         listRule: normalized.selector,
         listCount: listCount,
-        toc: normalized.reverse
-            ? chapters.reversed.toList(growable: false)
-            : chapters,
+        toc: formatted,
         fieldSample: sample,
         error: null,
       );
@@ -2387,6 +2767,7 @@ class RuleParserEngine {
         final response = await _fetch(
           currentUrl,
           header: source.header,
+          jsLib: source.jsLib,
           timeoutMs: source.respondTime,
           enabledCookieJar: source.enabledCookieJar,
         );
@@ -2399,16 +2780,17 @@ class RuleParserEngine {
                 : null;
 
         String extracted;
-        String? nextUrl;
+        List<String> nextCandidates = const <String>[];
 
         if (jsonRoot != null && contentRule.content != null && _looksLikeJsonPath(contentRule.content!)) {
           extracted = _parseValueOnNode(jsonRoot, contentRule.content, currentUrl);
           if (contentRule.nextContentUrl != null &&
               contentRule.nextContentUrl!.trim().isNotEmpty) {
-            nextUrl = _parseValueOnNode(
-              jsonRoot,
-              contentRule.nextContentUrl,
-              currentUrl,
+            nextCandidates = _parseStringListFromJson(
+              json: jsonRoot,
+              rule: contentRule.nextContentUrl!,
+              baseUrl: currentUrl,
+              isUrl: true,
             );
           }
         } else {
@@ -2422,7 +2804,12 @@ class RuleParserEngine {
           }
           if (contentRule.nextContentUrl != null &&
               contentRule.nextContentUrl!.trim().isNotEmpty) {
-            nextUrl = _parseRule(root, contentRule.nextContentUrl, currentUrl);
+            nextCandidates = _parseStringListFromHtml(
+              root: root,
+              rule: contentRule.nextContentUrl!,
+              baseUrl: currentUrl,
+              isUrl: true,
+            );
           }
         }
 
@@ -2434,13 +2821,18 @@ class RuleParserEngine {
         final cleaned = _cleanContent(processed);
         if (cleaned.trim().isNotEmpty) parts.add(cleaned);
 
-        if (nextUrl == null || nextUrl.trim().isEmpty) break;
-        var resolved = nextUrl.trim();
-        if (!resolved.startsWith('http')) {
-          resolved = _absoluteUrl(currentUrl, resolved);
+        if (nextCandidates.isEmpty) break;
+        String? picked;
+        for (final c in nextCandidates) {
+          final u = c.trim();
+          if (u.isEmpty) continue;
+          if (u == currentUrl) continue;
+          if (visited.contains(u)) continue;
+          picked = u;
+          break;
         }
-        if (resolved == currentUrl) break;
-        currentUrl = resolved;
+        if (picked == null) break;
+        currentUrl = picked;
         page++;
       }
 
@@ -2472,6 +2864,7 @@ class RuleParserEngine {
     final fetch = await _fetchDebug(
       fullUrl,
       header: source.header,
+      jsLib: source.jsLib,
       timeoutMs: source.respondTime,
       enabledCookieJar: source.enabledCookieJar,
     );
@@ -2505,6 +2898,7 @@ class RuleParserEngine {
         final body = (currentUrl == fullUrl) ? fetch.body! : await _fetch(
               currentUrl,
               header: source.header,
+              jsLib: source.jsLib,
               timeoutMs: source.respondTime,
               enabledCookieJar: source.enabledCookieJar,
             );
@@ -2516,7 +2910,7 @@ class RuleParserEngine {
             : null;
 
         String extracted;
-        String? nextUrl;
+        List<String> nextCandidates = const <String>[];
 
         if (jsonRoot != null &&
             contentRule.content != null &&
@@ -2525,10 +2919,11 @@ class RuleParserEngine {
               _parseValueOnNode(jsonRoot, contentRule.content, currentUrl);
           if (contentRule.nextContentUrl != null &&
               contentRule.nextContentUrl!.trim().isNotEmpty) {
-            nextUrl = _parseValueOnNode(
-              jsonRoot,
-              contentRule.nextContentUrl,
-              currentUrl,
+            nextCandidates = _parseStringListFromJson(
+              json: jsonRoot,
+              rule: contentRule.nextContentUrl!,
+              baseUrl: currentUrl,
+              isUrl: true,
             );
           }
         } else {
@@ -2542,7 +2937,12 @@ class RuleParserEngine {
           }
           if (contentRule.nextContentUrl != null &&
               contentRule.nextContentUrl!.trim().isNotEmpty) {
-            nextUrl = _parseRule(root, contentRule.nextContentUrl, currentUrl);
+            nextCandidates = _parseStringListFromHtml(
+              root: root,
+              rule: contentRule.nextContentUrl!,
+              baseUrl: currentUrl,
+              isUrl: true,
+            );
           }
         }
 
@@ -2556,13 +2956,18 @@ class RuleParserEngine {
         final cleaned = _cleanContent(text);
         if (cleaned.trim().isNotEmpty) parts.add(cleaned);
 
-        if (nextUrl == null || nextUrl.trim().isEmpty) break;
-        var resolved = nextUrl.trim();
-        if (!resolved.startsWith('http')) {
-          resolved = _absoluteUrl(currentUrl, resolved);
+        if (nextCandidates.isEmpty) break;
+        String? picked;
+        for (final c in nextCandidates) {
+          final u = c.trim();
+          if (u.isEmpty) continue;
+          if (u == currentUrl) continue;
+          if (visited.contains(u)) continue;
+          picked = u;
+          break;
         }
-        if (resolved == currentUrl) break;
-        currentUrl = resolved;
+        if (picked == null) break;
+        currentUrl = picked;
         page++;
       }
 
@@ -2594,11 +2999,12 @@ class RuleParserEngine {
   Future<String?> _fetch(
     String url, {
     String? header,
+    String? jsLib,
     int? timeoutMs,
     bool? enabledCookieJar,
   }) async {
     try {
-      final parsedHeaders = _parseRequestHeaders(header);
+      final parsedHeaders = _parseRequestHeaders(header, jsLib: jsLib);
       final parsedUrl = _parseLegadoStyleUrl(url);
 
       // URL option headers 覆盖书源 headers
@@ -2678,11 +3084,12 @@ class RuleParserEngine {
   Future<FetchDebugResult> _fetchDebug(
     String url, {
     String? header,
+    String? jsLib,
     int? timeoutMs,
     bool? enabledCookieJar,
   }) async {
     final sw = Stopwatch()..start();
-    final parsedHeaders = _parseRequestHeaders(header);
+    final parsedHeaders = _parseRequestHeaders(header, jsLib: jsLib);
     final parsedUrl = _parseLegadoStyleUrl(url);
 
     final mergedCustomHeaders = <String, String>{}
