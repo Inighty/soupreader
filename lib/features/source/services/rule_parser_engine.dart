@@ -46,6 +46,110 @@ class RuleParserEngine {
     return enabled ? _dioCookie : _dioPlain;
   }
 
+  Map<String, String> _buildEffectiveRequestHeaders(
+    String url, {
+    required Map<String, String> customHeaders,
+  }) {
+    final headers = <String, String>{};
+
+    // 先放入通用头，再用书源自定义 header 覆盖同名 key
+    headers.addAll(_defaultHeaders);
+    headers.addAll(customHeaders);
+
+    // 自动补齐 Referer/Origin（对标 legado 常见用法）
+    // - 防盗链/反爬站点常见会校验 Referer / Origin
+    // - 若书源里显式指定了 Referer/Origin，则不覆盖
+    Uri? uri;
+    try {
+      uri = Uri.parse(url);
+    } catch (_) {
+      uri = null;
+    }
+    if (uri != null && uri.scheme.isNotEmpty && uri.host.isNotEmpty) {
+      final isDefaultPort = (uri.scheme == 'http' && uri.port == 80) ||
+          (uri.scheme == 'https' && uri.port == 443);
+      final origin = isDefaultPort || !uri.hasPort
+          ? '${uri.scheme}://${uri.host}'
+          : '${uri.scheme}://${uri.host}:${uri.port}';
+
+      bool hasKey(String key) {
+        final lower = key.toLowerCase();
+        return headers.keys.any((k) => k.toLowerCase() == lower);
+      }
+
+      if (!hasKey('Origin')) {
+        headers['Origin'] = origin;
+      }
+      if (!hasKey('Referer')) {
+        headers['Referer'] = '$origin/';
+      }
+    }
+
+    return headers;
+  }
+
+  String _formatRequestHeadersForLog(Map<String, String> headers) {
+    if (headers.isEmpty) return '—';
+
+    String redactIfSensitive(String key, String value) {
+      final k = key.toLowerCase();
+      if (k == 'cookie' || k == 'authorization') {
+        return '<redacted ${value.length} chars>';
+      }
+      if (value.length <= 220) return value;
+      return '${value.substring(0, 220)}…';
+    }
+
+    const preferredOrder = <String>[
+      'User-Agent',
+      'Accept',
+      'Accept-Language',
+      'Referer',
+      'Origin',
+      'Cookie',
+    ];
+
+    final entries = headers.entries.toList(growable: false);
+
+    String? getByName(String name) {
+      final lower = name.toLowerCase();
+      for (final e in entries) {
+        if (e.key.toLowerCase() == lower) {
+          return '${e.key}: ${redactIfSensitive(e.key, e.value)}';
+        }
+      }
+      return null;
+    }
+
+    final lines = <String>[];
+    final takenLower = <String>{};
+
+    for (final k in preferredOrder) {
+      final line = getByName(k);
+      if (line != null) {
+        lines.add(line);
+        takenLower.add(k.toLowerCase());
+      }
+    }
+
+    final rest = entries
+        .where((e) => !takenLower.contains(e.key.toLowerCase()))
+        .toList(growable: false)
+      ..sort((a, b) => a.key.toLowerCase().compareTo(b.key.toLowerCase()));
+
+    for (final e in rest) {
+      lines.add('${e.key}: ${redactIfSensitive(e.key, e.value)}');
+    }
+
+    const maxLines = 18;
+    if (lines.length > maxLines) {
+      final head = lines.take(maxLines).toList(growable: false);
+      head.add('…（${lines.length - maxLines} 行已省略）');
+      return head.join('\n');
+    }
+    return lines.join('\n');
+  }
+
   static final RegExp _httpHeaderTokenRegex =
       RegExp(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$");
 
@@ -302,6 +406,13 @@ class RuleParserEngine {
       if (res.headersWarning != null && res.headersWarning!.trim().isNotEmpty) {
         log('└请求头解析提示：${res.headersWarning}', state: 1, showTime: false);
       }
+      final cookieJarEnabled = source.enabledCookieJar ?? true;
+      log(
+        '└请求头（CookieJar=${cookieJarEnabled ? '开' : '关'}）\n'
+        '${_formatRequestHeadersForLog(res.requestHeaders)}',
+        state: 1,
+        showTime: false,
+      );
       final status = res.statusCode;
       final statusText = status != null ? ' ($status)' : '';
       final isBadStatus = status != null && status >= 400;
@@ -1563,8 +1674,11 @@ class RuleParserEngine {
         receiveTimeout: timeout,
       );
       final parsedHeaders = _parseRequestHeaders(header);
-      final requestHeaders = parsedHeaders.headers;
-      if (requestHeaders.isNotEmpty) options.headers = requestHeaders;
+      final requestHeaders = _buildEffectiveRequestHeaders(
+        url,
+        customHeaders: parsedHeaders.headers,
+      );
+      options.headers = requestHeaders;
 
       final response = await _selectDio(enabledCookieJar: enabledCookieJar)
           .get(url, options: options);
@@ -1583,7 +1697,10 @@ class RuleParserEngine {
   }) async {
     final sw = Stopwatch()..start();
     final parsedHeaders = _parseRequestHeaders(header);
-    final requestHeaders = parsedHeaders.headers;
+    final requestHeaders = _buildEffectiveRequestHeaders(
+      url,
+      customHeaders: parsedHeaders.headers,
+    );
     try {
       final timeout =
           (timeoutMs != null && timeoutMs > 0) ? Duration(milliseconds: timeoutMs) : null;
@@ -1593,9 +1710,7 @@ class RuleParserEngine {
         receiveTimeout: timeout,
         validateStatus: (_) => true,
       );
-      if (requestHeaders.isNotEmpty) {
-        options.headers = requestHeaders;
-      }
+      options.headers = requestHeaders;
 
       final response = await _selectDio(enabledCookieJar: enabledCookieJar)
           .get(url, options: options);
