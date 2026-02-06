@@ -72,6 +72,497 @@ class RuleParserEngine {
     }
   }
 
+  /// 对标 Legado 的「书源调试」：按 key 触发不同链路，并以“日志流”方式输出调试信息。
+  ///
+  /// key 规则（与 legado Debug.startDebug 一致）：
+  /// - 绝对 URL（http/https）: 详情页调试（详情→目录→正文）
+  /// - 包含 :: : 发现页调试（访问 :: 后面的 url，取第一本书继续）
+  /// - ++ 开头: 目录页调试（目录→正文）
+  /// - -- 开头: 正文页调试（仅正文）
+  /// - 其它: 搜索关键字调试（搜索→详情→目录→正文）
+  Future<void> debugRun(
+    BookSource source,
+    String key, {
+    required void Function(SourceDebugEvent event) onEvent,
+  }) async {
+    final started = DateTime.now();
+
+    String formatTimePrefix() {
+      final ms = DateTime.now().difference(started).inMilliseconds;
+      final minutes = (ms ~/ 60000) % 60;
+      final seconds = (ms ~/ 1000) % 60;
+      final millis = ms % 1000;
+      final mm = minutes.toString().padLeft(2, '0');
+      final ss = seconds.toString().padLeft(2, '0');
+      final sss = millis.toString().padLeft(3, '0');
+      return '[$mm:$ss.$sss]';
+    }
+
+    void log(
+      String msg, {
+      int state = 1,
+      bool showTime = true,
+    }) {
+      final text = showTime ? '${formatTimePrefix()} $msg' : msg;
+      onEvent(SourceDebugEvent(state: state, message: text));
+    }
+
+    void rawHtml(int state, String html) {
+      onEvent(SourceDebugEvent(state: state, message: html, isRaw: true));
+    }
+
+    bool isAbsUrl(String input) {
+      final t = input.trim();
+      return t.startsWith('http://') || t.startsWith('https://');
+    }
+
+    Future<FetchDebugResult> fetchStage(
+      String url, {
+      required int rawState,
+    }) async {
+      final res = await _fetchDebug(url, source.header);
+      if (res.body != null) {
+        log(
+          '≡获取成功:${res.finalUrl ?? res.requestUrl}'
+          '${res.statusCode != null ? ' (${res.statusCode})' : ''}'
+          ' ${res.elapsedMs}ms',
+        );
+        rawHtml(rawState, res.body!);
+      } else {
+        log('≡请求失败:${res.requestUrl} ${res.elapsedMs}ms', state: -1);
+      }
+      return res;
+    }
+
+    try {
+      log('︾开始解析');
+
+      final trimmed = key.trim();
+      if (trimmed.isEmpty) {
+        log('key 不能为空', state: -1);
+        return;
+      }
+
+      if (isAbsUrl(trimmed)) {
+        log('⇒开始访问详情页:$trimmed');
+        final ok = await _debugInfoTocContent(
+          source: source,
+          bookUrl: trimmed,
+          fetchStage: fetchStage,
+          log: log,
+        );
+        if (!ok) return;
+        log('︽解析完成', state: 1000);
+        return;
+      }
+
+      if (trimmed.contains('::')) {
+        final url = trimmed.split('::').last.trim();
+        log('⇒开始访问发现页:$url');
+        final firstBookUrl = await _debugBookListThenPickFirst(
+          source: source,
+          keyOrUrl: url,
+          mode: _DebugListMode.explore,
+          fetchStage: fetchStage,
+          log: log,
+        );
+        if (firstBookUrl == null) {
+          log('︽未获取到书籍', state: -1);
+          return;
+        }
+        final ok = await _debugInfoTocContent(
+          source: source,
+          bookUrl: firstBookUrl,
+          fetchStage: fetchStage,
+          log: log,
+        );
+        if (!ok) return;
+        log('︽解析完成', state: 1000);
+        return;
+      }
+
+      if (trimmed.startsWith('++')) {
+        final url = trimmed.substring(2).trim();
+        log('⇒开始访目录页:$url');
+        final ok = await _debugTocThenContent(
+          source: source,
+          tocUrl: url,
+          fetchStage: fetchStage,
+          log: log,
+        );
+        if (!ok) return;
+        log('︽解析完成', state: 1000);
+        return;
+      }
+
+      if (trimmed.startsWith('--')) {
+        final url = trimmed.substring(2).trim();
+        log('⇒开始访正文页:$url');
+        final ok = await _debugContentOnly(
+          source: source,
+          chapterUrl: url,
+          fetchStage: fetchStage,
+          log: log,
+        );
+        if (!ok) return;
+        log('︽解析完成', state: 1000);
+        return;
+      }
+
+      log('⇒开始搜索关键字:$trimmed');
+      final firstBookUrl = await _debugBookListThenPickFirst(
+        source: source,
+        keyOrUrl: trimmed,
+        mode: _DebugListMode.search,
+        fetchStage: fetchStage,
+        log: log,
+      );
+      if (firstBookUrl == null) {
+        log('︽未获取到书籍', state: -1);
+        return;
+      }
+      final ok = await _debugInfoTocContent(
+        source: source,
+        bookUrl: firstBookUrl,
+        fetchStage: fetchStage,
+        log: log,
+      );
+      if (!ok) return;
+      log('︽解析完成', state: 1000);
+    } catch (e, st) {
+      log('调试异常: $e', state: -1);
+      log(st.toString(), state: -1, showTime: false);
+    }
+  }
+
+  Future<String?> _debugBookListThenPickFirst({
+    required BookSource source,
+    required String keyOrUrl,
+    required _DebugListMode mode,
+    required Future<FetchDebugResult> Function(String url, {required int rawState})
+        fetchStage,
+    required void Function(String msg, {int state, bool showTime}) log,
+  }) async {
+    final isSearch = mode == _DebugListMode.search;
+    final bookListRule = isSearch ? source.ruleSearch : source.ruleExplore;
+    final urlRule = isSearch ? source.searchUrl : source.exploreUrl;
+
+    log(isSearch ? '︾开始解析搜索页' : '︾开始解析发现页');
+
+    if (bookListRule == null || urlRule == null || urlRule.trim().isEmpty) {
+      log(isSearch ? '⇒搜索规则为空' : '⇒发现规则为空', state: -1);
+      return null;
+    }
+
+    final requestUrl = isSearch
+        ? _buildUrl(
+            source.bookSourceUrl,
+            urlRule,
+            {'key': keyOrUrl, 'searchKey': keyOrUrl},
+          )
+        : _buildUrl(
+            source.bookSourceUrl,
+            urlRule,
+            const {},
+          );
+
+    final fetch = await fetchStage(requestUrl, rawState: 10);
+    final body = fetch.body;
+    if (body == null) {
+      log('︽列表页解析失败', state: -1);
+      return null;
+    }
+
+    final document = html_parser.parse(body);
+    final listSelector = bookListRule.bookList ?? '';
+
+    log('┌获取书籍列表');
+    final elements = _querySelectorAll(document, listSelector);
+    log('└列表大小:${elements.length}');
+
+    if (elements.isEmpty) {
+      // 对齐 legado：列表为空时可能是“详情页”，这里仅提示，不强行走详情解析（后续可按 bookUrlPattern 补齐）
+      log('≡列表为空，可能是详情页或规则不匹配');
+    }
+
+    final results = <SearchResult>[];
+    for (var i = 0; i < elements.length; i++) {
+      final el = elements[i];
+      final name = _parseRule(el, bookListRule.name, source.bookSourceUrl);
+      final author = _parseRule(el, bookListRule.author, source.bookSourceUrl);
+      final coverUrl =
+          _parseRule(el, bookListRule.coverUrl, source.bookSourceUrl);
+      final intro = _parseRule(el, bookListRule.intro, source.bookSourceUrl);
+      final lastChapter =
+          _parseRule(el, bookListRule.lastChapter, source.bookSourceUrl);
+      var bookUrl = _parseRule(el, bookListRule.bookUrl, source.bookSourceUrl);
+      if (bookUrl.isNotEmpty && !bookUrl.startsWith('http')) {
+        bookUrl = _absoluteUrl(source.bookSourceUrl, bookUrl);
+      }
+
+      // 仅对第一条输出字段级日志，避免刷屏（对齐 legado 的 log 控制）
+      if (i == 0) {
+        log('┌获取书名');
+        log('└$name');
+        log('┌获取作者');
+        log('└$author');
+        log('┌获取封面');
+        log('└$coverUrl');
+        log('┌获取简介');
+        log('└${intro.isEmpty ? '' : intro}');
+        log('┌获取最新章节');
+        log('└$lastChapter');
+        log('┌获取详情链接');
+        log('└$bookUrl');
+      }
+
+      if (name.isEmpty || bookUrl.isEmpty) continue;
+      results.add(
+        SearchResult(
+          name: name,
+          author: author,
+          coverUrl: coverUrl,
+          intro: intro,
+          lastChapter: lastChapter,
+          bookUrl: bookUrl,
+          sourceUrl: source.bookSourceUrl,
+          sourceName: source.bookSourceName,
+        ),
+      );
+    }
+
+    log('◇书籍总数:${results.length}');
+    return results.isNotEmpty ? results.first.bookUrl : null;
+  }
+
+  Future<bool> _debugInfoTocContent({
+    required BookSource source,
+    required String bookUrl,
+    required Future<FetchDebugResult> Function(String url, {required int rawState})
+        fetchStage,
+    required void Function(String msg, {int state, bool showTime}) log,
+  }) async {
+    final tocUrl = await _debugBookInfo(
+      source: source,
+      bookUrl: bookUrl,
+      fetchStage: fetchStage,
+      log: log,
+    );
+    if (tocUrl == null || tocUrl.trim().isEmpty) {
+      log('≡未获取到目录链接', state: -1);
+      return false;
+    }
+    return _debugTocThenContent(
+      source: source,
+      tocUrl: tocUrl,
+      fetchStage: fetchStage,
+      log: log,
+    );
+  }
+
+  Future<String?> _debugBookInfo({
+    required BookSource source,
+    required String bookUrl,
+    required Future<FetchDebugResult> Function(String url, {required int rawState})
+        fetchStage,
+    required void Function(String msg, {int state, bool showTime}) log,
+  }) async {
+    log('︾开始解析详情页');
+
+    final rule = source.ruleBookInfo;
+    if (rule == null) {
+      log('⇒详情规则为空', state: -1);
+      return null;
+    }
+
+    final fullUrl = _absoluteUrl(source.bookSourceUrl, bookUrl);
+    final fetch = await fetchStage(fullUrl, rawState: 20);
+    final body = fetch.body;
+    if (body == null) {
+      log('︽详情页解析失败', state: -1);
+      return null;
+    }
+
+    final document = html_parser.parse(body);
+    Element? root = document.documentElement;
+    if (root == null) {
+      log('⇒页面无 documentElement', state: -1);
+      return null;
+    }
+
+    if (rule.init != null && rule.init!.trim().isNotEmpty) {
+      log('≡执行详情页初始化规则');
+      final initEl = _querySelector(document, rule.init!.trim());
+      if (initEl != null) {
+        root = initEl;
+      } else {
+        log('└init 匹配失败（将继续用 documentElement）');
+      }
+    }
+
+    String getField(String label, String? ruleStr) {
+      log('┌$label');
+      final value = _parseRule(root!, ruleStr, source.bookSourceUrl);
+      log('└$value');
+      return value;
+    }
+
+    final name = getField('获取书名', rule.name);
+    final author = getField('获取作者', rule.author);
+    getField('获取分类', rule.kind);
+    getField('获取字数', rule.wordCount);
+    final lastChapter = getField('获取最新章节', rule.lastChapter);
+    getField('获取简介', rule.intro);
+    getField('获取封面', rule.coverUrl);
+    final tocUrl = getField('获取目录链接', rule.tocUrl);
+
+    if (name.isEmpty && author.isEmpty && lastChapter.isEmpty && tocUrl.isEmpty) {
+      log('≡字段全为空，可能 ruleBookInfo 不匹配', state: -1);
+    }
+
+    log('︽详情页解析完成', showTime: false);
+    log('', showTime: false);
+
+    return tocUrl;
+  }
+
+  Future<bool> _debugTocThenContent({
+    required BookSource source,
+    required String tocUrl,
+    required Future<FetchDebugResult> Function(String url, {required int rawState})
+        fetchStage,
+    required void Function(String msg, {int state, bool showTime}) log,
+  }) async {
+    log('︾开始解析目录页');
+
+    final rule = source.ruleToc;
+    if (rule == null) {
+      log('⇒目录规则为空', state: -1);
+      return false;
+    }
+
+    final fullUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
+    final fetch = await fetchStage(fullUrl, rawState: 30);
+    final body = fetch.body;
+    if (body == null) {
+      log('︽目录页解析失败', state: -1);
+      return false;
+    }
+
+    final document = html_parser.parse(body);
+
+    var listRule = rule.chapterList ?? '';
+    var reverse = false;
+    if (listRule.startsWith('-')) {
+      reverse = true;
+      listRule = listRule.substring(1);
+    }
+    if (listRule.startsWith('+')) {
+      listRule = listRule.substring(1);
+    }
+
+    log('┌获取章节列表');
+    final elements = _querySelectorAll(document, listRule);
+    log('└列表大小:${elements.length}');
+
+    var toc = <TocItem>[];
+    for (var i = 0; i < elements.length; i++) {
+      final el = elements[i];
+      final name = _parseRule(el, rule.chapterName, source.bookSourceUrl);
+      var url = _parseRule(el, rule.chapterUrl, source.bookSourceUrl);
+      if (url.isNotEmpty && !url.startsWith('http')) {
+        url = _absoluteUrl(source.bookSourceUrl, url);
+      }
+      if (i == 0) {
+        log('┌获取章节名');
+        log('└$name');
+        log('┌获取章节链接');
+        log('└$url');
+      }
+      if (name.isEmpty || url.isEmpty) continue;
+      toc.add(TocItem(index: i, name: name, url: url));
+    }
+
+    if (reverse) toc = toc.reversed.toList(growable: true);
+    log('◇章节总数:${toc.length}');
+
+    if (toc.isEmpty) {
+      log('≡没有正文章节', state: -1);
+      return false;
+    }
+
+    log('︽目录页解析完成', showTime: false);
+    log('', showTime: false);
+
+    return _debugContentOnly(
+      source: source,
+      chapterUrl: toc.first.url,
+      fetchStage: fetchStage,
+      log: log,
+    );
+  }
+
+  Future<bool> _debugContentOnly({
+    required BookSource source,
+    required String chapterUrl,
+    required Future<FetchDebugResult> Function(String url, {required int rawState})
+        fetchStage,
+    required void Function(String msg, {int state, bool showTime}) log,
+  }) async {
+    log('︾开始解析正文页');
+
+    final rule = source.ruleContent;
+    if (rule == null) {
+      log('⇒正文规则为空', state: -1);
+      return false;
+    }
+
+    final fullUrl = _absoluteUrl(source.bookSourceUrl, chapterUrl);
+    final fetch = await fetchStage(fullUrl, rawState: 40);
+    final body = fetch.body;
+    if (body == null) {
+      log('︽正文页解析失败', state: -1);
+      return false;
+    }
+
+    final document = html_parser.parse(body);
+    final root = document.documentElement;
+    if (root == null) {
+      log('⇒页面无 documentElement', state: -1);
+      return false;
+    }
+
+    String extracted;
+    if (rule.content == null || rule.content!.trim().isEmpty) {
+      log('⇒内容规则为空，默认获取整个网页');
+      extracted = root.text;
+    } else {
+      extracted = _parseRule(root, rule.content, source.bookSourceUrl);
+    }
+
+    var processed = extracted;
+    if (rule.replaceRegex != null && rule.replaceRegex!.trim().isNotEmpty) {
+      processed = _applyReplaceRegex(processed, rule.replaceRegex!);
+    }
+    final cleaned = _cleanContent(processed);
+
+    log('◇提取长度:${extracted.length} 清理后长度:${cleaned.length}');
+    log('┌获取正文内容');
+    final maxLog = 2000;
+    final preview = cleaned.length <= maxLog
+        ? cleaned
+        : '${cleaned.substring(0, maxLog)}\n…（已截断，查看“正文结果”可看全文）';
+    log('└\n$preview');
+
+    if (cleaned.trim().isEmpty) {
+      log('≡内容为空', state: -1);
+      return false;
+    }
+
+    log('︽正文页解析完成');
+    return true;
+  }
+
   /// 搜索调试：返回「请求/解析」过程的关键诊断信息
   Future<SearchDebugResult> searchDebug(BookSource source, String keyword) async {
     final searchRule = source.ruleSearch;
@@ -940,6 +1431,20 @@ class RuleParserEngine {
     // 对齐 legado 的 HTML -> 文本清理策略（块级标签换行、不可见字符移除）
     return HtmlTextFormatter.formatToPlainText(content);
   }
+}
+
+enum _DebugListMode { search, explore }
+
+class SourceDebugEvent {
+  final int state;
+  final String message;
+  final bool isRaw;
+
+  const SourceDebugEvent({
+    required this.state,
+    required this.message,
+    this.isRaw = false,
+  });
 }
 
 enum DebugRequestType { search, explore, bookInfo, toc, content }

@@ -9,6 +9,7 @@ import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/utils/legado_json.dart';
 import '../models/book_source.dart';
 import '../services/rule_parser_engine.dart';
+import 'source_debug_text_view.dart';
 
 class SourceEditView extends StatefulWidget {
   final String? originalUrl;
@@ -95,16 +96,14 @@ class _SourceEditViewState extends State<SourceEditView> {
 
   // 调试
   final TextEditingController _debugKeyCtrl = TextEditingController();
-  final TextEditingController _debugExploreUrlCtrl = TextEditingController();
   bool _debugLoading = false;
   String? _debugError;
-  List<SearchResult> _debugResults = const [];
-  SearchResult? _selectedResult;
-  BookDetail? _selectedDetail;
-  List<TocItem> _selectedToc = const [];
-  String? _selectedContent;
-  Map<String, dynamic>? _debugSnapshot;
-  String? _debugSnapshotTitle;
+  final List<_DebugLine> _debugLines = <_DebugLine>[];
+  String? _debugListSrcHtml; // state=10（搜索/发现列表页）
+  String? _debugBookSrcHtml; // state=20（详情页）
+  String? _debugTocSrcHtml; // state=30（目录页）
+  String? _debugContentSrcHtml; // state=40（正文页）
+  String? _debugContentResult; // 清理后的正文结果（便于直接看）
 
   @override
   void initState() {
@@ -224,7 +223,6 @@ class _SourceEditViewState extends State<SourceEditView> {
     _contentReplaceRegexCtrl.dispose();
     _jsonCtrl.dispose();
     _debugKeyCtrl.dispose();
-    _debugExploreUrlCtrl.dispose();
     super.dispose();
   }
 
@@ -526,43 +524,44 @@ class _SourceEditViewState extends State<SourceEditView> {
   Widget _buildDebugTab() {
     return ListView(
       children: [
-        if (_debugSnapshot != null) _buildDebugSnapshotSection(),
         CupertinoListSection.insetGrouped(
-          header: const Text('搜索调试'),
+          header: const Text('输入'),
+          footer: const Text(
+            '对标 Legado：\n'
+            '- 关键字：搜索→详情→目录→正文\n'
+            '- 绝对 URL：http/https 详情调试\n'
+            '- 发现：标题::url\n'
+            '- 目录：++tocUrl\n'
+            '- 正文：--contentUrl',
+          ),
           children: [
             CupertinoListTile.notched(
-              title: const Text('关键词'),
+              title: const Text('Key'),
               subtitle: CupertinoTextField(
                 controller: _debugKeyCtrl,
-                placeholder: '输入关键字',
+                placeholder: '输入关键字或调试 key',
               ),
             ),
             CupertinoListTile.notched(
-              title: const Text('测试搜索'),
-              additionalInfo: _debugLoading ? const Text('请求中…') : null,
+              title: const Text('开始调试'),
+              additionalInfo: _debugLoading ? const Text('运行中…') : null,
               trailing: const CupertinoListTileChevron(),
-              onTap: _debugLoading ? null : _debugSearch,
+              onTap: _debugLoading ? null : _startLegadoStyleDebug,
+            ),
+            CupertinoListTile.notched(
+              title: const Text('清空控制台'),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _clearDebugConsole,
+            ),
+            CupertinoListTile.notched(
+              title: const Text('复制控制台（全部）'),
+              additionalInfo: Text('${_debugLines.length} 行'),
+              trailing: const CupertinoListTileChevron(),
+              onTap: _copyDebugConsole,
             ),
           ],
         ),
-        CupertinoListSection.insetGrouped(
-          header: const Text('发现调试'),
-          children: [
-            CupertinoListTile.notched(
-              title: const Text('发现 URL（可选覆盖）'),
-              subtitle: CupertinoTextField(
-                controller: _debugExploreUrlCtrl,
-                placeholder: '为空则使用 exploreUrl',
-              ),
-            ),
-            CupertinoListTile.notched(
-              title: const Text('测试发现'),
-              additionalInfo: _debugLoading ? const Text('请求中…') : null,
-              trailing: const CupertinoListTileChevron(),
-              onTap: _debugLoading ? null : _debugExplore,
-            ),
-          ],
-        ),
+        _buildDebugQuickActionsSection(),
         if (_debugError != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -574,166 +573,303 @@ class _SourceEditViewState extends State<SourceEditView> {
               ),
             ),
           ),
-        CupertinoListSection.insetGrouped(
-          header: Text('结果（${_debugResults.length}）'),
-          children: _debugResults.isEmpty
-              ? [
-                  const CupertinoListTile.notched(
-                    title: Text('暂无结果'),
-                  ),
-                ]
-              : _debugResults
-                  .map(
-                    (r) => CupertinoListTile.notched(
-                      title: Text(r.name.isEmpty ? '（无书名）' : r.name),
-                      subtitle: Text(
-                        r.author.isEmpty ? r.bookUrl : '${r.author} · ${r.bookUrl}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: const CupertinoListTileChevron(),
-                      onTap: () => _selectResult(r),
-                    ),
-                  )
-                  .toList(),
-        ),
-        if (_selectedResult != null) _buildSelectedDebugCard(),
+        _buildDebugSourcesSection(),
+        _buildDebugConsoleSection(),
       ],
     );
   }
 
-  Widget _buildSelectedDebugCard() {
-    final r = _selectedResult!;
+  Widget _buildDebugQuickActionsSection() {
+    final exploreUrl = _exploreUrlCtrl.text.trim();
+
+    List<Widget> actions = [
+      _buildQuickActionButton(
+        label: '我的',
+        onTap: () => _setDebugKeyAndMaybeRun('我的', run: false),
+      ),
+      _buildQuickActionButton(
+        label: '++目录',
+        onTap: () => _prefixKey('++'),
+      ),
+      _buildQuickActionButton(
+        label: '--正文',
+        onTap: () => _prefixKey('--'),
+      ),
+    ];
+
+    if (exploreUrl.isNotEmpty) {
+      actions.add(
+        _buildQuickActionButton(
+          label: '发现::exploreUrl',
+          onTap: () => _setDebugKeyAndMaybeRun('发现::$exploreUrl', run: false),
+        ),
+      );
+    }
+
     return CupertinoListSection.insetGrouped(
-      header: const Text('选中项'),
+      header: const Text('快捷'),
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: actions,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionButton({
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      color: CupertinoColors.systemGrey5.resolveFrom(context),
+      onPressed: onTap,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          color: CupertinoColors.label.resolveFrom(context),
+        ),
+      ),
+    );
+  }
+
+  void _setDebugKeyAndMaybeRun(String key, {required bool run}) {
+    setState(() => _debugKeyCtrl.text = key);
+    if (run && !_debugLoading) {
+      _startLegadoStyleDebug();
+    }
+  }
+
+  void _prefixKey(String prefix) {
+    final text = _debugKeyCtrl.text.trim();
+    if (text.isEmpty || text.length <= 2) {
+      setState(() => _debugKeyCtrl.text = prefix);
+      return;
+    }
+    if (!text.startsWith(prefix)) {
+      setState(() => _debugKeyCtrl.text = '$prefix$text');
+    }
+  }
+
+  Widget _buildDebugSourcesSection() {
+    String? nonEmpty(String? s) => (s != null && s.trim().isNotEmpty) ? s : null;
+    final listHtml = nonEmpty(_debugListSrcHtml);
+    final bookHtml = nonEmpty(_debugBookSrcHtml);
+    final tocHtml = nonEmpty(_debugTocSrcHtml);
+    final contentHtml = nonEmpty(_debugContentSrcHtml);
+    final contentResult = nonEmpty(_debugContentResult);
+
+    return CupertinoListSection.insetGrouped(
+      header: const Text('源码 & 结果'),
       children: [
         CupertinoListTile.notched(
-          title: const Text('书名'),
-          additionalInfo: Text(r.name),
-        ),
-        CupertinoListTile.notched(
-          title: const Text('作者'),
-          additionalInfo: Text(r.author),
-        ),
-        CupertinoListTile.notched(
-          title: const Text('详情 URL'),
-          subtitle: Text(r.bookUrl, maxLines: 2, overflow: TextOverflow.ellipsis),
-        ),
-        CupertinoListTile.notched(
-          title: const Text('测试详情'),
+          title: const Text('列表页源码'),
+          additionalInfo: Text(listHtml == null ? '—' : '${listHtml.length} 字符'),
           trailing: const CupertinoListTileChevron(),
-          onTap: _debugGetBookInfo,
+          onTap: listHtml == null
+              ? null
+              : () => _openDebugText(title: '列表页源码', text: listHtml),
         ),
-        if (_selectedDetail != null) ...[
-          CupertinoListTile.notched(
-            title: const Text('目录 URL'),
-            subtitle: Text(
-              _selectedDetail!.tocUrl,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
+        CupertinoListTile.notched(
+          title: const Text('详情页源码'),
+          additionalInfo: Text(bookHtml == null ? '—' : '${bookHtml.length} 字符'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: bookHtml == null
+              ? null
+              : () => _openDebugText(title: '详情页源码', text: bookHtml),
+        ),
+        CupertinoListTile.notched(
+          title: const Text('目录页源码'),
+          additionalInfo: Text(tocHtml == null ? '—' : '${tocHtml.length} 字符'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: tocHtml == null
+              ? null
+              : () => _openDebugText(title: '目录页源码', text: tocHtml),
+        ),
+        CupertinoListTile.notched(
+          title: const Text('正文页源码'),
+          additionalInfo:
+              Text(contentHtml == null ? '—' : '${contentHtml.length} 字符'),
+          trailing: const CupertinoListTileChevron(),
+          onTap: contentHtml == null
+              ? null
+              : () => _openDebugText(title: '正文页源码', text: contentHtml),
+        ),
+        CupertinoListTile.notched(
+          title: const Text('正文结果（清理后）'),
+          additionalInfo: Text(
+            contentResult == null ? '—' : '${contentResult.length} 字符',
           ),
+          trailing: const CupertinoListTileChevron(),
+          onTap: contentResult == null
+              ? null
+              : () => _openDebugText(title: '正文结果', text: contentResult),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDebugConsoleSection() {
+    if (_debugLines.isEmpty) {
+      return CupertinoListSection.insetGrouped(
+        header: const Text('控制台'),
+        children: const [
           CupertinoListTile.notched(
-            title: const Text('测试目录'),
-            trailing: const CupertinoListTileChevron(),
-            onTap: _debugGetToc,
+            title: Text('暂无日志'),
           ),
         ],
-        if (_selectedToc.isNotEmpty)
-          CupertinoListTile.notched(
-            title: Text('目录章节（${_selectedToc.length}）'),
-            subtitle: Text(
-              _selectedToc.take(3).map((e) => e.name).join(' / '),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        if (_selectedToc.isNotEmpty)
-          CupertinoListTile.notched(
-            title: const Text('测试正文（第 1 章）'),
-            trailing: const CupertinoListTileChevron(),
-            onTap: _debugGetFirstContent,
-          ),
-        if (_selectedContent != null)
-          CupertinoListTile.notched(
-            title: const Text('正文预览'),
-            subtitle: Text(
-              _selectedContent!,
-              maxLines: 6,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildDebugSnapshotSection() {
-    final snapshot = _debugSnapshot!;
-    String fieldValue(String key) => (snapshot[key] ?? '').toString();
-
-    Widget buildMultilineValue(String title, String value) {
-      if (value.trim().isEmpty) {
-        return CupertinoListTile.notched(title: Text(title), additionalInfo: const Text('—'));
-      }
-      return CupertinoListTile.notched(
-        title: Text(title),
-        subtitle: Text(
-          value,
-          maxLines: 6,
-          overflow: TextOverflow.ellipsis,
-        ),
       );
     }
-
-    Widget buildKeyValue(String title, String value) {
-      return CupertinoListTile.notched(
-        title: Text(title),
-        additionalInfo: Text(value.trim().isEmpty ? '—' : value),
-      );
-    }
-
-    final snippet = fieldValue('responseSnippet');
 
     return CupertinoListSection.insetGrouped(
-      header: Text(_debugSnapshotTitle ?? '调试信息'),
-      children: [
-        buildKeyValue('类型', fieldValue('type')),
-        buildKeyValue('状态码', fieldValue('statusCode')),
-        buildKeyValue('耗时', fieldValue('elapsedMs')),
-        buildKeyValue('响应长度', fieldValue('responseLength')),
-        buildMultilineValue('请求 URL', fieldValue('requestUrl')),
-        if (fieldValue('finalUrl').trim().isNotEmpty)
-          buildMultilineValue('最终 URL', fieldValue('finalUrl')),
-        if (fieldValue('listRule').trim().isNotEmpty)
-          buildMultilineValue('列表规则', fieldValue('listRule')),
-        if (fieldValue('listCount').trim().isNotEmpty)
-          buildKeyValue('匹配数量', fieldValue('listCount')),
-        if (fieldValue('initRule').trim().isNotEmpty)
-          buildMultilineValue('init 规则', fieldValue('initRule')),
-        if (fieldValue('initMatched').trim().isNotEmpty)
-          buildKeyValue('init 匹配', fieldValue('initMatched')),
-        if (fieldValue('extractedLength').trim().isNotEmpty)
-          buildKeyValue('提取长度', fieldValue('extractedLength')),
-        if (fieldValue('cleanedLength').trim().isNotEmpty)
-          buildKeyValue('清理后长度', fieldValue('cleanedLength')),
-        if (fieldValue('fieldSample').trim().isNotEmpty)
-          buildMultilineValue('字段样例', fieldValue('fieldSample')),
-        if (snippet.trim().isNotEmpty) buildMultilineValue('响应片段', snippet),
-        CupertinoListTile.notched(
-          title: const Text('复制调试信息'),
-          trailing: const CupertinoListTileChevron(),
-          onTap: _copyDebugSnapshot,
-        ),
-      ],
+      header: Text('控制台（${_debugLines.length}）'),
+      children: _debugLines.map((line) {
+        final color = line.state == -1
+            ? CupertinoColors.systemRed.resolveFrom(context)
+            : line.state == 1000
+                ? CupertinoColors.systemGreen.resolveFrom(context)
+                : CupertinoColors.label.resolveFrom(context);
+        return CupertinoListTile.notched(
+          title: Text(
+            line.text,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12.5,
+              color: color,
+            ),
+          ),
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: line.text));
+            _showMessage('已复制该行日志');
+          },
+        );
+      }).toList(),
     );
   }
 
-  void _copyDebugSnapshot() {
-    final snapshot = _debugSnapshot;
-    if (snapshot == null) return;
-    final text = const JsonEncoder.withIndent('  ').convert(snapshot);
+  void _clearDebugConsole() {
+    setState(() {
+      _debugLines.clear();
+      _debugError = null;
+      _debugListSrcHtml = null;
+      _debugBookSrcHtml = null;
+      _debugTocSrcHtml = null;
+      _debugContentSrcHtml = null;
+      _debugContentResult = null;
+    });
+  }
+
+  void _copyDebugConsole() {
+    if (_debugLines.isEmpty) {
+      _showMessage('暂无日志可复制');
+      return;
+    }
+    final text = _debugLines.map((e) => e.text).join('\n');
     Clipboard.setData(ClipboardData(text: text));
-    _showMessage('已复制调试信息 JSON');
+    _showMessage('已复制全部日志');
+  }
+
+  Future<void> _startLegadoStyleDebug() async {
+    _syncFieldsToJson(switchToJsonTab: false);
+    final map = _tryDecodeJsonMap(_jsonCtrl.text);
+    if (map == null) {
+      setState(() => _debugError = 'JSON 格式错误');
+      return;
+    }
+    final source = BookSource.fromJson(map);
+    final key = _debugKeyCtrl.text.trim();
+    if (key.isEmpty) {
+      setState(() => _debugError = '请输入 key');
+      return;
+    }
+
+    setState(() {
+      _debugLoading = true;
+      _debugError = null;
+      _debugLines.clear();
+      _debugListSrcHtml = null;
+      _debugBookSrcHtml = null;
+      _debugTocSrcHtml = null;
+      _debugContentSrcHtml = null;
+      _debugContentResult = null;
+    });
+
+    try {
+      await _engine.debugRun(
+        source,
+        key,
+        onEvent: _onDebugEvent,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _debugError = '调试失败：$e');
+    } finally {
+      if (mounted) {
+        setState(() => _debugLoading = false);
+      }
+    }
+  }
+
+  void _onDebugEvent(SourceDebugEvent event) {
+    if (!mounted) return;
+    if (event.isRaw) {
+      setState(() {
+        switch (event.state) {
+          case 10:
+            _debugListSrcHtml = event.message;
+            break;
+          case 20:
+            _debugBookSrcHtml = event.message;
+            break;
+          case 30:
+            _debugTocSrcHtml = event.message;
+            break;
+          case 40:
+            _debugContentSrcHtml = event.message;
+            break;
+        }
+      });
+      return;
+    }
+
+    setState(() {
+      // 从正文日志里粗略提取“清理后正文”，便于用户直接查看结果。
+      // 规则：遇到 “└\\n” 开头的正文输出时累积到 _debugContentResult。
+      if (event.message.contains('┌获取正文内容')) {
+        _debugContentResult = '';
+      } else if (event.message.contains('└\n') && _debugContentResult != null) {
+        final idx = event.message.indexOf('└\n');
+        _debugContentResult = event.message.substring(idx + 2).trimLeft();
+      }
+
+      _debugLines.add(_DebugLine(state: event.state, text: event.message));
+      // 防止日志无限增长
+      const maxLines = 240;
+      if (_debugLines.length > maxLines) {
+        _debugLines.removeRange(0, _debugLines.length - maxLines);
+      }
+
+      if (event.state == -1) {
+        _debugError = _debugError ?? '调试中断（错误）';
+      }
+    });
+  }
+
+  Future<void> _openDebugText({
+    required String title,
+    required String text,
+  }) async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceDebugTextView(title: title, text: text),
+      ),
+    );
   }
 
   CupertinoListTile _buildTextFieldTile(
@@ -1042,308 +1178,6 @@ class _SourceEditViewState extends State<SourceEditView> {
     }
   }
 
-  Future<void> _debugSearch() async {
-    final map = _tryDecodeJsonMap(_jsonCtrl.text);
-    if (map == null) {
-      setState(() => _debugError = '请先修正 JSON');
-      return;
-    }
-    final source = BookSource.fromJson(map);
-    final key = _debugKeyCtrl.text.trim();
-    if (key.isEmpty) {
-      setState(() => _debugError = '请输入关键词');
-      return;
-    }
-
-    setState(() {
-      _debugLoading = true;
-      _debugError = null;
-      _debugResults = const [];
-      _selectedResult = null;
-      _selectedDetail = null;
-      _selectedToc = const [];
-      _selectedContent = null;
-      _debugSnapshot = null;
-      _debugSnapshotTitle = null;
-    });
-
-    try {
-      final debug = await _engine.searchDebug(source, key);
-      if (!mounted) return;
-      setState(() {
-        _debugResults = debug.results;
-        _debugSnapshot = _searchDebugToMap(debug);
-        _debugSnapshotTitle = '搜索调试信息';
-      });
-      if (debug.error != null) {
-        setState(() => _debugError = debug.error);
-      } else if (debug.results.isEmpty) {
-        setState(() => _debugError = '没有结果（可能规则不匹配或解析失败）');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _debugError = '搜索失败：$e');
-    } finally {
-      if (mounted) {
-        setState(() => _debugLoading = false);
-      }
-    }
-  }
-
-  Future<void> _debugExplore() async {
-    final map = _tryDecodeJsonMap(_jsonCtrl.text);
-    if (map == null) {
-      setState(() => _debugError = '请先修正 JSON');
-      return;
-    }
-    final source = BookSource.fromJson(map);
-    final overrideUrl = _debugExploreUrlCtrl.text.trim();
-
-    setState(() {
-      _debugLoading = true;
-      _debugError = null;
-      _debugResults = const [];
-      _selectedResult = null;
-      _selectedDetail = null;
-      _selectedToc = const [];
-      _selectedContent = null;
-      _debugSnapshot = null;
-      _debugSnapshotTitle = null;
-    });
-
-    try {
-      final debug = await _engine.exploreDebug(
-        source,
-        exploreUrlOverride: overrideUrl.isEmpty ? null : overrideUrl,
-      );
-      if (!mounted) return;
-      setState(() {
-        _debugResults = debug.results;
-        _debugSnapshot = _exploreDebugToMap(debug);
-        _debugSnapshotTitle = '发现调试信息';
-      });
-      if (debug.error != null) {
-        setState(() => _debugError = debug.error);
-      } else if (debug.results.isEmpty) {
-        setState(() => _debugError = '没有结果（可能规则不匹配或解析失败）');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _debugError = '发现失败：$e');
-    } finally {
-      if (mounted) {
-        setState(() => _debugLoading = false);
-      }
-    }
-  }
-
-  void _selectResult(SearchResult r) {
-    setState(() {
-      _selectedResult = r;
-      _selectedDetail = null;
-      _selectedToc = const [];
-      _selectedContent = null;
-    });
-  }
-
-  Future<void> _debugGetBookInfo() async {
-    final map = _tryDecodeJsonMap(_jsonCtrl.text);
-    final selected = _selectedResult;
-    if (map == null || selected == null) return;
-    final source = BookSource.fromJson(map);
-
-    setState(() {
-      _debugLoading = true;
-      _debugError = null;
-      _selectedDetail = null;
-      _selectedToc = const [];
-      _selectedContent = null;
-      _debugSnapshot = null;
-      _debugSnapshotTitle = null;
-    });
-
-    try {
-      final debug = await _engine.getBookInfoDebug(source, selected.bookUrl);
-      if (!mounted) return;
-      if (debug.detail == null) {
-        setState(() {
-          _debugError = debug.error ?? '获取详情失败（ruleBookInfo 为空或解析失败）';
-          _debugSnapshot = _bookInfoDebugToMap(debug);
-          _debugSnapshotTitle = '详情调试信息';
-        });
-        return;
-      }
-      setState(() {
-        _selectedDetail = debug.detail;
-        _debugSnapshot = _bookInfoDebugToMap(debug);
-        _debugSnapshotTitle = '详情调试信息';
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _debugError = '获取详情失败：$e');
-    } finally {
-      if (mounted) {
-        setState(() => _debugLoading = false);
-      }
-    }
-  }
-
-  Future<void> _debugGetToc() async {
-    final map = _tryDecodeJsonMap(_jsonCtrl.text);
-    final detail = _selectedDetail;
-    if (map == null || detail == null) return;
-    final source = BookSource.fromJson(map);
-    if (detail.tocUrl.trim().isEmpty) {
-      setState(() => _debugError = 'tocUrl 为空（ruleBookInfo.tocUrl 没解析到）');
-      return;
-    }
-
-    setState(() {
-      _debugLoading = true;
-      _debugError = null;
-      _selectedToc = const [];
-      _selectedContent = null;
-      _debugSnapshot = null;
-      _debugSnapshotTitle = null;
-    });
-
-    try {
-      final debug = await _engine.getTocDebug(source, detail.tocUrl);
-      if (!mounted) return;
-      setState(() {
-        _selectedToc = debug.toc;
-        _debugSnapshot = _tocDebugToMap(debug);
-        _debugSnapshotTitle = '目录调试信息';
-      });
-      if (debug.error != null) {
-        setState(() => _debugError = debug.error);
-      } else if (debug.toc.isEmpty) {
-        setState(() => _debugError = '目录为空（可能规则不匹配或解析失败）');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _debugError = '获取目录失败：$e');
-    } finally {
-      if (mounted) {
-        setState(() => _debugLoading = false);
-      }
-    }
-  }
-
-  Future<void> _debugGetFirstContent() async {
-    final map = _tryDecodeJsonMap(_jsonCtrl.text);
-    if (map == null) return;
-    final source = BookSource.fromJson(map);
-    if (_selectedToc.isEmpty) return;
-
-    final chapterUrl = _selectedToc.first.url;
-    if (chapterUrl.trim().isEmpty) return;
-
-    setState(() {
-      _debugLoading = true;
-      _debugError = null;
-      _selectedContent = null;
-      _debugSnapshot = null;
-      _debugSnapshotTitle = null;
-    });
-
-    try {
-      final debug = await _engine.getContentDebug(source, chapterUrl);
-      if (!mounted) return;
-      setState(() {
-        _selectedContent = debug.content;
-        _debugSnapshot = _contentDebugToMap(debug);
-        _debugSnapshotTitle = '正文调试信息';
-      });
-      if (debug.error != null) {
-        setState(() => _debugError = debug.error);
-      } else if (debug.content.trim().isEmpty) {
-        setState(() => _debugError = '正文为空（可能规则不匹配或解析失败）');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _debugError = '获取正文失败：$e');
-    } finally {
-      if (mounted) {
-        setState(() => _debugLoading = false);
-      }
-    }
-  }
-
-  Map<String, dynamic> _fetchDebugToMap(FetchDebugResult fetch) {
-    return <String, dynamic>{
-      'requestUrl': fetch.requestUrl,
-      'finalUrl': fetch.finalUrl,
-      'statusCode': fetch.statusCode,
-      'elapsedMs': fetch.elapsedMs,
-      'responseLength': fetch.responseLength,
-      'requestHeaders': fetch.requestHeaders,
-      'responseSnippet': fetch.responseSnippet,
-      'error': fetch.error,
-    };
-  }
-
-  Map<String, dynamic> _searchDebugToMap(SearchDebugResult d) {
-    return <String, dynamic>{
-      'type': 'search',
-      ..._fetchDebugToMap(d.fetch),
-      'requestUrlRule': d.requestUrlRule,
-      'listRule': d.listRule,
-      'listCount': d.listCount,
-      'fieldSample': d.fieldSample,
-      'error': d.error ?? d.fetch.error,
-    };
-  }
-
-  Map<String, dynamic> _exploreDebugToMap(ExploreDebugResult d) {
-    return <String, dynamic>{
-      'type': 'explore',
-      ..._fetchDebugToMap(d.fetch),
-      'requestUrlRule': d.requestUrlRule,
-      'listRule': d.listRule,
-      'listCount': d.listCount,
-      'fieldSample': d.fieldSample,
-      'error': d.error ?? d.fetch.error,
-    };
-  }
-
-  Map<String, dynamic> _bookInfoDebugToMap(BookInfoDebugResult d) {
-    return <String, dynamic>{
-      'type': 'bookInfo',
-      ..._fetchDebugToMap(d.fetch),
-      'requestUrlRule': d.requestUrlRule,
-      'initRule': d.initRule,
-      'initMatched': d.initMatched,
-      'fieldSample': d.fieldSample,
-      'error': d.error ?? d.fetch.error,
-    };
-  }
-
-  Map<String, dynamic> _tocDebugToMap(TocDebugResult d) {
-    return <String, dynamic>{
-      'type': 'toc',
-      ..._fetchDebugToMap(d.fetch),
-      'requestUrlRule': d.requestUrlRule,
-      'listRule': d.listRule,
-      'listCount': d.listCount,
-      'fieldSample': d.fieldSample,
-      'error': d.error ?? d.fetch.error,
-    };
-  }
-
-  Map<String, dynamic> _contentDebugToMap(ContentDebugResult d) {
-    final preview = d.content.length <= 800 ? d.content : d.content.substring(0, 800);
-    return <String, dynamic>{
-      'type': 'content',
-      ..._fetchDebugToMap(d.fetch),
-      'requestUrlRule': d.requestUrlRule,
-      'extractedLength': d.extractedLength,
-      'cleanedLength': d.cleanedLength,
-      'contentPreview': preview,
-      'error': d.error ?? d.fetch.error,
-    };
-  }
-
   String _prettyJson(String raw) {
     try {
       final decoded = json.decode(raw);
@@ -1369,4 +1203,14 @@ class _SourceEditViewState extends State<SourceEditView> {
       ),
     );
   }
+}
+
+class _DebugLine {
+  final int state;
+  final String text;
+
+  const _DebugLine({
+    required this.state,
+    required this.text,
+  });
 }
