@@ -72,6 +72,115 @@ class RuleParserEngine {
     }
   }
 
+  /// 搜索调试：返回「请求/解析」过程的关键诊断信息
+  Future<SearchDebugResult> searchDebug(BookSource source, String keyword) async {
+    final searchRule = source.ruleSearch;
+    final searchUrlRule = source.searchUrl;
+    if (searchRule == null || searchUrlRule == null || searchUrlRule.isEmpty) {
+      return SearchDebugResult(
+        fetch: FetchDebugResult.empty(),
+        requestType: DebugRequestType.search,
+        requestUrlRule: searchUrlRule,
+        listRule: searchRule?.bookList,
+        listCount: 0,
+        results: const [],
+        fieldSample: const {},
+        error: 'searchUrl / ruleSearch 为空',
+      );
+    }
+
+    final requestUrl = _buildUrl(
+      source.bookSourceUrl,
+      searchUrlRule,
+      {'key': keyword, 'searchKey': keyword},
+    );
+
+    final fetch = await _fetchDebug(requestUrl, source.header);
+    if (fetch.body == null) {
+      return SearchDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.search,
+        requestUrlRule: searchUrlRule,
+        listRule: searchRule.bookList,
+        listCount: 0,
+        results: const [],
+        fieldSample: const {},
+        error: fetch.error ?? '请求失败',
+      );
+    }
+
+    try {
+      final document = html_parser.parse(fetch.body);
+      final bookListRule = searchRule.bookList ?? '';
+      final bookElements = _querySelectorAll(document, bookListRule);
+
+      final results = <SearchResult>[];
+      Map<String, String> fieldSample = const {};
+
+      for (final element in bookElements) {
+        final name = _parseRule(element, searchRule.name, source.bookSourceUrl);
+        final author =
+            _parseRule(element, searchRule.author, source.bookSourceUrl);
+        final coverUrl =
+            _parseRule(element, searchRule.coverUrl, source.bookSourceUrl);
+        final intro =
+            _parseRule(element, searchRule.intro, source.bookSourceUrl);
+        final lastChapter =
+            _parseRule(element, searchRule.lastChapter, source.bookSourceUrl);
+        final bookUrl =
+            _parseRule(element, searchRule.bookUrl, source.bookSourceUrl);
+
+        final result = SearchResult(
+          name: name,
+          author: author,
+          coverUrl: coverUrl,
+          intro: intro,
+          lastChapter: lastChapter,
+          bookUrl: bookUrl,
+          sourceUrl: source.bookSourceUrl,
+          sourceName: source.bookSourceName,
+        );
+
+        if (results.isEmpty) {
+          fieldSample = <String, String>{
+            'name': name,
+            'author': author,
+            'coverUrl': coverUrl,
+            'intro': intro,
+            'lastChapter': lastChapter,
+            'bookUrl': bookUrl,
+          };
+        }
+
+        if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
+          results.add(result);
+        }
+      }
+
+      return SearchDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.search,
+        requestUrlRule: searchUrlRule,
+        listRule: bookListRule,
+        listCount: bookElements.length,
+        results: results,
+        fieldSample: fieldSample,
+        error: null,
+      );
+    } catch (e) {
+      return SearchDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.search,
+        requestUrlRule: searchUrlRule,
+        listRule: searchRule.bookList,
+        listCount: 0,
+        results: const [],
+        fieldSample: const {},
+        error: '解析失败: $e',
+      );
+    }
+  }
+
   /// 发现书籍
   ///
   /// 对标 Legado：`exploreUrl` + `ruleExplore`
@@ -130,6 +239,121 @@ class RuleParserEngine {
     }
   }
 
+  Future<ExploreDebugResult> exploreDebug(
+    BookSource source, {
+    String? exploreUrlOverride,
+  }) async {
+    final exploreRule = source.ruleExplore;
+    final exploreUrlRule = exploreUrlOverride ?? source.exploreUrl;
+    if (exploreRule == null ||
+        exploreUrlRule == null ||
+        exploreUrlRule.trim().isEmpty) {
+      return ExploreDebugResult(
+        fetch: FetchDebugResult.empty(),
+        requestType: DebugRequestType.explore,
+        requestUrlRule: exploreUrlRule,
+        listRule: exploreRule?.bookList,
+        listCount: 0,
+        results: const [],
+        fieldSample: const {},
+        error: 'exploreUrl / ruleExplore 为空',
+      );
+    }
+
+    final requestUrl = _buildUrl(
+      source.bookSourceUrl,
+      exploreUrlRule,
+      const {},
+    );
+    final fetch = await _fetchDebug(requestUrl, source.header);
+    if (fetch.body == null) {
+      return ExploreDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.explore,
+        requestUrlRule: exploreUrlRule,
+        listRule: exploreRule.bookList,
+        listCount: 0,
+        results: const [],
+        fieldSample: const {},
+        error: fetch.error ?? '请求失败',
+      );
+    }
+
+    try {
+      final document = html_parser.parse(fetch.body);
+      final bookListRule = exploreRule.bookList ?? '';
+      final bookElements = _querySelectorAll(document, bookListRule);
+
+      final results = <SearchResult>[];
+      Map<String, String> fieldSample = const {};
+
+      for (final element in bookElements) {
+        final name = _parseRule(element, exploreRule.name, source.bookSourceUrl);
+        final author =
+            _parseRule(element, exploreRule.author, source.bookSourceUrl);
+        final coverUrl =
+            _parseRule(element, exploreRule.coverUrl, source.bookSourceUrl);
+        final intro =
+            _parseRule(element, exploreRule.intro, source.bookSourceUrl);
+        final lastChapter = _parseRule(
+          element,
+          exploreRule.lastChapter,
+          source.bookSourceUrl,
+        );
+        final bookUrl =
+            _parseRule(element, exploreRule.bookUrl, source.bookSourceUrl);
+
+        final result = SearchResult(
+          name: name,
+          author: author,
+          coverUrl: coverUrl,
+          intro: intro,
+          lastChapter: lastChapter,
+          bookUrl: bookUrl,
+          sourceUrl: source.bookSourceUrl,
+          sourceName: source.bookSourceName,
+        );
+
+        if (results.isEmpty) {
+          fieldSample = <String, String>{
+            'name': name,
+            'author': author,
+            'coverUrl': coverUrl,
+            'intro': intro,
+            'lastChapter': lastChapter,
+            'bookUrl': bookUrl,
+          };
+        }
+
+        if (result.name.isNotEmpty && result.bookUrl.isNotEmpty) {
+          results.add(result);
+        }
+      }
+
+      return ExploreDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.explore,
+        requestUrlRule: exploreUrlRule,
+        listRule: bookListRule,
+        listCount: bookElements.length,
+        results: results,
+        fieldSample: fieldSample,
+        error: null,
+      );
+    } catch (e) {
+      return ExploreDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.explore,
+        requestUrlRule: exploreUrlRule,
+        listRule: exploreRule.bookList,
+        listCount: 0,
+        results: const [],
+        fieldSample: const {},
+        error: '解析失败: $e',
+      );
+    }
+  }
+
   /// 获取书籍详情
   Future<BookDetail?> getBookInfo(BookSource source, String bookUrl) async {
     final bookInfoRule = source.ruleBookInfo;
@@ -164,6 +388,116 @@ class RuleParserEngine {
     } catch (e) {
       debugPrint('获取书籍详情失败: $e');
       return null;
+    }
+  }
+
+  Future<BookInfoDebugResult> getBookInfoDebug(
+    BookSource source,
+    String bookUrl,
+  ) async {
+    final bookInfoRule = source.ruleBookInfo;
+    if (bookInfoRule == null) {
+      return BookInfoDebugResult(
+        fetch: FetchDebugResult.empty(),
+        requestType: DebugRequestType.bookInfo,
+        requestUrlRule: bookUrl,
+        initRule: null,
+        initMatched: false,
+        detail: null,
+        fieldSample: const {},
+        error: 'ruleBookInfo 为空',
+      );
+    }
+
+    final fullUrl = _absoluteUrl(source.bookSourceUrl, bookUrl);
+    final fetch = await _fetchDebug(fullUrl, source.header);
+    if (fetch.body == null) {
+      return BookInfoDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.bookInfo,
+        requestUrlRule: bookUrl,
+        initRule: bookInfoRule.init,
+        initMatched: false,
+        detail: null,
+        fieldSample: const {},
+        error: fetch.error ?? '请求失败',
+      );
+    }
+
+    try {
+      final document = html_parser.parse(fetch.body);
+      Element? root = document.documentElement;
+      var initMatched = true;
+
+      if (bookInfoRule.init != null && bookInfoRule.init!.isNotEmpty) {
+        root = _querySelector(document, bookInfoRule.init!);
+        initMatched = root != null;
+      }
+      if (root == null) {
+        return BookInfoDebugResult(
+          fetch: fetch,
+          requestType: DebugRequestType.bookInfo,
+          requestUrlRule: bookUrl,
+          initRule: bookInfoRule.init,
+          initMatched: initMatched,
+          detail: null,
+          fieldSample: const {},
+          error: 'init 定位失败或页面无 documentElement',
+        );
+      }
+
+      final name = _parseRule(root, bookInfoRule.name, source.bookSourceUrl);
+      final author =
+          _parseRule(root, bookInfoRule.author, source.bookSourceUrl);
+      final coverUrl =
+          _parseRule(root, bookInfoRule.coverUrl, source.bookSourceUrl);
+      final intro = _parseRule(root, bookInfoRule.intro, source.bookSourceUrl);
+      final kind = _parseRule(root, bookInfoRule.kind, source.bookSourceUrl);
+      final lastChapter =
+          _parseRule(root, bookInfoRule.lastChapter, source.bookSourceUrl);
+      final tocUrl =
+          _parseRule(root, bookInfoRule.tocUrl, source.bookSourceUrl);
+
+      final detail = BookDetail(
+        name: name,
+        author: author,
+        coverUrl: coverUrl,
+        intro: intro,
+        kind: kind,
+        lastChapter: lastChapter,
+        tocUrl: tocUrl,
+        bookUrl: fullUrl,
+      );
+
+      return BookInfoDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.bookInfo,
+        requestUrlRule: bookUrl,
+        initRule: bookInfoRule.init,
+        initMatched: initMatched,
+        detail: detail,
+        fieldSample: <String, String>{
+          'name': name,
+          'author': author,
+          'coverUrl': coverUrl,
+          'intro': intro,
+          'kind': kind,
+          'lastChapter': lastChapter,
+          'tocUrl': tocUrl,
+        },
+        error: null,
+      );
+    } catch (e) {
+      return BookInfoDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.bookInfo,
+        requestUrlRule: bookUrl,
+        initRule: bookInfoRule.init,
+        initMatched: false,
+        detail: null,
+        fieldSample: const {},
+        error: '解析失败: $e',
+      );
     }
   }
 
@@ -204,6 +538,81 @@ class RuleParserEngine {
     }
   }
 
+  Future<TocDebugResult> getTocDebug(BookSource source, String tocUrl) async {
+    final tocRule = source.ruleToc;
+    if (tocRule == null) {
+      return TocDebugResult(
+        fetch: FetchDebugResult.empty(),
+        requestType: DebugRequestType.toc,
+        requestUrlRule: tocUrl,
+        listRule: null,
+        listCount: 0,
+        toc: const [],
+        fieldSample: const {},
+        error: 'ruleToc 为空',
+      );
+    }
+
+    final fullUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
+    final fetch = await _fetchDebug(fullUrl, source.header);
+    if (fetch.body == null) {
+      return TocDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.toc,
+        requestUrlRule: tocUrl,
+        listRule: tocRule.chapterList,
+        listCount: 0,
+        toc: const [],
+        fieldSample: const {},
+        error: fetch.error ?? '请求失败',
+      );
+    }
+
+    try {
+      final document = html_parser.parse(fetch.body);
+      final chapterListRule = tocRule.chapterList ?? '';
+      final chapterElements = _querySelectorAll(document, chapterListRule);
+
+      final chapters = <TocItem>[];
+      Map<String, String> sample = const {};
+      for (var i = 0; i < chapterElements.length; i++) {
+        final element = chapterElements[i];
+        final name =
+            _parseRule(element, tocRule.chapterName, source.bookSourceUrl);
+        final url =
+            _parseRule(element, tocRule.chapterUrl, source.bookSourceUrl);
+        if (chapters.isEmpty) {
+          sample = <String, String>{'name': name, 'url': url};
+        }
+        if (name.isNotEmpty && url.isNotEmpty) {
+          chapters.add(TocItem(index: i, name: name, url: url));
+        }
+      }
+
+      return TocDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.toc,
+        requestUrlRule: tocUrl,
+        listRule: chapterListRule,
+        listCount: chapterElements.length,
+        toc: chapters,
+        fieldSample: sample,
+        error: null,
+      );
+    } catch (e) {
+      return TocDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.toc,
+        requestUrlRule: tocUrl,
+        listRule: tocRule.chapterList,
+        listCount: 0,
+        toc: const [],
+        fieldSample: const {},
+        error: '解析失败: $e',
+      );
+    }
+  }
+
   /// 获取正文
   Future<String> getContent(BookSource source, String chapterUrl) async {
     final contentRule = source.ruleContent;
@@ -237,6 +646,73 @@ class RuleParserEngine {
     }
   }
 
+  Future<ContentDebugResult> getContentDebug(
+    BookSource source,
+    String chapterUrl,
+  ) async {
+    final contentRule = source.ruleContent;
+    if (contentRule == null) {
+      return ContentDebugResult(
+        fetch: FetchDebugResult.empty(),
+        requestType: DebugRequestType.content,
+        requestUrlRule: chapterUrl,
+        extractedLength: 0,
+        cleanedLength: 0,
+        content: '',
+        error: 'ruleContent 为空',
+      );
+    }
+
+    final fullUrl = _absoluteUrl(source.bookSourceUrl, chapterUrl);
+    final fetch = await _fetchDebug(fullUrl, source.header);
+    if (fetch.body == null) {
+      return ContentDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.content,
+        requestUrlRule: chapterUrl,
+        extractedLength: 0,
+        cleanedLength: 0,
+        content: '',
+        error: fetch.error ?? '请求失败',
+      );
+    }
+
+    try {
+      final document = html_parser.parse(fetch.body);
+      final extracted = _parseRule(
+        document.documentElement!,
+        contentRule.content,
+        source.bookSourceUrl,
+      );
+      var text = extracted;
+      if (contentRule.replaceRegex != null &&
+          contentRule.replaceRegex!.isNotEmpty) {
+        text = _applyReplaceRegex(text, contentRule.replaceRegex!);
+      }
+      final cleaned = _cleanContent(text);
+
+      return ContentDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.content,
+        requestUrlRule: chapterUrl,
+        extractedLength: extracted.length,
+        cleanedLength: cleaned.length,
+        content: cleaned,
+        error: null,
+      );
+    } catch (e) {
+      return ContentDebugResult(
+        fetch: fetch,
+        requestType: DebugRequestType.content,
+        requestUrlRule: chapterUrl,
+        extractedLength: 0,
+        cleanedLength: 0,
+        content: '',
+        error: '解析失败: $e',
+      );
+    }
+  }
+
   /// 发送HTTP请求
   Future<String?> _fetch(String url, String? header) async {
     try {
@@ -261,6 +737,61 @@ class RuleParserEngine {
       debugPrint('请求失败: $url - $e');
       return null;
     }
+  }
+
+  Future<FetchDebugResult> _fetchDebug(String url, String? header) async {
+    final sw = Stopwatch()..start();
+    try {
+      final options = Options();
+      final requestHeaders = <String, String>{};
+      if (header != null && header.isNotEmpty) {
+        for (final line in header.split('\n')) {
+          final parts = line.split(':');
+          if (parts.length >= 2) {
+            requestHeaders[parts[0].trim()] = parts.sublist(1).join(':').trim();
+          }
+        }
+      }
+      if (requestHeaders.isNotEmpty) {
+        options.headers = requestHeaders;
+      }
+
+      final response = await _dio.get(url, options: options);
+      final body = response.data?.toString();
+      sw.stop();
+      return FetchDebugResult(
+        requestUrl: url,
+        finalUrl: response.realUri.toString(),
+        statusCode: response.statusCode,
+        elapsedMs: sw.elapsedMilliseconds,
+        responseLength: body?.length ?? 0,
+        responseSnippet: _snippet(body),
+        requestHeaders: requestHeaders,
+        error: null,
+        body: body,
+      );
+    } catch (e) {
+      sw.stop();
+      return FetchDebugResult(
+        requestUrl: url,
+        finalUrl: null,
+        statusCode: null,
+        elapsedMs: sw.elapsedMilliseconds,
+        responseLength: 0,
+        responseSnippet: null,
+        requestHeaders: const {},
+        error: e.toString(),
+        body: null,
+      );
+    }
+  }
+
+  String? _snippet(String? text) {
+    if (text == null) return null;
+    final t = text.replaceAll('\r\n', '\n');
+    final max = 1200;
+    if (t.length <= max) return t;
+    return t.substring(0, max);
   }
 
   /// 构建URL
@@ -409,6 +940,156 @@ class RuleParserEngine {
     // 对齐 legado 的 HTML -> 文本清理策略（块级标签换行、不可见字符移除）
     return HtmlTextFormatter.formatToPlainText(content);
   }
+}
+
+enum DebugRequestType { search, explore, bookInfo, toc, content }
+
+class FetchDebugResult {
+  final String requestUrl;
+  final String? finalUrl;
+  final int? statusCode;
+  final int elapsedMs;
+  final int responseLength;
+  final String? responseSnippet;
+  final Map<String, String> requestHeaders;
+  final String? error;
+
+  /// 原始响应体（仅用于编辑器调试；不要在普通 UI 中到处传递）
+  final String? body;
+
+  const FetchDebugResult({
+    required this.requestUrl,
+    required this.finalUrl,
+    required this.statusCode,
+    required this.elapsedMs,
+    required this.responseLength,
+    required this.responseSnippet,
+    required this.requestHeaders,
+    required this.error,
+    required this.body,
+  });
+
+  factory FetchDebugResult.empty() {
+    return const FetchDebugResult(
+      requestUrl: '',
+      finalUrl: null,
+      statusCode: null,
+      elapsedMs: 0,
+      responseLength: 0,
+      responseSnippet: null,
+      requestHeaders: {},
+      error: null,
+      body: null,
+    );
+  }
+}
+
+class SearchDebugResult {
+  final FetchDebugResult fetch;
+  final DebugRequestType requestType;
+  final String? requestUrlRule;
+  final String? listRule;
+  final int listCount;
+  final List<SearchResult> results;
+  final Map<String, String> fieldSample;
+  final String? error;
+
+  const SearchDebugResult({
+    required this.fetch,
+    required this.requestType,
+    required this.requestUrlRule,
+    required this.listRule,
+    required this.listCount,
+    required this.results,
+    required this.fieldSample,
+    required this.error,
+  });
+}
+
+class ExploreDebugResult {
+  final FetchDebugResult fetch;
+  final DebugRequestType requestType;
+  final String? requestUrlRule;
+  final String? listRule;
+  final int listCount;
+  final List<SearchResult> results;
+  final Map<String, String> fieldSample;
+  final String? error;
+
+  const ExploreDebugResult({
+    required this.fetch,
+    required this.requestType,
+    required this.requestUrlRule,
+    required this.listRule,
+    required this.listCount,
+    required this.results,
+    required this.fieldSample,
+    required this.error,
+  });
+}
+
+class BookInfoDebugResult {
+  final FetchDebugResult fetch;
+  final DebugRequestType requestType;
+  final String? requestUrlRule;
+  final String? initRule;
+  final bool initMatched;
+  final BookDetail? detail;
+  final Map<String, String> fieldSample;
+  final String? error;
+
+  const BookInfoDebugResult({
+    required this.fetch,
+    required this.requestType,
+    required this.requestUrlRule,
+    required this.initRule,
+    required this.initMatched,
+    required this.detail,
+    required this.fieldSample,
+    required this.error,
+  });
+}
+
+class TocDebugResult {
+  final FetchDebugResult fetch;
+  final DebugRequestType requestType;
+  final String? requestUrlRule;
+  final String? listRule;
+  final int listCount;
+  final List<TocItem> toc;
+  final Map<String, String> fieldSample;
+  final String? error;
+
+  const TocDebugResult({
+    required this.fetch,
+    required this.requestType,
+    required this.requestUrlRule,
+    required this.listRule,
+    required this.listCount,
+    required this.toc,
+    required this.fieldSample,
+    required this.error,
+  });
+}
+
+class ContentDebugResult {
+  final FetchDebugResult fetch;
+  final DebugRequestType requestType;
+  final String? requestUrlRule;
+  final int extractedLength;
+  final int cleanedLength;
+  final String content;
+  final String? error;
+
+  const ContentDebugResult({
+    required this.fetch,
+    required this.requestType,
+    required this.requestUrlRule,
+    required this.extractedLength,
+    required this.cleanedLength,
+    required this.content,
+    required this.error,
+  });
 }
 
 /// 搜索结果
