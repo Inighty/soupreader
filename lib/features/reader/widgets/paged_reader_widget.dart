@@ -904,7 +904,14 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   Widget _buildPageContent() {
-    final isVertical = widget.pageDirection == PageDirection.vertical;
+    // 仿真翻页（含 shader / 贝塞尔）只支持水平手势与水平渲染。
+    // 如果沿用 `pageDirection=vertical` 会导致：
+    // - 手势走垂直分支，仿真逻辑无法正确工作
+    // - 渲染降级为垂直滑动，看起来“仿真不对”
+    final forceHorizontal = widget.pageTurnMode == PageTurnMode.simulation ||
+        widget.pageTurnMode == PageTurnMode.simulation2;
+    final isVertical =
+        widget.pageDirection == PageDirection.vertical && !forceHorizontal;
     // 只有启用手势时才允许滑动翻页
     final enableDrag = widget.enableGestures;
 
@@ -930,7 +937,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final size = MediaQuery.of(context).size;
     final screenWidth = size.width;
     final screenHeight = size.height;
-    final isVertical = widget.pageDirection == PageDirection.vertical;
+    final forceHorizontal = widget.pageTurnMode == PageTurnMode.simulation ||
+        widget.pageTurnMode == PageTurnMode.simulation2;
+    final isVertical =
+        widget.pageDirection == PageDirection.vertical && !forceHorizontal;
     final isRunning = _isMoved || _isRunning || _isStarted;
     if (!isRunning) {
       // 静止态提前预渲染相邻页，避免首次拖拽时同步生成导致的卡顿
