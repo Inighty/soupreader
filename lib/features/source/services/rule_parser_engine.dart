@@ -133,15 +133,27 @@ class RuleParserEngine {
         header: source.header,
         timeoutMs: source.respondTime,
       );
+      final status = res.statusCode;
+      final statusText = status != null ? ' ($status)' : '';
+      final isBadStatus = status != null && status >= 400;
       if (res.body != null) {
         log(
-          '≡获取成功:${res.finalUrl ?? res.requestUrl}'
-          '${res.statusCode != null ? ' (${res.statusCode})' : ''}'
-          ' ${res.elapsedMs}ms',
+          '≡获取${isBadStatus ? '完成' : '成功'}:${res.finalUrl ?? res.requestUrl}'
+          '$statusText ${res.elapsedMs}ms',
+          state: isBadStatus ? -1 : 1,
         );
         rawHtml(rawState, res.body!);
+        if (isBadStatus) {
+          log('└HTTP 状态码异常：$status', state: -1, showTime: false);
+        }
       } else {
-        log('≡请求失败:${res.requestUrl} ${res.elapsedMs}ms', state: -1);
+        log(
+          '≡请求失败:${res.requestUrl}$statusText ${res.elapsedMs}ms',
+          state: -1,
+        );
+        if (res.error != null && res.error!.trim().isNotEmpty) {
+          log('└${res.error}', state: -1, showTime: false);
+        }
       }
       return res;
     }
@@ -1307,6 +1319,7 @@ class RuleParserEngine {
     int? timeoutMs,
   }) async {
     final sw = Stopwatch()..start();
+    final requestHeaders = <String, String>{};
     try {
       final timeout =
           (timeoutMs != null && timeoutMs > 0) ? Duration(milliseconds: timeoutMs) : null;
@@ -1314,8 +1327,8 @@ class RuleParserEngine {
         connectTimeout: timeout,
         sendTimeout: timeout,
         receiveTimeout: timeout,
+        validateStatus: (_) => true,
       );
-      final requestHeaders = <String, String>{};
       if (header != null && header.isNotEmpty) {
         for (final line in header.split('\n')) {
           final parts = line.split(':');
@@ -1344,6 +1357,28 @@ class RuleParserEngine {
       );
     } catch (e) {
       sw.stop();
+      if (e is DioException) {
+        final response = e.response;
+        final body = response?.data?.toString();
+        final statusCode = response?.statusCode;
+        final finalUrl = response?.realUri.toString();
+        final parts = <String>[
+          'DioException(${e.type})',
+          if (e.message != null && e.message!.trim().isNotEmpty) e.message!.trim(),
+          if (e.error != null) 'error=${e.error}',
+        ];
+        return FetchDebugResult(
+          requestUrl: url,
+          finalUrl: finalUrl,
+          statusCode: statusCode,
+          elapsedMs: sw.elapsedMilliseconds,
+          responseLength: body?.length ?? 0,
+          responseSnippet: _snippet(body),
+          requestHeaders: requestHeaders,
+          error: parts.join('：'),
+          body: body,
+        );
+      }
       return FetchDebugResult(
         requestUrl: url,
         finalUrl: null,
@@ -1351,7 +1386,7 @@ class RuleParserEngine {
         elapsedMs: sw.elapsedMilliseconds,
         responseLength: 0,
         responseSnippet: null,
-        requestHeaders: const {},
+        requestHeaders: requestHeaders,
         error: e.toString(),
         body: null,
       );
