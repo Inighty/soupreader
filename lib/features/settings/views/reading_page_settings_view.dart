@@ -46,12 +46,6 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
                   onTap: () => _pickAnimDuration(),
                 ),
                 CupertinoListTile.notched(
-                  title: const Text('翻页方向'),
-                  additionalInfo: Text(_settings.pageDirection.name),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _pickDirection,
-                ),
-                CupertinoListTile.notched(
                   title: const Text('滚动模式无动画翻页'),
                   trailing: CupertinoSwitch(
                     value: _settings.noAnimScrollPage,
@@ -128,40 +122,6 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
     _update(_settings.copyWith(pageAnimDuration: duration));
   }
 
-  Future<void> _pickDirection() async {
-    await showCupertinoModalPopup<void>(
-      context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('翻页方向'),
-        actions: PageDirection.values.map((dir) {
-          final selected = dir == _settings.pageDirection;
-          return CupertinoActionSheetAction(
-            onPressed: () {
-              _update(_settings.copyWith(pageDirection: dir));
-              Navigator.pop(ctx);
-            },
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(dir.name),
-                if (selected) ...[
-                  const SizedBox(width: 8),
-                  const Icon(CupertinoIcons.check_mark,
-                      size: 18, color: CupertinoColors.activeBlue),
-                ],
-              ],
-            ),
-          );
-        }).toList(),
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('取消'),
-        ),
-      ),
-    );
-  }
-
   Future<void> _pickTouchSlop() async {
     final controller =
         TextEditingController(text: _settings.pageTouchSlop.toString());
@@ -197,4 +157,3 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
     _update(_settings.copyWith(pageTouchSlop: result.clamp(0, 100)));
   }
 }
-

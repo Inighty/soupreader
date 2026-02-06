@@ -44,7 +44,7 @@
 ### 翻页
 
 - 翻页模式：`pageTurnMode`
-- 方向：`pageDirection`
+- 方向：对用户隐藏，统一使用“垂直”
 - 动画时长：`pageAnimDuration`
 - 灵敏度：`pageTouchSlop`
 - 滚动无动画：`noAnimScrollPage`
@@ -56,4 +56,3 @@
 - 页眉页脚：`hideHeader/hideFooter`、分割线、左右中内容字段
 - 点击区域：`clickActions`
 - 其它：`keepScreenOn`、`chineseTraditional`、`cleanChapterTitle`、自动阅读速度等
-

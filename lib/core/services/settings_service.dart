@@ -39,6 +39,10 @@ class SettingsService {
       _readingSettings = const ReadingSettings();
     }
 
+    // 迁移：翻页方向对用户隐藏，统一采用“垂直”。
+    // - 防止 UI 隐藏后用户还停留在水平导致体验不一致
+    await _migratePageDirectionToVertical();
+
     final appJson = _prefs.getString(_keyAppSettings);
     if (appJson != null) {
       try {
@@ -50,6 +54,33 @@ class SettingsService {
       _appSettings = const AppSettings();
     }
     _appSettingsNotifier.value = _appSettings;
+  }
+
+  Future<void> _migratePageDirectionToVertical() async {
+    const target = PageDirection.vertical;
+
+    if (_readingSettings.pageDirection != target) {
+      _readingSettings = _readingSettings.copyWith(pageDirection: target);
+      await _prefs.setString(
+        _keyReadingSettings,
+        json.encode(_readingSettings.toJson()),
+      );
+    }
+
+    final keys = _prefs
+        .getKeys()
+        .where((k) => k.startsWith(_keyBookReadingSettingsPrefix))
+        .toList(growable: false);
+    for (final key in keys) {
+      final bookId = key.substring(_keyBookReadingSettingsPrefix.length);
+      final settings = getBookReadingSettings(bookId);
+      if (settings == null) continue;
+      if (settings.pageDirection == target) continue;
+      await saveBookReadingSettings(
+        bookId,
+        settings.copyWith(pageDirection: target),
+      );
+    }
   }
 
   Future<void> saveReadingSettings(ReadingSettings settings) async {

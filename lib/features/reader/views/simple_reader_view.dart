@@ -2738,51 +2738,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             ),
           ),
           _buildSettingsCard(
-            title: '翻页方向',
-            child: Row(
-              children: PageDirection.values.map((direction) {
-                final isSelected = _settings.pageDirection == direction;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      _updateSettingsFromSheet(
-                        setPopupState,
-                        _settings.copyWith(pageDirection: direction),
-                      );
-                    },
-                    child: Container(
-                      margin: EdgeInsets.only(
-                          right: direction == PageDirection.horizontal ? 8 : 0),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? CupertinoColors.activeBlue.withValues(alpha: 0.2)
-                            : Colors.white10,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isSelected
-                              ? CupertinoColors.activeBlue
-                              : Colors.white10,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          direction.name,
-                          style: TextStyle(
-                            color: isSelected
-                                ? CupertinoColors.activeBlue
-                                : Colors.white70,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          _buildSettingsCard(
             title: '翻页手感',
             child: Column(
               children: [

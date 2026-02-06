@@ -104,7 +104,8 @@ class ReadingSettings {
     this.autoReadSpeed = 50,
     // 翻页动画增强默认值
     this.pageAnimDuration = 300,
-    this.pageDirection = PageDirection.horizontal,
+    // 对标专业阅读器：翻页方向默认更符合“上下”阅读习惯（尤其在滚动/连贯阅读场景）
+    this.pageDirection = PageDirection.vertical,
     this.noAnimScrollPage = false,
     this.pageTouchSlop = 25,
     this.volumeKeyPage = false,
@@ -183,7 +184,8 @@ class ReadingSettings {
       autoReadSpeed: json['autoReadSpeed'] as int? ?? 50,
       // 翻页动画增强
       pageAnimDuration: json['pageAnimDuration'] as int? ?? 300,
-      pageDirection: PageDirection.values[json['pageDirection'] as int? ?? 0],
+      pageDirection: PageDirection.values[
+          json['pageDirection'] as int? ?? PageDirection.vertical.index],
       noAnimScrollPage: json['noAnimScrollPage'] as bool? ?? false,
       pageTouchSlop: json['pageTouchSlop'] as int? ?? 25,
       volumeKeyPage: json['volumeKeyPage'] as bool? ?? false,
