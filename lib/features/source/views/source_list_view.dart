@@ -8,6 +8,7 @@ import '../models/book_source.dart';
 import '../services/source_import_export_service.dart';
 import '../../../core/utils/legado_json.dart';
 import 'source_edit_view.dart';
+import 'source_availability_check_view.dart';
 
 /// 书源管理页面 - 纯 iOS 原生风格
 class SourceListView extends StatefulWidget {
@@ -263,7 +264,7 @@ class _SourceListViewState extends State<SourceListView> {
             child: const Text('检查可用性'),
             onPressed: () {
               Navigator.pop(context);
-              _showMessage('暂未实现可用性检测');
+              _openAvailabilityCheck();
             },
           ),
           CupertinoActionSheetAction(
@@ -272,6 +273,48 @@ class _SourceListViewState extends State<SourceListView> {
             onPressed: () {
               Navigator.pop(context);
               _sourceRepo.deleteDisabledSources();
+            },
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAvailabilityCheck() async {
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('书源可用性检测'),
+        message: const Text('建议先检测“启用的书源”，避免浪费时间。'),
+        actions: [
+          CupertinoActionSheetAction(
+            child: const Text('检测启用的（推荐）'),
+            onPressed: () async {
+              Navigator.pop(context);
+              await Navigator.of(context).push(
+                CupertinoPageRoute<void>(
+                  builder: (_) => const SourceAvailabilityCheckView(
+                    includeDisabled: false,
+                  ),
+                ),
+              );
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('检测全部（含失效）'),
+            onPressed: () async {
+              Navigator.pop(context);
+              await Navigator.of(context).push(
+                CupertinoPageRoute<void>(
+                  builder: (_) => const SourceAvailabilityCheckView(
+                    includeDisabled: true,
+                  ),
+                ),
+              );
             },
           ),
         ],
@@ -339,6 +382,7 @@ class _SourceListViewState extends State<SourceListView> {
       'customOrder': 0,
       'enabled': true,
       'enabledExplore': true,
+      'enabledCookieJar': true,
       'respondTime': 180000,
       'weight': 0,
       'searchUrl': null,

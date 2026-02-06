@@ -14,26 +14,44 @@ import 'source_debug_text_view.dart';
 class SourceEditView extends StatefulWidget {
   final String? originalUrl;
   final String initialRawJson;
+  final int? initialTab;
+  final String? initialDebugKey;
 
   const SourceEditView({
     super.key,
     required this.initialRawJson,
     this.originalUrl,
+    this.initialTab,
+    this.initialDebugKey,
   });
 
-  static SourceEditView fromEntity(BookSourceEntity entity) {
+  static SourceEditView fromEntity(
+    BookSourceEntity entity, {
+    int? initialTab,
+    String? initialDebugKey,
+  }) {
     final raw = (entity.rawJson != null && entity.rawJson!.trim().isNotEmpty)
         ? entity.rawJson!
         : LegadoJson.encode({
             'bookSourceUrl': entity.bookSourceUrl,
             'bookSourceName': entity.bookSourceName,
             'bookSourceGroup': entity.bookSourceGroup,
+            'bookSourceType': entity.bookSourceType,
+            'customOrder': 0,
             'enabled': entity.enabled,
+            'enabledExplore': true,
+            'enabledCookieJar': true,
+            'respondTime': 180000,
             'weight': entity.weight,
             'header': entity.header,
             'loginUrl': entity.loginUrl,
           });
-    return SourceEditView(originalUrl: entity.bookSourceUrl, initialRawJson: raw);
+    return SourceEditView(
+      originalUrl: entity.bookSourceUrl,
+      initialRawJson: raw,
+      initialTab: initialTab,
+      initialDebugKey: initialDebugKey,
+    );
   }
 
   @override
@@ -50,12 +68,27 @@ class _SourceEditViewState extends State<SourceEditView> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _urlCtrl;
   late final TextEditingController _groupCtrl;
+  late final TextEditingController _typeCtrl;
+  late final TextEditingController _customOrderCtrl;
   late final TextEditingController _weightCtrl;
+  late final TextEditingController _respondTimeCtrl;
+  bool _enabledCookieJar = true;
+  late final TextEditingController _concurrentRateCtrl;
+  late final TextEditingController _bookUrlPatternCtrl;
+  late final TextEditingController _jsLibCtrl;
   late final TextEditingController _headerCtrl;
+  late final TextEditingController _loginUrlCtrl;
+  late final TextEditingController _loginUiCtrl;
+  late final TextEditingController _loginCheckJsCtrl;
+  late final TextEditingController _coverDecodeJsCtrl;
+  late final TextEditingController _bookSourceCommentCtrl;
+  late final TextEditingController _variableCommentCtrl;
   late final TextEditingController _searchUrlCtrl;
   late final TextEditingController _exploreUrlCtrl;
+  late final TextEditingController _exploreScreenCtrl;
 
   // 规则（常用字段）
+  late final TextEditingController _searchCheckKeyWordCtrl;
   late final TextEditingController _searchBookListCtrl;
   late final TextEditingController _searchNameCtrl;
   late final TextEditingController _searchAuthorCtrl;
@@ -111,6 +144,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     _db = DatabaseService();
     _repo = SourceRepository(_db);
 
+    _tab = widget.initialTab ?? 0;
     _jsonCtrl = TextEditingController(text: _prettyJson(widget.initialRawJson));
     final initialMap = _tryDecodeJsonMap(_jsonCtrl.text);
     final source = initialMap != null ? BookSource.fromJson(initialMap) : null;
@@ -118,13 +152,42 @@ class _SourceEditViewState extends State<SourceEditView> {
     _nameCtrl = TextEditingController(text: source?.bookSourceName ?? '');
     _urlCtrl = TextEditingController(text: source?.bookSourceUrl ?? '');
     _groupCtrl = TextEditingController(text: source?.bookSourceGroup ?? '');
+    _typeCtrl = TextEditingController(
+      text: (source?.bookSourceType ?? 0).toString(),
+    );
+    _customOrderCtrl = TextEditingController(
+      text: (source?.customOrder ?? 0).toString(),
+    );
     _weightCtrl = TextEditingController(text: (source?.weight ?? 0).toString());
+    _respondTimeCtrl = TextEditingController(
+      text: (source?.respondTime ?? 180000).toString(),
+    );
+    _enabledCookieJar = source?.enabledCookieJar ?? true;
+    _concurrentRateCtrl =
+        TextEditingController(text: source?.concurrentRate ?? '');
+    _bookUrlPatternCtrl =
+        TextEditingController(text: source?.bookUrlPattern ?? '');
+    _jsLibCtrl = TextEditingController(text: source?.jsLib ?? '');
     _headerCtrl = TextEditingController(text: source?.header ?? '');
+    _loginUrlCtrl = TextEditingController(text: source?.loginUrl ?? '');
+    _loginUiCtrl = TextEditingController(text: source?.loginUi ?? '');
+    _loginCheckJsCtrl = TextEditingController(text: source?.loginCheckJs ?? '');
+    _coverDecodeJsCtrl = TextEditingController(text: source?.coverDecodeJs ?? '');
+    _bookSourceCommentCtrl =
+        TextEditingController(text: source?.bookSourceComment ?? '');
+    _variableCommentCtrl =
+        TextEditingController(text: source?.variableComment ?? '');
     _searchUrlCtrl = TextEditingController(text: source?.searchUrl ?? '');
     _exploreUrlCtrl = TextEditingController(text: source?.exploreUrl ?? '');
+    _exploreScreenCtrl =
+        TextEditingController(text: source?.exploreScreen ?? '');
     _enabled = source?.enabled ?? true;
     _enabledExplore = source?.enabledExplore ?? true;
 
+    _debugKeyCtrl.text = widget.initialDebugKey ?? '';
+
+    _searchCheckKeyWordCtrl =
+        TextEditingController(text: source?.ruleSearch?.checkKeyWord ?? '');
     _searchBookListCtrl =
         TextEditingController(text: source?.ruleSearch?.bookList ?? '');
     _searchNameCtrl = TextEditingController(text: source?.ruleSearch?.name ?? '');
@@ -190,10 +253,24 @@ class _SourceEditViewState extends State<SourceEditView> {
     _nameCtrl.dispose();
     _urlCtrl.dispose();
     _groupCtrl.dispose();
+    _typeCtrl.dispose();
+    _customOrderCtrl.dispose();
     _weightCtrl.dispose();
+    _respondTimeCtrl.dispose();
+    _concurrentRateCtrl.dispose();
+    _bookUrlPatternCtrl.dispose();
+    _jsLibCtrl.dispose();
     _headerCtrl.dispose();
+    _loginUrlCtrl.dispose();
+    _loginUiCtrl.dispose();
+    _loginCheckJsCtrl.dispose();
+    _coverDecodeJsCtrl.dispose();
+    _bookSourceCommentCtrl.dispose();
+    _variableCommentCtrl.dispose();
     _searchUrlCtrl.dispose();
     _exploreUrlCtrl.dispose();
+    _exploreScreenCtrl.dispose();
+    _searchCheckKeyWordCtrl.dispose();
     _searchBookListCtrl.dispose();
     _searchNameCtrl.dispose();
     _searchAuthorCtrl.dispose();
@@ -294,6 +371,8 @@ class _SourceEditViewState extends State<SourceEditView> {
             '常用规则为 CSS 选择器，可用 “selector@href/@src/@text/@html” 等形式取值。',
           ),
           children: [
+            _buildTextFieldTile('校验关键词', _searchCheckKeyWordCtrl,
+                placeholder: 'ruleSearch.checkKeyWord（用于可用性检测）'),
             _buildTextFieldTile('书籍列表', _searchBookListCtrl,
                 placeholder: 'ruleSearch.bookList（CSS 选择器）'),
             _buildTextFieldTile('书名', _searchNameCtrl,
@@ -400,6 +479,12 @@ class _SourceEditViewState extends State<SourceEditView> {
             _buildTextFieldTile('名称', _nameCtrl, placeholder: 'bookSourceName'),
             _buildTextFieldTile('地址', _urlCtrl, placeholder: 'bookSourceUrl'),
             _buildTextFieldTile('分组', _groupCtrl, placeholder: 'bookSourceGroup'),
+            _buildTextFieldTile('类型', _typeCtrl, placeholder: 'bookSourceType（数字）'),
+            _buildTextFieldTile(
+              '自定义排序',
+              _customOrderCtrl,
+              placeholder: 'customOrder（数字）',
+            ),
             _buildTextFieldTile('权重', _weightCtrl, placeholder: 'weight（数字）'),
             CupertinoListTile.notched(
               title: const Text('启用'),
@@ -418,11 +503,95 @@ class _SourceEditViewState extends State<SourceEditView> {
           ],
         ),
         CupertinoListSection.insetGrouped(
-          header: const Text('常用字段'),
+          header: const Text('网络/登录'),
           children: [
-            _buildTextFieldTile('Header', _headerCtrl, placeholder: 'header（每行 key:value）', maxLines: 6),
-            _buildTextFieldTile('搜索 URL', _searchUrlCtrl, placeholder: 'searchUrl（含 {key} 或 {{key}}）'),
+            _buildTextFieldTile(
+              '请求超时',
+              _respondTimeCtrl,
+              placeholder: 'respondTime（毫秒）',
+            ),
+            CupertinoListTile.notched(
+              title: const Text('CookieJar'),
+              subtitle: const Text('enabledCookieJar'),
+              trailing: CupertinoSwitch(
+                value: _enabledCookieJar,
+                onChanged: (v) => setState(() => _enabledCookieJar = v),
+              ),
+            ),
+            _buildTextFieldTile(
+              '并发速率',
+              _concurrentRateCtrl,
+              placeholder: 'concurrentRate（可空）',
+            ),
+            _buildTextFieldTile(
+              'Header',
+              _headerCtrl,
+              placeholder: 'header（每行 key:value）',
+              maxLines: 6,
+            ),
+            _buildTextFieldTile('登录地址', _loginUrlCtrl, placeholder: 'loginUrl'),
+            _buildTextFieldTile(
+              '登录 UI',
+              _loginUiCtrl,
+              placeholder: 'loginUi（可空）',
+              maxLines: 3,
+            ),
+            _buildTextFieldTile(
+              '登录检查 JS',
+              _loginCheckJsCtrl,
+              placeholder: 'loginCheckJs（可空）',
+              maxLines: 3,
+            ),
+            _buildTextFieldTile(
+              'JS 库',
+              _jsLibCtrl,
+              placeholder: 'jsLib（可空）',
+              maxLines: 2,
+            ),
+            _buildTextFieldTile(
+              '封面解码 JS',
+              _coverDecodeJsCtrl,
+              placeholder: 'coverDecodeJs（可空）',
+              maxLines: 3,
+            ),
+          ],
+        ),
+        CupertinoListSection.insetGrouped(
+          header: const Text('URL'),
+          children: [
+            _buildTextFieldTile(
+              '书籍 URL 正则',
+              _bookUrlPatternCtrl,
+              placeholder: 'bookUrlPattern（可空）',
+            ),
+            _buildTextFieldTile(
+              '搜索 URL',
+              _searchUrlCtrl,
+              placeholder: 'searchUrl（含 {key} 或 {{key}}）',
+            ),
             _buildTextFieldTile('发现 URL', _exploreUrlCtrl, placeholder: 'exploreUrl'),
+            _buildTextFieldTile(
+              '发现屏蔽',
+              _exploreScreenCtrl,
+              placeholder: 'exploreScreen（可空）',
+            ),
+          ],
+        ),
+        CupertinoListSection.insetGrouped(
+          header: const Text('备注'),
+          children: [
+            _buildTextFieldTile(
+              '书源备注',
+              _bookSourceCommentCtrl,
+              placeholder: 'bookSourceComment（可空）',
+              maxLines: 4,
+            ),
+            _buildTextFieldTile(
+              '变量备注',
+              _variableCommentCtrl,
+              placeholder: 'variableComment（可空）',
+              maxLines: 4,
+            ),
           ],
         ),
         CupertinoListSection.insetGrouped(
@@ -998,12 +1167,26 @@ class _SourceEditViewState extends State<SourceEditView> {
     setOrRemove('bookSourceName', textOrNull(_nameCtrl));
     setOrRemove('bookSourceUrl', textOrNull(_urlCtrl));
     setOrRemove('bookSourceGroup', textOrNull(_groupCtrl));
+    map['bookSourceType'] = parseInt(_typeCtrl.text, 0);
+    map['customOrder'] = parseInt(_customOrderCtrl.text, 0);
     map['enabled'] = _enabled;
     map['enabledExplore'] = _enabledExplore;
+    map['enabledCookieJar'] = _enabledCookieJar;
+    map['respondTime'] = parseInt(_respondTimeCtrl.text, 180000);
     map['weight'] = parseInt(_weightCtrl.text, 0);
+    setOrRemove('concurrentRate', textOrNull(_concurrentRateCtrl));
+    setOrRemove('bookUrlPattern', textOrNull(_bookUrlPatternCtrl));
+    setOrRemove('jsLib', textOrNull(_jsLibCtrl, trimValue: false));
     setOrRemove('header', textOrNull(_headerCtrl, trimValue: false));
+    setOrRemove('loginUrl', textOrNull(_loginUrlCtrl));
+    setOrRemove('loginUi', textOrNull(_loginUiCtrl, trimValue: false));
+    setOrRemove('loginCheckJs', textOrNull(_loginCheckJsCtrl, trimValue: false));
+    setOrRemove('coverDecodeJs', textOrNull(_coverDecodeJsCtrl, trimValue: false));
+    setOrRemove('bookSourceComment', textOrNull(_bookSourceCommentCtrl, trimValue: false));
+    setOrRemove('variableComment', textOrNull(_variableCommentCtrl, trimValue: false));
     setOrRemove('searchUrl', textOrNull(_searchUrlCtrl));
     setOrRemove('exploreUrl', textOrNull(_exploreUrlCtrl));
+    setOrRemove('exploreScreen', textOrNull(_exploreScreenCtrl));
 
     Map<String, dynamic> ensureMap(dynamic raw) {
       if (raw is Map<String, dynamic>) return Map<String, dynamic>.from(raw);
@@ -1027,6 +1210,7 @@ class _SourceEditViewState extends State<SourceEditView> {
 
     // 规则字段：在“保留未知字段”的前提下只覆盖常用键
     final ruleSearch = mergeRule(map['ruleSearch'], {
+      'checkKeyWord': textOrNull(_searchCheckKeyWordCtrl),
       'bookList': textOrNull(_searchBookListCtrl),
       'name': textOrNull(_searchNameCtrl),
       'author': textOrNull(_searchAuthorCtrl),
@@ -1112,13 +1296,28 @@ class _SourceEditViewState extends State<SourceEditView> {
       _nameCtrl.text = source.bookSourceName;
       _urlCtrl.text = source.bookSourceUrl;
       _groupCtrl.text = source.bookSourceGroup ?? '';
+      _typeCtrl.text = source.bookSourceType.toString();
+      _customOrderCtrl.text = source.customOrder.toString();
       _weightCtrl.text = source.weight.toString();
+      _respondTimeCtrl.text = source.respondTime.toString();
+      _enabledCookieJar = source.enabledCookieJar ?? true;
+      _concurrentRateCtrl.text = source.concurrentRate ?? '';
+      _bookUrlPatternCtrl.text = source.bookUrlPattern ?? '';
+      _jsLibCtrl.text = source.jsLib ?? '';
       _headerCtrl.text = source.header ?? '';
+      _loginUrlCtrl.text = source.loginUrl ?? '';
+      _loginUiCtrl.text = source.loginUi ?? '';
+      _loginCheckJsCtrl.text = source.loginCheckJs ?? '';
+      _coverDecodeJsCtrl.text = source.coverDecodeJs ?? '';
+      _bookSourceCommentCtrl.text = source.bookSourceComment ?? '';
+      _variableCommentCtrl.text = source.variableComment ?? '';
       _searchUrlCtrl.text = source.searchUrl ?? '';
       _exploreUrlCtrl.text = source.exploreUrl ?? '';
+      _exploreScreenCtrl.text = source.exploreScreen ?? '';
       _enabled = source.enabled;
       _enabledExplore = source.enabledExplore;
 
+      _searchCheckKeyWordCtrl.text = source.ruleSearch?.checkKeyWord ?? '';
       _searchBookListCtrl.text = source.ruleSearch?.bookList ?? '';
       _searchNameCtrl.text = source.ruleSearch?.name ?? '';
       _searchAuthorCtrl.text = source.ruleSearch?.author ?? '';

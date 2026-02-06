@@ -34,7 +34,11 @@ class RuleParserEngine {
       );
 
       // 发送请求
-      final response = await _fetch(searchUrl, source.header);
+      final response = await _fetch(
+        searchUrl,
+        header: source.header,
+        timeoutMs: source.respondTime,
+      );
       if (response == null) return [];
 
       // 解析结果
@@ -120,7 +124,11 @@ class RuleParserEngine {
       String url, {
       required int rawState,
     }) async {
-      final res = await _fetchDebug(url, source.header);
+      final res = await _fetchDebug(
+        url,
+        header: source.header,
+        timeoutMs: source.respondTime,
+      );
       if (res.body != null) {
         log(
           '≡获取成功:${res.finalUrl ?? res.requestUrl}'
@@ -586,7 +594,11 @@ class RuleParserEngine {
       {'key': keyword, 'searchKey': keyword},
     );
 
-    final fetch = await _fetchDebug(requestUrl, source.header);
+    final fetch = await _fetchDebug(
+      requestUrl,
+      header: source.header,
+      timeoutMs: source.respondTime,
+    );
     if (fetch.body == null) {
       return SearchDebugResult(
         fetch: fetch,
@@ -694,7 +706,11 @@ class RuleParserEngine {
         const {},
       );
 
-      final response = await _fetch(exploreUrl, source.header);
+      final response = await _fetch(
+        exploreUrl,
+        header: source.header,
+        timeoutMs: source.respondTime,
+      );
       if (response == null) return [];
 
       final document = html_parser.parse(response);
@@ -756,7 +772,11 @@ class RuleParserEngine {
       exploreUrlRule,
       const {},
     );
-    final fetch = await _fetchDebug(requestUrl, source.header);
+    final fetch = await _fetchDebug(
+      requestUrl,
+      header: source.header,
+      timeoutMs: source.respondTime,
+    );
     if (fetch.body == null) {
       return ExploreDebugResult(
         fetch: fetch,
@@ -852,7 +872,11 @@ class RuleParserEngine {
 
     try {
       final fullUrl = _absoluteUrl(source.bookSourceUrl, bookUrl);
-      final response = await _fetch(fullUrl, source.header);
+      final response = await _fetch(
+        fullUrl,
+        header: source.header,
+        timeoutMs: source.respondTime,
+      );
       if (response == null) return null;
 
       final document = html_parser.parse(response);
@@ -901,7 +925,11 @@ class RuleParserEngine {
     }
 
     final fullUrl = _absoluteUrl(source.bookSourceUrl, bookUrl);
-    final fetch = await _fetchDebug(fullUrl, source.header);
+    final fetch = await _fetchDebug(
+      fullUrl,
+      header: source.header,
+      timeoutMs: source.respondTime,
+    );
     if (fetch.body == null) {
       return BookInfoDebugResult(
         fetch: fetch,
@@ -999,7 +1027,11 @@ class RuleParserEngine {
 
     try {
       final fullUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
-      final response = await _fetch(fullUrl, source.header);
+      final response = await _fetch(
+        fullUrl,
+        header: source.header,
+        timeoutMs: source.respondTime,
+      );
       if (response == null) return [];
 
       final document = html_parser.parse(response);
@@ -1045,7 +1077,11 @@ class RuleParserEngine {
     }
 
     final fullUrl = _absoluteUrl(source.bookSourceUrl, tocUrl);
-    final fetch = await _fetchDebug(fullUrl, source.header);
+    final fetch = await _fetchDebug(
+      fullUrl,
+      header: source.header,
+      timeoutMs: source.respondTime,
+    );
     if (fetch.body == null) {
       return TocDebugResult(
         fetch: fetch,
@@ -1111,7 +1147,11 @@ class RuleParserEngine {
 
     try {
       final fullUrl = _absoluteUrl(source.bookSourceUrl, chapterUrl);
-      final response = await _fetch(fullUrl, source.header);
+      final response = await _fetch(
+        fullUrl,
+        header: source.header,
+        timeoutMs: source.respondTime,
+      );
       if (response == null) return '';
 
       final document = html_parser.parse(response);
@@ -1155,7 +1195,11 @@ class RuleParserEngine {
     }
 
     final fullUrl = _absoluteUrl(source.bookSourceUrl, chapterUrl);
-    final fetch = await _fetchDebug(fullUrl, source.header);
+    final fetch = await _fetchDebug(
+      fullUrl,
+      header: source.header,
+      timeoutMs: source.respondTime,
+    );
     if (fetch.body == null) {
       return ContentDebugResult(
         fetch: fetch,
@@ -1205,9 +1249,19 @@ class RuleParserEngine {
   }
 
   /// 发送HTTP请求
-  Future<String?> _fetch(String url, String? header) async {
+  Future<String?> _fetch(
+    String url, {
+    String? header,
+    int? timeoutMs,
+  }) async {
     try {
-      final options = Options();
+      final timeout =
+          (timeoutMs != null && timeoutMs > 0) ? Duration(milliseconds: timeoutMs) : null;
+      final options = Options(
+        connectTimeout: timeout,
+        sendTimeout: timeout,
+        receiveTimeout: timeout,
+      );
       if (header != null && header.isNotEmpty) {
         try {
           // 尝试解析自定义 header
@@ -1230,10 +1284,20 @@ class RuleParserEngine {
     }
   }
 
-  Future<FetchDebugResult> _fetchDebug(String url, String? header) async {
+  Future<FetchDebugResult> _fetchDebug(
+    String url, {
+    String? header,
+    int? timeoutMs,
+  }) async {
     final sw = Stopwatch()..start();
     try {
-      final options = Options();
+      final timeout =
+          (timeoutMs != null && timeoutMs > 0) ? Duration(milliseconds: timeoutMs) : null;
+      final options = Options(
+        connectTimeout: timeout,
+        sendTimeout: timeout,
+        receiveTimeout: timeout,
+      );
       final requestHeaders = <String, String>{};
       if (header != null && header.isNotEmpty) {
         for (final line in header.split('\n')) {
