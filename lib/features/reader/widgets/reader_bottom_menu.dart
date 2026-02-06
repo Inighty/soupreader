@@ -16,8 +16,10 @@ class ReaderBottomMenuNew extends StatefulWidget {
   final ValueChanged<int> onPageChanged;  // 页码变化回调
   final ValueChanged<ReadingSettings> onSettingsChanged;
   final VoidCallback onShowChapterList;
-  final VoidCallback onShowInterfaceSettings;
-  final VoidCallback onShowMoreMenu;
+  final VoidCallback onShowTypography;
+  final VoidCallback onShowTheme;
+  final VoidCallback onShowPage;
+  final VoidCallback onShowMore;
 
   const ReaderBottomMenuNew({
     super.key,
@@ -31,8 +33,10 @@ class ReaderBottomMenuNew extends StatefulWidget {
     required this.onPageChanged,
     required this.onSettingsChanged,
     required this.onShowChapterList,
-    required this.onShowInterfaceSettings,
-    required this.onShowMoreMenu,
+    required this.onShowTypography,
+    required this.onShowTheme,
+    required this.onShowPage,
+    required this.onShowMore,
   });
 
   @override
@@ -102,12 +106,30 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 children: [
                   _buildTabItem(0, CupertinoIcons.list_bullet, '目录',
                       widget.onShowChapterList),
-                  _buildTabItem(1, _getDayNightIcon(), _getDayNightLabel(),
-                      _toggleDayNight),
-                  _buildTabItem(2, CupertinoIcons.textformat_size, '常用',
-                      widget.onShowInterfaceSettings),
-                  _buildTabItem(3, CupertinoIcons.gear, '设置',
-                      widget.onShowMoreMenu),
+                  _buildTabItem(
+                    1,
+                    CupertinoIcons.textformat_size,
+                    'Aa',
+                    widget.onShowTypography,
+                  ),
+                  _buildTabItem(
+                    2,
+                    CupertinoIcons.paintbrush,
+                    '主题',
+                    widget.onShowTheme,
+                  ),
+                  _buildTabItem(
+                    3,
+                    CupertinoIcons.arrow_right_arrow_left_circle,
+                    '翻页',
+                    widget.onShowPage,
+                  ),
+                  _buildTabItem(
+                    4,
+                    CupertinoIcons.ellipsis,
+                    '更多',
+                    widget.onShowMore,
+                  ),
                 ],
               ),
             ),
@@ -268,26 +290,5 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     );
   }
 
-  /// 日夜切换图标
-  IconData _getDayNightIcon() {
-    return widget.currentTheme.isDark
-        ? CupertinoIcons.moon_fill
-        : CupertinoIcons.sun_max_fill;
-  }
-
-  /// 日夜切换标签
-  String _getDayNightLabel() {
-    return widget.currentTheme.isDark ? '夜间' : '日间';
-  }
-
-  /// 切换日夜模式
-  void _toggleDayNight() {
-    final isDark = widget.currentTheme.isDark;
-    // 找到一个相反亮度的主题
-    final targetIndex = AppColors.readingThemes
-        .indexWhere((t) => isDark ? !t.isDark : t.isDark);
-    if (targetIndex != -1) {
-      widget.onSettingsChanged(widget.settings.copyWith(themeIndex: targetIndex));
-    }
-  }
+  // 日夜切换/主题切换的高频入口已并入“主题”面板，避免占用底栏位置。
 }

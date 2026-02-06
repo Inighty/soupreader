@@ -26,6 +26,7 @@ import '../widgets/reader_menus.dart';
 import '../widgets/reader_bottom_menu.dart';
 import '../widgets/reader_status_bar.dart';
 import '../widgets/typography_settings_dialog.dart';
+import '../widgets/reader_quick_settings_sheet.dart';
 
 /// 简洁阅读器 - Cupertino 风格 (增强版)
 class SimpleReaderView extends StatefulWidget {
@@ -948,8 +949,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     },
                     onSettingsChanged: (settings) => _updateSettings(settings),
                     onShowChapterList: _showChapterList,
-                    onShowInterfaceSettings: _showInterfaceSettingsSheet,
-                    onShowMoreMenu: _showMoreMenu,
+                    onShowTypography: () => _showQuickSettingsSheet(
+                      initialTab: ReaderQuickSettingsTab.typography,
+                    ),
+                    onShowTheme: () => _showQuickSettingsSheet(
+                      initialTab: ReaderQuickSettingsTab.theme,
+                    ),
+                    onShowPage: () => _showQuickSettingsSheet(
+                      initialTab: ReaderQuickSettingsTab.page,
+                    ),
+                    onShowMore: _showMoreMenu,
                   ),
 
                 if (_isLoadingChapter)
@@ -1423,6 +1432,21 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   /// 显示综合界面设置面板
   void _showInterfaceSettingsSheet() {
     _showReadingSettingsSheet(initialTab: 0);
+  }
+
+  void _showQuickSettingsSheet({
+    required ReaderQuickSettingsTab initialTab,
+  }) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (context) => ReaderQuickSettingsSheet(
+        settings: _settings,
+        themes: AppColors.readingThemes,
+        initialTab: initialTab,
+        onSettingsChanged: _updateSettings,
+        onOpenFullSettings: () => _showReadingSettingsSheet(initialTab: 0),
+      ),
+    );
   }
 
   void _showReadingSettingsSheet({int initialTab = 0}) {
