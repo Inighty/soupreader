@@ -330,12 +330,18 @@ class ReaderBottomMenu extends StatelessWidget {
       context: context,
       builder: (context) => CupertinoActionSheet(
         title: const Text('选择翻页模式'),
-        actions: PageTurnMode.values.map((mode) {
+        actions: PageTurnModeUi.values(current: settings.pageTurnMode).map((mode) {
           final isSelected = mode == settings.pageTurnMode;
           return CupertinoActionSheetAction(
             onPressed: () {
-              onSettingsChanged(settings.copyWith(pageTurnMode: mode));
               Navigator.pop(context);
+              if (PageTurnModeUi.isHidden(mode)) {
+                Future<void>.delayed(Duration.zero, () {
+                  _showMessage(context, '仿真2模式已隐藏');
+                });
+                return;
+              }
+              onSettingsChanged(settings.copyWith(pageTurnMode: mode));
             },
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -344,16 +350,20 @@ class ReaderBottomMenu extends StatelessWidget {
                   _getPageTurnModeIcon(mode),
                   color: isSelected
                       ? CupertinoColors.activeBlue
-                      : CupertinoColors.label,
+                      : PageTurnModeUi.isHidden(mode)
+                          ? CupertinoColors.inactiveGray
+                          : CupertinoColors.label,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  mode.name,
+                  PageTurnModeUi.isHidden(mode) ? '${mode.name}（隐藏）' : mode.name,
                   style: TextStyle(
                     color: isSelected
                         ? CupertinoColors.activeBlue
-                        : CupertinoColors.label,
+                        : PageTurnModeUi.isHidden(mode)
+                            ? CupertinoColors.inactiveGray
+                            : CupertinoColors.label,
                     fontWeight:
                         isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
@@ -375,6 +385,22 @@ class ReaderBottomMenu extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
           child: const Text('取消'),
         ),
+      ),
+    );
+  }
+
+  void _showMessage(BuildContext context, String message) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('提示'),
+        content: Text('\n$message'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('好'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
       ),
     );
   }

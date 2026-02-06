@@ -476,6 +476,35 @@ extension PageTurnModeExtension on PageTurnMode {
   }
 }
 
+/// 翻页模式在 UI 中的展示顺序（对标专业阅读器习惯）
+///
+/// 约定：
+/// - `simulation2` 默认隐藏（不出现在可选项里）
+/// - `none`（无动画）永远放在最后
+class PageTurnModeUi {
+  static bool isHidden(PageTurnMode mode) => mode == PageTurnMode.simulation2;
+
+  /// 返回用于 UI 展示/选择的翻页模式列表。
+  ///
+  /// - 当当前模式为隐藏项（`simulation2`）时，会把它插入到列表中（但 UI 应禁用点击）
+  ///   以避免“当前选中值在 UI 里消失”的困惑。
+  static List<PageTurnMode> values({required PageTurnMode current}) {
+    final list = <PageTurnMode>[
+      PageTurnMode.slide,
+      PageTurnMode.simulation,
+      PageTurnMode.cover,
+      PageTurnMode.scroll,
+      PageTurnMode.none, // 放最后
+    ];
+
+    if (current == PageTurnMode.simulation2) {
+      list.insert(2, PageTurnMode.simulation2);
+    }
+
+    return list;
+  }
+}
+
 /// 翻页方向
 enum PageDirection {
   horizontal, // 水平（左右）

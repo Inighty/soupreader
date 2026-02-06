@@ -85,20 +85,27 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
       context: context,
       builder: (ctx) => CupertinoActionSheet(
         title: const Text('选择翻页模式'),
-        actions: PageTurnMode.values.map((mode) {
+        actions: PageTurnModeUi.values(current: _settings.pageTurnMode).map((mode) {
           final isSelected = mode == _settings.pageTurnMode;
           return CupertinoActionSheetAction(
             onPressed: () {
-              _update(_settings.copyWith(pageTurnMode: mode));
               Navigator.pop(ctx);
+              if (PageTurnModeUi.isHidden(mode)) {
+                _showMessage('仿真2模式已隐藏');
+                return;
+              }
+              _update(_settings.copyWith(pageTurnMode: mode));
             },
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  mode.name,
+                  PageTurnModeUi.isHidden(mode) ? '${mode.name}（隐藏）' : mode.name,
                   style: TextStyle(
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: PageTurnModeUi.isHidden(mode)
+                        ? CupertinoColors.inactiveGray
+                        : null,
                   ),
                 ),
                 if (isSelected) ...[
@@ -282,4 +289,3 @@ class _SliderTile extends StatelessWidget {
     );
   }
 }
-

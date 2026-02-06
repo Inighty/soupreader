@@ -2710,10 +2710,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: PageTurnMode.values.map((mode) {
+              children: PageTurnModeUi.values(current: _settings.pageTurnMode).map((mode) {
                 final isSelected = _settings.pageTurnMode == mode;
                 return ChoiceChip(
-                  label: Text(mode.name),
+                  label: Text(
+                    PageTurnModeUi.isHidden(mode) ? '${mode.name}（隐藏）' : mode.name,
+                  ),
                   selected: isSelected,
                   selectedColor: CupertinoColors.activeBlue,
                   backgroundColor: Colors.white10,
@@ -2721,7 +2723,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     color: isSelected ? Colors.white : Colors.white70,
                     fontSize: 13,
                   ),
-                  onSelected: (selected) {
+                  onSelected: PageTurnModeUi.isHidden(mode)
+                      ? null
+                      : (selected) {
                     if (selected) {
                       _updateSettingsFromSheet(
                         setPopupState,

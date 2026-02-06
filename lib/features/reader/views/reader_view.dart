@@ -609,12 +609,14 @@ class _ReaderViewState extends State<ReaderView> {
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
-                children: PageTurnMode.values.map((mode) {
+                children: PageTurnModeUi.values(current: _settings.pageTurnMode).map((mode) {
                   final isSelected = _settings.pageTurnMode == mode;
                   return ChoiceChip(
-                    label: Text(mode.name),
+                    label: Text(PageTurnModeUi.isHidden(mode) ? '${mode.name}（隐藏）' : mode.name),
                     selected: isSelected,
-                    onSelected: (selected) {
+                    onSelected: PageTurnModeUi.isHidden(mode)
+                        ? null
+                        : (selected) {
                       if (selected) {
                         setSheetState(() {
                           setState(() {
