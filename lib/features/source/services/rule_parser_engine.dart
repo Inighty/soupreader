@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart';
+import 'dart:convert';
 import '../models/book_source.dart';
 import 'package:flutter/foundation.dart';
 import '../../../core/utils/html_text_formatter.dart';
@@ -16,6 +17,46 @@ class RuleParserEngine {
           'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
     },
   ));
+
+  Map<String, String> _parseRequestHeaders(String? header) {
+    if (header == null) return const {};
+    final raw = header.trim();
+    if (raw.isEmpty) return const {};
+
+    // Legado 的 header 常见格式是 JSON 字符串：
+    // {"User-Agent":"xxx","Referer":"xxx"}
+    if (raw.startsWith('{') && raw.endsWith('}')) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          final m = <String, String>{};
+          decoded.forEach((k, v) {
+            final key = k.toString().trim();
+            if (key.isEmpty) return;
+            if (v == null) return;
+            m[key] = v.toString();
+          });
+          return m;
+        }
+      } catch (_) {
+        // fallthrough: try "key:value" lines below
+      }
+    }
+
+    // 兼容编辑器里的“每行 key:value”格式
+    final headers = <String, String>{};
+    for (final line in raw.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      final idx = trimmed.indexOf(':');
+      if (idx <= 0) continue;
+      final key = trimmed.substring(0, idx).trim();
+      final value = trimmed.substring(idx + 1).trim();
+      if (key.isEmpty) continue;
+      headers[key] = value;
+    }
+    return headers;
+  }
 
   /// 搜索书籍
   Future<List<SearchResult>> search(BookSource source, String keyword) async {
@@ -1291,19 +1332,8 @@ class RuleParserEngine {
         sendTimeout: timeout,
         receiveTimeout: timeout,
       );
-      if (header != null && header.isNotEmpty) {
-        try {
-          // 尝试解析自定义 header
-          final headers = <String, String>{};
-          for (final line in header.split('\n')) {
-            final parts = line.split(':');
-            if (parts.length >= 2) {
-              headers[parts[0].trim()] = parts.sublist(1).join(':').trim();
-            }
-          }
-          options.headers = headers;
-        } catch (_) {}
-      }
+      final requestHeaders = _parseRequestHeaders(header);
+      if (requestHeaders.isNotEmpty) options.headers = requestHeaders;
 
       final response = await _dio.get(url, options: options);
       return response.data?.toString();
@@ -1319,7 +1349,7 @@ class RuleParserEngine {
     int? timeoutMs,
   }) async {
     final sw = Stopwatch()..start();
-    final requestHeaders = <String, String>{};
+    final requestHeaders = _parseRequestHeaders(header);
     try {
       final timeout =
           (timeoutMs != null && timeoutMs > 0) ? Duration(milliseconds: timeoutMs) : null;
@@ -1329,14 +1359,6 @@ class RuleParserEngine {
         receiveTimeout: timeout,
         validateStatus: (_) => true,
       );
-      if (header != null && header.isNotEmpty) {
-        for (final line in header.split('\n')) {
-          final parts = line.split(':');
-          if (parts.length >= 2) {
-            requestHeaders[parts[0].trim()] = parts.sublist(1).join(':').trim();
-          }
-        }
-      }
       if (requestHeaders.isNotEmpty) {
         options.headers = requestHeaders;
       }

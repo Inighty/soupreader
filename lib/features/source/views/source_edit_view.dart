@@ -526,7 +526,7 @@ class _SourceEditViewState extends State<SourceEditView> {
             _buildTextFieldTile(
               'Header',
               _headerCtrl,
-              placeholder: 'header（每行 key:value）',
+              placeholder: 'header（支持 JSON 或每行 key:value）',
               maxLines: 6,
             ),
             _buildTextFieldTile('登录地址', _loginUrlCtrl, placeholder: 'loginUrl'),
