@@ -33,11 +33,26 @@ class ReaderQuickSettingsSheet extends StatefulWidget {
 
 class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   late ReaderQuickSettingsTab _tab;
+  late ReadingSettings _draft;
 
   @override
   void initState() {
     super.initState();
     _tab = widget.initialTab;
+    _draft = widget.settings;
+  }
+
+  @override
+  void didUpdateWidget(covariant ReaderQuickSettingsSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 该 sheet 是一个独立 route，通常不会随外层 setState 重建；
+    // 这里主要用于极少数场景（例如外部强制刷新）保持一致。
+    _draft = widget.settings;
+  }
+
+  void _apply(ReadingSettings next) {
+    setState(() => _draft = next);
+    widget.onSettingsChanged(next);
   }
 
   @override
@@ -157,21 +172,21 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
       case ReaderQuickSettingsTab.typography:
         return _TypographyTab(
           key: const ValueKey('typography'),
-          settings: widget.settings,
-          onSettingsChanged: widget.onSettingsChanged,
+          settings: _draft,
+          onSettingsChanged: _apply,
         );
       case ReaderQuickSettingsTab.theme:
         return _ThemeTab(
           key: const ValueKey('theme'),
-          settings: widget.settings,
+          settings: _draft,
           themes: widget.themes,
-          onSettingsChanged: widget.onSettingsChanged,
+          onSettingsChanged: _apply,
         );
       case ReaderQuickSettingsTab.page:
         return _PageTab(
           key: const ValueKey('page'),
-          settings: widget.settings,
-          onSettingsChanged: widget.onSettingsChanged,
+          settings: _draft,
+          onSettingsChanged: _apply,
         );
     }
   }
@@ -221,7 +236,7 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
             isDestructiveAction: true,
             onPressed: () {
               Navigator.pop(context);
-              widget.onSettingsChanged(const ReadingSettings());
+              _apply(const ReadingSettings());
             },
             child: const Text('恢复'),
           ),
@@ -753,4 +768,3 @@ class _ModeChip extends StatelessWidget {
     );
   }
 }
-
