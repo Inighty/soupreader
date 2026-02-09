@@ -72,7 +72,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   double _startX = 0; // 按下的起始点
   double _startY = 0;
   double _lastX = 0; // 上一帧触摸点
-  double _lastY = 0;
   double _touchX = 0.1; // 当前触摸点（P1: 不让x,y为0,否则在点计算时会有问题）
   double _touchY = 0.1;
 
@@ -642,7 +641,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _startX = x;
     _startY = y;
     _lastX = x;
-    _lastY = y;
     _touchX = x;
     _touchY = y;
   }
@@ -650,7 +648,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // === 对标 Legado: setTouchPoint ===
   void _setTouchPoint(double x, double y) {
     _lastX = _touchX;
-    _lastY = _touchY;
     _touchX = x;
     _touchY = y;
   }
@@ -931,9 +928,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   Widget _buildAnimatedPages() {
     final size = MediaQuery.of(context).size;
     final screenWidth = size.width;
-    final screenHeight = size.height;
-    // 同 _buildPageContent：除了滚动以外一律按水平处理
-    final isVertical = false;
     final isRunning = _isMoved || _isRunning || _isStarted;
     if (!isRunning) {
       // 静止态提前预渲染相邻页，避免首次拖拽时同步生成导致的卡顿
@@ -942,12 +936,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     // 计算偏移量（基于触摸点相对于起始点的位移）
     // 对于滑动/覆盖模式使用
-    final double offset;
-    if (isVertical) {
-      offset = (_touchY - _startY).clamp(-screenHeight, screenHeight);
-    } else {
-      offset = (_touchX - _startX).clamp(-screenWidth, screenWidth);
-    }
+    final offset = (_touchX - _startX).clamp(-screenWidth, screenWidth);
 
     switch (widget.pageTurnMode) {
       case PageTurnMode.slide:
@@ -955,31 +944,23 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         if (_needsPictureCache) {
           _ensurePagePictures(size, allowRecord: !_gestureInProgress);
         }
-        return isVertical
-            ? _buildVerticalSlideAnimation(screenHeight, offset)
-            : _buildSlideAnimation(screenWidth, offset);
+        return _buildSlideAnimation(screenWidth, offset);
       case PageTurnMode.cover:
         if (!isRunning) return _buildPageWidget(_factory.curPage);
         if (_needsPictureCache) {
           _ensurePagePictures(size, allowRecord: !_gestureInProgress);
         }
-        return isVertical
-            ? _buildVerticalCoverAnimation(screenHeight, offset)
-            : _buildCoverAnimation(screenWidth, offset);
+        return _buildCoverAnimation(screenWidth, offset);
       case PageTurnMode.simulation:
         // 仿真模式使用 touchX/touchY (Shader)
         if (_needsShaderImages) _ensureShaderImages(size);
-        return isVertical
-            ? _buildVerticalSlideAnimation(screenHeight, offset)
-            : _buildSimulationAnimation(size);
+        return _buildSimulationAnimation(size);
       case PageTurnMode.simulation2:
         // 仿真模式2 使用贝塞尔曲线
         if (_needsPictureCache) {
           _ensurePagePictures(size, allowRecord: !_gestureInProgress);
         }
-        return isVertical
-            ? _buildVerticalSlideAnimation(screenHeight, offset)
-            : _buildSimulation2Animation(size);
+        return _buildSimulation2Animation(size);
       case PageTurnMode.none:
         if (!isRunning) return _buildPageWidget(_factory.curPage);
         if (_needsPictureCache) {
@@ -987,9 +968,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         }
         return _buildNoAnimation(screenWidth, offset);
       default:
-        return isVertical
-            ? _buildVerticalSlideAnimation(screenHeight, offset)
-            : _buildSlideAnimation(screenWidth, offset);
+        return _buildSlideAnimation(screenWidth, offset);
     }
   }
 
@@ -1002,71 +981,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
           isComplex: true,
         ),
       ),
-    );
-  }
-
-  /// 垂直滑动模式
-  Widget _buildVerticalSlideAnimation(double screenHeight, double offset) {
-    if (_direction == _PageDirection.none) {
-      return _buildRecordedPage(_curPagePicture, _factory.curPage);
-    }
-    final clamped = offset.clamp(-screenHeight, screenHeight);
-    return Stack(
-      children: [
-        if (_direction == _PageDirection.next)
-          Transform.translate(
-            offset: Offset(0, screenHeight + clamped),
-            child: _buildRecordedPage(_nextPagePicture, _factory.nextPage),
-          ),
-        if (_direction == _PageDirection.prev)
-          Transform.translate(
-            offset: Offset(0, clamped - screenHeight),
-            child: _buildRecordedPage(_prevPagePicture, _factory.prevPage),
-          ),
-        Transform.translate(
-          offset: Offset(0, clamped),
-          child: _buildRecordedPage(_curPagePicture, _factory.curPage),
-        ),
-      ],
-    );
-  }
-
-  /// 垂直覆盖模式
-  Widget _buildVerticalCoverAnimation(double screenHeight, double offset) {
-    if (_direction == _PageDirection.none) {
-      return _buildRecordedPage(_curPagePicture, _factory.curPage);
-    }
-    final clamped = offset.clamp(-screenHeight, screenHeight);
-    final shadowOpacity =
-        (clamped.abs() / screenHeight * 0.4).clamp(0.0, 0.4);
-
-    return Stack(
-      children: [
-        if (_direction == _PageDirection.next)
-          Positioned.fill(
-            child: _buildRecordedPage(_nextPagePicture, _factory.nextPage),
-          ),
-        if (_direction == _PageDirection.prev)
-          Positioned.fill(
-            child: _buildRecordedPage(_prevPagePicture, _factory.prevPage),
-          ),
-        Transform.translate(
-          offset: Offset(0, clamped),
-          child: Container(
-            decoration: BoxDecoration(
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: shadowOpacity),
-                  blurRadius: 20,
-                  spreadRadius: 5,
-                  offset: Offset(0, clamped > 0 ? -8 : 8),
-                ),
-              ],
-            ),
-            child: _buildRecordedPage(_curPagePicture, _factory.curPage),
-          ),
-        ),
-      ],
     );
   }
 
@@ -1373,69 +1287,6 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     // 开始动画（完成翻页或取消）
-    _onAnimStart();
-  }
-
-  // === 垂直翻页手势处理（对标水平方式） ===
-  void _onVerticalDragStart(DragStartDetails details) {
-    if (!widget.enableGestures) return;
-    _gestureInProgress = true;
-    // 允许中断正在进行的动画，实现连续翻页
-    _abortAnim();
-    _setStartPoint(details.localPosition.dx, details.localPosition.dy);
-    _isMoved = false;
-    _isCancel = false;
-    _direction = _PageDirection.none;
-  }
-
-  void _onVerticalDragUpdate(DragUpdateDetails details) {
-    // _onVerticalDragStart 已处理动画中断，此处直接处理拖拽
-
-    final focusX = details.localPosition.dx;
-    final focusY = details.localPosition.dy;
-
-    if (!_isMoved) {
-      final deltaX = (focusX - _startX).abs();
-      final deltaY = (focusY - _startY).abs();
-      final distance = deltaX * deltaX + deltaY * deltaY;
-      final slop = 5.0 + (widget.pageTouchSlop.clamp(0, 100) / 100) * 45.0;
-      final slopSquare = slop * slop;
-
-      _isMoved = distance > slopSquare;
-
-      if (_isMoved) {
-        if (focusY - _startY > 0) {
-          // 向下滑动 = 上一页
-          if (!_factory.hasPrev()) {
-            return;
-          }
-          _setDirection(_PageDirection.prev);
-        } else {
-          // 向上滑动 = 下一页
-          if (!_factory.hasNext()) {
-            return;
-          }
-          _setDirection(_PageDirection.next);
-        }
-        _setStartPoint(focusX, focusY);
-      }
-    }
-
-    if (_isMoved) {
-      _isCancel =
-          _direction == _PageDirection.next ? focusY > _lastY : focusY < _lastY;
-      _isRunning = true;
-      _setTouchPoint(focusX, focusY);
-      setState(() {});
-    }
-  }
-
-  void _onVerticalDragEnd(DragEndDetails details) {
-    _gestureInProgress = false;
-    if (!_isMoved) {
-      _direction = _PageDirection.none;
-      return;
-    }
     _onAnimStart();
   }
 
