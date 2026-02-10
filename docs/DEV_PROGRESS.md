@@ -946,3 +946,30 @@
 ### 兼容影响
 - 仅 UI/UX 表现层变更，不涉及 legado 规则语义、书源解析链路与数据结构。
 - 对旧书源兼容性无负面影响，功能行为保持不变。
+
+## 2026-02-11（P2：阅读设置弹层统一 - 点击区域/排版）
+
+### 已完成
+- 重构 `click_action_config_dialog` 的视觉层：
+  - 接入 `AppDesignTokens`，亮暗模式自适应面板背景、标题层级、边框与抓手；
+  - 统一 9 宫格区域卡片、图例色块与重置/保存操作的语义色反馈；
+  - 保持点击动作配置与保存逻辑不变，仅调整表现层。
+- 重构 `typography_settings_dialog` 的视觉层：
+  - 统一弹层壳结构（抓手 + 标题栏 + 分割线）；
+  - 滑杆、分段选项、加减按钮、文本层级改为语义色驱动；
+  - 保持排版参数（字号、行距、缩进、边距等）变更逻辑不变。
+- 兼容性补齐：`showClickActionConfigDialog` 同时兼容 `initialConfig` 与历史调用参数 `currentConfig`，避免调用方断裂。
+
+### 为什么
+- 阅读器主界面和一级面板已完成统一，但“点击区域设置”“排版设置”仍保留固定深色硬编码，亮暗模式下风格不一致。
+- 本次目标是补齐阅读设置链路的视觉连续性，减少二级弹层的跳脱感。
+
+### 验证方式
+- 命令：`dart format lib/features/reader/widgets/click_action_config_dialog.dart lib/features/reader/widgets/typography_settings_dialog.dart`
+- 命令：`flutter analyze --no-pub`
+- 命令：`flutter test test/rule_parser_engine_css_nth_compat_test.dart`
+- 手工：阅读页依次打开“点击区域设置”“排版设置”，检查亮暗模式下标题、按钮、卡片、滑杆、分段选项状态是否协调一致。
+
+### 兼容影响
+- 仅 UI/UX 表现层调整，不涉及 legado 规则语义、书源解析链路与数据结构。
+- 点击区域配置的调用入口向后兼容旧参数命名，不影响已有功能行为。

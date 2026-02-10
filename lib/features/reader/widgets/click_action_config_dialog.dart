@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Colors;
+
+import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
 
 /// 点击区域配置对话框
@@ -32,6 +34,31 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
 
   // 默认配置
   static const Map<String, int> _defaultConfig = ClickAction.defaultZoneConfig;
+
+  bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
+
+  Color get _accent =>
+      _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+
+  Color get _panelBg =>
+      _isDark ? const Color(0xFF1C1C1E) : AppDesignTokens.surfaceLight;
+
+  Color get _textStrong =>
+      _isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+
+  Color get _textNormal =>
+      _isDark ? CupertinoColors.systemGrey : AppDesignTokens.textNormal;
+
+  Color get _textSubtle => _isDark
+      ? CupertinoColors.systemGrey.withValues(alpha: 0.75)
+      : AppDesignTokens.textMuted;
+
+  Color get _lineColor =>
+      _isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+
+  Color get _chipBg => _isDark
+      ? CupertinoColors.systemGrey.withValues(alpha: 0.16)
+      : AppDesignTokens.pageBgLight;
 
   @override
   void initState() {
@@ -71,21 +98,21 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   Color _getActionColor(int action) {
     switch (action) {
       case ClickAction.showMenu:
-        return Colors.amber;
+        return _accent;
       case ClickAction.nextPage:
-        return Colors.green;
+        return AppDesignTokens.success;
       case ClickAction.prevPage:
-        return Colors.blue;
+        return AppDesignTokens.info;
       case ClickAction.nextChapter:
-        return Colors.orange;
+        return AppDesignTokens.warning;
       case ClickAction.prevChapter:
-        return Colors.cyan;
+        return const Color(0xFF8B5CF6);
       case ClickAction.addBookmark:
-        return Colors.red;
+        return const Color(0xFFEC4899);
       case ClickAction.openChapterList:
-        return Colors.purple;
+        return const Color(0xFF6366F1);
       default:
-        return Colors.grey;
+        return _textSubtle;
     }
   }
 
@@ -93,89 +120,121 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   Widget build(BuildContext context) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
-      decoration: const BoxDecoration(
-        color: Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      decoration: BoxDecoration(
+        color: _panelBg,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
-      child: Column(
-        children: [
-          // 标题栏
-          _buildHeader(),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            _buildGrabber(),
+            _buildHeader(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    // 说明文字
+                    Text(
+                      '点击下方区域选择该位置的动作',
+                      style: TextStyle(color: _textNormal, fontSize: 14),
+                    ),
+                    const SizedBox(height: 16),
 
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // 说明文字
-                  const Text(
-                    '点击下方区域选择该位置的动作',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                  const SizedBox(height: 16),
+                    // 9宫格预览
+                    _buildGridPreview(),
 
-                  // 9宫格预览
-                  _buildGridPreview(),
+                    const SizedBox(height: 24),
 
-                  const SizedBox(height: 24),
+                    // 动作说明
+                    _buildLegend(),
 
-                  // 动作说明
-                  _buildLegend(),
+                    const SizedBox(height: 16),
 
-                  const SizedBox(height: 16),
-
-                  // 重置按钮
-                  CupertinoButton(
-                    onPressed: _resetToDefault,
-                    child: const Text('恢复默认',
-                        style: TextStyle(color: Colors.white70)),
-                  ),
-                ],
+                    // 重置按钮
+                    CupertinoButton(
+                      onPressed: _resetToDefault,
+                      child: Text(
+                        '恢复默认',
+                        style: TextStyle(
+                          color: _textSubtle,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGrabber() {
+    final color = _isDark
+        ? Colors.white24
+        : AppDesignTokens.textMuted.withValues(alpha: 0.35);
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.only(top: 10),
+        width: 38,
+        height: 4,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(2),
+        ),
       ),
     );
   }
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
+      padding: const EdgeInsets.fromLTRB(16, 8, 12, 12),
+      decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: Color(0xFF333333)),
+          bottom: BorderSide(color: _lineColor),
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            '点击区域设置',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+          Expanded(
+            child: Text(
+              '点击区域设置',
+              style: TextStyle(
+                color: _textStrong,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-          Row(
-            children: [
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: () {
-                  widget.onSave(_config);
-                  Navigator.pop(context);
-                },
-                child:
-                    const Text('保存', style: TextStyle(color: Colors.amber)),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            minimumSize: const Size(30, 30),
+            onPressed: () {
+              widget.onSave(_config);
+              Navigator.pop(context);
+            },
+            child: Text(
+              '保存',
+              style: TextStyle(
+                color: _accent,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: () => Navigator.pop(context),
-                child: const Icon(CupertinoIcons.xmark_circle_fill,
-                    color: Colors.white70),
-              ),
-            ],
+            ),
+          ),
+          CupertinoButton(
+            padding: const EdgeInsets.all(6),
+            minimumSize: const Size(30, 30),
+            onPressed: () => Navigator.pop(context),
+            child: Icon(
+              CupertinoIcons.xmark,
+              color: _textSubtle,
+              size: 18,
+            ),
           ),
         ],
       ),
@@ -187,8 +246,9 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
       aspectRatio: 0.6, // 模拟手机屏幕比例
       child: Container(
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.white24),
-          borderRadius: BorderRadius.circular(8),
+          color: _chipBg,
+          border: Border.all(color: _lineColor),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: GridView.builder(
           physics: const NeverScrollableScrollPhysics(),
@@ -201,39 +261,41 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
             final zone = _zones[index];
             final action = _config[zone] ?? ClickAction.showMenu;
             final isSelected = _selectedZone == zone;
+            final actionColor = _getActionColor(action);
 
             return GestureDetector(
               onTap: () => _showActionPicker(zone),
               child: Container(
-                margin: const EdgeInsets.all(2),
+                margin: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
-                  color: _getActionColor(action)
-                      .withValues(alpha: isSelected ? 0.5 : 0.2),
+                  color:
+                      actionColor.withValues(alpha: isSelected ? 0.28 : 0.14),
                   border: Border.all(
                     color: isSelected
-                        ? Colors.white
-                        : _getActionColor(action).withValues(alpha: 0.5),
-                    width: isSelected ? 2 : 1,
+                        ? _accent
+                        : actionColor.withValues(alpha: 0.45),
+                    width: isSelected ? 1.8 : 1,
                   ),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       _getZoneName(zone),
-                      style: const TextStyle(
-                        color: Colors.white70,
+                      style: TextStyle(
+                        color: _textSubtle,
                         fontSize: 10,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       ClickAction.getName(action),
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: _getActionColor(action),
+                        color: actionColor,
                         fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -251,17 +313,18 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
       spacing: 8,
       runSpacing: 8,
       children: ClickAction.allActions.map((action) {
+        final actionColor = _getActionColor(action);
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: _getActionColor(action).withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: _getActionColor(action).withValues(alpha: 0.5)),
+            color: actionColor.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: actionColor.withValues(alpha: 0.4)),
           ),
           child: Text(
             ClickAction.getName(action),
             style: TextStyle(
-              color: _getActionColor(action),
+              color: actionColor,
               fontSize: 12,
             ),
           ),
@@ -280,6 +343,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
       builder: (context) => CupertinoActionSheet(
         title: Text('选择 ${_getZoneName(zone)} 的动作'),
         actions: ClickAction.allActions.map((action) {
+          final actionColor = _getActionColor(action);
           return CupertinoActionSheetAction(
             onPressed: () {
               setState(() {
@@ -295,7 +359,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: _getActionColor(action),
+                    color: actionColor,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -322,20 +386,27 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   void _resetToDefault() {
     setState(() {
       _config = Map<String, int>.from(_defaultConfig);
+      _selectedZone = null;
     });
   }
 }
 
 /// 显示点击区域配置对话框
-Future<void> showClickActionConfigDialog(
+void showClickActionConfigDialog(
   BuildContext context, {
-  required Map<String, int> currentConfig,
+  Map<String, int>? initialConfig,
+  Map<String, int>? currentConfig,
   required Function(Map<String, int>) onSave,
 }) {
-  return showCupertinoModalPopup(
+  final resolvedConfig = initialConfig ?? currentConfig;
+  if (resolvedConfig == null) {
+    throw ArgumentError('initialConfig 或 currentConfig 至少需要提供一个');
+  }
+
+  showCupertinoModalPopup(
     context: context,
     builder: (context) => ClickActionConfigDialog(
-      initialConfig: currentConfig,
+      initialConfig: resolvedConfig,
       onSave: onSave,
     ),
   );
