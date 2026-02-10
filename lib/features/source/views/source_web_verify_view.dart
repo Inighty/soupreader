@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/webview_cookie_bridge.dart';
 import '../services/rule_parser_engine.dart';
 
@@ -134,102 +135,98 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
   Widget build(BuildContext context) {
     final progress = _progress;
     final showProgress = progress > 0 && progress < 100;
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: const Text('网页验证'),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: () {
-            showCupertinoModalPopup(
-              context: context,
-              builder: (_) => CupertinoActionSheet(
-                title: const Text('操作'),
-                message: Text(
-                  (_currentUrl.isEmpty ? widget.initialUrl : _currentUrl),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                actions: [
-                  CupertinoActionSheetAction(
-                    child: const Text('刷新'),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      _controller.reload();
-                    },
-                  ),
-                  CupertinoActionSheetAction(
-                    child: const Text('导入 Cookie 到解析引擎'),
-                    onPressed: () async {
-                      Navigator.of(context).pop();
-                      await _importCookies();
-                    },
-                  ),
-                  CupertinoActionSheetAction(
-                    child: const Text('复制 Cookie 值'),
-                    onPressed: () async {
-                      Navigator.of(context).pop();
-                      await _copyCookieHeader();
-                    },
-                  ),
-                  CupertinoActionSheetAction(
-                    isDestructiveAction: true,
-                    child: const Text('清空 WebView Cookie'),
-                    onPressed: () async {
-                      Navigator.of(context).pop();
-                      final ok = await WebViewCookieBridge.clearAllCookies();
-                      await _showMessage(ok ? '已清空 Cookie' : '清空失败或不支持');
-                    },
-                  ),
-                ],
-                cancelButton: CupertinoActionSheetAction(
-                  child: const Text('取消'),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
+    return AppCupertinoPageScaffold(
+      title: '网页验证',
+      trailing: CupertinoButton(
+        padding: EdgeInsets.zero,
+        onPressed: () {
+          showCupertinoModalPopup(
+            context: context,
+            builder: (_) => CupertinoActionSheet(
+              title: const Text('操作'),
+              message: Text(
+                (_currentUrl.isEmpty ? widget.initialUrl : _currentUrl),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-            );
-          },
-          child: const Icon(CupertinoIcons.ellipsis),
-        ),
+              actions: [
+                CupertinoActionSheetAction(
+                  child: const Text('刷新'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _controller.reload();
+                  },
+                ),
+                CupertinoActionSheetAction(
+                  child: const Text('导入 Cookie 到解析引擎'),
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    await _importCookies();
+                  },
+                ),
+                CupertinoActionSheetAction(
+                  child: const Text('复制 Cookie 值'),
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    await _copyCookieHeader();
+                  },
+                ),
+                CupertinoActionSheetAction(
+                  isDestructiveAction: true,
+                  child: const Text('清空 WebView Cookie'),
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    final ok = await WebViewCookieBridge.clearAllCookies();
+                    await _showMessage(ok ? '已清空 Cookie' : '清空失败或不支持');
+                  },
+                ),
+              ],
+              cancelButton: CupertinoActionSheetAction(
+                child: const Text('取消'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          );
+        },
+        child: const Icon(CupertinoIcons.ellipsis),
       ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            if (showProgress)
-              SizedBox(
-                height: 2,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: CupertinoColors.systemGrey5.resolveFrom(context),
-                  ),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: FractionallySizedBox(
-                      widthFactor: progress / 100.0,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: CupertinoColors.activeBlue.resolveFrom(context),
-                        ),
+      child: Column(
+        children: [
+          if (showProgress)
+            SizedBox(
+              height: 2,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: CupertinoColors.systemGrey5.resolveFrom(context),
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: progress / 100.0,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.activeBlue.resolveFrom(context),
                       ),
                     ),
                   ),
                 ),
               ),
-            if (_lastImportHint != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                child: Text(
-                  _lastImportHint!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                  ),
+            ),
+          if (_lastImportHint != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+              child: Text(
+                _lastImportHint!,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
                 ),
               ),
-            Expanded(
-              child: WebViewWidget(controller: _controller),
             ),
-          ],
-        ),
+          Expanded(
+            child: WebViewWidget(controller: _controller),
+          ),
+        ],
       ),
     );
   }

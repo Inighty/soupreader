@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show SelectableText;
 import 'package:flutter/services.dart';
 
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/entities/book_entity.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -413,45 +414,41 @@ class _SourceEditViewState extends State<SourceEditView> {
       },
     );
 
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: const Text('书源编辑'),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: _save,
-              child: const Text('保存'),
-            ),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: _showMore,
-              child: const Icon(CupertinoIcons.ellipsis),
-            ),
-          ],
-        ),
+    return AppCupertinoPageScaffold(
+      title: '书源编辑',
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: _save,
+            child: const Text('保存'),
+          ),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: _showMore,
+            child: const Icon(CupertinoIcons.ellipsis),
+          ),
+        ],
       ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: tabControl,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: tabControl,
+          ),
+          Expanded(
+            child: IndexedStack(
+              index: _tab,
+              children: [
+                _buildBasicTab(),
+                _buildRulesTab(),
+                _buildJsonTab(),
+                _buildDebugTab(),
+              ],
             ),
-            Expanded(
-              child: IndexedStack(
-                index: _tab,
-                children: [
-                  _buildBasicTab(),
-                  _buildRulesTab(),
-                  _buildJsonTab(),
-                  _buildDebugTab(),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

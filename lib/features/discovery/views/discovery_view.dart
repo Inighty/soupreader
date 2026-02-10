@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../bookshelf/services/book_add_service.dart';
@@ -240,134 +241,114 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   @override
   Widget build(BuildContext context) {
     final eligibleCount = _eligibleSources().length;
-    final theme = CupertinoTheme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final borderColor =
         isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
     final panelColor = isDark
         ? AppDesignTokens.surfaceDark.withValues(alpha: 0.82)
         : AppDesignTokens.surfaceLight.withValues(alpha: 0.94);
 
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: const Text('发现'),
-        backgroundColor: theme.barBackgroundColor,
-        border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          onPressed: _loading ? null : _refresh,
-          child: const Icon(CupertinoIcons.refresh),
-        ),
+    return AppCupertinoPageScaffold(
+      title: '发现',
+      trailing: CupertinoButton(
+        padding: EdgeInsets.zero,
+        onPressed: _loading ? null : _refresh,
+        child: const Icon(CupertinoIcons.refresh),
       ),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              panelColor,
-              theme.scaffoldBackgroundColor,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              if (_loading)
-                _buildStatusPanel(
-                  borderColor: borderColor,
-                  panelColor: panelColor,
-                  child: Row(
-                    children: [
-                      const CupertinoActivityIndicator(),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _currentSourceName.isEmpty
-                              ? '正在加载…'
-                              : '正在发现: $_currentSourceName ($_completedSources/$_totalSources)',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isDark
-                                ? AppDesignTokens.textMuted
-                                : AppDesignTokens.textNormal,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+      child: Column(
+        children: [
+          if (_loading)
+            _buildStatusPanel(
+              borderColor: borderColor,
+              panelColor: panelColor,
+              child: Row(
+                children: [
+                  const CupertinoActivityIndicator(),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _currentSourceName.isEmpty
+                          ? '正在加载…'
+                          : '正在发现: $_currentSourceName ($_completedSources/$_totalSources)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark
+                            ? AppDesignTokens.textMuted
+                            : AppDesignTokens.textNormal,
                       ),
-                      CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: _stop,
-                        child: const Text('停止'),
-                      ),
-                    ],
-                  ),
-                )
-              else if (_sourceIssues.isNotEmpty)
-                _buildStatusPanel(
-                  borderColor: CupertinoColors.systemRed.resolveFrom(context),
-                  panelColor: panelColor,
-                  child: Row(
-                    children: [
-                      Icon(
-                        CupertinoIcons.exclamationmark_triangle,
-                        size: 16,
-                        color: CupertinoColors.systemRed.resolveFrom(context),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '本次 ${_sourceIssues.length} 个书源失败，可查看原因',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color:
-                                CupertinoColors.systemRed.resolveFrom(context),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: _showIssueDetails,
-                        child: const Text('查看'),
-                      ),
-                    ],
-                  ),
-                )
-              else if (_lastError != null && _results.isEmpty)
-                _buildStatusPanel(
-                  borderColor: CupertinoColors.systemRed.resolveFrom(context),
-                  panelColor: panelColor,
-                  child: Text(
-                    _lastError!,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: CupertinoColors.systemRed.resolveFrom(context),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                )
-              else
-                const SizedBox(height: 6),
-              Expanded(
-                child: _results.isEmpty
-                    ? _buildEmptyState(context, eligibleCount)
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
-                        itemCount: _results.length,
-                        itemBuilder: (context, index) =>
-                            _buildResultItem(_results[index]),
-                      ),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: _stop,
+                    child: const Text('停止'),
+                  ),
+                ],
               ),
-              if (_isImporting)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 12),
-                  child: CupertinoActivityIndicator(),
+            )
+          else if (_sourceIssues.isNotEmpty)
+            _buildStatusPanel(
+              borderColor: CupertinoColors.systemRed.resolveFrom(context),
+              panelColor: panelColor,
+              child: Row(
+                children: [
+                  Icon(
+                    CupertinoIcons.exclamationmark_triangle,
+                    size: 16,
+                    color: CupertinoColors.systemRed.resolveFrom(context),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '本次 ${_sourceIssues.length} 个书源失败，可查看原因',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: CupertinoColors.systemRed.resolveFrom(context),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: _showIssueDetails,
+                    child: const Text('查看'),
+                  ),
+                ],
+              ),
+            )
+          else if (_lastError != null && _results.isEmpty)
+            _buildStatusPanel(
+              borderColor: CupertinoColors.systemRed.resolveFrom(context),
+              panelColor: panelColor,
+              child: Text(
+                _lastError!,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: CupertinoColors.systemRed.resolveFrom(context),
                 ),
-            ],
+              ),
+            )
+          else
+            const SizedBox(height: 6),
+          Expanded(
+            child: _results.isEmpty
+                ? _buildEmptyState(context, eligibleCount)
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
+                    itemCount: _results.length,
+                    itemBuilder: (context, index) =>
+                        _buildResultItem(_results[index]),
+                  ),
           ),
-        ),
+          if (_isImporting)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: CupertinoActivityIndicator(),
+            ),
+        ],
       ),
     );
   }

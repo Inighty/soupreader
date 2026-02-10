@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 
@@ -9,7 +10,8 @@ class ReadingPageSettingsView extends StatefulWidget {
   const ReadingPageSettingsView({super.key});
 
   @override
-  State<ReadingPageSettingsView> createState() => _ReadingPageSettingsViewState();
+  State<ReadingPageSettingsView> createState() =>
+      _ReadingPageSettingsViewState();
 }
 
 class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
@@ -29,45 +31,42 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('翻页与按键'),
-      ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            CupertinoListSection.insetGrouped(
-              header: const Text('翻页动画'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('动画时长'),
-                  additionalInfo: Text('${_settings.pageAnimDuration} ms'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => _pickAnimDuration(),
+    return AppCupertinoPageScaffold(
+      title: '翻页与按键',
+      child: ListView(
+        children: [
+          CupertinoListSection.insetGrouped(
+            header: const Text('翻页动画'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('动画时长'),
+                additionalInfo: Text('${_settings.pageAnimDuration} ms'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => _pickAnimDuration(),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('触发与按键'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('翻页触发灵敏度'),
+                additionalInfo: Text('${_settings.pageTouchSlop}%'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _pickTouchSlop,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('音量键翻页'),
+                trailing: CupertinoSwitch(
+                  value: _settings.volumeKeyPage,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(volumeKeyPage: v)),
                 ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('触发与按键'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('翻页触发灵敏度'),
-                  additionalInfo: Text('${_settings.pageTouchSlop}%'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _pickTouchSlop,
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('音量键翻页'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.volumeKeyPage,
-                    onChanged: (v) => _update(_settings.copyWith(volumeKeyPage: v)),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }

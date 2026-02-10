@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/entities/book_entity.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
@@ -40,47 +41,43 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: const Text('文本替换规则'),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: _createRule,
-              child: const Icon(CupertinoIcons.add),
-            ),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: _showMoreMenu,
-              child: const Icon(CupertinoIcons.ellipsis),
-            ),
-          ],
-        ),
+    return AppCupertinoPageScaffold(
+      title: '文本替换规则',
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: _createRule,
+            child: const Icon(CupertinoIcons.add),
+          ),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: _showMoreMenu,
+            child: const Icon(CupertinoIcons.ellipsis),
+          ),
+        ],
       ),
-      child: SafeArea(
-        child: ValueListenableBuilder<Box<ReplaceRuleEntity>>(
-          valueListenable: _db.replaceRulesBox.listenable(),
-          builder: (context, _, __) {
-            final allRules = _repo.getAllRules();
-            allRules.sort((a, b) => a.order.compareTo(b.order));
+      child: ValueListenableBuilder<Box<ReplaceRuleEntity>>(
+        valueListenable: _db.replaceRulesBox.listenable(),
+        builder: (context, _, __) {
+          final allRules = _repo.getAllRules();
+          allRules.sort((a, b) => a.order.compareTo(b.order));
 
-            final groups = _buildGroups(allRules);
-            final activeGroup =
-                groups.contains(_selectedGroup) ? _selectedGroup : '全部';
-            final rules = _filter(allRules, activeGroup);
+          final groups = _buildGroups(allRules);
+          final activeGroup =
+              groups.contains(_selectedGroup) ? _selectedGroup : '全部';
+          final rules = _filter(allRules, activeGroup);
 
-            return Column(
-              children: [
-                _buildGroupFilter(groups, activeGroup),
-                Expanded(
-                  child: rules.isEmpty ? _empty() : _buildList(rules),
-                ),
-              ],
-            );
-          },
-        ),
+          return Column(
+            children: [
+              _buildGroupFilter(groups, activeGroup),
+              Expanded(
+                child: rules.isEmpty ? _empty() : _buildList(rules),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -321,7 +318,8 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   Future<void> _export() async {
-    final rules = _repo.getAllRules()..sort((a, b) => a.order.compareTo(b.order));
+    final rules = _repo.getAllRules()
+      ..sort((a, b) => a.order.compareTo(b.order));
     final jsonText = LegadoJson.encode(
       rules.map((r) => r.toJson()).toList(growable: false),
     );
@@ -346,4 +344,3 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     );
   }
 }
-

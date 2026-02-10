@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/colors.dart';
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 
@@ -32,37 +33,32 @@ class _ReadingThemeSettingsViewState extends State<ReadingThemeSettingsView> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('阅读主题'),
-      ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            CupertinoListSection.insetGrouped(
-              header: const Text('选择主题'),
-              children: AppColors.readingThemes.asMap().entries.map((entry) {
-                final index = entry.key;
-                final theme = entry.value;
-                final selected = index == _settings.themeIndex;
-                return CupertinoListTile.notched(
-                  title: Text(theme.name),
-                  trailing: selected
-                      ? const Icon(
-                          CupertinoIcons.checkmark,
-                          color: CupertinoColors.activeBlue,
-                          size: 18,
-                        )
-                      : null,
-                  onTap: () => _updateThemeIndex(index),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
+    return AppCupertinoPageScaffold(
+      title: '阅读主题',
+      child: ListView(
+        children: [
+          CupertinoListSection.insetGrouped(
+            header: const Text('选择主题'),
+            children: AppColors.readingThemes.asMap().entries.map((entry) {
+              final index = entry.key;
+              final theme = entry.value;
+              final selected = index == _settings.themeIndex;
+              return CupertinoListTile.notched(
+                title: Text(theme.name),
+                trailing: selected
+                    ? const Icon(
+                        CupertinoIcons.checkmark,
+                        color: CupertinoColors.activeBlue,
+                        size: 18,
+                      )
+                    : null,
+                onTap: () => _updateThemeIndex(index),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
 }
-

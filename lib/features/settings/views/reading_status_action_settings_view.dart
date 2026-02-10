@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../reader/widgets/click_action_config_dialog.dart';
@@ -32,179 +33,179 @@ class _ReadingStatusActionSettingsViewState
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('状态栏与操作'),
-      ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            CupertinoListSection.insetGrouped(
-              header: const Text('状态栏'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('显示状态栏'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.showStatusBar,
-                    onChanged: (v) => _update(_settings.copyWith(showStatusBar: v)),
-                  ),
+    return AppCupertinoPageScaffold(
+      title: '状态栏与操作',
+      child: ListView(
+        children: [
+          CupertinoListSection.insetGrouped(
+            header: const Text('状态栏'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('显示状态栏'),
+                trailing: CupertinoSwitch(
+                  value: _settings.showStatusBar,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(showStatusBar: v)),
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('显示章节进度'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.showChapterProgress,
-                    onChanged: (v) =>
-                        _update(_settings.copyWith(showChapterProgress: v)),
-                  ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('显示章节进度'),
+                trailing: CupertinoSwitch(
+                  value: _settings.showChapterProgress,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(showChapterProgress: v)),
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('显示时间'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.showTime,
-                    onChanged: (v) => _update(_settings.copyWith(showTime: v)),
-                  ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('显示时间'),
+                trailing: CupertinoSwitch(
+                  value: _settings.showTime,
+                  onChanged: (v) => _update(_settings.copyWith(showTime: v)),
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('显示进度'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.showProgress,
-                    onChanged: (v) => _update(_settings.copyWith(showProgress: v)),
-                  ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('显示进度'),
+                trailing: CupertinoSwitch(
+                  value: _settings.showProgress,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(showProgress: v)),
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('显示电量'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.showBattery,
-                    onChanged: (v) => _update(_settings.copyWith(showBattery: v)),
-                  ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('显示电量'),
+                trailing: CupertinoSwitch(
+                  value: _settings.showBattery,
+                  onChanged: (v) => _update(_settings.copyWith(showBattery: v)),
                 ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('页眉'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('显示页眉'),
-                  trailing: CupertinoSwitch(
-                    value: !_settings.hideHeader,
-                    onChanged: (v) => _update(_settings.copyWith(hideHeader: !v)),
-                  ),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('页眉'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('显示页眉'),
+                trailing: CupertinoSwitch(
+                  value: !_settings.hideHeader,
+                  onChanged: (v) => _update(_settings.copyWith(hideHeader: !v)),
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('页眉分割线'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.showHeaderLine,
-                    onChanged: (v) =>
-                        _update(_settings.copyWith(showHeaderLine: v)),
-                  ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('页眉分割线'),
+                trailing: CupertinoSwitch(
+                  value: _settings.showHeaderLine,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(showHeaderLine: v)),
                 ),
-                _optionTile(
-                  title: '左侧',
-                  value: _tipLabel(_headerOptions, _settings.headerLeftContent),
-                  onTap: () => _pickTip(
-                    title: '页眉左侧',
-                    options: _headerOptions,
-                    current: _settings.headerLeftContent,
-                    onSelected: (v) => _update(_settings.copyWith(headerLeftContent: v)),
-                  ),
+              ),
+              _optionTile(
+                title: '左侧',
+                value: _tipLabel(_headerOptions, _settings.headerLeftContent),
+                onTap: () => _pickTip(
+                  title: '页眉左侧',
+                  options: _headerOptions,
+                  current: _settings.headerLeftContent,
+                  onSelected: (v) =>
+                      _update(_settings.copyWith(headerLeftContent: v)),
                 ),
-                _optionTile(
-                  title: '中间',
-                  value: _tipLabel(_headerOptions, _settings.headerCenterContent),
-                  onTap: () => _pickTip(
-                    title: '页眉中间',
-                    options: _headerOptions,
-                    current: _settings.headerCenterContent,
-                    onSelected: (v) =>
-                        _update(_settings.copyWith(headerCenterContent: v)),
-                  ),
+              ),
+              _optionTile(
+                title: '中间',
+                value: _tipLabel(_headerOptions, _settings.headerCenterContent),
+                onTap: () => _pickTip(
+                  title: '页眉中间',
+                  options: _headerOptions,
+                  current: _settings.headerCenterContent,
+                  onSelected: (v) =>
+                      _update(_settings.copyWith(headerCenterContent: v)),
                 ),
-                _optionTile(
-                  title: '右侧',
-                  value: _tipLabel(_headerOptions, _settings.headerRightContent),
-                  onTap: () => _pickTip(
-                    title: '页眉右侧',
-                    options: _headerOptions,
-                    current: _settings.headerRightContent,
-                    onSelected: (v) =>
-                        _update(_settings.copyWith(headerRightContent: v)),
-                  ),
+              ),
+              _optionTile(
+                title: '右侧',
+                value: _tipLabel(_headerOptions, _settings.headerRightContent),
+                onTap: () => _pickTip(
+                  title: '页眉右侧',
+                  options: _headerOptions,
+                  current: _settings.headerRightContent,
+                  onSelected: (v) =>
+                      _update(_settings.copyWith(headerRightContent: v)),
                 ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('页脚'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('显示页脚'),
-                  trailing: CupertinoSwitch(
-                    value: !_settings.hideFooter,
-                    onChanged: (v) => _update(_settings.copyWith(hideFooter: !v)),
-                  ),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('页脚'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('显示页脚'),
+                trailing: CupertinoSwitch(
+                  value: !_settings.hideFooter,
+                  onChanged: (v) => _update(_settings.copyWith(hideFooter: !v)),
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('页脚分割线'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.showFooterLine,
-                    onChanged: (v) =>
-                        _update(_settings.copyWith(showFooterLine: v)),
-                  ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('页脚分割线'),
+                trailing: CupertinoSwitch(
+                  value: _settings.showFooterLine,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(showFooterLine: v)),
                 ),
-                _optionTile(
-                  title: '左侧',
-                  value: _tipLabel(_footerOptions, _settings.footerLeftContent),
-                  onTap: () => _pickTip(
-                    title: '页脚左侧',
-                    options: _footerOptions,
-                    current: _settings.footerLeftContent,
-                    onSelected: (v) => _update(_settings.copyWith(footerLeftContent: v)),
-                  ),
+              ),
+              _optionTile(
+                title: '左侧',
+                value: _tipLabel(_footerOptions, _settings.footerLeftContent),
+                onTap: () => _pickTip(
+                  title: '页脚左侧',
+                  options: _footerOptions,
+                  current: _settings.footerLeftContent,
+                  onSelected: (v) =>
+                      _update(_settings.copyWith(footerLeftContent: v)),
                 ),
-                _optionTile(
-                  title: '中间',
-                  value: _tipLabel(_footerOptions, _settings.footerCenterContent),
-                  onTap: () => _pickTip(
-                    title: '页脚中间',
-                    options: _footerOptions,
-                    current: _settings.footerCenterContent,
-                    onSelected: (v) =>
-                        _update(_settings.copyWith(footerCenterContent: v)),
-                  ),
+              ),
+              _optionTile(
+                title: '中间',
+                value: _tipLabel(_footerOptions, _settings.footerCenterContent),
+                onTap: () => _pickTip(
+                  title: '页脚中间',
+                  options: _footerOptions,
+                  current: _settings.footerCenterContent,
+                  onSelected: (v) =>
+                      _update(_settings.copyWith(footerCenterContent: v)),
                 ),
-                _optionTile(
-                  title: '右侧',
-                  value: _tipLabel(_footerOptions, _settings.footerRightContent),
-                  onTap: () => _pickTip(
-                    title: '页脚右侧',
-                    options: _footerOptions,
-                    current: _settings.footerRightContent,
-                    onSelected: (v) =>
-                        _update(_settings.copyWith(footerRightContent: v)),
-                  ),
+              ),
+              _optionTile(
+                title: '右侧',
+                value: _tipLabel(_footerOptions, _settings.footerRightContent),
+                onTap: () => _pickTip(
+                  title: '页脚右侧',
+                  options: _footerOptions,
+                  current: _settings.footerRightContent,
+                  onSelected: (v) =>
+                      _update(_settings.copyWith(footerRightContent: v)),
                 ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('操作'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('点击区域（9 宫格）'),
-                  additionalInfo: const Text('配置'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () {
-                    showClickActionConfigDialog(
-                      context,
-                      currentConfig: _settings.clickActions,
-                      onSave: (newConfig) =>
-                          _update(_settings.copyWith(clickActions: newConfig)),
-                    );
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('操作'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('点击区域（9 宫格）'),
+                additionalInfo: const Text('配置'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () {
+                  showClickActionConfigDialog(
+                    context,
+                    currentConfig: _settings.clickActions,
+                    onSave: (newConfig) =>
+                        _update(_settings.copyWith(clickActions: newConfig)),
+                  );
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
@@ -301,4 +302,3 @@ class _TipOption {
 
   const _TipOption(this.value, this.label);
 }
-

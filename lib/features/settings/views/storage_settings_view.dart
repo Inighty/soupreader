@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/services/settings_service.dart';
@@ -30,10 +31,8 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
   }
 
   void _refreshCacheInfo() {
-    final localBookIds = _db.booksBox.values
-        .where((b) => b.isLocal)
-        .map((b) => b.id)
-        .toSet();
+    final localBookIds =
+        _db.booksBox.values.where((b) => b.isLocal).map((b) => b.id).toSet();
     final info =
         _chapterRepo.getDownloadedCacheInfo(protectBookIds: localBookIds);
     if (!mounted) return;
@@ -47,68 +46,67 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
     final chapterText =
         _cacheInfo.chapters == 0 ? '无' : '${_cacheInfo.chapters} 章';
 
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('下载与缓存'),
-      ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            CupertinoListSection.insetGrouped(
-              header: const Text('下载'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('仅 Wi‑Fi 下载'),
-                  trailing: CupertinoSwitch(
-                    value: wifiOnly,
-                    onChanged: (v) async {
-                      await _settingsService.saveAppSettings(
-                        _settingsService.appSettings.copyWith(wifiOnlyDownload: v),
-                      );
-                      if (mounted) setState(() {});
-                    },
-                  ),
+    return AppCupertinoPageScaffold(
+      title: '下载与缓存',
+      child: ListView(
+        children: [
+          CupertinoListSection.insetGrouped(
+            header: const Text('下载'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('仅 Wi‑Fi 下载'),
+                trailing: CupertinoSwitch(
+                  value: wifiOnly,
+                  onChanged: (v) async {
+                    await _settingsService.saveAppSettings(
+                      _settingsService.appSettings
+                          .copyWith(wifiOnlyDownload: v),
+                    );
+                    if (mounted) setState(() {});
+                  },
                 ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('缓存'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('章节缓存占用'),
-                  additionalInfo: Text('$cacheText（$chapterText）'),
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('清理章节缓存（在线书籍）'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _confirmClearCache,
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('说明'),
-              children: const [
-                CupertinoListTile(
-                  title: Text('清理缓存不会影响书架与阅读进度；本地导入书籍的正文不会被清理。'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('缓存'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('章节缓存占用'),
+                additionalInfo: Text('$cacheText（$chapterText）'),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('清理章节缓存（在线书籍）'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _confirmClearCache,
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('说明'),
+            children: const [
+              CupertinoListTile(
+                title: Text('清理缓存不会影响书架与阅读进度；本地导入书籍的正文不会被清理。'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
 
   Future<void> _confirmClearCache() async {
     final sizeText = FormatUtils.formatBytes(_cacheInfo.bytes);
-    final chapterText = _cacheInfo.chapters == 0 ? '无' : '${_cacheInfo.chapters} 章';
+    final chapterText =
+        _cacheInfo.chapters == 0 ? '无' : '${_cacheInfo.chapters} 章';
 
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('清理章节缓存？'),
-        content: Text('\n当前缓存 $sizeText（$chapterText）\n\n将删除在线书籍已缓存的章节内容，本地导入书籍不受影响。'),
+        content: Text(
+            '\n当前缓存 $sizeText（$chapterText）\n\n将删除在线书籍已缓存的章节内容，本地导入书籍不受影响。'),
         actions: [
           CupertinoDialogAction(
             child: const Text('取消'),
@@ -134,10 +132,8 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
     );
 
     try {
-      final localBookIds = _db.booksBox.values
-          .where((b) => b.isLocal)
-          .map((b) => b.id)
-          .toSet();
+      final localBookIds =
+          _db.booksBox.values.where((b) => b.isLocal).map((b) => b.id).toSet();
       final result =
           await _chapterRepo.clearDownloadedCache(protectBookIds: localBookIds);
 
@@ -171,4 +167,3 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
     );
   }
 }
-

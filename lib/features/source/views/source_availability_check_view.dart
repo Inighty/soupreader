@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../models/book_source.dart';
@@ -511,7 +512,8 @@ class _SourceAvailabilityCheckViewState
       '列表：${item.listCount}',
       if (item.diagnosis.labels.isNotEmpty)
         '诊断：${item.diagnosis.labels.map(_diagnosisLabelText).join(' / ')}',
-      if (item.diagnosis.hints.isNotEmpty) '建议：${item.diagnosis.hints.join('；')}',
+      if (item.diagnosis.hints.isNotEmpty)
+        '建议：${item.diagnosis.hints.join('；')}',
       if (item.message != null) '信息：${item.message}',
     ].join('\n');
     await Navigator.of(context).push(
@@ -572,132 +574,126 @@ class _SourceAvailabilityCheckViewState
         .where((e) => _matchesFilter(e, _resultFilter))
         .toList(growable: false);
 
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        middle: const Text('书源可用性检测'),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: _copyReport,
-              child: const Text('复制'),
-            ),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: _exportReportToFile,
-              child: const Text('导出'),
-            ),
-          ],
-        ),
+    return AppCupertinoPageScaffold(
+      title: '书源可用性检测',
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: _copyReport,
+            child: const Text('复制'),
+          ),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: _exportReportToFile,
+            child: const Text('导出'),
+          ),
+        ],
       ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            CupertinoListSection.insetGrouped(
-              header: const Text('概览'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('进度'),
-                  additionalInfo: Text('$done / $total'),
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('结果'),
-                  additionalInfo: Text(
-                      '可用 $ok / 失败 $fail / 空 $empty / 超时 $timedOut / 跳过 $skipped'),
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('结果筛选'),
-                  subtitle: CupertinoSlidingSegmentedControl<_ResultFilter>(
-                    groupValue: _resultFilter,
-                    children: {
-                      for (final f in _ResultFilter.values)
-                        f: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child:
-                              Text('${_filterLabel(f)}(${_countByFilter(f)})'),
-                        ),
-                    },
-                    onValueChanged: (v) {
-                      if (v == null) return;
-                      setState(() => _resultFilter = v);
-                    },
-                  ),
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('一键禁用失效源'),
-                  subtitle: const Text('禁用状态为“失败/空列表”的已启用书源'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _disableUnavailableSources,
-                ),
-                CupertinoListTile.notched(
-                  title: Text(_running ? '停止检测' : '重新检测'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _running ? _stop : _start,
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: Text('列表（显示 ${visibleItems.length} / 总计 $total）'),
-              children: visibleItems.map((item) {
-                final statusText = _statusText(item.status);
-                final color = _statusColor(item.status);
-                return GestureDetector(
-                  onLongPress: () => _openEditorAtDebug(item),
-                  child: CupertinoListTile.notched(
-                    title: Text(item.source.bookSourceName),
-                    subtitle: Text(item.source.bookSourceUrl),
-                    additionalInfo: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          statusText,
-                          style: TextStyle(color: color),
-                        ),
-                        const SizedBox(height: 2),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _diagnosisLabelColor(item.diagnosis.primary)
-                                .withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color:
-                                  _diagnosisLabelColor(item.diagnosis.primary)
-                                      .withValues(alpha: 0.35),
-                            ),
-                          ),
-                          child: Text(
-                            _diagnosisLabelText(item.diagnosis.primary),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: _diagnosisLabelColor(
-                                item.diagnosis.primary,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    trailing: const CupertinoListTileChevron(),
-                    onTap: () => _openItemDetails(item),
-                  ),
-                );
-              }).toList(),
-            ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Text(
-                '提示：长按某条书源可直接打开编辑器并跳到调试 Tab。',
-                style: TextStyle(fontSize: 12.5),
+      child: ListView(
+        children: [
+          CupertinoListSection.insetGrouped(
+            header: const Text('概览'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('进度'),
+                additionalInfo: Text('$done / $total'),
               ),
+              CupertinoListTile.notched(
+                title: const Text('结果'),
+                additionalInfo: Text(
+                    '可用 $ok / 失败 $fail / 空 $empty / 超时 $timedOut / 跳过 $skipped'),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('结果筛选'),
+                subtitle: CupertinoSlidingSegmentedControl<_ResultFilter>(
+                  groupValue: _resultFilter,
+                  children: {
+                    for (final f in _ResultFilter.values)
+                      f: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text('${_filterLabel(f)}(${_countByFilter(f)})'),
+                      ),
+                  },
+                  onValueChanged: (v) {
+                    if (v == null) return;
+                    setState(() => _resultFilter = v);
+                  },
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('一键禁用失效源'),
+                subtitle: const Text('禁用状态为“失败/空列表”的已启用书源'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _disableUnavailableSources,
+              ),
+              CupertinoListTile.notched(
+                title: Text(_running ? '停止检测' : '重新检测'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _running ? _stop : _start,
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: Text('列表（显示 ${visibleItems.length} / 总计 $total）'),
+            children: visibleItems.map((item) {
+              final statusText = _statusText(item.status);
+              final color = _statusColor(item.status);
+              return GestureDetector(
+                onLongPress: () => _openEditorAtDebug(item),
+                child: CupertinoListTile.notched(
+                  title: Text(item.source.bookSourceName),
+                  subtitle: Text(item.source.bookSourceUrl),
+                  additionalInfo: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        statusText,
+                        style: TextStyle(color: color),
+                      ),
+                      const SizedBox(height: 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _diagnosisLabelColor(item.diagnosis.primary)
+                              .withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: _diagnosisLabelColor(item.diagnosis.primary)
+                                .withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          _diagnosisLabelText(item.diagnosis.primary),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _diagnosisLabelColor(
+                              item.diagnosis.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  trailing: const CupertinoListTileChevron(),
+                  onTap: () => _openItemDetails(item),
+                ),
+              );
+            }).toList(),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Text(
+              '提示：长按某条书源可直接打开编辑器并跳到调试 Tab。',
+              style: TextStyle(fontSize: 12.5),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

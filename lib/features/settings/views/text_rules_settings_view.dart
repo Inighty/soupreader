@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../replace/views/replace_rule_list_view.dart';
@@ -30,53 +31,49 @@ class _TextRulesSettingsViewState extends State<TextRulesSettingsView> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('替换净化'),
-      ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            CupertinoListSection.insetGrouped(
-              header: const Text('内置开关'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('净化章节标题'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.cleanChapterTitle,
-                    onChanged: (v) =>
-                        _update(_settings.copyWith(cleanChapterTitle: v)),
-                  ),
+    return AppCupertinoPageScaffold(
+      title: '替换净化',
+      child: ListView(
+        children: [
+          CupertinoListSection.insetGrouped(
+            header: const Text('内置开关'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('净化章节标题'),
+                trailing: CupertinoSwitch(
+                  value: _settings.cleanChapterTitle,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(cleanChapterTitle: v)),
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('繁体显示'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.chineseTraditional,
-                    onChanged: (v) =>
-                        _update(_settings.copyWith(chineseTraditional: v)),
-                  ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('繁体显示'),
+                trailing: CupertinoSwitch(
+                  value: _settings.chineseTraditional,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(chineseTraditional: v)),
                 ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('规则列表'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('文本替换规则'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openReplaceRules,
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('说明'),
-              children: const [
-                CupertinoListTile(title: Text('本页用于净化正文内容与标题。')),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('规则列表'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('文本替换规则'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _openReplaceRules,
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('说明'),
+            children: const [
+              CupertinoListTile(title: Text('本页用于净化正文内容与标题。')),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }

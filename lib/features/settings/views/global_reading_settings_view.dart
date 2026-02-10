@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../reader/widgets/typography_settings_dialog.dart';
@@ -107,68 +108,63 @@ class _GlobalReadingSettingsViewState extends State<GlobalReadingSettingsView> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('阅读（全局默认）'),
-      ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            CupertinoListSection.insetGrouped(
-              header: const Text('常用'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('常用与亮度'),
-                  additionalInfo: const Text('主题 / 字号 / 翻页 / 亮度'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openCommon,
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('细项'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('排版与边距'),
-                  additionalInfo: const Text('字距 / 段距 / 边距 / 标题'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openTypographyDialog,
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('翻页与按键'),
-                  additionalInfo: const Text('动画 / 灵敏度 / 音量键'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openPageSettings,
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('状态栏与操作'),
-                  additionalInfo: const Text('页眉页脚 / 点击区域'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openStatusAndActions,
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('其他'),
-                  additionalInfo: const Text('常亮 / 繁简 / 净化'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openOther,
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('高级'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('恢复默认阅读设置'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _resetDefaults,
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
+    return AppCupertinoPageScaffold(
+      title: '阅读（全局默认）',
+      child: ListView(
+        children: [
+          CupertinoListSection.insetGrouped(
+            header: const Text('常用'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('常用与亮度'),
+                additionalInfo: const Text('主题 / 字号 / 翻页 / 亮度'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _openCommon,
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('细项'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('排版与边距'),
+                additionalInfo: const Text('字距 / 段距 / 边距 / 标题'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _openTypographyDialog,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('翻页与按键'),
+                additionalInfo: const Text('动画 / 灵敏度 / 音量键'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _openPageSettings,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('状态栏与操作'),
+                additionalInfo: const Text('页眉页脚 / 点击区域'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _openStatusAndActions,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('其他'),
+                additionalInfo: const Text('常亮 / 繁简 / 净化'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _openOther,
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('高级'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('恢复默认阅读设置'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _resetDefaults,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
 }
-

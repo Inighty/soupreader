@@ -3,6 +3,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+
 class AboutSettingsView extends StatefulWidget {
   const AboutSettingsView({super.key});
 
@@ -34,47 +36,43 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('关于与诊断'),
-      ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            CupertinoListSection.insetGrouped(
-              header: const Text('应用'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('应用名称'),
-                  additionalInfo: const Text('SoupReader'),
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('版本'),
-                  additionalInfo: Text(_version),
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('更新'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('检查更新'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _checkUpdate,
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('说明'),
-              children: const [
-                CupertinoListTile(
-                  title: Text('如遇到书源解析问题，建议在“书源”中导出相关书源 JSON 便于排查。'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
+    return AppCupertinoPageScaffold(
+      title: '关于与诊断',
+      child: ListView(
+        children: [
+          CupertinoListSection.insetGrouped(
+            header: const Text('应用'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('应用名称'),
+                additionalInfo: const Text('SoupReader'),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('版本'),
+                additionalInfo: Text(_version),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('更新'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('检查更新'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _checkUpdate,
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('说明'),
+            children: const [
+              CupertinoListTile(
+                title: Text('如遇到书源解析问题，建议在“书源”中导出相关书源 JSON 便于排查。'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
@@ -178,4 +176,3 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
     );
   }
 }
-

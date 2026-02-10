@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+
 import '../../../app/theme/colors.dart';
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../reader/widgets/typography_settings_dialog.dart';
@@ -85,7 +87,8 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
       context: context,
       builder: (ctx) => CupertinoActionSheet(
         title: const Text('选择翻页模式'),
-        actions: PageTurnModeUi.values(current: _settings.pageTurnMode).map((mode) {
+        actions:
+            PageTurnModeUi.values(current: _settings.pageTurnMode).map((mode) {
           final isSelected = mode == _settings.pageTurnMode;
           return CupertinoActionSheetAction(
             onPressed: () {
@@ -100,7 +103,9 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  PageTurnModeUi.isHidden(mode) ? '${mode.name}（隐藏）' : mode.name,
+                  PageTurnModeUi.isHidden(mode)
+                      ? '${mode.name}（隐藏）'
+                      : mode.name,
                   style: TextStyle(
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                     color: PageTurnModeUi.isHidden(mode)
@@ -154,118 +159,114 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('阅读偏好'),
-      ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            CupertinoListSection.insetGrouped(
-              header: const Text('常用'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('主题'),
-                  additionalInfo: Text(_themeLabel),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _pickTheme,
+    return AppCupertinoPageScaffold(
+      title: '阅读偏好',
+      child: ListView(
+        children: [
+          CupertinoListSection.insetGrouped(
+            header: const Text('常用'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('主题'),
+                additionalInfo: Text(_themeLabel),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _pickTheme,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('翻页模式'),
+                additionalInfo: Text(_settings.pageTurnMode.name),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _pickPageTurnMode,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('两端对齐'),
+                trailing: CupertinoSwitch(
+                  value: _settings.textFullJustify,
+                  onChanged: (value) =>
+                      _update(_settings.copyWith(textFullJustify: value)),
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('翻页模式'),
-                  additionalInfo: Text(_settings.pageTurnMode.name),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _pickPageTurnMode,
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('两端对齐'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.textFullJustify,
-                    onChanged: (value) =>
-                        _update(_settings.copyWith(textFullJustify: value)),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('段首缩进'),
+                trailing: CupertinoSwitch(
+                  value: _settings.paragraphIndent.isNotEmpty,
+                  onChanged: (value) => _update(
+                    _settings.copyWith(paragraphIndent: value ? '　　' : ''),
                   ),
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('段首缩进'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.paragraphIndent.isNotEmpty,
-                    onChanged: (value) => _update(
-                      _settings.copyWith(paragraphIndent: value ? '　　' : ''),
-                    ),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('排版'),
+            children: [
+              _SliderTile(
+                title: '字体大小',
+                value: _settings.fontSize,
+                min: 10,
+                max: 40,
+                display: _settings.fontSize.toInt().toString(),
+                onChanged: (v) => _update(_settings.copyWith(fontSize: v)),
+              ),
+              _SliderTile(
+                title: '行距',
+                value: _settings.lineHeight,
+                min: 1.0,
+                max: 3.0,
+                display: _settings.lineHeight.toStringAsFixed(1),
+                onChanged: (v) => _update(_settings.copyWith(lineHeight: v)),
+              ),
+              _SliderTile(
+                title: '段距',
+                value: _settings.paragraphSpacing,
+                min: 0,
+                max: 50,
+                display: _settings.paragraphSpacing.toInt().toString(),
+                onChanged: (v) =>
+                    _update(_settings.copyWith(paragraphSpacing: v)),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('亮度'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('跟随系统亮度'),
+                trailing: CupertinoSwitch(
+                  value: _settings.useSystemBrightness,
+                  onChanged: (value) => _update(
+                    _settings.copyWith(useSystemBrightness: value),
                   ),
                 ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('排版'),
-              children: [
-                _SliderTile(
-                  title: '字体大小',
-                  value: _settings.fontSize,
-                  min: 10,
-                  max: 40,
-                  display: _settings.fontSize.toInt().toString(),
-                  onChanged: (v) => _update(_settings.copyWith(fontSize: v)),
-                ),
-                _SliderTile(
-                  title: '行距',
-                  value: _settings.lineHeight,
-                  min: 1.0,
-                  max: 3.0,
-                  display: _settings.lineHeight.toStringAsFixed(1),
-                  onChanged: (v) => _update(_settings.copyWith(lineHeight: v)),
-                ),
-                _SliderTile(
-                  title: '段距',
-                  value: _settings.paragraphSpacing,
-                  min: 0,
-                  max: 50,
-                  display: _settings.paragraphSpacing.toInt().toString(),
-                  onChanged: (v) =>
-                      _update(_settings.copyWith(paragraphSpacing: v)),
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('亮度'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('跟随系统亮度'),
-                  trailing: CupertinoSwitch(
-                    value: _settings.useSystemBrightness,
-                    onChanged: (value) => _update(
-                      _settings.copyWith(useSystemBrightness: value),
-                    ),
-                  ),
-                ),
-                _SliderTile(
-                  title: '手动亮度',
-                  value: _settings.brightness,
-                  min: 0.0,
-                  max: 1.0,
-                  display: '${(_settings.brightness * 100).toInt()}%',
-                  onChanged: (v) => _update(_settings.copyWith(brightness: v)),
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('高级'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('排版与边距（高级）'),
-                  additionalInfo: const Text('更多选项'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _openAdvancedTypography,
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('恢复默认阅读设置'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => _update(const ReadingSettings()),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
+              ),
+              _SliderTile(
+                title: '手动亮度',
+                value: _settings.brightness,
+                min: 0.0,
+                max: 1.0,
+                display: '${(_settings.brightness * 100).toInt()}%',
+                onChanged: (v) => _update(_settings.copyWith(brightness: v)),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('高级'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('排版与边距（高级）'),
+                additionalInfo: const Text('更多选项'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _openAdvancedTypography,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('恢复默认阅读设置'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => _update(const ReadingSettings()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }

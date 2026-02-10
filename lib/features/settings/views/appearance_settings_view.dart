@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 
@@ -35,76 +36,72 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
   @override
   Widget build(BuildContext context) {
     final systemBrightness = MediaQuery.platformBrightnessOf(context);
-    final followSystem = _settings.appearanceMode == AppAppearanceMode.followSystem;
+    final followSystem =
+        _settings.appearanceMode == AppAppearanceMode.followSystem;
     final effectiveIsDark = followSystem
         ? systemBrightness == Brightness.dark
         : _settings.appearanceMode == AppAppearanceMode.dark;
 
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('外观与通用'),
-      ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            CupertinoListSection.insetGrouped(
-              header: const Text('外观'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('跟随系统外观'),
-                  trailing: CupertinoSwitch(
-                    value: followSystem,
-                    onChanged: (value) async {
-                      if (value) {
-                        await _settingsService.saveAppSettings(
-                          _settings.copyWith(
-                            appearanceMode: AppAppearanceMode.followSystem,
-                          ),
-                        );
-                        return;
-                      }
-
+    return AppCupertinoPageScaffold(
+      title: '外观与通用',
+      child: ListView(
+        children: [
+          CupertinoListSection.insetGrouped(
+            header: const Text('外观'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('跟随系统外观'),
+                trailing: CupertinoSwitch(
+                  value: followSystem,
+                  onChanged: (value) async {
+                    if (value) {
                       await _settingsService.saveAppSettings(
                         _settings.copyWith(
-                          appearanceMode: systemBrightness == Brightness.dark
-                              ? AppAppearanceMode.dark
-                              : AppAppearanceMode.light,
+                          appearanceMode: AppAppearanceMode.followSystem,
                         ),
                       );
-                    },
-                  ),
+                      return;
+                    }
+
+                    await _settingsService.saveAppSettings(
+                      _settings.copyWith(
+                        appearanceMode: systemBrightness == Brightness.dark
+                            ? AppAppearanceMode.dark
+                            : AppAppearanceMode.light,
+                      ),
+                    );
+                  },
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('深色模式'),
-                  trailing: CupertinoSwitch(
-                    value: effectiveIsDark,
-                    onChanged: followSystem
-                        ? null
-                        : (value) async {
-                            await _settingsService.saveAppSettings(
-                              _settings.copyWith(
-                                appearanceMode: value
-                                    ? AppAppearanceMode.dark
-                                    : AppAppearanceMode.light,
-                              ),
-                            );
-                          },
-                  ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('深色模式'),
+                trailing: CupertinoSwitch(
+                  value: effectiveIsDark,
+                  onChanged: followSystem
+                      ? null
+                      : (value) async {
+                          await _settingsService.saveAppSettings(
+                            _settings.copyWith(
+                              appearanceMode: value
+                                  ? AppAppearanceMode.dark
+                                  : AppAppearanceMode.light,
+                            ),
+                          );
+                        },
                 ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('说明'),
-              children: const [
-                CupertinoListTile(
-                  title: Text('本页只影响应用整体外观，不影响阅读主题。'),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('说明'),
+            children: const [
+              CupertinoListTile(
+                title: Text('本页只影响应用整体外观，不影响阅读主题。'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
-

@@ -822,3 +822,27 @@
 ### 兼容影响
 - 规则协议无变更：本次仅涉及 UI/UX 展示层，不触及 legado 书源语义解析逻辑。
 - 交互兼容：保留原有核心业务入口与功能流程，主要调整视觉组织与信息层级。
+
+## 2026-02-10（P2：全页面 UI/UX 统一改造 - 第二批收口）
+
+### 已完成
+- 基于 `ui-ux-pro-max` 技能检索并确认“移动端阅读产品的统一层级与留白优先”方向，继续沿用现有 Cupertino 极简风格做全页面收口。
+- 新增并批量接入统一页面容器 `lib/app/widgets/app_cupertino_page_scaffold.dart`，将导航栏边框、背景层次、SafeArea 策略统一下沉到基础壳层。
+- 第二批页面完成统一接入（不改业务逻辑，仅替换外层页面壳）：
+  - 设置相关：`about/appearance/backup/function/global_reading/other_hub/other/reading_* /source_management/storage/text_rules/theme/settings`。
+  - 书源相关：`source_list_view`、`source_edit_view`、`source_web_verify_view`、`source_availability_check_view`、`source_debug_text_view`。
+  - 其他业务页：`bookshelf_view`、`reading_history_view`、`search_view`、`discovery_view`、`replace_rule_list_view`、`replace_rule_edit_view`。
+- 全量扫描后，`lib/features` 下仅保留 `simple_reader_view` 使用 `CupertinoPageScaffold`（阅读页全屏沉浸态，刻意保留独立壳层）。
+
+### 为什么
+- 第一批完成主题中台与主 Tab 统一后，仍存在大量二级页样式分散、视觉节奏不一致问题。
+- 本次将“导航 + 背景 + 安全区”抽象为统一壳层，减少后续 UI 维护成本，确保页面间切换的一致体验。
+
+### 验证方式
+- 命令：`dart format $(git diff --name-only -- '*.dart')`
+- 命令：`flutter analyze --no-pub`
+- 命令：`flutter test test/rule_parser_engine_css_nth_compat_test.dart`
+
+### 兼容影响
+- 规则协议无变更：不涉及书源字段、规则语义和解析链路。
+- 行为兼容：业务流程、入口与数据结构保持不变，仅统一视觉外壳与页面层级。

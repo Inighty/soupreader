@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 import 'settings_placeholders.dart';
@@ -130,180 +131,177 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      navigationBar: const CupertinoNavigationBar(
-        middle: Text('其它设置'),
-      ),
-      child: SafeArea(
-        child: ListView(
-          children: [
-            CupertinoListSection.insetGrouped(
-              header: const Text('基本设置'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('主页面'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '主页面（底部导航栏顺序/显示）暂未实现',
+    return AppCupertinoPageScaffold(
+      title: '其它设置',
+      child: ListView(
+        children: [
+          CupertinoListSection.insetGrouped(
+            header: const Text('基本设置'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('主页面'),
+                additionalInfo: const Text('暂未实现'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '主页面（底部导航栏顺序/显示）暂未实现',
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('更换图标'),
+                additionalInfo: const Text('暂未实现'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '更换图标暂未实现',
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('自动刷新'),
+                additionalInfo: const Text('暂未实现'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '自动刷新暂未实现',
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('竖屏锁定'),
+                additionalInfo: const Text('暂未实现'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '竖屏锁定暂未实现',
+                ),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('源设置'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('服务器证书验证'),
+                additionalInfo: const Text('暂未实现'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '服务器证书验证开关暂未实现（需要对 Dio/HttpClient 做统一配置）',
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('开启 18+ 网址检测'),
+                additionalInfo: const Text('暂未实现'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '18+ 网址检测暂未实现',
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('高级搜索'),
+                additionalInfo: const Text('暂未实现'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '高级搜索设置暂未实现',
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('智能评估'),
+                additionalInfo: const Text('暂未实现'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '智能评估暂未实现',
+                ),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('书籍设置'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('书架显示方式'),
+                additionalInfo: Text(
+                  _appSettings.bookshelfViewMode == BookshelfViewMode.grid
+                      ? '网格'
+                      : '列表',
+                ),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _pickBookshelfViewMode,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('新书默认排序'),
+                additionalInfo:
+                    Text(_bookshelfSortLabel(_appSettings.bookshelfSortMode)),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _pickBookshelfSortMode,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('启动自动跳转之前阅读'),
+                additionalInfo: const Text('暂未实现'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '启动自动跳转之前阅读暂未实现',
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('新书默认开启净化替换'),
+                additionalInfo: const Text('暂未实现'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '新书默认开启净化替换暂未实现',
+                ),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('下载与缓存'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('下载与缓存'),
+                additionalInfo: const Text('Wi‑Fi / 清理'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => Navigator.of(context).push(
+                  CupertinoPageRoute<void>(
+                    builder: (context) => const StorageSettingsView(),
                   ),
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('更换图标'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '更换图标暂未实现',
-                  ),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('订阅设置'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('订阅设置'),
+                additionalInfo: const Text('暂未实现'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '订阅设置暂未实现',
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('自动刷新'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '自动刷新暂未实现',
-                  ),
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('日志'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('日志文件'),
+                additionalInfo: const Text('暂未实现'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => SettingsPlaceholders.showNotImplemented(
+                  context,
+                  title: '日志文件暂未实现',
                 ),
-                CupertinoListTile.notched(
-                  title: const Text('竖屏锁定'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '竖屏锁定暂未实现',
-                  ),
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('源设置'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('服务器证书验证'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '服务器证书验证开关暂未实现（需要对 Dio/HttpClient 做统一配置）',
-                  ),
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('开启 18+ 网址检测'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '18+ 网址检测暂未实现',
-                  ),
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('高级搜索'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '高级搜索设置暂未实现',
-                  ),
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('智能评估'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '智能评估暂未实现',
-                  ),
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('书籍设置'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('书架显示方式'),
-                  additionalInfo: Text(
-                    _appSettings.bookshelfViewMode == BookshelfViewMode.grid
-                        ? '网格'
-                        : '列表',
-                  ),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _pickBookshelfViewMode,
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('新书默认排序'),
-                  additionalInfo: Text(_bookshelfSortLabel(_appSettings.bookshelfSortMode)),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: _pickBookshelfSortMode,
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('启动自动跳转之前阅读'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '启动自动跳转之前阅读暂未实现',
-                  ),
-                ),
-                CupertinoListTile.notched(
-                  title: const Text('新书默认开启净化替换'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '新书默认开启净化替换暂未实现',
-                  ),
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('下载与缓存'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('下载与缓存'),
-                  additionalInfo: const Text('Wi‑Fi / 清理'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => Navigator.of(context).push(
-                    CupertinoPageRoute<void>(
-                      builder: (context) => const StorageSettingsView(),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('订阅设置'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('订阅设置'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '订阅设置暂未实现',
-                  ),
-                ),
-              ],
-            ),
-            CupertinoListSection.insetGrouped(
-              header: const Text('日志'),
-              children: [
-                CupertinoListTile.notched(
-                  title: const Text('日志文件'),
-                  additionalInfo: const Text('暂未实现'),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => SettingsPlaceholders.showNotImplemented(
-                    context,
-                    title: '日志文件暂未实现',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
@@ -321,4 +319,3 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     }
   }
 }
-
