@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/webview_cookie_bridge.dart';
 import '../services/rule_parser_engine.dart';
@@ -131,6 +132,13 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
     await _showMessage('已复制 Cookie 值（可用于书源 header 的 Cookie 字段）');
   }
 
+  Color _accentColor(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    return isDark
+        ? AppDesignTokens.brandSecondary
+        : AppDesignTokens.brandPrimary;
+  }
+
   @override
   Widget build(BuildContext context) {
     final progress = _progress;
@@ -205,7 +213,7 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
                     widthFactor: progress / 100.0,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: CupertinoColors.activeBlue.resolveFrom(context),
+                        color: _accentColor(context),
                       ),
                     ),
                   ),

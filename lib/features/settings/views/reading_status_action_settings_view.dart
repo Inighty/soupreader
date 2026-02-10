@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
@@ -19,6 +20,13 @@ class _ReadingStatusActionSettingsViewState
     extends State<ReadingStatusActionSettingsView> {
   final SettingsService _settingsService = SettingsService();
   late ReadingSettings _settings;
+
+  Color _accent(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    return isDark
+        ? AppDesignTokens.brandSecondary
+        : AppDesignTokens.brandPrimary;
+  }
 
   @override
   void initState() {
@@ -246,8 +254,8 @@ class _ReadingStatusActionSettingsViewState
                 Text(opt.label),
                 if (selected) ...[
                   const SizedBox(width: 8),
-                  const Icon(CupertinoIcons.checkmark,
-                      size: 18, color: CupertinoColors.activeBlue),
+                  Icon(CupertinoIcons.checkmark,
+                      size: 18, color: _accent(context)),
                 ],
               ],
             ),

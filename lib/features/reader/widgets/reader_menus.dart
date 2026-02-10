@@ -243,7 +243,7 @@ class ReaderBottomMenu extends StatelessWidget {
                         value: currentChapterIndex.toDouble(),
                         min: 0,
                         max: (totalChapters - 1).toDouble(),
-                        activeColor: CupertinoColors.activeBlue,
+                        activeColor: AppDesignTokens.brandSecondary,
                         inactiveColor:
                             CupertinoColors.systemGrey.withValues(alpha: 0.3),
                         onChanged: (value) {
@@ -278,7 +278,7 @@ class ReaderBottomMenu extends StatelessWidget {
                     value: settings.brightness,
                     min: 0.0,
                     max: 1.0,
-                    activeColor: CupertinoColors.activeBlue,
+                    activeColor: AppDesignTokens.brandSecondary,
                     inactiveColor:
                         CupertinoColors.systemGrey.withValues(alpha: 0.3),
                     onChanged: (value) {
@@ -299,7 +299,7 @@ class ReaderBottomMenu extends StatelessWidget {
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: settings.useSystemBrightness
-                          ? CupertinoColors.activeBlue
+                          ? AppDesignTokens.brandSecondary
                           : CupertinoColors.systemGrey.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -364,7 +364,7 @@ class ReaderBottomMenu extends StatelessWidget {
       onPressed: onTap,
       child: Icon(icon,
           color: onTap != null
-              ? CupertinoColors.activeBlue
+              ? AppDesignTokens.brandSecondary
               : CupertinoColors.systemGrey,
           size: 24),
     );
@@ -376,7 +376,7 @@ class ReaderBottomMenu extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        splashColor: CupertinoColors.activeBlue.withValues(alpha: 0.3),
+        splashColor: AppDesignTokens.brandSecondary.withValues(alpha: 0.3),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Column(
@@ -442,7 +442,7 @@ class ReaderBottomMenu extends StatelessWidget {
                 Icon(
                   _getPageTurnModeIcon(mode),
                   color: isSelected
-                      ? CupertinoColors.activeBlue
+                      ? AppDesignTokens.brandSecondary
                       : PageTurnModeUi.isHidden(mode)
                           ? CupertinoColors.inactiveGray
                           : CupertinoColors.label,
@@ -455,7 +455,7 @@ class ReaderBottomMenu extends StatelessWidget {
                       : mode.name,
                   style: TextStyle(
                     color: isSelected
-                        ? CupertinoColors.activeBlue
+                        ? AppDesignTokens.brandSecondary
                         : PageTurnModeUi.isHidden(mode)
                             ? CupertinoColors.inactiveGray
                             : CupertinoColors.label,
@@ -467,7 +467,7 @@ class ReaderBottomMenu extends StatelessWidget {
                   const SizedBox(width: 8),
                   const Icon(
                     CupertinoIcons.checkmark,
-                    color: CupertinoColors.activeBlue,
+                    color: AppDesignTokens.brandSecondary,
                     size: 18,
                   ),
                 ],

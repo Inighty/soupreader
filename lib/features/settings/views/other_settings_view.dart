@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
@@ -18,6 +19,13 @@ class OtherSettingsView extends StatefulWidget {
 class _OtherSettingsViewState extends State<OtherSettingsView> {
   final SettingsService _settingsService = SettingsService();
   late AppSettings _appSettings;
+
+  Color _accent(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    return isDark
+        ? AppDesignTokens.brandSecondary
+        : AppDesignTokens.brandPrimary;
+  }
 
   @override
   void initState() {
@@ -74,8 +82,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
           Text(label),
           if (selected) ...[
             const SizedBox(width: 8),
-            const Icon(CupertinoIcons.checkmark,
-                size: 18, color: CupertinoColors.activeBlue),
+            Icon(CupertinoIcons.checkmark, size: 18, color: _accent(context)),
           ],
         ],
       ),
@@ -121,8 +128,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
           Text(label),
           if (selected) ...[
             const SizedBox(width: 8),
-            const Icon(CupertinoIcons.checkmark,
-                size: 18, color: CupertinoColors.activeBlue),
+            Icon(CupertinoIcons.checkmark, size: 18, color: _accent(context)),
           ],
         ],
       ),

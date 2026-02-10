@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/colors.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
@@ -18,6 +19,13 @@ class ReadingThemeSettingsView extends StatefulWidget {
 class _ReadingThemeSettingsViewState extends State<ReadingThemeSettingsView> {
   final SettingsService _settingsService = SettingsService();
   late ReadingSettings _settings;
+
+  Color _accent(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    return isDark
+        ? AppDesignTokens.brandSecondary
+        : AppDesignTokens.brandPrimary;
+  }
 
   @override
   void initState() {
@@ -46,9 +54,9 @@ class _ReadingThemeSettingsViewState extends State<ReadingThemeSettingsView> {
               return CupertinoListTile.notched(
                 title: Text(theme.name),
                 trailing: selected
-                    ? const Icon(
+                    ? Icon(
                         CupertinoIcons.checkmark,
-                        color: CupertinoColors.activeBlue,
+                        color: _accent(context),
                         size: 18,
                       )
                     : null,

@@ -973,3 +973,40 @@
 ### 兼容影响
 - 仅 UI/UX 表现层调整，不涉及 legado 规则语义、书源解析链路与数据结构。
 - 点击区域配置的调用入口向后兼容旧参数命名，不影响已有功能行为。
+
+## 2026-02-11（P2：全量页面收口 - 阅读核心页与设置/书源页）
+
+### 已完成
+- `simple_reader_view` 进一步统一为语义色体系：
+  - 新增阅读页 UI 语义色 getter（强调色、面板底色、卡片底色、边框、文本层级）；
+  - 阅读设置弹层（分段控件、卡片、开关、主题选择、字体选择、按钮态）改为语义色驱动；
+  - 浮动快捷按钮与设置卡片样式统一，亮暗主题下视觉层级更一致。
+- `auto_pager` 面板重构：
+  - 顶部面板、播放按钮、速度滑杆、标题与辅助文本统一语义色；
+  - 支持亮暗模式下自动阅读面板颜色自适应。
+- `reader_menus` 收口：顶部/底部菜单中原 `activeBlue` 强调色替换为设计令牌强调色，保证阅读器控制区一致。
+- 设置页统一：
+  - `reading_preferences_view`
+  - `reading_status_action_settings_view`
+  - `other_settings_view`
+  - `reading_theme_settings_view`
+  上述页面中的勾选态图标改为设计令牌强调色，并按亮暗模式自适应。
+- 书源相关页面统一：
+  - `source_web_verify_view` 进度条强调色改为语义色；
+  - `source_availability_check_view` “检测中”状态色改为语义色。
+
+### 为什么
+- 前几批已完成大部分页面壳和阅读器二级面板统一，但仍有若干核心入口保留旧硬编码蓝色/深色值，导致“全站统一”仍有断层。
+- 本次按“全部修改”要求，覆盖阅读主入口设置链路 + 全局设置关键页 + 书源校验关键页，补齐跨模块视觉一致性。
+
+### 验证方式
+- 命令：`dart format lib/features/reader/views/simple_reader_view.dart lib/features/reader/widgets/auto_pager.dart lib/features/reader/widgets/reader_menus.dart lib/features/settings/views/reading_preferences_view.dart lib/features/settings/views/reading_status_action_settings_view.dart lib/features/settings/views/other_settings_view.dart lib/features/settings/views/reading_theme_settings_view.dart lib/features/source/views/source_web_verify_view.dart lib/features/source/views/source_availability_check_view.dart`
+- 命令：`flutter analyze --no-pub`
+- 命令：`flutter test test/rule_parser_engine_css_nth_compat_test.dart`
+- 手工：
+  - 阅读页打开“阅读设置/自动阅读/顶部底部菜单”检查亮暗模式协调；
+  - 设置页与书源校验页检查强调色是否与全局品牌语义一致。
+
+### 兼容影响
+- 本次仅 UI/UX 表现层改造，不涉及 legado 规则语义、书源解析逻辑与数据模型。
+- 用户可见变化为视觉风格统一与状态反馈一致性提升，功能链路保持不变。

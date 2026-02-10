@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Colors;
+import '../../../app/theme/design_tokens.dart';
 
 /// 自动翻页器
 /// 支持滚动模式和翻页模式
@@ -188,6 +188,21 @@ class AutoReadPanel extends StatefulWidget {
 }
 
 class _AutoReadPanelState extends State<AutoReadPanel> {
+  bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
+
+  Color get _accent =>
+      _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+
+  Color get _panelBg => _isDark
+      ? const Color(0xFF1C1C1E).withValues(alpha: 0.98)
+      : AppDesignTokens.surfaceLight.withValues(alpha: 0.98);
+
+  Color get _textStrong =>
+      _isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+
+  Color get _textNormal =>
+      _isDark ? CupertinoColors.systemGrey : AppDesignTokens.textNormal;
+
   @override
   void initState() {
     super.initState();
@@ -211,7 +226,7 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E).withValues(alpha: 0.98),
+        color: _panelBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: SafeArea(
@@ -223,10 +238,10 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   '自动阅读',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: _textStrong,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -237,8 +252,10 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
                     widget.autoPager.stop();
                     widget.onClose?.call();
                   },
-                  child:
-                      const Icon(CupertinoIcons.xmark_circle_fill, color: Colors.white),
+                  child: Icon(
+                    CupertinoIcons.xmark_circle_fill,
+                    color: _textNormal,
+                  ),
                 ),
               ],
             ),
@@ -255,7 +272,7 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
                     widget.autoPager.isRunning
                         ? CupertinoIcons.pause_circle_fill
                         : CupertinoIcons.play_circle_fill,
-                    color: Colors.white,
+                    color: _accent,
                     size: 54,
                   ),
                 ),
@@ -266,14 +283,14 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
             // 速度调节
             Row(
               children: [
-                const Icon(CupertinoIcons.tortoise,
-                    color: Colors.white70, size: 20),
+                Icon(CupertinoIcons.tortoise, color: _textNormal, size: 20),
                 Expanded(
                   child: CupertinoSlider(
                     value: widget.autoPager.speed.toDouble(),
                     min: 1,
                     max: 100,
                     divisions: 99,
+                    activeColor: _accent,
                     onChanged: (value) {
                       final speed = value.round();
                       widget.autoPager.setSpeed(speed);
@@ -281,14 +298,14 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
                     },
                   ),
                 ),
-                const Icon(CupertinoIcons.hare, color: Colors.white70, size: 20),
+                Icon(CupertinoIcons.hare, color: _textNormal, size: 20),
               ],
             ),
 
             // 显示当前速度
             Text(
               '速度: ${widget.autoPager.speed}',
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+              style: TextStyle(color: _textNormal, fontSize: 12),
             ),
           ],
         ),

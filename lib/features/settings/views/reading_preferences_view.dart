@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/colors.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
@@ -21,6 +22,13 @@ class ReadingPreferencesView extends StatefulWidget {
 class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
   final SettingsService _settingsService = SettingsService();
   late ReadingSettings _settings;
+
+  Color _accent(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    return isDark
+        ? AppDesignTokens.brandSecondary
+        : AppDesignTokens.brandPrimary;
+  }
 
   @override
   void initState() {
@@ -66,8 +74,8 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                 ),
                 if (isSelected) ...[
                   const SizedBox(width: 8),
-                  const Icon(CupertinoIcons.checkmark,
-                      size: 18, color: CupertinoColors.activeBlue),
+                  Icon(CupertinoIcons.checkmark,
+                      size: 18, color: _accent(context)),
                 ],
               ],
             ),
@@ -115,8 +123,8 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                 ),
                 if (isSelected) ...[
                   const SizedBox(width: 8),
-                  const Icon(CupertinoIcons.checkmark,
-                      size: 18, color: CupertinoColors.activeBlue),
+                  Icon(CupertinoIcons.checkmark,
+                      size: 18, color: _accent(context)),
                 ],
               ],
             ),

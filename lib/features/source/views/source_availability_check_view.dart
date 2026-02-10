@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -219,6 +220,13 @@ class _SourceAvailabilityCheckViewState
     });
   }
 
+  Color _accentColor() {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    return isDark
+        ? AppDesignTokens.brandSecondary
+        : AppDesignTokens.brandPrimary;
+  }
+
   Color _statusColor(_CheckStatus status) {
     switch (status) {
       case _CheckStatus.ok:
@@ -228,7 +236,7 @@ class _SourceAvailabilityCheckViewState
       case _CheckStatus.fail:
         return CupertinoColors.systemRed.resolveFrom(context);
       case _CheckStatus.running:
-        return CupertinoColors.activeBlue.resolveFrom(context);
+        return _accentColor();
       case _CheckStatus.skipped:
         return CupertinoColors.systemGrey.resolveFrom(context);
       case _CheckStatus.pending:

@@ -14,6 +14,7 @@ import '../../../core/services/keep_screen_on_service.dart';
 import '../../../core/services/screen_brightness_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../app/theme/colors.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
 import '../../bookshelf/models/book.dart';
 import '../../replace/services/replace_rule_service.dart';
@@ -637,6 +638,30 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
     return AppColors.readingThemes[0];
   }
+
+  bool get _isUiDark => _currentTheme.isDark;
+
+  Color get _uiAccent =>
+      _isUiDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+
+  Color get _uiPanelBg =>
+      _isUiDark ? const Color(0xFF1C1C1E) : AppDesignTokens.surfaceLight;
+
+  Color get _uiCardBg => _isUiDark
+      ? Colors.white10
+      : AppDesignTokens.pageBgLight.withValues(alpha: 0.9);
+
+  Color get _uiBorder =>
+      _isUiDark ? Colors.white12 : AppDesignTokens.borderLight;
+
+  Color get _uiTextStrong =>
+      _isUiDark ? Colors.white : AppDesignTokens.textStrong;
+
+  Color get _uiTextNormal =>
+      _isUiDark ? Colors.white70 : AppDesignTokens.textNormal;
+
+  Color get _uiTextSubtle =>
+      _isUiDark ? Colors.white54 : AppDesignTokens.textMuted;
 
   /// 获取当前字体
   String? get _currentFontFamily {
@@ -1534,17 +1559,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         height: 40,
         decoration: BoxDecoration(
           color: active
-              ? CupertinoColors.activeBlue.withValues(alpha: 0.22)
+              ? _uiAccent.withValues(alpha: 0.22)
               : Colors.black.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: active ? CupertinoColors.activeBlue : Colors.white24,
+            color: active ? _uiAccent : _uiBorder,
           ),
         ),
         child: Icon(
           icon,
           size: 20,
-          color: active ? CupertinoColors.activeBlue : CupertinoColors.white,
+          color: active ? _uiAccent : _uiTextStrong,
         ),
       ),
     );
@@ -1804,8 +1829,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       builder: (context) => StatefulBuilder(
         builder: (context, setPopupState) => Container(
           height: MediaQuery.of(context).size.height * 0.7,
-          decoration: const BoxDecoration(
-            color: Color(0xFF1C1C1E),
+          decoration: BoxDecoration(
+            color: _uiPanelBg,
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
           child: SafeArea(
@@ -1818,7 +1843,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.white24,
+                      color: _isUiDark
+                          ? Colors.white24
+                          : AppDesignTokens.textMuted.withValues(alpha: 0.35),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1827,11 +1854,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           '阅读设置',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: _uiTextStrong,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1840,9 +1867,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       CupertinoButton(
                         padding: EdgeInsets.zero,
                         onPressed: () => Navigator.pop(context),
-                        child: const Icon(
+                        child: Icon(
                           CupertinoIcons.xmark_circle_fill,
-                          color: CupertinoColors.systemGrey,
+                          color: _uiTextSubtle,
                           size: 26,
                         ),
                       ),
@@ -1881,7 +1908,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.white70,
+            color: isSelected ? _uiTextStrong : _uiTextNormal,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
@@ -1891,8 +1918,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     return CupertinoSlidingSegmentedControl<int>(
       groupValue: selectedTab,
-      backgroundColor: Colors.white12,
-      thumbColor: CupertinoColors.activeBlue,
+      backgroundColor: _uiCardBg,
+      thumbColor: _uiAccent,
       children: {
         0: buildTab('排版', selectedTab == 0),
         1: buildTab('界面', selectedTab == 1),
@@ -2024,16 +2051,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white10,
+                      color: _uiCardBg,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('字体: ${_currentFontFamily ?? "系统默认"}',
-                            style: const TextStyle(color: Colors.white)),
-                        const Icon(CupertinoIcons.chevron_right,
-                            color: Colors.white54, size: 16),
+                            style: TextStyle(color: _uiTextStrong)),
+                        Icon(CupertinoIcons.chevron_right,
+                            color: _uiTextSubtle, size: 16),
                       ],
                     ),
                   ),
@@ -2041,33 +2068,33 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 const SizedBox(height: 12),
                 CupertinoSlidingSegmentedControl<int>(
                   groupValue: _settings.textBold,
-                  backgroundColor: Colors.white12,
-                  thumbColor: CupertinoColors.activeBlue,
-                  children: const {
+                  backgroundColor: _uiCardBg,
+                  thumbColor: _uiAccent,
+                  children: {
                     2: Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       child: Text('细体',
                           style: TextStyle(
-                              color: Colors.white70,
+                              color: _uiTextNormal,
                               fontSize: 12,
                               fontWeight: FontWeight.w600)),
                     ),
                     0: Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       child: Text('正常',
                           style: TextStyle(
-                              color: Colors.white70,
+                              color: _uiTextNormal,
                               fontSize: 12,
                               fontWeight: FontWeight.w600)),
                     ),
                     1: Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       child: Text('粗体',
                           style: TextStyle(
-                              color: Colors.white70,
+                              color: _uiTextNormal,
                               fontSize: 12,
                               fontWeight: FontWeight.w600)),
                     ),
@@ -2165,15 +2192,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white10,
+                      color: _uiCardBg,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('高级排版与边距', style: TextStyle(color: Colors.white)),
                         Icon(CupertinoIcons.chevron_right,
-                            color: Colors.white54, size: 16),
+                            color: _uiTextSubtle, size: 16),
                       ],
                     ),
                   ),
@@ -2270,14 +2297,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     opacity: _settings.useSystemBrightness ? 0.4 : 1.0,
                     child: Row(
                       children: [
-                        const Icon(CupertinoIcons.sun_min,
-                            color: Colors.white54, size: 20),
+                        Icon(CupertinoIcons.sun_min,
+                            color: _uiTextSubtle, size: 20),
                         Expanded(
                           child: CupertinoSlider(
                             value: _settings.brightness,
                             min: 0.0,
                             max: 1.0,
-                            activeColor: CupertinoColors.activeBlue,
+                            activeColor: _uiAccent,
                             onChanged: (value) {
                               _updateSettingsFromSheet(
                                 setPopupState,
@@ -2286,8 +2313,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                             },
                           ),
                         ),
-                        const Icon(CupertinoIcons.sun_max,
-                            color: Colors.white54, size: 20),
+                        Icon(CupertinoIcons.sun_max,
+                            color: _uiTextSubtle, size: 20),
                       ],
                     ),
                   ),
@@ -2320,9 +2347,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         color: theme.background,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isSelected
-                              ? CupertinoColors.activeBlue
-                              : Colors.white12,
+                          color: isSelected ? _uiAccent : _uiBorder,
                           width: isSelected ? 2 : 1,
                         ),
                       ),
@@ -2339,12 +2364,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                             ),
                           ),
                           if (isSelected)
-                            const Positioned(
+                            Positioned(
                               bottom: 4,
                               right: 4,
                               child: Icon(
                                 CupertinoIcons.checkmark_circle_fill,
-                                color: CupertinoColors.activeBlue,
+                                color: _uiAccent,
                                 size: 18,
                               ),
                             ),
@@ -2492,10 +2517,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                             : mode.name,
                       ),
                       selected: isSelected,
-                      selectedColor: CupertinoColors.activeBlue,
-                      backgroundColor: Colors.white10,
+                      selectedColor: _uiAccent,
+                      backgroundColor: _uiCardBg,
                       labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : Colors.white70,
+                        color: isSelected ? _uiTextStrong : _uiTextNormal,
                         fontSize: 13,
                       ),
                       onSelected: PageTurnModeUi.isHidden(mode)
@@ -2820,9 +2845,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white10,
+        color: _uiCardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: _uiBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2843,16 +2868,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label,
-                style: const TextStyle(color: Colors.white, fontSize: 14)),
+            Text(label, style: TextStyle(color: _uiTextStrong, fontSize: 14)),
             Row(
               children: [
                 Text(value,
-                    style:
-                        const TextStyle(color: Colors.white70, fontSize: 13)),
+                    style: TextStyle(color: _uiTextNormal, fontSize: 13)),
                 const SizedBox(width: 6),
-                const Icon(CupertinoIcons.chevron_right,
-                    color: Colors.white38, size: 14),
+                Icon(CupertinoIcons.chevron_right,
+                    color: _uiTextSubtle, size: 14),
               ],
             ),
           ],
@@ -2883,8 +2906,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   children: [
                     Text(option.label),
                     if (option.value == currentValue)
-                      const Icon(CupertinoIcons.check_mark,
-                          color: CupertinoColors.activeBlue),
+                      Icon(CupertinoIcons.check_mark, color: _uiAccent),
                   ],
                 ),
               ),
@@ -2916,7 +2938,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return Text(
       title,
       style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.6),
+        color: _uiTextSubtle,
         fontSize: 13,
       ),
     );
@@ -2930,13 +2952,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         SizedBox(
             width: 40,
             child: Text(label,
-                style: const TextStyle(color: Colors.white70, fontSize: 13))),
+                style: TextStyle(color: _uiTextNormal, fontSize: 13))),
         Expanded(
           child: CupertinoSlider(
             value: value,
             min: min,
             max: max,
-            activeColor: CupertinoColors.activeBlue,
+            activeColor: _uiAccent,
             onChanged: onChanged,
           ),
         ),
@@ -2960,19 +2982,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isActive
-              ? CupertinoColors.activeBlue.withValues(alpha: 0.2)
-              : Colors.white10,
+          color: isActive ? _uiAccent.withValues(alpha: 0.2) : _uiCardBg,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-              color: isActive ? CupertinoColors.activeBlue : Colors.white10),
+          border: Border.all(color: isActive ? _uiAccent : _uiBorder),
         ),
         child: Center(
           child: Text(
             label,
             style: TextStyle(
-                color: isActive ? CupertinoColors.activeBlue : Colors.white70,
-                fontSize: 14),
+                color: isActive ? _uiAccent : _uiTextNormal, fontSize: 14),
           ),
         ),
       ),
@@ -2982,16 +3000,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Widget _buildFontSelectDialog(StateSetter parentSetState) {
     return Container(
       height: 300,
-      decoration: const BoxDecoration(
-        color: Color(0xFF2C2C2E),
+      decoration: BoxDecoration(
+        color: _uiPanelBg,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
         children: [
           const SizedBox(height: 16),
-          const Text('选择字体',
+          Text('选择字体',
               style: TextStyle(
-                  color: Colors.white,
+                  color: _uiTextStrong,
                   fontSize: 16,
                   fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
@@ -3004,12 +3022,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 return ListTile(
                   title: Text(font.name,
                       style: TextStyle(
-                          color: isSelected
-                              ? CupertinoColors.activeBlue
-                              : Colors.white)),
+                          color: isSelected ? _uiAccent : _uiTextStrong)),
                   trailing: isSelected
-                      ? const Icon(CupertinoIcons.checkmark,
-                          color: CupertinoColors.activeBlue)
+                      ? Icon(CupertinoIcons.checkmark, color: _uiAccent)
                       : null,
                   onTap: () {
                     _updateSettings(_settings.copyWith(fontFamilyIndex: index));
@@ -3032,12 +3047,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: const TextStyle(color: Colors.white, fontSize: 16)),
+          Text(label, style: TextStyle(color: _uiTextStrong, fontSize: 16)),
           CupertinoSwitch(
             value: value,
             onChanged: onChanged,
-            activeTrackColor: CupertinoColors.activeBlue,
+            activeTrackColor: _uiAccent,
           ),
         ],
       ),
