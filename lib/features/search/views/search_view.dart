@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
-import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -203,15 +203,18 @@ class _SearchViewState extends State<SearchView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog(
+    showShadDialog<void>(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
+      builder: (dialogContext) => ShadDialog.alert(
         title: const Text('提示'),
-        content: Text('\n$message'),
+        description: Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(message),
+        ),
         actions: [
-          CupertinoDialogAction(
+          ShadButton(
             child: const Text('好'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(dialogContext).pop(),
           ),
         ],
       ),
@@ -221,12 +224,8 @@ class _SearchViewState extends State<SearchView> {
   @override
   Widget build(BuildContext context) {
     final totalSources = _enabledSources().length;
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final borderColor =
-        isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
-    final panelColor = isDark
-        ? AppDesignTokens.surfaceDark.withValues(alpha: 0.82)
-        : AppDesignTokens.surfaceLight.withValues(alpha: 0.94);
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
 
     return AppCupertinoPageScaffold(
       title: '搜索',
@@ -234,38 +233,37 @@ class _SearchViewState extends State<SearchView> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                color: panelColor,
-                borderRadius:
-                    BorderRadius.circular(AppDesignTokens.radiusPopup),
-                border: Border.all(color: borderColor),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: CupertinoSearchTextField(
-                      controller: _searchController,
-                      placeholder: '输入书名或作者',
-                      backgroundColor: CupertinoColors.transparent,
-                      onSubmitted: (_) => _search(),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ShadInput(
+                    controller: _searchController,
+                    placeholder: const Text('输入书名或作者'),
+                    textInputAction: TextInputAction.search,
+                    leading: const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(LucideIcons.search, size: 16),
                     ),
+                    onSubmitted: (_) => _search(),
                   ),
-                  CupertinoButton(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    minimumSize: const Size(32, 32),
-                    onPressed: _isSearching ? null : _search,
-                    child: const Icon(CupertinoIcons.search),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 10),
+                ShadButton(
+                  onPressed: _isSearching ? null : _search,
+                  leading: _isSearching
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CupertinoActivityIndicator(radius: 8),
+                        )
+                      : const Icon(LucideIcons.search),
+                  child: const Text('搜索'),
+                ),
+              ],
             ),
           ),
           if (_isSearching)
             _buildStatusPanel(
-              panelColor: panelColor,
-              borderColor: borderColor,
+              borderColor: scheme.border,
               child: Row(
                 children: [
                   const CupertinoActivityIndicator(),
@@ -275,14 +273,11 @@ class _SearchViewState extends State<SearchView> {
                       '正在搜索: $_searchingSource ($_completedSources/$totalSources)',
                       style: TextStyle(
                         fontSize: 13,
-                        color: isDark
-                            ? AppDesignTokens.textMuted
-                            : AppDesignTokens.textNormal,
+                        color: scheme.mutedForeground,
                       ),
                     ),
                   ),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
+                  ShadButton.link(
                     onPressed: () => setState(() => _isSearching = false),
                     child: const Text('停止'),
                   ),
@@ -291,43 +286,37 @@ class _SearchViewState extends State<SearchView> {
             )
           else if (_sourceIssues.isNotEmpty)
             _buildStatusPanel(
-              panelColor: panelColor,
-              borderColor: CupertinoColors.systemRed.resolveFrom(context),
+              borderColor: scheme.destructive,
               child: Row(
                 children: [
-                  Icon(
-                    CupertinoIcons.exclamationmark_triangle,
-                    size: 16,
-                    color: CupertinoColors.systemRed.resolveFrom(context),
-                  ),
+                  Icon(LucideIcons.triangleAlert, size: 16, color: scheme.destructive),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '本次 ${_sourceIssues.length} 个书源失败，可查看原因',
                       style: TextStyle(
                         fontSize: 12,
-                        color: CupertinoColors.systemRed.resolveFrom(context),
+                        color: scheme.destructive,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
+                  ShadButton.link(
                     onPressed: _showIssueDetails,
                     child: const Text('查看'),
                   ),
                 ],
               ),
-            ),
+          ),
           Expanded(
             child: _results.isEmpty
-                ? _buildEmptyState(isDark)
+                ? _buildEmptyState()
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
                     itemCount: _results.length,
                     itemBuilder: (context, index) =>
-                        _buildResultItem(_results[index], isDark),
+                        _buildResultItem(_results[index]),
                   ),
           ),
           if (_isImporting)
@@ -341,53 +330,42 @@ class _SearchViewState extends State<SearchView> {
   }
 
   Widget _buildStatusPanel({
-    required Color panelColor,
     required Color borderColor,
     required Widget child,
   }) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: panelColor,
-          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-          border: Border.all(color: borderColor),
-        ),
+      child: ShadCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: ShadBorder.all(color: borderColor, width: 1),
         child: child,
       ),
     );
   }
 
-  Widget _buildEmptyState(bool isDark) {
-    final secondary =
-        isDark ? AppDesignTokens.textMuted : AppDesignTokens.textNormal;
-    final tertiary =
-        isDark ? AppDesignTokens.textMuted : AppDesignTokens.textMuted;
+  Widget _buildEmptyState() {
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
 
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            CupertinoIcons.search,
-            size: 64,
-            color: secondary,
+            LucideIcons.search,
+            size: 52,
+            color: scheme.mutedForeground,
           ),
           const SizedBox(height: 16),
           Text(
             '搜索书籍',
-            style: TextStyle(
-              fontSize: 16,
-              color: secondary,
-            ),
+            style: theme.textTheme.h4,
           ),
           const SizedBox(height: 8),
           Text(
             _sourceIssues.isEmpty ? '输入书名或作者后回车' : '本次有失败书源，点上方“查看”了解原因',
-            style: TextStyle(
-              fontSize: 14,
-              color: tertiary,
+            style: theme.textTheme.muted.copyWith(
+              color: scheme.mutedForeground,
             ),
           ),
         ],
@@ -395,31 +373,24 @@ class _SearchViewState extends State<SearchView> {
     );
   }
 
-  Widget _buildResultItem(SearchResult result, bool isDark) {
-    final tileColor = isDark
-        ? AppDesignTokens.surfaceDark.withValues(alpha: 0.78)
-        : AppDesignTokens.surfaceLight;
-    final borderColor =
-        isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
-    final coverBg = isDark
-        ? AppDesignTokens.pageBgDark
-        : CupertinoColors.systemGrey6.resolveFrom(context);
+  Widget _buildResultItem(SearchResult result) {
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
+    final radius = theme.radius;
+    final coverBg = scheme.muted;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: tileColor,
-          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-          border: Border.all(color: borderColor),
-        ),
-        child: CupertinoListTile.notched(
+      child: GestureDetector(
+        onTap: () => _importBook(result),
+        child: ShadCard(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           leading: Container(
             width: 40,
             height: 56,
             decoration: BoxDecoration(
               color: coverBg,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: radius,
               image: result.coverUrl.isNotEmpty
                   ? DecorationImage(
                       image: NetworkImage(result.coverUrl),
@@ -430,32 +401,36 @@ class _SearchViewState extends State<SearchView> {
             child: result.coverUrl.isEmpty
                 ? Center(
                     child: Text(
-                      result.name.isNotEmpty
-                          ? result.name.substring(0, 1)
-                          : '?',
-                      style: TextStyle(
-                        color:
-                            CupertinoColors.secondaryLabel.resolveFrom(context),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
+                      result.name.isNotEmpty ? result.name.substring(0, 1) : '?',
+                      style: theme.textTheme.h4.copyWith(
+                        color: scheme.mutedForeground,
                       ),
                     ),
                   )
                 : null,
           ),
-          title: Text(
-            result.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          trailing: Icon(
+            LucideIcons.chevronRight,
+            size: 16,
+            color: scheme.mutedForeground,
           ),
-          subtitle: Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
+                result.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.p.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: scheme.foreground,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
                 result.author.isNotEmpty ? result.author : '未知作者',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                style: theme.textTheme.small.copyWith(
+                  color: scheme.mutedForeground,
                 ),
               ),
               if ([
@@ -476,9 +451,8 @@ class _SearchViewState extends State<SearchView> {
                   ].join(' · '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+                  style: theme.textTheme.small.copyWith(
+                    color: scheme.mutedForeground,
                   ),
                 ),
               ],
@@ -488,24 +462,20 @@ class _SearchViewState extends State<SearchView> {
                   '最新: ${result.lastChapter.trim()}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+                  style: theme.textTheme.small.copyWith(
+                    color: scheme.mutedForeground,
                   ),
                 ),
               ],
               const SizedBox(height: 2),
               Text(
                 '来源: ${result.sourceName}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+                style: theme.textTheme.small.copyWith(
+                  color: scheme.mutedForeground,
                 ),
               ),
             ],
           ),
-          trailing: const CupertinoListTileChevron(),
-          onTap: () => _importBook(result),
         ),
       ),
     );

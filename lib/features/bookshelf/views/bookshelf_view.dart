@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
@@ -407,26 +408,27 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   Widget _buildEmptyState() {
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            CupertinoIcons.book,
-            size: 64,
-            color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            LucideIcons.bookOpen,
+            size: 52,
+            color: scheme.mutedForeground,
           ),
           const SizedBox(height: 16),
           Text(
             '书架空空如也',
-            style: TextStyle(
-              fontSize: 17,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
+            style: theme.textTheme.h4,
           ),
           const SizedBox(height: 24),
-          CupertinoButton.filled(
+          ShadButton(
             onPressed: _importLocalBook,
+            leading: const Icon(LucideIcons.fileUp),
             child: const Text('导入本地书籍'),
           ),
         ],
@@ -565,35 +567,66 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   Widget _buildListView() {
-    return ListView.builder(
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
+    final radius = theme.radius;
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       itemCount: _books.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final book = _books[index];
-        return CupertinoListTile(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          leadingSize: 50,
-          leading: Container(
-            width: 50,
-            height: 70,
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemGrey5.resolveFrom(context),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Center(
-              child: Text(
-                book.title.isNotEmpty ? book.title.substring(0, 1) : '?',
-                style: TextStyle(
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
+        return GestureDetector(
+          onTap: () => _openReader(book),
+          onLongPress: () => _onBookLongPress(book),
+          child: ShadCard(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            leading: Container(
+              width: 44,
+              height: 62,
+              decoration: BoxDecoration(
+                color: scheme.muted,
+                borderRadius: radius,
+              ),
+              child: Center(
+                child: Text(
+                  book.title.isNotEmpty ? book.title.substring(0, 1) : '?',
+                  style: theme.textTheme.h4.copyWith(
+                    color: scheme.mutedForeground,
+                  ),
                 ),
               ),
             ),
+            trailing: Icon(
+              LucideIcons.chevronRight,
+              size: 16,
+              color: scheme.mutedForeground,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  book.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.p.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: scheme.foreground,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${book.author} · ${book.totalChapters}章',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.small.copyWith(
+                    color: scheme.mutedForeground,
+                  ),
+                ),
+              ],
+            ),
           ),
-          title: Text(book.title),
-          subtitle: Text('${book.author} · ${book.totalChapters}章'),
-          trailing: const CupertinoListTileChevron(),
-          onTap: () => _openReader(book),
         );
       },
     );

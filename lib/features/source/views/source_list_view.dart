@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
@@ -183,50 +184,74 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Widget _buildSourceList(List<BookSource> sources) {
-    return ListView.builder(
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       itemCount: sources.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final source = sources[index];
-        return CupertinoListTile.notched(
-          title: Text(source.bookSourceName),
-          subtitle: Text(source.bookSourceUrl),
-          trailing: CupertinoSwitch(
+        return ShadCard(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          trailing: ShadSwitch(
             value: source.enabled,
             onChanged: (value) {
               _sourceRepo.updateSource(source.copyWith(enabled: value));
             },
           ),
-          onTap: () => _onSourceTap(source),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _onSourceTap(source),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  source.bookSourceName,
+                  style: theme.textTheme.p.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: scheme.foreground,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  source.bookSourceUrl,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.small.copyWith(
+                    color: scheme.mutedForeground,
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
   }
 
   Widget _buildEmptyState() {
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            CupertinoIcons.cloud_download,
-            size: 64,
-            color: CupertinoColors.systemGrey,
+            LucideIcons.cloudDownload,
+            size: 52,
+            color: scheme.mutedForeground,
           ),
           const SizedBox(height: 16),
           Text(
             '暂无书源',
-            style: TextStyle(
-              fontSize: 16,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
+            style: theme.textTheme.h4,
           ),
           const SizedBox(height: 8),
           Text(
             '点击右上角 + 导入书源',
-            style: TextStyle(
-              fontSize: 14,
-              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
-            ),
+            style: theme.textTheme.muted.copyWith(color: scheme.mutedForeground),
           ),
         ],
       ),

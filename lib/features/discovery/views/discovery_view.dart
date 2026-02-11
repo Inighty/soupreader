@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
-import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -223,15 +223,18 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog(
+    showShadDialog<void>(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
+      builder: (dialogContext) => ShadDialog.alert(
         title: const Text('提示'),
-        content: Text('\n$message'),
+        description: Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(message),
+        ),
         actions: [
-          CupertinoDialogAction(
+          ShadButton(
             child: const Text('好'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(dialogContext).pop(),
           ),
         ],
       ),
@@ -241,12 +244,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   @override
   Widget build(BuildContext context) {
     final eligibleCount = _eligibleSources().length;
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final borderColor =
-        isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
-    final panelColor = isDark
-        ? AppDesignTokens.surfaceDark.withValues(alpha: 0.82)
-        : AppDesignTokens.surfaceLight.withValues(alpha: 0.94);
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
 
     return AppCupertinoPageScaffold(
       title: '发现',
@@ -259,8 +258,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         children: [
           if (_loading)
             _buildStatusPanel(
-              borderColor: borderColor,
-              panelColor: panelColor,
+              borderColor: scheme.border,
               child: Row(
                 children: [
                   const CupertinoActivityIndicator(),
@@ -272,16 +270,13 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                           : '正在发现: $_currentSourceName ($_completedSources/$_totalSources)',
                       style: TextStyle(
                         fontSize: 13,
-                        color: isDark
-                            ? AppDesignTokens.textMuted
-                            : AppDesignTokens.textNormal,
+                        color: scheme.mutedForeground,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
+                  ShadButton.link(
                     onPressed: _stop,
                     child: const Text('停止'),
                   ),
@@ -290,29 +285,23 @@ class _DiscoveryViewState extends State<DiscoveryView> {
             )
           else if (_sourceIssues.isNotEmpty)
             _buildStatusPanel(
-              borderColor: CupertinoColors.systemRed.resolveFrom(context),
-              panelColor: panelColor,
+              borderColor: scheme.destructive,
               child: Row(
                 children: [
-                  Icon(
-                    CupertinoIcons.exclamationmark_triangle,
-                    size: 16,
-                    color: CupertinoColors.systemRed.resolveFrom(context),
-                  ),
+                  Icon(LucideIcons.triangleAlert, size: 16, color: scheme.destructive),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '本次 ${_sourceIssues.length} 个书源失败，可查看原因',
                       style: TextStyle(
                         fontSize: 12,
-                        color: CupertinoColors.systemRed.resolveFrom(context),
+                        color: scheme.destructive,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
+                  ShadButton.link(
                     onPressed: _showIssueDetails,
                     child: const Text('查看'),
                   ),
@@ -321,13 +310,12 @@ class _DiscoveryViewState extends State<DiscoveryView> {
             )
           else if (_lastError != null && _results.isEmpty)
             _buildStatusPanel(
-              borderColor: CupertinoColors.systemRed.resolveFrom(context),
-              panelColor: panelColor,
+              borderColor: scheme.destructive,
               child: Text(
                 _lastError!,
                 style: TextStyle(
                   fontSize: 13,
-                  color: CupertinoColors.systemRed.resolveFrom(context),
+                  color: scheme.destructive,
                 ),
               ),
             )
@@ -355,24 +343,22 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
   Widget _buildStatusPanel({
     required Color borderColor,
-    required Color panelColor,
     required Widget child,
   }) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: panelColor,
-          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-          border: Border.all(color: borderColor),
-        ),
+      child: ShadCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: ShadBorder.all(color: borderColor, width: 1),
         child: child,
       ),
     );
   }
 
   Widget _buildEmptyState(BuildContext context, int eligibleCount) {
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
+
     final subtitle = eligibleCount == 0
         ? '没有可用的发现书源\n请先导入带 exploreUrl/ruleExplore 的 Legado 书源'
         : _sourceIssues.isEmpty
@@ -383,25 +369,21 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            CupertinoIcons.compass,
-            size: 64,
-            color: CupertinoColors.systemGrey.resolveFrom(context),
+            LucideIcons.compass,
+            size: 52,
+            color: scheme.mutedForeground,
           ),
           const SizedBox(height: 16),
           Text(
             '暂无发现内容',
-            style: TextStyle(
-              fontSize: 16,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
+            style: theme.textTheme.h4,
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+            style: theme.textTheme.muted.copyWith(
+              color: scheme.mutedForeground,
             ),
           ),
         ],
@@ -410,28 +392,23 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   Widget _buildResultItem(SearchResult result) {
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final tileColor = isDark
-        ? AppDesignTokens.surfaceDark.withValues(alpha: 0.78)
-        : AppDesignTokens.surfaceLight;
-    final borderColor =
-        isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
+    final radius = theme.radius;
+    final coverBg = scheme.muted;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: tileColor,
-          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-          border: Border.all(color: borderColor),
-        ),
-        child: CupertinoListTile.notched(
+      child: GestureDetector(
+        onTap: () => _importBook(result),
+        child: ShadCard(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           leading: Container(
             width: 40,
             height: 56,
             decoration: BoxDecoration(
-              color: CupertinoColors.systemGrey5.resolveFrom(context),
-              borderRadius: BorderRadius.circular(6),
+              color: coverBg,
+              borderRadius: radius,
               image: result.coverUrl.isNotEmpty
                   ? DecorationImage(
                       image: NetworkImage(result.coverUrl),
@@ -442,40 +419,43 @@ class _DiscoveryViewState extends State<DiscoveryView> {
             child: result.coverUrl.isEmpty
                 ? Center(
                     child: Text(
-                      result.name.isNotEmpty
-                          ? result.name.substring(0, 1)
-                          : '?',
-                      style: TextStyle(
-                        color:
-                            CupertinoColors.secondaryLabel.resolveFrom(context),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
+                      result.name.isNotEmpty ? result.name.substring(0, 1) : '?',
+                      style: theme.textTheme.h4.copyWith(
+                        color: scheme.mutedForeground,
                       ),
                     ),
                   )
                 : null,
           ),
-          title: Text(
-            result.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          trailing: Icon(
+            LucideIcons.chevronRight,
+            size: 16,
+            color: scheme.mutedForeground,
           ),
-          subtitle: Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
+                result.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.p.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: scheme.foreground,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
                 result.author.isNotEmpty ? result.author : '未知作者',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                style: theme.textTheme.small.copyWith(
+                  color: scheme.mutedForeground,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 '来源: ${result.sourceName}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+                style: theme.textTheme.small.copyWith(
+                  color: scheme.mutedForeground,
                 ),
               ),
               if (result.lastChapter.trim().isNotEmpty) ...[
@@ -484,16 +464,13 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                   '最新: ${result.lastChapter.trim()}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: CupertinoColors.tertiaryLabel.resolveFrom(context),
+                  style: theme.textTheme.small.copyWith(
+                    color: scheme.mutedForeground,
                   ),
                 ),
               ],
             ],
           ),
-          trailing: const CupertinoListTileChevron(),
-          onTap: () => _importBook(result),
         ),
       ),
     );

@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
-
-import '../theme/design_tokens.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// 统一页面容器：导航栏 + 渐变背景 + SafeArea。
 class AppCupertinoPageScaffold extends StatelessWidget {
@@ -24,9 +23,11 @@ class AppCupertinoPageScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = CupertinoTheme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final shad = ShadTheme.of(context);
+    final scheme = shad.colorScheme;
+    final isDark = shad.brightness == Brightness.dark;
     final borderColor =
-        isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+        scheme.border.withValues(alpha: isDark ? 0.85 : 1);
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
@@ -43,9 +44,9 @@ class AppCupertinoPageScaffold extends StatelessWidget {
             end: Alignment.bottomCenter,
             colors: [
               isDark
-                  ? AppDesignTokens.surfaceDark.withValues(alpha: 0.78)
-                  : AppDesignTokens.surfaceLight.withValues(alpha: 0.96),
-              theme.scaffoldBackgroundColor,
+                  ? scheme.card.withValues(alpha: 0.78)
+                  : scheme.card.withValues(alpha: 0.96),
+              scheme.background,
             ],
           ),
         ),

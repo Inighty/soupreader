@@ -2,8 +2,12 @@ import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'app/theme/cupertino_theme.dart';
+import 'app/theme/shadcn_theme.dart';
 import 'core/database/database_service.dart';
 import 'core/models/app_settings.dart';
 import 'core/services/cookie_store.dart';
@@ -136,13 +140,40 @@ class _SoupReaderAppState extends State<SoupReaderApp>
   @override
   Widget build(BuildContext context) {
     final brightness = _effectiveBrightness;
+    final themeMode = switch (_settingsService.appSettings.appearanceMode) {
+      AppAppearanceMode.followSystem => ThemeMode.system,
+      AppAppearanceMode.light => ThemeMode.light,
+      AppAppearanceMode.dark => ThemeMode.dark,
+    };
 
-    // 使用统一 Cupertino 主题，确保全页面风格一致。
-    return CupertinoApp(
-      title: 'SoupReader',
-      debugShowCheckedModeBanner: false,
-      theme: AppCupertinoTheme.build(brightness),
-      home: MainScreen(brightness: brightness),
+    return ShadApp.custom(
+      themeMode: themeMode,
+      theme: AppShadcnTheme.light(),
+      darkTheme: AppShadcnTheme.dark(),
+      appBuilder: (context) {
+        final shad = ShadTheme.of(context);
+        final cupertinoTheme = CupertinoTheme.of(context).copyWith(
+          barBackgroundColor:
+              shad.colorScheme.background.withValues(alpha: 0.92),
+        );
+
+        return CupertinoApp(
+          title: 'SoupReader',
+          debugShowCheckedModeBanner: false,
+          theme: cupertinoTheme,
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('zh', 'CN'),
+            Locale('en', 'US'),
+          ],
+          home: MainScreen(brightness: brightness),
+          builder: (context, child) => ShadAppBuilder(child: child!),
+        );
+      },
     );
   }
 }
