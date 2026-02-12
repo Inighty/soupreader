@@ -31,7 +31,6 @@ import '../widgets/reader_bottom_menu.dart';
 import '../widgets/reader_status_bar.dart';
 import '../widgets/reader_catalog_sheet.dart';
 import '../widgets/typography_settings_dialog.dart';
-import '../widgets/reader_quick_settings_sheet.dart';
 
 /// 简洁阅读器 - Cupertino 风格 (增强版)
 class SimpleReaderView extends StatefulWidget {
@@ -1138,15 +1137,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         onSettingsChanged: (settings) =>
                             _updateSettings(settings),
                         onShowChapterList: _openChapterListFromMenu,
-                        onShowTypography: () => _openQuickSettingsFromMenu(
-                            ReaderQuickSettingsTab.typography),
-                        onShowTheme: () => _openQuickSettingsFromMenu(
-                            ReaderQuickSettingsTab.interface),
-                        onShowPage: () => _openQuickSettingsFromMenu(
-                            ReaderQuickSettingsTab.page),
-                        onOpenFullSettings: _openFullSettingsFromMenu,
-                        onToggleAutoRead: _toggleAutoReadPanelFromMenu,
-                        autoReadRunning: _autoPager.isRunning,
+                        onShowReadAloud: _openReadAloudFromMenu,
+                        onShowInterfaceSettings: _openInterfaceSettingsFromMenu,
+                        onShowBehaviorSettings: _openBehaviorSettingsFromMenu,
                       ),
 
                     if (_isLoadingChapter)
@@ -1452,35 +1445,33 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _showChapterList();
   }
 
-  void _openQuickSettingsFromMenu(ReaderQuickSettingsTab tab) {
+  void _openInterfaceSettingsFromMenu() {
     _closeReaderMenuOverlay();
-    _showQuickSettingsSheet(initialTab: tab);
+    _showReadingSettingsSheet(
+      title: '界面',
+      initialTab: 0,
+      allowedTabs: const [0, 1],
+    );
   }
 
-  void _openFullSettingsFromMenu() {
+  void _openBehaviorSettingsFromMenu() {
     _closeReaderMenuOverlay();
-    _showReadingSettingsSheet(initialTab: 0);
+    _showReadingSettingsSheet(
+      title: '设置',
+      initialTab: 2,
+      allowedTabs: const [2, 3],
+    );
   }
 
-  void _toggleAutoReadPanelFromMenu() {
-    final nextVisible = !_showAutoReadPanel;
-    if (_showMenu) {
-      setState(() {
-        _showMenu = false;
-        _showAutoReadPanel = nextVisible;
-      });
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    } else {
-      setState(() {
-        _showAutoReadPanel = nextVisible;
-      });
+  void _openReadAloudFromMenu() {
+    _closeReaderMenuOverlay();
+    final capability = _detectReadAloudCapability();
+    if (!capability.available) {
+      _showToast(capability.reason);
+      return;
     }
-
-    if (nextVisible) {
-      _autoPager.start();
-    } else {
-      _autoPager.stop();
-    }
+    // 后续接入真实朗读流程时，从这里进入。
+    _showToast('语音朗读即将上线');
   }
 
   Widget _buildFloatingActionRail() {
@@ -1518,25 +1509,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             ),
             const SizedBox(height: 8),
             _buildFloatingActionButton(
-              icon: CupertinoIcons.textformat_size,
-              onTap: () => _openQuickSettingsFromMenu(
-                ReaderQuickSettingsTab.typography,
-              ),
+              icon: CupertinoIcons.speaker_2_fill,
+              onTap: _openReadAloudFromMenu,
             ),
             const SizedBox(height: 8),
             _buildFloatingActionButton(
               icon: CupertinoIcons.circle_grid_3x3,
-              onTap: () => _openQuickSettingsFromMenu(
-                ReaderQuickSettingsTab.interface,
-              ),
+              onTap: _openInterfaceSettingsFromMenu,
             ),
             const SizedBox(height: 8),
             _buildFloatingActionButton(
-              icon: _autoPager.isRunning
-                  ? CupertinoIcons.pause_circle_fill
-                  : CupertinoIcons.play_circle_fill,
-              active: _autoPager.isRunning,
-              onTap: _toggleAutoReadPanelFromMenu,
+              icon: CupertinoIcons.gear,
+              onTap: _openBehaviorSettingsFromMenu,
             ),
           ],
         ),
@@ -1594,6 +1578,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           ),
         ],
       ),
+    );
+  }
+
+  _ReadAloudCapability _detectReadAloudCapability() {
+    // 当前版本尚未接入 TTS 引擎；保留入口并给出明确可观测提示。
+    return const _ReadAloudCapability(
+      available: false,
+      reason: '语音朗读（TTS）暂未实现',
     );
   }
 
@@ -1807,23 +1799,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
   }
 
-  void _showQuickSettingsSheet({
-    required ReaderQuickSettingsTab initialTab,
+  void _showReadingSettingsSheet({
+    String title = '阅读设置',
+    int initialTab = 0,
+    List<int>? allowedTabs,
   }) {
-    showCupertinoModalPopup<void>(
-      context: context,
-      builder: (context) => ReaderQuickSettingsSheet(
-        settings: _settings,
-        themes: AppColors.readingThemes,
-        initialTab: initialTab,
-        onSettingsChanged: _updateSettings,
-        onOpenFullSettings: () => _showReadingSettingsSheet(initialTab: 0),
-      ),
-    );
-  }
-
-  void _showReadingSettingsSheet({int initialTab = 0}) {
-    int selectedTab = initialTab;
+    final tabs = (allowedTabs == null || allowedTabs.isEmpty)
+        ? <int>[0, 1, 2, 3]
+        : allowedTabs.toSet().toList()
+      ..sort();
+    int selectedTab = tabs.contains(initialTab) ? initialTab : tabs.first;
     showCupertinoModalPopup(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -1856,7 +1841,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     children: [
                       Expanded(
                         child: Text(
-                          '阅读设置',
+                          title,
                           style: TextStyle(
                             color: _uiTextStrong,
                             fontSize: 20,
@@ -1876,17 +1861,21 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _buildSettingsTabs(
-                    selectedTab,
-                    (value) {
-                      setPopupState(() => selectedTab = value);
-                    },
+                if (tabs.length > 1) ...[
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _buildSettingsTabs(
+                      selectedTab,
+                      tabs,
+                      (value) {
+                        setPopupState(() => selectedTab = value);
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
+                ] else
+                  const SizedBox(height: 10),
                 Expanded(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
@@ -1901,7 +1890,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  Widget _buildSettingsTabs(int selectedTab, ValueChanged<int> onChanged) {
+  Widget _buildSettingsTabs(
+    int selectedTab,
+    List<int> tabs,
+    ValueChanged<int> onChanged,
+  ) {
+    const labels = <int, String>{
+      0: '排版',
+      1: '界面',
+      2: '翻页',
+      3: '其他',
+    };
+
     Widget buildTab(String label, bool isSelected) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1921,10 +1921,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       backgroundColor: _uiCardBg,
       thumbColor: _uiAccent,
       children: {
-        0: buildTab('排版', selectedTab == 0),
-        1: buildTab('界面', selectedTab == 1),
-        2: buildTab('翻页', selectedTab == 2),
-        3: buildTab('其他', selectedTab == 3),
+        for (final tab in tabs)
+          tab: buildTab(labels[tab] ?? '设置', selectedTab == tab),
       },
       onValueChanged: (value) {
         if (value == null) return;
@@ -3321,6 +3319,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       ),
     );
   }
+}
+
+class _ReadAloudCapability {
+  final bool available;
+  final String reason;
+
+  const _ReadAloudCapability({
+    required this.available,
+    required this.reason,
+  });
 }
 
 class _TipOption {
