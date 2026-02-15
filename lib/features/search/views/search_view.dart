@@ -1,17 +1,23 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
-import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/source_aware_cover_image.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
+import '../../../core/models/app_settings.dart';
+import '../../../core/services/settings_service.dart';
 import '../../bookshelf/services/book_add_service.dart';
 import '../../source/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
+import '../services/search_cache_service.dart';
 import 'search_book_info_view.dart';
+import 'search_scope_picker_view.dart';
 
-/// 搜索页面 - 全局统一视觉风格
+/// 搜索页面（对齐 legado 核心语义：范围、过滤、可停止、历史词）。
 class SearchView extends StatefulWidget {
   final List<String>? sourceUrls;
   final String? initialKeyword;
@@ -34,9 +40,13 @@ class SearchView extends StatefulWidget {
 
 class _SearchViewState extends State<SearchView> {
   final TextEditingController _searchController = TextEditingController();
-  static const int _maxSearchConcurrency = 6;
+  final SettingsService _settingsService = SettingsService();
+  final SearchCacheService _cacheService = SearchCacheService();
   late final SourceRepository _sourceRepo;
   late final BookAddService _addService;
+
+  late AppSettings _settings;
+  List<String> _historyKeywords = const <String>[];
 
   List<SearchResult> _results = <SearchResult>[];
   List<_SearchDisplayItem> _displayResults = <_SearchDisplayItem>[];
@@ -44,9 +54,16 @@ class _SearchViewState extends State<SearchView> {
   final Set<CancelToken> _activeCancelTokens = <CancelToken>{};
   bool _isSearching = false;
   String _searchingSource = '';
+  String _currentKeyword = '';
   int _completedSources = 0;
   int _searchSessionSeed = 0;
   int _runningSearchSessionId = 0;
+
+  bool get _isEntryScoped {
+    final scoped = widget.sourceUrls;
+    if (scoped == null || scoped.isEmpty) return false;
+    return scoped.any((item) => item.trim().isNotEmpty);
+  }
 
   @override
   void initState() {
@@ -54,6 +71,9 @@ class _SearchViewState extends State<SearchView> {
     final db = DatabaseService();
     _sourceRepo = SourceRepository(db);
     _addService = BookAddService(database: db);
+    _settings = _sanitizeSettings(_settingsService.appSettings);
+    unawaited(_prepareLocalState());
+
     final initialKeyword = widget.initialKeyword?.trim();
     if (initialKeyword != null && initialKeyword.isNotEmpty) {
       _searchController.text = initialKeyword;
@@ -61,6 +81,7 @@ class _SearchViewState extends State<SearchView> {
         TextPosition(offset: initialKeyword.length),
       );
     }
+
     if (widget.autoSearchOnOpen == true && initialKeyword != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -77,19 +98,52 @@ class _SearchViewState extends State<SearchView> {
     super.dispose();
   }
 
-  List<BookSource> _enabledSources() {
-    final scopedUrls = widget.sourceUrls
-        ?.map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toSet();
+  Future<void> _prepareLocalState() async {
+    final history = await _cacheService.loadHistory();
+    await _cacheService.purgeExpiredCache(
+      retentionDays: _settings.searchCacheRetentionDays,
+    );
+    if (!mounted) return;
+    setState(() => _historyKeywords = history);
+  }
 
+  AppSettings _sanitizeSettings(AppSettings settings) {
+    final normalizedScope = settings.searchScopeSourceUrls
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList(growable: false)
+      ..sort();
+
+    return settings.copyWith(
+      searchConcurrency: settings.searchConcurrency.clamp(2, 12),
+      searchCacheRetentionDays: settings.searchCacheRetentionDays.clamp(1, 30),
+      searchScopeSourceUrls: normalizedScope,
+    );
+  }
+
+  Future<void> _saveSettings(AppSettings next) async {
+    final normalized = _sanitizeSettings(next);
+    if (mounted) {
+      setState(() => _settings = normalized);
+    } else {
+      _settings = normalized;
+    }
+    await _settingsService.saveAppSettings(normalized);
+  }
+
+  Set<String> _normalizeUrlSet(Iterable<String> values) {
+    return values
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet();
+  }
+
+  List<BookSource> _allEnabledSources() {
     final enabled = _sourceRepo
         .getAllSources()
         .where((source) => source.enabled == true)
-        .where((source) {
-      if (scopedUrls == null || scopedUrls.isEmpty) return true;
-      return scopedUrls.contains(source.bookSourceUrl);
-    }).toList(growable: false);
+        .toList(growable: false);
     enabled.sort((a, b) {
       if (a.weight != b.weight) {
         return b.weight.compareTo(a.weight);
@@ -99,6 +153,25 @@ class _SearchViewState extends State<SearchView> {
     return enabled;
   }
 
+  List<BookSource> _enabledSources() {
+    final enabled = _allEnabledSources();
+
+    final forcedScope = widget.sourceUrls == null
+        ? const <String>{}
+        : _normalizeUrlSet(widget.sourceUrls!);
+    if (forcedScope.isNotEmpty) {
+      return enabled
+          .where((source) => forcedScope.contains(source.bookSourceUrl))
+          .toList(growable: false);
+    }
+
+    final configuredScope = _normalizeUrlSet(_settings.searchScopeSourceUrls);
+    if (configuredScope.isEmpty) return enabled;
+    return enabled
+        .where((source) => configuredScope.contains(source.bookSourceUrl))
+        .toList(growable: false);
+  }
+
   List<SearchResult> _collectUniqueResults(
     List<SearchResult> incoming,
     Set<String> seenKeys,
@@ -106,8 +179,9 @@ class _SearchViewState extends State<SearchView> {
     final unique = <SearchResult>[];
     for (final item in incoming) {
       final bookUrl = item.bookUrl.trim();
-      if (bookUrl.isEmpty) continue;
-      final key = '${item.sourceUrl.trim()}|$bookUrl';
+      final sourceUrl = item.sourceUrl.trim();
+      if (bookUrl.isEmpty || sourceUrl.isEmpty) continue;
+      final key = '$sourceUrl|$bookUrl';
       if (!seenKeys.add(key)) continue;
       unique.add(item);
     }
@@ -118,45 +192,126 @@ class _SearchViewState extends State<SearchView> {
     return text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
   }
 
-  void _rebuildDisplayResults() {
-    final grouped = <String, List<SearchResult>>{};
-    for (final item in _results) {
-      final key =
-          '${_normalizeCompare(item.name)}|${_normalizeCompare(item.author)}';
-      grouped.putIfAbsent(key, () => <SearchResult>[]).add(item);
+  List<SearchResult> _filterResultsByMode(
+    List<SearchResult> incoming,
+    String keyword,
+  ) {
+    switch (_settings.searchFilterMode) {
+      case SearchFilterMode.none:
+      case SearchFilterMode.normal:
+        return incoming;
+      case SearchFilterMode.precise:
+        final normalizedKeyword = _normalizeCompare(keyword);
+        if (normalizedKeyword.isEmpty) return incoming;
+        return incoming.where((item) {
+          final name = _normalizeCompare(item.name);
+          final author = _normalizeCompare(item.author);
+          return name.contains(normalizedKeyword) ||
+              author.contains(normalizedKeyword);
+        }).toList(growable: false);
     }
+  }
+
+  int _matchRank(SearchResult result, String normalizedKeyword) {
+    if (normalizedKeyword.isEmpty) return 2;
+    final name = _normalizeCompare(result.name);
+    final author = _normalizeCompare(result.author);
+    if (name == normalizedKeyword || author == normalizedKeyword) return 0;
+    if (name.contains(normalizedKeyword) ||
+        author.contains(normalizedKeyword)) {
+      return 1;
+    }
+    return 2;
+  }
+
+  SearchResult _pickPrimaryResult(
+    List<SearchResult> origins,
+    String normalizedKeyword,
+  ) {
+    if (origins.length <= 1) return origins.first;
+    final sorted = origins.toList(growable: false)
+      ..sort((a, b) {
+        final rankCompare = _matchRank(a, normalizedKeyword).compareTo(
+          _matchRank(b, normalizedKeyword),
+        );
+        if (rankCompare != 0) return rankCompare;
+        final sourceNameCompare = a.sourceName.compareTo(b.sourceName);
+        if (sourceNameCompare != 0) return sourceNameCompare;
+        return a.bookUrl.compareTo(b.bookUrl);
+      });
+    return sorted.first;
+  }
+
+  void _rebuildDisplayResults({String? keyword}) {
+    final normalizedKeyword = _normalizeCompare(keyword ?? _currentKeyword);
+    final mode = _settings.searchFilterMode;
     final built = <_SearchDisplayItem>[];
-    for (final entry in grouped.entries) {
-      final origins = entry.value;
-      if (origins.isEmpty) continue;
-      final primary = origins.first;
-      final inBookshelf = origins.any(_addService.isInBookshelf);
-      final displayCoverUrl = _pickDisplayCoverUrl(origins);
-      built.add(
-        _SearchDisplayItem(
-          primary: primary,
-          origins: origins,
-          inBookshelf: inBookshelf,
-          displayCoverUrl: displayCoverUrl,
-        ),
-      );
+
+    if (mode == SearchFilterMode.none) {
+      for (final item in _results) {
+        final cover = _pickDisplayCover(<SearchResult>[item]);
+        built.add(
+          _SearchDisplayItem(
+            key: '${item.sourceUrl.trim()}|${item.bookUrl.trim()}',
+            primary: item,
+            origins: <SearchResult>[item],
+            inBookshelf: _addService.isInBookshelf(item),
+            displayCoverUrl: cover.url,
+            displayCoverSourceUrl: cover.sourceUrl,
+          ),
+        );
+      }
+    } else {
+      final grouped = <String, List<SearchResult>>{};
+      for (final item in _results) {
+        final groupKey =
+            '${_normalizeCompare(item.name)}|${_normalizeCompare(item.author)}';
+        grouped.putIfAbsent(groupKey, () => <SearchResult>[]).add(item);
+      }
+      for (final entry in grouped.entries) {
+        final origins = entry.value;
+        if (origins.isEmpty) continue;
+        final primary = _pickPrimaryResult(origins, normalizedKeyword);
+        final cover = _pickDisplayCover(origins);
+        built.add(
+          _SearchDisplayItem(
+            key: '${entry.key}|${primary.bookUrl.trim()}',
+            primary: primary,
+            origins: origins,
+            inBookshelf: origins.any(_addService.isInBookshelf),
+            displayCoverUrl: cover.url,
+            displayCoverSourceUrl: cover.sourceUrl,
+          ),
+        );
+      }
     }
+
     built.sort((a, b) {
+      final rankCompare = _matchRank(a.primary, normalizedKeyword).compareTo(
+        _matchRank(b.primary, normalizedKeyword),
+      );
+      if (rankCompare != 0) return rankCompare;
       final originsCompare = b.origins.length.compareTo(a.origins.length);
       if (originsCompare != 0) return originsCompare;
       final nameCompare = a.primary.name.compareTo(b.primary.name);
       if (nameCompare != 0) return nameCompare;
       return a.primary.author.compareTo(b.primary.author);
     });
+
     _displayResults = built;
   }
 
-  String _pickDisplayCoverUrl(List<SearchResult> origins) {
+  _DisplayCover _pickDisplayCover(List<SearchResult> origins) {
     for (final item in origins) {
       final cover = item.coverUrl.trim();
-      if (cover.isNotEmpty) return cover;
+      if (cover.isNotEmpty) {
+        return _DisplayCover(
+          url: cover,
+          sourceUrl: item.sourceUrl.trim(),
+        );
+      }
     }
-    return '';
+    return const _DisplayCover(url: '', sourceUrl: '');
   }
 
   bool _isSearchSessionActive(int sessionId) {
@@ -197,28 +352,49 @@ class _SearchViewState extends State<SearchView> {
   Future<void> _search() async {
     final keyword = _searchController.text.trim();
     if (keyword.isEmpty) return;
+    _currentKeyword = keyword;
 
     final enabledSources = _enabledSources();
     if (enabledSources.isEmpty) {
-      _showMessage('没有启用的书源');
+      _showMessage('当前搜索范围没有启用书源，请先调整“搜索范围”。');
       return;
     }
 
+    await _saveHistoryKeyword(keyword);
+
+    final cacheKey = _cacheService.buildCacheKey(
+      keyword: keyword,
+      filterMode: _settings.searchFilterMode,
+      scopeSourceUrls: enabledSources.map((item) => item.bookSourceUrl),
+    );
+    final cached = await _cacheService.readCache(
+      key: cacheKey,
+      retentionDays: _settings.searchCacheRetentionDays,
+    );
+    final cachedResults = cached?.results ?? const <SearchResult>[];
+
     _cancelOngoingSearch(updateState: false);
     final seenResultKeys = <String>{};
+    for (final item in cachedResults) {
+      final sourceUrl = item.sourceUrl.trim();
+      final bookUrl = item.bookUrl.trim();
+      if (sourceUrl.isEmpty || bookUrl.isEmpty) continue;
+      seenResultKeys.add('$sourceUrl|$bookUrl');
+    }
+
     final searchSessionId = _startSearchSession();
     var nextSourceIndex = 0;
-    final workerCount = enabledSources.length < _maxSearchConcurrency
+    final workerCount = enabledSources.length < _settings.searchConcurrency
         ? enabledSources.length
-        : _maxSearchConcurrency;
+        : _settings.searchConcurrency;
 
     setState(() {
       _isSearching = true;
-      _results = <SearchResult>[];
-      _displayResults = <_SearchDisplayItem>[];
+      _results = cachedResults.toList(growable: true);
       _sourceIssues.clear();
       _completedSources = 0;
       _searchingSource = '';
+      _rebuildDisplayResults(keyword: keyword);
     });
 
     Future<void> runWorker() async {
@@ -240,13 +416,16 @@ class _SearchViewState extends State<SearchView> {
             cancelToken: token,
           );
           if (!_isSearchSessionActive(searchSessionId)) return;
+
           final issue = _buildSearchIssue(source, debugResult);
-          final uniqueResults =
-              _collectUniqueResults(debugResult.results, seenResultKeys);
+          final filtered =
+              _filterResultsByMode(debugResult.results, keyword.trim());
+          final uniqueResults = _collectUniqueResults(filtered, seenResultKeys);
           if (!_isSearchSessionActive(searchSessionId)) return;
+
           setState(() {
             _results.addAll(uniqueResults);
-            _rebuildDisplayResults();
+            _rebuildDisplayResults(keyword: keyword);
             if (issue != null) {
               _sourceIssues.add(issue);
             }
@@ -278,6 +457,10 @@ class _SearchViewState extends State<SearchView> {
     );
 
     if (!_isSearchSessionActive(searchSessionId)) return;
+    if (_results.isNotEmpty) {
+      unawaited(_cacheService.writeCache(key: cacheKey, results: _results));
+    }
+
     setState(() {
       _isSearching = false;
       _runningSearchSessionId = 0;
@@ -327,6 +510,442 @@ class _SearchViewState extends State<SearchView> {
     return '${normalized.substring(0, maxLength)}…';
   }
 
+  Future<void> _saveHistoryKeyword(String keyword) async {
+    final history = await _cacheService.saveHistoryKeyword(keyword);
+    if (!mounted) return;
+    setState(() => _historyKeywords = history);
+  }
+
+  Future<void> _removeHistoryKeyword(String keyword) async {
+    final history = await _cacheService.deleteHistoryKeyword(keyword);
+    if (!mounted) return;
+    setState(() => _historyKeywords = history);
+  }
+
+  Future<void> _clearHistory() async {
+    final confirmed = await _confirm(
+      title: '清空搜索历史',
+      content: '确定清空所有搜索历史吗？',
+      confirmText: '清空',
+      isDestructive: true,
+    );
+    if (!confirmed) return;
+    await _cacheService.clearHistory();
+    if (!mounted) return;
+    setState(() => _historyKeywords = const <String>[]);
+  }
+
+  Future<void> _openBookInfo(SearchResult result) async {
+    await Navigator.of(context, rootNavigator: true).push(
+      CupertinoPageRoute(
+        builder: (_) => SearchBookInfoView(result: result),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _rebuildDisplayResults(keyword: _currentKeyword));
+  }
+
+  String _filterModeLabel(SearchFilterMode mode) {
+    switch (mode) {
+      case SearchFilterMode.none:
+        return '不过滤';
+      case SearchFilterMode.normal:
+        return '普通过滤';
+      case SearchFilterMode.precise:
+        return '精准过滤';
+    }
+  }
+
+  String _scopeLabel({
+    required int scopedCount,
+    required int allEnabledCount,
+  }) {
+    if (_isEntryScoped) {
+      return '入口限定 $scopedCount 源';
+    }
+    if (_settings.searchScopeSourceUrls.isEmpty) {
+      return '所有书源';
+    }
+    return '$scopedCount/$allEnabledCount 书源';
+  }
+
+  Future<void> _showSearchSettingsSheet() async {
+    final enabledCount = _enabledSources().length;
+    final allEnabledCount = _allEnabledSources().length;
+    final action = await showCupertinoModalPopup<_SearchSettingAction>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('搜索设置'),
+        message: const Text('以下设置会自动保存'),
+        actions: [
+          _buildSettingsAction(
+            ctx,
+            action: _SearchSettingAction.filterMode,
+            label: '搜索过滤',
+            value: _filterModeLabel(_settings.searchFilterMode),
+          ),
+          _buildSettingsAction(
+            ctx,
+            action: _SearchSettingAction.scope,
+            label: '搜索范围',
+            value: _scopeLabel(
+              scopedCount: enabledCount,
+              allEnabledCount: allEnabledCount,
+            ),
+          ),
+          _buildSettingsAction(
+            ctx,
+            action: _SearchSettingAction.concurrency,
+            label: '并发任务',
+            value: '${_settings.searchConcurrency} 个',
+          ),
+          _buildSettingsAction(
+            ctx,
+            action: _SearchSettingAction.cacheRetention,
+            label: '搜索缓存保留时间',
+            value: '${_settings.searchCacheRetentionDays} 天',
+          ),
+          _buildSettingsAction(
+            ctx,
+            action: _SearchSettingAction.coverToggle,
+            label: '结果封面',
+            value: _settings.searchShowCover ? '开启' : '关闭',
+          ),
+          _buildSettingsAction(
+            ctx,
+            action: _SearchSettingAction.clearCache,
+            label: '清除搜索缓存',
+            value: '',
+            isDestructive: true,
+          ),
+          _buildSettingsAction(
+            ctx,
+            action: _SearchSettingAction.clearHistory,
+            label: '清空搜索历史',
+            value: '',
+            isDestructive: true,
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+
+    if (action == null) return;
+    switch (action) {
+      case _SearchSettingAction.filterMode:
+        await _pickFilterMode();
+        break;
+      case _SearchSettingAction.scope:
+        if (_isEntryScoped) {
+          _showMessage('当前为源内搜索，范围由入口限定。');
+        } else {
+          await _openScopePicker();
+        }
+        break;
+      case _SearchSettingAction.concurrency:
+        await _pickConcurrency();
+        break;
+      case _SearchSettingAction.cacheRetention:
+        await _pickCacheRetention();
+        break;
+      case _SearchSettingAction.coverToggle:
+        await _toggleCover();
+        break;
+      case _SearchSettingAction.clearCache:
+        await _clearSearchCache();
+        break;
+      case _SearchSettingAction.clearHistory:
+        await _clearHistory();
+        break;
+    }
+  }
+
+  CupertinoActionSheetAction _buildSettingsAction(
+    BuildContext ctx, {
+    required _SearchSettingAction action,
+    required String label,
+    required String value,
+    bool isDestructive = false,
+  }) {
+    return CupertinoActionSheetAction(
+      isDestructiveAction: isDestructive,
+      onPressed: () => Navigator.pop(ctx, action),
+      child: Row(
+        children: [
+          Expanded(child: Text(label)),
+          if (value.isNotEmpty)
+            Text(
+              value,
+              style: TextStyle(
+                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                fontSize: 14,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickFilterMode() async {
+    final selected = await showCupertinoModalPopup<SearchFilterMode>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('过滤模式'),
+        actions: [
+          _buildFilterModeAction(
+              ctx, SearchFilterMode.none, '不过滤搜索结果', '保留所有搜索结果'),
+          _buildFilterModeAction(ctx, SearchFilterMode.normal, '普通过滤搜索结果',
+              '保留书名或作者含关键字的结果，也可少量输入错误'),
+          _buildFilterModeAction(
+              ctx, SearchFilterMode.precise, '精准过滤搜索结果', '仅保留书名或作者匹配关键字的结果'),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (selected == null || selected == _settings.searchFilterMode) return;
+    await _saveSettings(_settings.copyWith(searchFilterMode: selected));
+    if (!mounted) return;
+    setState(() => _rebuildDisplayResults(keyword: _currentKeyword));
+  }
+
+  CupertinoActionSheetAction _buildFilterModeAction(
+    BuildContext ctx,
+    SearchFilterMode mode,
+    String title,
+    String subtitle,
+  ) {
+    final selected = _settings.searchFilterMode == mode;
+    return CupertinoActionSheetAction(
+      onPressed: () => Navigator.pop(ctx, mode),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(title)),
+              if (selected)
+                Icon(
+                  CupertinoIcons.check_mark_circled_solid,
+                  size: 18,
+                  color: CupertinoColors.activeGreen.resolveFrom(context),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 13,
+              color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openScopePicker() async {
+    final allEnabled = _allEnabledSources();
+    if (allEnabled.isEmpty) {
+      _showMessage('没有可用的启用书源。');
+      return;
+    }
+
+    final selected = _normalizeUrlSet(_settings.searchScopeSourceUrls);
+    final result =
+        await Navigator.of(context, rootNavigator: true).push<List<String>>(
+      CupertinoPageRoute(
+        builder: (_) => SearchScopePickerView(
+          sources: allEnabled,
+          initialSelectedUrls: selected,
+        ),
+      ),
+    );
+    if (result == null) return;
+
+    final normalized = _normalizeUrlSet(result);
+    final scopeToSave = normalized.length == allEnabled.length
+        ? const <String>[]
+        : (normalized.toList(growable: false)..sort());
+    await _saveSettings(
+      _settings.copyWith(searchScopeSourceUrls: scopeToSave),
+    );
+  }
+
+  Future<void> _pickConcurrency() async {
+    final values = List<int>.generate(11, (index) => index + 2);
+    final picked = await _pickIntValue(
+      title: '设置搜索并发任务',
+      values: values,
+      current: _settings.searchConcurrency,
+      infoMessage: '并发任务越多，搜索越快；同时会增加设备和网络负担。',
+    );
+    if (picked == null || picked == _settings.searchConcurrency) return;
+    await _saveSettings(_settings.copyWith(searchConcurrency: picked));
+  }
+
+  Future<void> _pickCacheRetention() async {
+    final values = List<int>.generate(30, (index) => index + 1);
+    final picked = await _pickIntValue(
+      title: '设置搜索缓存保留时间',
+      values: values,
+      current: _settings.searchCacheRetentionDays,
+      infoMessage: '过期缓存会在打开搜索页时自动清理，最多保留 30 天。',
+    );
+    if (picked == null || picked == _settings.searchCacheRetentionDays) return;
+    await _saveSettings(_settings.copyWith(searchCacheRetentionDays: picked));
+    await _cacheService.purgeExpiredCache(retentionDays: picked);
+  }
+
+  Future<int?> _pickIntValue({
+    required String title,
+    required List<int> values,
+    required int current,
+    String? infoMessage,
+  }) async {
+    if (values.isEmpty) return null;
+    var selectedIndex = values.indexOf(current);
+    if (selectedIndex < 0) selectedIndex = 0;
+    final scrollController = FixedExtentScrollController(
+      initialItem: selectedIndex,
+    );
+
+    return showCupertinoModalPopup<int>(
+      context: context,
+      builder: (sheetContext) {
+        final backgroundColor = CupertinoColors.systemBackground.resolveFrom(
+          sheetContext,
+        );
+        return Container(
+          height: 320,
+          color: backgroundColor,
+          child: Column(
+            children: [
+              Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('取消'),
+                    ),
+                    Expanded(
+                      child: Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (infoMessage != null)
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(24, 24),
+                        onPressed: () => _showMessage(infoMessage),
+                        child: const Icon(
+                          CupertinoIcons.info_circle,
+                          size: 20,
+                        ),
+                      )
+                    else
+                      const SizedBox(width: 20),
+                    CupertinoButton(
+                      padding: const EdgeInsets.only(left: 8),
+                      onPressed: () =>
+                          Navigator.pop(sheetContext, values[selectedIndex]),
+                      child: const Text('确定'),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                height: 1,
+                color: CupertinoColors.separator.resolveFrom(sheetContext),
+              ),
+              Expanded(
+                child: CupertinoPicker(
+                  itemExtent: 36,
+                  scrollController: scrollController,
+                  onSelectedItemChanged: (index) {
+                    selectedIndex = index;
+                  },
+                  children: values
+                      .map(
+                        (value) => Center(
+                          child: Text(
+                            '$value${title.contains("时间") ? " 天" : " 个"}',
+                          ),
+                        ),
+                      )
+                      .toList(growable: false),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _toggleCover() async {
+    await _saveSettings(
+      _settings.copyWith(searchShowCover: !_settings.searchShowCover),
+    );
+  }
+
+  Future<void> _clearSearchCache() async {
+    final confirmed = await _confirm(
+      title: '清除搜索缓存',
+      content: '确定清除所有搜索缓存吗？',
+      confirmText: '清除',
+      isDestructive: true,
+    );
+    if (!confirmed) return;
+    final removed = await _cacheService.clearCache();
+    _showMessage('已清除 $removed 条缓存记录。');
+  }
+
+  Future<bool> _confirm({
+    required String title,
+    required String content,
+    required String confirmText,
+    bool isDestructive = false,
+  }) async {
+    final result = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(content),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: isDestructive,
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(confirmText),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   void _showIssueDetails() {
     if (_sourceIssues.isEmpty) return;
     final lines = <String>['失败书源：${_sourceIssues.length} 条'];
@@ -340,16 +959,6 @@ class _SearchViewState extends State<SearchView> {
     }
     lines.add('可在“书源可用性检测”或“调试”继续定位。');
     _showMessage(lines.join('\n'));
-  }
-
-  Future<void> _openBookInfo(SearchResult result) async {
-    await Navigator.of(context, rootNavigator: true).push(
-      CupertinoPageRoute(
-        builder: (_) => SearchBookInfoView(result: result),
-      ),
-    );
-    if (!mounted) return;
-    setState(_rebuildDisplayResults);
   }
 
   void _showMessage(String message) {
@@ -373,12 +982,20 @@ class _SearchViewState extends State<SearchView> {
 
   @override
   Widget build(BuildContext context) {
-    final totalSources = _enabledSources().length;
+    final enabledSources = _enabledSources();
+    final totalSources = enabledSources.length;
+    final allEnabledCount = _allEnabledSources().length;
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
 
     return AppCupertinoPageScaffold(
       title: '搜索',
+      trailing: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(30, 30),
+        onPressed: _showSearchSettingsSheet,
+        child: const Icon(CupertinoIcons.slider_horizontal_3, size: 21),
+      ),
       child: Column(
         children: [
           Padding(
@@ -390,7 +1007,7 @@ class _SearchViewState extends State<SearchView> {
                     Expanded(
                       child: ShadInput(
                         controller: _searchController,
-                        placeholder: const Text('输入书名或作者'),
+                        placeholder: const Text('请输入书名或作者名'),
                         textInputAction: TextInputAction.search,
                         leading: const Padding(
                           padding: EdgeInsets.all(4),
@@ -411,6 +1028,47 @@ class _SearchViewState extends State<SearchView> {
                       child: const Text('搜索'),
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: _showSearchSettingsSheet,
+                  child: ShadCard(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    child: Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.gear,
+                          size: 17,
+                          color: scheme.mutedForeground,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '搜索设置',
+                            style: theme.textTheme.p.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${_filterModeLabel(_settings.searchFilterMode)} · '
+                          '${_scopeLabel(scopedCount: totalSources, allEnabledCount: allEnabledCount)} · '
+                          '并发 ${_settings.searchConcurrency}',
+                          style: theme.textTheme.small.copyWith(
+                            color: scheme.mutedForeground,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(
+                          LucideIcons.chevronRight,
+                          size: 15,
+                          color: scheme.mutedForeground,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -451,7 +1109,7 @@ class _SearchViewState extends State<SearchView> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      '正在搜索: $_searchingSource ($_completedSources/$totalSources)',
+                      '正在搜索：$_searchingSource ($_completedSources/$totalSources)',
                       style: TextStyle(
                         fontSize: 13,
                         color: scheme.mutedForeground,
@@ -470,8 +1128,11 @@ class _SearchViewState extends State<SearchView> {
               borderColor: scheme.destructive,
               child: Row(
                 children: [
-                  Icon(LucideIcons.triangleAlert,
-                      size: 16, color: scheme.destructive),
+                  Icon(
+                    LucideIcons.triangleAlert,
+                    size: 16,
+                    color: scheme.destructive,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -493,7 +1154,7 @@ class _SearchViewState extends State<SearchView> {
             ),
           Expanded(
             child: _displayResults.isEmpty
-                ? _buildEmptyState()
+                ? _buildEmptyBody(totalSources: totalSources)
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
                     itemCount: _displayResults.length,
@@ -520,32 +1181,126 @@ class _SearchViewState extends State<SearchView> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyBody({required int totalSources}) {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
+    final subtitle = _sourceIssues.isNotEmpty
+        ? '本次有失败书源，点上方“查看”了解原因'
+        : totalSources == 0
+            ? '当前没有启用书源，先在“搜索设置”里调整范围'
+            : '输入书名或作者后开始搜索';
 
-    return Center(
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
+      children: [
+        ShadCard(
+          padding: const EdgeInsets.fromLTRB(14, 20, 14, 16),
+          child: Column(
+            children: [
+              Icon(
+                LucideIcons.search,
+                size: 44,
+                color: scheme.mutedForeground,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '搜索书籍',
+                style: theme.textTheme.h4,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                style: theme.textTheme.small.copyWith(
+                  color: scheme.mutedForeground,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        _buildHistoryPanel(),
+      ],
+    );
+  }
+
+  Widget _buildHistoryPanel() {
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
+    return ShadCard(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            LucideIcons.search,
-            size: 52,
-            color: scheme.mutedForeground,
+          Row(
+            children: [
+              Text(
+                '搜索历史',
+                style: theme.textTheme.p.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              if (_historyKeywords.isNotEmpty)
+                ShadButton.link(
+                  onPressed: _clearHistory,
+                  child: const Text('清空'),
+                ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            '搜索书籍',
-            style: theme.textTheme.h4,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _sourceIssues.isEmpty ? '输入书名或作者后回车' : '本次有失败书源，点上方“查看”了解原因',
-            style: theme.textTheme.muted.copyWith(
-              color: scheme.mutedForeground,
+          const SizedBox(height: 6),
+          if (_historyKeywords.isEmpty)
+            Text(
+              '暂无历史记录',
+              style: theme.textTheme.small.copyWith(
+                color: scheme.mutedForeground,
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _historyKeywords
+                  .map((keyword) => _buildHistoryChip(keyword))
+                  .toList(growable: false),
             ),
-          ),
+          if (_historyKeywords.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '长按历史词可删除单条',
+              style: theme.textTheme.small.copyWith(
+                color: scheme.mutedForeground,
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryChip(String keyword) {
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
+    return GestureDetector(
+      onLongPress: () => _removeHistoryKeyword(keyword),
+      child: CupertinoButton(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        minimumSize: Size.zero,
+        color: scheme.secondary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        onPressed: () {
+          _searchController.text = keyword;
+          _searchController.selection = TextSelection.fromPosition(
+            TextPosition(offset: keyword.length),
+          );
+          _search();
+        },
+        child: Text(
+          keyword,
+          style: theme.textTheme.small.copyWith(
+            color: scheme.foreground,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ),
     );
   }
@@ -555,125 +1310,141 @@ class _SearchViewState extends State<SearchView> {
     final scheme = theme.colorScheme;
     final result = item.primary;
     final sourceCount = item.origins.length;
+    final meta = <String>[
+      if (result.kind.trim().isNotEmpty) result.kind.trim(),
+      if (result.wordCount.trim().isNotEmpty) '字数:${result.wordCount.trim()}',
+      if (result.updateTime.trim().isNotEmpty) '更新:${result.updateTime.trim()}',
+    ];
+    final coverSource = _settings.searchShowCover
+        ? _sourceRepo.getSourceByUrl(item.displayCoverSourceUrl)
+        : null;
 
     return Padding(
+      key: ValueKey(item.key),
       padding: const EdgeInsets.only(bottom: 8),
       child: GestureDetector(
         onTap: () => _openBookInfo(result),
         child: ShadCard(
           padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-          leading: AppCoverImage(
-            urlOrPath: item.displayCoverUrl,
-            title: result.name,
-            author: result.author,
-            width: 40,
-            height: 56,
-            borderRadius: 6,
-            fit: BoxFit.cover,
-            showTextOnPlaceholder: false,
-          ),
-          trailing: Icon(
-            item.inBookshelf ? LucideIcons.bookCheck : LucideIcons.chevronRight,
-            size: item.inBookshelf ? 17 : 16,
-            color: item.inBookshelf ? scheme.primary : scheme.mutedForeground,
-          ),
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      result.name,
+              if (_settings.searchShowCover) ...[
+                SourceAwareCoverImage(
+                  urlOrPath: item.displayCoverUrl,
+                  source: coverSource,
+                  title: result.name,
+                  author: result.author,
+                  width: 52,
+                  height: 74,
+                  borderRadius: 8,
+                  fit: BoxFit.cover,
+                  showTextOnPlaceholder: false,
+                ),
+                const SizedBox(width: 10),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            result.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.p.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: scheme.foreground,
+                            ),
+                          ),
+                        ),
+                        if (sourceCount > 1)
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: scheme.primary.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              '$sourceCount 源',
+                              style: theme.textTheme.small.copyWith(
+                                color: scheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      result.author.isNotEmpty ? result.author : '未知作者',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.p.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: scheme.foreground,
+                      style: theme.textTheme.small.copyWith(
+                        color: scheme.mutedForeground,
                       ),
                     ),
-                  ),
-                  if (sourceCount > 1)
-                    Container(
-                      margin: const EdgeInsets.only(left: 6),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: scheme.primary.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '$sourceCount源',
+                    if (meta.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        meta.join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.small.copyWith(
-                          color: scheme.primary,
-                          fontWeight: FontWeight.w600,
+                          color: scheme.mutedForeground,
                         ),
                       ),
+                    ],
+                    if (result.lastChapter.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '最新: ${result.lastChapter.trim()}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.small.copyWith(
+                          color: scheme.mutedForeground,
+                        ),
+                      ),
+                    ],
+                    if (result.intro.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        result.intro.trim(),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.small.copyWith(
+                          color: scheme.mutedForeground,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 2),
+                    Text(
+                      sourceCount > 1
+                          ? '来源: ${result.sourceName} 等 $sourceCount 个'
+                          : '来源: ${result.sourceName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.small.copyWith(
+                        color: scheme.mutedForeground,
+                      ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                result.author.isNotEmpty ? result.author : '未知作者',
-                style: theme.textTheme.small.copyWith(
-                  color: scheme.mutedForeground,
+                  ],
                 ),
               ),
-              if (result.intro.trim().isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  result.intro.trim(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.small.copyWith(
-                    color: scheme.mutedForeground,
-                  ),
-                ),
-              ],
-              if ([
-                if (result.kind.trim().isNotEmpty) result.kind.trim(),
-                if (result.wordCount.trim().isNotEmpty)
-                  '字数:${result.wordCount.trim()}',
-                if (result.updateTime.trim().isNotEmpty)
-                  '更新:${result.updateTime.trim()}',
-              ].isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  [
-                    if (result.kind.trim().isNotEmpty) result.kind.trim(),
-                    if (result.wordCount.trim().isNotEmpty)
-                      '字数:${result.wordCount.trim()}',
-                    if (result.updateTime.trim().isNotEmpty)
-                      '更新:${result.updateTime.trim()}',
-                  ].join(' · '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.small.copyWith(
-                    color: scheme.mutedForeground,
-                  ),
-                ),
-              ],
-              if (result.lastChapter.trim().isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  '最新: ${result.lastChapter.trim()}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.small.copyWith(
-                    color: scheme.mutedForeground,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 2),
-              Text(
-                sourceCount > 1
-                    ? '来源: ${result.sourceName} 等 $sourceCount 个'
-                    : '来源: ${result.sourceName}',
-                style: theme.textTheme.small.copyWith(
-                  color: scheme.mutedForeground,
-                ),
+              const SizedBox(width: 8),
+              Icon(
+                item.inBookshelf
+                    ? LucideIcons.bookCheck
+                    : LucideIcons.chevronRight,
+                size: item.inBookshelf ? 17 : 16,
+                color:
+                    item.inBookshelf ? scheme.primary : scheme.mutedForeground,
               ),
             ],
           ),
@@ -684,16 +1455,30 @@ class _SearchViewState extends State<SearchView> {
 }
 
 class _SearchDisplayItem {
+  final String key;
   final SearchResult primary;
   final List<SearchResult> origins;
   final bool inBookshelf;
   final String displayCoverUrl;
+  final String displayCoverSourceUrl;
 
   const _SearchDisplayItem({
+    required this.key,
     required this.primary,
     required this.origins,
     required this.inBookshelf,
     required this.displayCoverUrl,
+    required this.displayCoverSourceUrl,
+  });
+}
+
+class _DisplayCover {
+  final String url;
+  final String sourceUrl;
+
+  const _DisplayCover({
+    required this.url,
+    required this.sourceUrl,
   });
 }
 
@@ -705,4 +1490,14 @@ class _SourceRunIssue {
     required this.sourceName,
     required this.reason,
   });
+}
+
+enum _SearchSettingAction {
+  filterMode,
+  scope,
+  concurrency,
+  cacheRetention,
+  coverToggle,
+  clearCache,
+  clearHistory,
 }

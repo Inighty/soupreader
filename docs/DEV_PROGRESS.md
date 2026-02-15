@@ -1,5 +1,79 @@
 # SoupReader 开发进度日志
 
+## 2026-02-15（搜索 UI 结构重构：参考 IMG 布局关系并对齐 legado 搜索语义）
+
+### 已完成
+- `lib/core/models/app_settings.dart`
+  - 新增搜索设置模型字段并持久化：
+    - `searchFilterMode`（不过滤/普通过滤/精准过滤）；
+    - `searchConcurrency`（并发任务）；
+    - `searchCacheRetentionDays`（缓存保留天数）；
+    - `searchScopeSourceUrls`（搜索范围书源 URL 列表）；
+    - `searchShowCover`（搜索结果封面开关）。
+- `lib/features/search/services/search_cache_service.dart`（新增）
+  - 新增搜索本地状态服务：
+    - 维护历史关键词（最多 12 条）；
+    - 按“关键词+过滤模式+范围”缓存搜索结果；
+    - 支持缓存过期清理、清空缓存。
+- `lib/features/search/views/search_scope_picker_view.dart`（新增）
+  - 新增搜索范围选择页：
+    - 支持书源搜索过滤、计数展示、取消全选；
+    - 支持多选后返回 URL 列表并持久化。
+- `lib/features/search/views/search_view.dart`
+  - 搜索页结构重构（参考 IMG 的布局关系，不照搬视觉风格）：
+    - 顶部输入栏 + 搜索按钮；
+    - 新增“搜索设置”入口卡片（过滤/范围/并发/缓存/封面/清理动作）；
+    - 空态新增“搜索历史”分区（点击回填搜索、长按删除、支持清空）；
+    - 结果列表恢复封面展示（可开关），采用中等密度信息层级。
+  - 搜索行为对齐 legado 语义：
+    - 支持过滤模式切换；
+    - 支持范围过滤（范围为空表示所有启用书源）；
+    - 支持并发任务数设置；
+    - 保留“搜索进行中可停止”与失败书源原因查看。
+  - 引入缓存命中回显：
+    - 命中缓存时先展示已有结果，再继续刷新网络搜索并回写缓存。
+
+### 为什么
+- 你要求“分析当前目录 IMG 参考布局排版，优化搜索功能，且不照搬图片风格”。
+- legacy 搜索链路具备“过滤模式/范围设置/历史词/停止搜索”等关键语义；此前 SoupReader 搜索页缺少完整设置链路与本地历史体验。
+- 本次在保持 `Shadcn + Cupertino` 体系前提下，提炼参考图的“信息架构与交互层级”，并补齐 legado 语义能力。
+
+### 如何验证
+- 执行：`flutter analyze`
+  - 结果：`No issues found!`
+- 手工路径：
+  - 进入搜索页，点击“搜索设置”，验证过滤模式/范围/并发/缓存时间可调整并持久化；
+  - 搜索后返回空态，验证历史词展示、点击可回填搜索、长按可删除、可清空历史；
+  - 调整“结果封面”开关，验证搜索结果列表封面显示可切换；
+  - 搜索进行中点击“停止”，验证任务可立即中止，状态区退出加载。
+
+### 兼容影响
+- 搜索页展示行为变更：
+  - 从“默认无封面列表”调整为“默认显示封面（可关闭）”；
+  - 新增设置与历史区，页面信息密度与交互路径有所变化。
+- 不涉及数据库 schema 与书源规则字段，不影响五段链路解析协议（search/bookInfo/toc/content）。
+- 旧版本 `app_settings` 缺少新增字段时会自动回落默认值，向后兼容。
+
+## 2026-02-15（根目录 IMG 扩展忽略规则补充）
+
+### 已完成
+- `.gitignore`
+  - 新增根目录图片扩展忽略规则：`/*.IMG`。
+  - 规则仅作用于仓库根目录，避免误伤子目录内同扩展文件。
+
+### 为什么
+- 根目录可能出现临时或设备导出的 `.IMG` 文件，不应进入版本控制。
+- 你要求将“根目录 IMG 扩展名”加入 ignore，本次按该范围精确处理。
+
+### 如何验证
+- 执行：`flutter analyze`
+- 执行：`git check-ignore -v demo.IMG ./demo.IMG sub/demo.IMG`
+  - 预期：仅 `./demo.IMG` 命中 `/*.IMG` 规则，`sub/demo.IMG` 不命中。
+
+### 兼容影响
+- 仅调整版本控制忽略规则，不涉及运行时代码与书源解析链路。
+- 对旧书源兼容性无影响。
+
 ## 2026-02-15（发现入口链路恢复：对齐 legado 二级发现页）
 
 ### 已完成
@@ -2954,3 +3028,44 @@
 ### 兼容影响
 - 仅涉及阅读器目录面板与阅读设置 UI/交互，不影响书源解析、目录抓取、正文抓取和数据库结构。
 - 对旧书源兼容性无影响。
+
+## 2026-02-15（搜索结果封面加载对齐 legado：书源上下文 + CookieJar + coverDecodeJs）
+
+### 已完成
+- `lib/features/source/services/rule_parser_engine.dart`
+  - 新增 `fetchCoverBytes(...)`：按书源上下文请求封面二进制，复用 legado 语义的请求链路：
+    - 书源 header + 登录 header + URL option headers 合并；
+    - `Origin/Referer` 补齐；
+    - `enabledCookieJar` 与并发率限制生效；
+    - 非 4xx/5xx 响应读取二进制封面。
+  - 新增封面解密桥接：`coverDecodeJs` 支持通过 JS 返回 Base64 / dataURL / JSON byte array，并回写为图片字节。
+  - 封面请求异常接入 `ExceptionLogService`（node: `source.cover`），便于问题排查。
+- `lib/features/source/services/source_cover_loader.dart`
+  - 新增封面加载器：
+    - 内存 LRU 缓存；
+    - in-flight 去重；
+    - 失败短期负缓存，避免滚动列表重复打失败请求。
+- `lib/app/widgets/source_aware_cover_image.dart`
+  - 新增“书源感知封面组件”：
+    - 有 source 且远程 URL 时，走 `SourceCoverLoader`；
+    - 其余场景保持原 `AppCoverImage` 逻辑；
+    - 失败回退占位，不阻塞列表渲染。
+- `lib/features/search/views/search_view.dart`
+  - 搜索聚合结果新增封面来源书源字段 `displayCoverSourceUrl`；
+  - 列表封面从 `AppCoverImage` 切换为 `SourceAwareCoverImage`，将封面 URL 对应的 source 一并传入。
+
+### 为什么
+- 搜索结果页此前是“裸 URL 直连”，未携带书源 header/Cookie/解密规则，导致防盗链或加密封面场景下列表无图。
+- legado 搜索页封面加载会带 `origin` 并走统一图片请求链路，本次按该行为对齐。
+
+### 如何验证
+- 命令：`flutter analyze --no-pub`
+  - 结果：`No issues found!`
+- 手工路径：
+  - 使用需要 Referer/Cookie/coverDecodeJs 的书源进行搜索，检查结果列表封面是否显示；
+  - 对比同一本书“搜索列表封面”与“详情页封面”是否一致；
+  - 快速滚动搜索列表，确认封面加载稳定且失败项不会频繁重复请求。
+
+### 兼容影响
+- 变更仅作用于搜索结果封面加载链路，不影响 search/bookInfo/toc/content 规则解析语义。
+- 对旧书源兼容：无 source 或无封面规则时仍走原占位回退逻辑。

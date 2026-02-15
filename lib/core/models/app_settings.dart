@@ -20,6 +20,12 @@ enum BookshelfSortMode {
   author,
 }
 
+enum SearchFilterMode {
+  none,
+  normal,
+  precise,
+}
+
 class AppSettings {
   final AppAppearanceMode appearanceMode;
   final bool wifiOnlyDownload;
@@ -27,6 +33,11 @@ class AppSettings {
 
   final BookshelfViewMode bookshelfViewMode;
   final BookshelfSortMode bookshelfSortMode;
+  final SearchFilterMode searchFilterMode;
+  final int searchConcurrency;
+  final int searchCacheRetentionDays;
+  final List<String> searchScopeSourceUrls;
+  final bool searchShowCover;
 
   const AppSettings({
     this.appearanceMode = AppAppearanceMode.followSystem,
@@ -34,6 +45,11 @@ class AppSettings {
     this.autoUpdateSources = true,
     this.bookshelfViewMode = BookshelfViewMode.grid,
     this.bookshelfSortMode = BookshelfSortMode.recentRead,
+    this.searchFilterMode = SearchFilterMode.normal,
+    this.searchConcurrency = 8,
+    this.searchCacheRetentionDays = 5,
+    this.searchScopeSourceUrls = const <String>[],
+    this.searchShowCover = true,
   });
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -44,8 +60,8 @@ class AppSettings {
               ? raw.toInt()
               : null;
       if (index == null) return AppAppearanceMode.followSystem;
-      return AppAppearanceMode.values[
-          index.clamp(0, AppAppearanceMode.values.length - 1)];
+      return AppAppearanceMode
+          .values[index.clamp(0, AppAppearanceMode.values.length - 1)];
     }
 
     BookshelfViewMode parseViewMode(dynamic raw) {
@@ -70,12 +86,50 @@ class AppSettings {
           .values[index.clamp(0, BookshelfSortMode.values.length - 1)];
     }
 
+    SearchFilterMode parseSearchFilterMode(dynamic raw) {
+      final index = raw is int
+          ? raw
+          : raw is num
+              ? raw.toInt()
+              : null;
+      if (index == null) return SearchFilterMode.normal;
+      return SearchFilterMode
+          .values[index.clamp(0, SearchFilterMode.values.length - 1)];
+    }
+
+    int parseIntWithDefault(dynamic raw, int fallback) {
+      if (raw is int) return raw;
+      if (raw is num) return raw.toInt();
+      if (raw is String) return int.tryParse(raw) ?? fallback;
+      return fallback;
+    }
+
+    List<String> parseStringList(dynamic raw) {
+      if (raw is! List) return const <String>[];
+      final seen = <String>{};
+      final out = <String>[];
+      for (final item in raw) {
+        final text = item.toString().trim();
+        if (text.isEmpty) continue;
+        if (!seen.add(text)) continue;
+        out.add(text);
+      }
+      return out;
+    }
+
     return AppSettings(
       appearanceMode: parseAppearanceMode(json['appearanceMode']),
       wifiOnlyDownload: json['wifiOnlyDownload'] as bool? ?? true,
       autoUpdateSources: json['autoUpdateSources'] as bool? ?? true,
       bookshelfViewMode: parseViewMode(json['bookshelfViewMode']),
       bookshelfSortMode: parseSortMode(json['bookshelfSortMode']),
+      searchFilterMode: parseSearchFilterMode(json['searchFilterMode']),
+      searchConcurrency:
+          parseIntWithDefault(json['searchConcurrency'], 8).clamp(2, 12),
+      searchCacheRetentionDays:
+          parseIntWithDefault(json['searchCacheRetentionDays'], 5).clamp(1, 30),
+      searchScopeSourceUrls: parseStringList(json['searchScopeSourceUrls']),
+      searchShowCover: json['searchShowCover'] as bool? ?? true,
     );
   }
 
@@ -86,6 +140,11 @@ class AppSettings {
       'autoUpdateSources': autoUpdateSources,
       'bookshelfViewMode': bookshelfViewMode.index,
       'bookshelfSortMode': bookshelfSortMode.index,
+      'searchFilterMode': searchFilterMode.index,
+      'searchConcurrency': searchConcurrency,
+      'searchCacheRetentionDays': searchCacheRetentionDays,
+      'searchScopeSourceUrls': searchScopeSourceUrls,
+      'searchShowCover': searchShowCover,
     };
   }
 
@@ -95,6 +154,11 @@ class AppSettings {
     bool? autoUpdateSources,
     BookshelfViewMode? bookshelfViewMode,
     BookshelfSortMode? bookshelfSortMode,
+    SearchFilterMode? searchFilterMode,
+    int? searchConcurrency,
+    int? searchCacheRetentionDays,
+    List<String>? searchScopeSourceUrls,
+    bool? searchShowCover,
   }) {
     return AppSettings(
       appearanceMode: appearanceMode ?? this.appearanceMode,
@@ -102,7 +166,13 @@ class AppSettings {
       autoUpdateSources: autoUpdateSources ?? this.autoUpdateSources,
       bookshelfViewMode: bookshelfViewMode ?? this.bookshelfViewMode,
       bookshelfSortMode: bookshelfSortMode ?? this.bookshelfSortMode,
+      searchFilterMode: searchFilterMode ?? this.searchFilterMode,
+      searchConcurrency: searchConcurrency ?? this.searchConcurrency,
+      searchCacheRetentionDays:
+          searchCacheRetentionDays ?? this.searchCacheRetentionDays,
+      searchScopeSourceUrls:
+          searchScopeSourceUrls ?? this.searchScopeSourceUrls,
+      searchShowCover: searchShowCover ?? this.searchShowCover,
     );
   }
 }
-
