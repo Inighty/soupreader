@@ -825,3 +825,33 @@
 ### 兼容影响
 - **有兼容影响（正向）**：滚动模式长章节绘制负载显著下降，预期拖动连续性更好、卡帧概率降低。
 - 不涉及书源解析与翻页语义，不影响旧书源兼容性。
+
+## 2026-02-17 - 书源编辑对齐 legado（主编辑页语义补齐）
+
+### 做了什么
+- 更新 `lib/features/source/views/source_edit_legacy_view.dart`：
+  - 移除“打开高级工作台”入口，主编辑页菜单收敛到 legacy 主流程；
+  - 菜单补充“分享文本 / 分享二维码（当前以复制 JSON 兜底）”；
+  - `enabledCookieJar` 在编辑页加载与回填时，缺省按 legacy 语义处理为 `false`；
+  - `SourceLegacySaveService` 注入 `clearJsLibScope` 回调位，保留 legacy 的 jsLib 变更清理触发链路；
+  - 规则对象写回改为始终回填 `ruleSearch/ruleExplore/ruleBookInfo/ruleToc/ruleContent`（不再按空规则折叠为 `null`）。
+- 更新 `lib/features/source/models/book_source.dart`：
+  - `enabledCookieJar` 默认值从 `true` 调整为 `false`；
+  - `fromJson` 在缺失 `enabledCookieJar` 字段时默认 `false`，对齐 legacy `?: false` 语义。
+- 新增测试 `test/book_source_model_cookie_default_test.dart`：
+  - 覆盖构造默认值、缺失字段默认值与显式 true 的解析行为。
+
+### 为什么
+- 用户要求“书源编辑保持与 legado 一致”。
+- 之前在 CookieJar 默认、菜单结构与规则序列化结构上仍有偏差，导致主编辑页行为与 legacy 不一致。
+
+### 如何验证
+- `flutter test test/book_source_model_cookie_default_test.dart`
+- `flutter test test/source_legacy_save_service_test.dart test/source_rule_complete_test.dart test/source_variable_store_test.dart`
+- `flutter analyze`
+
+### 兼容影响
+- **有兼容影响（行为对齐）**：
+  - 旧书源 JSON 缺失 `enabledCookieJar` 字段时，运行默认从 `true` 改为 `false`；
+  - 主编辑页保存后规则字段结构更稳定（不再因“空规则”被折叠为 `null`）。
+- “分享二维码”当前无原生二维码分享能力，采用“复制 JSON”兜底并提示，已在菜单文案明确。

@@ -62,7 +62,7 @@ class BookSource {
     this.enabled = true,
     this.enabledExplore = true,
     this.jsLib,
-    this.enabledCookieJar = true,
+    this.enabledCookieJar = false,
     this.concurrentRate,
     this.header,
     this.loginUrl,
@@ -236,8 +236,8 @@ class BookSource {
       enabledExplore: parseBool(json['enabledExplore'], true),
       jsLib: json['jsLib']?.toString(),
       enabledCookieJar: json.containsKey('enabledCookieJar')
-          ? (parseNullableBool(json['enabledCookieJar']) ?? true)
-          : true,
+          ? (parseNullableBool(json['enabledCookieJar']) ?? false)
+          : false,
       concurrentRate: json['concurrentRate']?.toString(),
       // 对标 legado：header 允许为 JSON 字符串或 Map；统一归一为字符串，交由解析引擎兼容处理。
       header: parseHeader(json['header']),

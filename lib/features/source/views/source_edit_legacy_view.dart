@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
@@ -158,6 +159,9 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
         );
       },
       clearExploreKindsCache: _exploreKindsService.clearExploreKindsCache,
+      clearJsLibScope: (_) {
+        // Flutter 侧当前无跨源共享 JS Scope，保留回调以对齐 legado 语义。
+      },
     );
 
     _tab = (widget.initialTab ?? 0).clamp(0, 5);
@@ -619,6 +623,20 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(popupContext);
+              _shareSourceJsonText();
+            },
+            child: const Text('分享文本'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(popupContext);
+              _shareSourceJsonQrFallback();
+            },
+            child: const Text('分享二维码'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(popupContext);
               _pasteSourceJson();
             },
             child: const Text('粘贴书源'),
@@ -629,13 +647,6 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
               _importFromQrCode();
             },
             child: const Text('扫码导入'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _openAdvancedWorkbench();
-            },
-            child: const Text('打开高级工作台'),
           ),
           CupertinoActionSheetAction(
             onPressed: () {
@@ -659,6 +670,29 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     _showMessage('已复制书源 JSON');
+  }
+
+  Future<void> _shareSourceJsonText() async {
+    final source = _buildSourceFromFields();
+    final text = LegadoJson.encode(source.toJson());
+    await SharePlus.instance.share(
+      ShareParams(
+        text: text,
+        subject: source.bookSourceName.trim().isEmpty
+            ? 'SoupReader 书源'
+            : source.bookSourceName.trim(),
+      ),
+    );
+    if (!mounted) return;
+    _showMessage('已打开系统分享');
+  }
+
+  Future<void> _shareSourceJsonQrFallback() async {
+    final source = _buildSourceFromFields();
+    final text = LegadoJson.encode(source.toJson());
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    _showMessage('当前版本暂不支持二维码分享，已复制书源 JSON');
   }
 
   Future<void> _pasteSourceJson() async {
@@ -818,18 +852,6 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     _showMessage('源变量已保存');
   }
 
-  Future<void> _openAdvancedWorkbench() async {
-    final source = _buildSourceFromFields();
-    await Navigator.of(context).push(
-      CupertinoPageRoute<void>(
-        builder: (_) => SourceEditView.fromSource(
-          source,
-          rawJson: LegadoJson.encode(source.toJson()),
-        ),
-      ),
-    );
-  }
-
   Future<void> _clearCookie() async {
     final url = _bookSourceUrlCtrl.text.trim();
     if (url.isEmpty) {
@@ -935,8 +957,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
       name: _ruleComplete(_exploreNameCtrl, preRule: exploreBookList),
       author: _ruleComplete(_exploreAuthorCtrl, preRule: exploreBookList),
       kind: _ruleComplete(_exploreKindCtrl, preRule: exploreBookList),
-      wordCount:
-          _ruleComplete(_exploreWordCountCtrl, preRule: exploreBookList),
+      wordCount: _ruleComplete(_exploreWordCountCtrl, preRule: exploreBookList),
       lastChapter:
           _ruleComplete(_exploreLastChapterCtrl, preRule: exploreBookList),
       intro: _ruleComplete(_exploreIntroCtrl, preRule: exploreBookList),
@@ -1016,11 +1037,11 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
       enabledExplore: _enabledExplore,
       enabledCookieJar: _enabledCookieJar,
       bookSourceType: _bookSourceType,
-      ruleSearch: _isRuleEmpty(searchRule.toJson()) ? null : searchRule,
-      ruleExplore: _isRuleEmpty(exploreRule.toJson()) ? null : exploreRule,
-      ruleBookInfo: _isRuleEmpty(infoRule.toJson()) ? null : infoRule,
-      ruleToc: _isRuleEmpty(tocRule.toJson()) ? null : tocRule,
-      ruleContent: _isRuleEmpty(contentRule.toJson()) ? null : contentRule,
+      ruleSearch: searchRule,
+      ruleExplore: exploreRule,
+      ruleBookInfo: infoRule,
+      ruleToc: tocRule,
+      ruleContent: contentRule,
     );
   }
 
@@ -1041,15 +1062,6 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
       preRule: preRule,
       type: type,
     );
-  }
-
-  bool _isRuleEmpty(Map<String, dynamic> map) {
-    for (final value in map.values) {
-      if (value == null) continue;
-      if (value is String && value.trim().isEmpty) continue;
-      return false;
-    }
-    return true;
   }
 
   Map<String, dynamic>? _tryDecodeJsonMap(String text) {
@@ -1074,7 +1086,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   void _setupControllers(BookSource source) {
     _enabled = source.enabled;
     _enabledExplore = source.enabledExplore;
-    _enabledCookieJar = source.enabledCookieJar ?? true;
+    _enabledCookieJar = source.enabledCookieJar ?? false;
     _bookSourceType = source.bookSourceType;
 
     _bookSourceUrlCtrl = TextEditingController(text: source.bookSourceUrl);
@@ -1144,15 +1156,18 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     _infoDownloadUrlsCtrl =
         TextEditingController(text: source.ruleBookInfo?.downloadUrls);
 
-    _tocPreUpdateJsCtrl = TextEditingController(text: source.ruleToc?.preUpdateJs);
+    _tocPreUpdateJsCtrl =
+        TextEditingController(text: source.ruleToc?.preUpdateJs);
     _tocChapterListCtrl =
         TextEditingController(text: source.ruleToc?.chapterList);
     _tocChapterNameCtrl =
         TextEditingController(text: source.ruleToc?.chapterName);
-    _tocChapterUrlCtrl = TextEditingController(text: source.ruleToc?.chapterUrl);
+    _tocChapterUrlCtrl =
+        TextEditingController(text: source.ruleToc?.chapterUrl);
     _tocFormatJsCtrl = TextEditingController(text: source.ruleToc?.formatJs);
     _tocIsVolumeCtrl = TextEditingController(text: source.ruleToc?.isVolume);
-    _tocUpdateTimeCtrl = TextEditingController(text: source.ruleToc?.updateTime);
+    _tocUpdateTimeCtrl =
+        TextEditingController(text: source.ruleToc?.updateTime);
     _tocIsVipCtrl = TextEditingController(text: source.ruleToc?.isVip);
     _tocIsPayCtrl = TextEditingController(text: source.ruleToc?.isPay);
     _tocNextTocUrlCtrl =
@@ -1180,7 +1195,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     setState(() {
       _enabled = source.enabled;
       _enabledExplore = source.enabledExplore;
-      _enabledCookieJar = source.enabledCookieJar ?? true;
+      _enabledCookieJar = source.enabledCookieJar ?? false;
       _bookSourceType = source.bookSourceType;
 
       _bookSourceUrlCtrl.text = source.bookSourceUrl;
@@ -1245,7 +1260,8 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
 
       _contentContentCtrl.text = source.ruleContent?.content ?? '';
       _contentTitleCtrl.text = source.ruleContent?.title ?? '';
-      _contentNextContentUrlCtrl.text = source.ruleContent?.nextContentUrl ?? '';
+      _contentNextContentUrlCtrl.text =
+          source.ruleContent?.nextContentUrl ?? '';
       _contentWebJsCtrl.text = source.ruleContent?.webJs ?? '';
       _contentSourceRegexCtrl.text = source.ruleContent?.sourceRegex ?? '';
       _contentReplaceRegexCtrl.text = source.ruleContent?.replaceRegex ?? '';
