@@ -655,3 +655,114 @@
 - **有兼容影响（正向）**：
   - `slide/cover` 的完成/取消翻页手感、阴影位置和过渡帧更接近 legado。
   - 不涉及数据结构与书源规则变更，对旧书源解析兼容性无负面影响。
+
+## 2026-02-17 - 滚动翻页卡帧优化（节流同步 + 段落预切分）
+
+### 做了什么
+- `lib/features/reader/views/simple_reader_view.dart`
+  - 滚动通知链路增加节流与门控：
+    - 新增滚动 UI 同步节流（120ms）；
+    - 新增预加载检查节流（160ms）；
+    - 新增程序化滚动标记 `_programmaticScrollInFlight`，避免 `animateTo` 期间高频触发可见章节同步。
+  - `_scrollPage(...)` 改造：
+    - `animateTo/jumpTo` 用 `try/finally` 包裹，确保程序化滚动标记可靠收敛；
+    - 动画曲线调整为 `Curves.linearToEaseOut`，降低尾段突变感；
+    - 动画完成后统一做一次章节同步与进度保存。
+  - 进度保存节流从 350ms 调整为 450ms，减少滚动期高频 IO 触发。
+  - 滚动正文渲染改造：
+    - `_ScrollSegment` 新增 `paragraphs` 字段；
+    - 章节加载时一次性完成段落拆分并缓存；
+    - 构建滚动正文时直接使用缓存段落，移除 build 期重复 `split`。
+- `lib/features/reader/widgets/scroll_runtime_helper.dart`（新增）
+  - 提供滚动运行时辅助方法：
+    - `splitParagraphs`：段落预切分并过滤空段；
+    - `shouldRun`：通用最小间隔判定。
+- `test/scroll_runtime_helper_test.dart`（新增）
+  - 覆盖段落切分与节流判定的核心用例。
+
+### 为什么
+- 用户反馈“滚动翻页点击与拖动都卡帧”，并优先要求流畅性。
+- 现状中滚动通知每帧都可能触发章节同步和预加载检查，同时正文 build 期重复拆分长文本，容易造成主线程抖动与掉帧。
+
+### 如何验证
+- 相关测试：
+  - `flutter test test/scroll_runtime_helper_test.dart`
+  - `flutter test test/paged_reader_widget_non_simulation_test.dart test/reading_settings_test.dart`
+- `flutter analyze`：
+  - 按协作规范保留在提交推送前执行。
+
+### 兼容影响
+- **有兼容影响（正向）**：
+  - 滚动模式章节进度/标题刷新改为节流更新（更稳、更省资源）；
+  - 可能出现轻微“非每帧实时”进度更新，但滚动结束时会强制同步，最终进度准确。
+
+## 2026-02-17 - 书源编辑主流程对齐 legado（6 Tab 主编辑页 + 保存语义 + 自动补全）
+
+### 做了什么
+- 新增 `lib/features/source/views/source_edit_legacy_view.dart`
+  - 新建 legacy 主编辑页，结构对齐 legado：
+    - 顶部开关与类型：`enabled / enabledExplore / enabledCookieJar / bookSourceType`；
+    - 六个分栏：`基础 / 搜索 / 发现 / 详情 / 目录 / 正文`。
+  - 字段写回按 legado 语义补齐：
+    - `ruleBookInfo.canReName / downloadUrls`
+    - `ruleToc.isVolume / updateTime / isVip / isPay`
+    - `ruleContent.webJs / sourceRegex / imageStyle / imageDecode / payAction`
+  - 菜单动作补齐主流程能力：保存、调试、登录、搜索、清 Cookie、自动补全、复制/粘贴、扫码导入、帮助，以及“打开高级工作台”（承接 JSON/高级调试能力）。
+  - 增加未保存退出确认（对齐 legado 退出前确认语义）。
+- 新增 `lib/features/source/services/source_rule_complete.dart`
+  - 复刻 legado `RuleComplete.autoComplete` 规则补全核心语义（文本/链接/图片三种类型）。
+- 新增 `lib/features/source/services/source_legacy_save_service.dart`
+  - 统一 legacy 保存语义：
+    - `bookSourceName/bookSourceUrl` 非空校验；
+    - 仅在源内容变更时刷新 `lastUpdateTime`；
+    - `exploreUrl` 变化时清理旧源发现缓存；
+    - `jsLib` 变化时预留 scope 清理回调；
+    - 通过 `originalUrl` 语义执行 URL 变更保存。
+- 入口切换（主编辑页默认走 legacy）：
+  - `lib/features/source/views/source_list_view.dart`
+  - `lib/features/discovery/views/discovery_view.dart`
+  - 编辑入口默认跳 `SourceEditLegacyView`；调试入口（`initialTab=3`）继续走高级工作台 `SourceEditView`。
+- 新增测试：
+  - `test/source_rule_complete_test.dart`
+  - `test/source_legacy_save_service_test.dart`
+
+### 为什么
+- 当前项目书源编辑主流程与 legado 在页面结构、字段覆盖、保存语义上存在偏差，导致“主编辑页行为不一致”。
+- 本次以“主流程严格对齐 legado，增强能力迁移到二级入口”为原则，确保编辑、保存、搜索/登录联动语义一致，同时保留现有高级调试能力。
+
+### 如何验证
+- 相关测试：
+  - `flutter test test/source_rule_complete_test.dart test/source_legacy_save_service_test.dart`
+- 静态检查：
+  - `flutter analyze`
+
+### 兼容影响
+- **有兼容影响（正向）**：书源编辑默认入口切换为 legacy 主编辑页，主流程交互与字段写回更接近 legado。
+- 高级 JSON/调试能力仍保留在 `SourceEditView`，通过“调试入口”或“打开高级工作台”进入，不影响原有深度调试场景。
+
+## 2026-02-17 - 书源编辑对齐补充：设置源变量（sourceVariable）
+
+### 做了什么
+- 新增 `lib/core/services/source_variable_store.dart`
+  - 对齐 legado `BaseSource.setVariable/getVariable` 键语义，使用 `sourceVariable_{bookSourceUrl}` 持久化存储。
+  - 提供 `getVariable / putVariable / removeVariable`。
+- 更新 `lib/features/source/views/source_edit_legacy_view.dart`
+  - “更多”菜单新增“设置源变量”。
+  - 行为对齐 legado：
+    - 先保存当前书源；
+    - 读取并展示当前源变量；
+    - 备注说明拼接 `variableComment + 源变量默认说明`；
+    - 保存空文本时清理变量。
+- 新增测试 `test/source_variable_store_test.dart`
+  - 覆盖变量写入、读取、空值清理与删除。
+
+### 为什么
+- legado 主编辑页支持“设置源变量”，用于规则/JS 调试时按源维度保存自定义变量。
+- 当前实现缺失该入口与持久化能力，主编辑语义不完整。
+
+### 如何验证
+- `flutter test test/source_variable_store_test.dart`
+- `flutter analyze`
+
+### 兼容影响
+- **有兼容影响（正向）**：新增与 legacy 同名语义的书源变量存储，不影响已有书源 JSON 结构。

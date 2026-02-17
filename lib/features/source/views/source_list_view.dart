@@ -25,6 +25,7 @@ import '../services/source_debug_summary_store.dart';
 import '../services/source_filter_helper.dart';
 import '../services/source_import_export_service.dart';
 import 'source_availability_check_view.dart';
+import 'source_edit_legacy_view.dart';
 import 'source_edit_view.dart';
 import 'source_web_verify_view.dart';
 
@@ -2318,7 +2319,7 @@ class _SourceListViewState extends State<SourceListView> {
     };
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceEditView(
+        builder: (_) => SourceEditLegacyView(
           initialRawJson: LegadoJson.encode(template),
           originalUrl: null,
         ),
@@ -2338,12 +2339,22 @@ class _SourceListViewState extends State<SourceListView> {
     }
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceEditView.fromSource(
-          source,
-          rawJson: _sourceRepo.getRawJsonByUrl(source.bookSourceUrl),
-          initialTab: initialTab,
-          initialDebugKey: initialDebugKey,
-        ),
+        builder: (_) {
+          final raw = _sourceRepo.getRawJsonByUrl(source.bookSourceUrl);
+          if (initialTab == 3 || (initialDebugKey ?? '').trim().isNotEmpty) {
+            return SourceEditView.fromSource(
+              source,
+              rawJson: raw,
+              initialTab: initialTab,
+              initialDebugKey: initialDebugKey,
+            );
+          }
+          return SourceEditLegacyView.fromSource(
+            source,
+            rawJson: raw,
+            initialTab: initialTab,
+          );
+        },
       ),
     );
   }

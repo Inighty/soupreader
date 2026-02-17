@@ -11,7 +11,7 @@ import '../../../core/database/repositories/source_repository.dart';
 import '../../search/views/search_view.dart';
 import '../../source/models/book_source.dart';
 import '../../source/services/source_explore_kinds_service.dart';
-import '../../source/views/source_edit_view.dart';
+import '../../source/views/source_edit_legacy_view.dart';
 import '../../source/views/source_web_verify_view.dart';
 import 'discovery_explore_results_view.dart';
 
@@ -355,7 +355,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   Future<void> _openEditor(BookSource source) async {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceEditView.fromSource(
+        builder: (_) => SourceEditLegacyView.fromSource(
           source,
           rawJson: _sourceRepo.getRawJsonByUrl(source.bookSourceUrl),
         ),
