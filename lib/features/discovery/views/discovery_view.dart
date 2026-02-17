@@ -11,7 +11,10 @@ import '../../../core/database/repositories/source_repository.dart';
 import '../../search/views/search_view.dart';
 import '../../source/models/book_source.dart';
 import '../../source/services/source_explore_kinds_service.dart';
+import '../../source/services/source_login_ui_helper.dart';
+import '../../source/services/source_login_url_resolver.dart';
 import '../../source/views/source_edit_legacy_view.dart';
+import '../../source/views/source_login_form_view.dart';
 import '../../source/views/source_web_verify_view.dart';
 import 'discovery_explore_results_view.dart';
 
@@ -375,19 +378,33 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   Future<void> _openSourceLogin(BookSource source) async {
-    final url = source.loginUrl?.trim() ?? '';
-    if (url.isEmpty) {
-      _showMessage('当前书源未配置 loginUrl');
+    if (SourceLoginUiHelper.hasLoginUi(source.loginUi)) {
+      await Navigator.of(context).push(
+        CupertinoPageRoute<void>(
+          builder: (_) => SourceLoginFormView(source: source),
+        ),
+      );
       return;
     }
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      _showMessage('loginUrl 不是有效网页地址');
+
+    final resolvedUrl = SourceLoginUrlResolver.resolve(
+      baseUrl: source.bookSourceUrl,
+      loginUrl: source.loginUrl ?? '',
+    );
+    if (resolvedUrl.isEmpty) {
+      _showMessage('当前书源未配置登录地址');
+      return;
+    }
+    final uri = Uri.tryParse(resolvedUrl);
+    final scheme = uri?.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') {
+      _showMessage('登录地址不是有效网页地址');
       return;
     }
 
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceWebVerifyView(initialUrl: url),
+        builder: (_) => SourceWebVerifyView(initialUrl: resolvedUrl),
       ),
     );
   }

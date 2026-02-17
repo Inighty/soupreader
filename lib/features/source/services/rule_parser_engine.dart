@@ -6667,6 +6667,111 @@ class RuleParserEngine {
     }
   }
 
+  /// 登录脚本网络桥接（java.ajax / java.connect）：
+  /// - headerOverride 为空: 使用书源 header + 登录 header + URL option header。
+  /// - headerOverride 非空: 使用覆盖头作为基础头，并保持 URL option header 最高优先级。
+  Future<ScriptHttpResponse> fetchForLoginScript({
+    required BookSource source,
+    required String requestUrl,
+    Map<String, String>? headerOverride,
+  }) async {
+    final url = requestUrl.trim();
+    if (url.isEmpty) {
+      return const ScriptHttpResponse(
+        requestUrl: '',
+        finalUrl: '',
+        statusCode: 200,
+        statusMessage: 'OK',
+        headers: <String, String>{},
+        body: '',
+      );
+    }
+
+    final headerText =
+        headerOverride == null ? source.header : jsonEncode(headerOverride);
+    final sourceKey = headerOverride == null ? source.bookSourceUrl : null;
+
+    final fetch = await _fetchDebug(
+      url,
+      header: headerText,
+      jsLib: source.jsLib,
+      timeoutMs: source.respondTime,
+      enabledCookieJar: source.enabledCookieJar,
+      sourceKey: sourceKey,
+      concurrentRate: source.concurrentRate,
+    );
+
+    final resolvedFinalUrl = (fetch.finalUrl ?? '').trim().isNotEmpty
+        ? fetch.finalUrl!.trim()
+        : fetch.requestUrl.trim();
+    final fallbackBody = fetch.body ?? fetch.error ?? '';
+    final statusCode = fetch.statusCode ?? 200;
+    final statusMessage = _statusMessageFromCode(statusCode);
+    final responseHeaders = fetch.statusCode == null
+        ? const <String, String>{}
+        : fetch.responseHeaders;
+
+    return ScriptHttpResponse(
+      requestUrl: fetch.requestUrl,
+      finalUrl: resolvedFinalUrl,
+      statusCode: statusCode,
+      statusMessage: statusMessage,
+      headers: responseHeaders,
+      body: fallbackBody,
+    );
+  }
+
+  String _statusMessageFromCode(int code) {
+    switch (code) {
+      case 200:
+        return 'OK';
+      case 201:
+        return 'Created';
+      case 202:
+        return 'Accepted';
+      case 204:
+        return 'No Content';
+      case 301:
+        return 'Moved Permanently';
+      case 302:
+        return 'Found';
+      case 303:
+        return 'See Other';
+      case 307:
+        return 'Temporary Redirect';
+      case 308:
+        return 'Permanent Redirect';
+      case 400:
+        return 'Bad Request';
+      case 401:
+        return 'Unauthorized';
+      case 403:
+        return 'Forbidden';
+      case 404:
+        return 'Not Found';
+      case 405:
+        return 'Method Not Allowed';
+      case 408:
+        return 'Request Timeout';
+      case 409:
+        return 'Conflict';
+      case 429:
+        return 'Too Many Requests';
+      case 500:
+        return 'Internal Server Error';
+      case 501:
+        return 'Not Implemented';
+      case 502:
+        return 'Bad Gateway';
+      case 503:
+        return 'Service Unavailable';
+      case 504:
+        return 'Gateway Timeout';
+      default:
+        return 'HTTP $code';
+    }
+  }
+
   /// 发送HTTP请求
   Future<String?> _fetch(
     String url, {
@@ -9082,6 +9187,24 @@ class SourceDebugEvent {
 }
 
 enum DebugRequestType { search, explore, bookInfo, toc, content }
+
+class ScriptHttpResponse {
+  final String requestUrl;
+  final String finalUrl;
+  final int statusCode;
+  final String statusMessage;
+  final Map<String, String> headers;
+  final String body;
+
+  const ScriptHttpResponse({
+    required this.requestUrl,
+    required this.finalUrl,
+    required this.statusCode,
+    required this.statusMessage,
+    required this.headers,
+    required this.body,
+  });
+}
 
 class FetchDebugResult {
   final String requestUrl;

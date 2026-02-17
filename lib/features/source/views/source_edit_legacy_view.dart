@@ -17,8 +17,11 @@ import '../models/book_source.dart';
 import '../services/source_explore_kinds_service.dart';
 import '../services/source_import_export_service.dart';
 import '../services/source_legacy_save_service.dart';
+import '../services/source_login_ui_helper.dart';
+import '../services/source_login_url_resolver.dart';
 import '../services/source_rule_complete.dart';
 import 'source_edit_view.dart';
+import 'source_login_form_view.dart';
 import 'source_web_verify_view.dart';
 
 class SourceEditLegacyView extends StatefulWidget {
@@ -762,19 +765,33 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     final saved = await _saveInternal();
     if (saved == null || !mounted) return;
 
-    final url = (saved.loginUrl ?? '').trim();
-    if (url.isEmpty) {
-      _showMessage('当前书源未配置 loginUrl');
+    if (SourceLoginUiHelper.hasLoginUi(saved.loginUi)) {
+      await Navigator.of(context).push(
+        CupertinoPageRoute<void>(
+          builder: (_) => SourceLoginFormView(source: saved),
+        ),
+      );
       return;
     }
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      _showMessage('loginUrl 不是有效网页地址');
+
+    final resolvedUrl = SourceLoginUrlResolver.resolve(
+      baseUrl: saved.bookSourceUrl,
+      loginUrl: saved.loginUrl ?? '',
+    );
+    if (resolvedUrl.isEmpty) {
+      _showMessage('当前书源未配置登录地址');
+      return;
+    }
+    final uri = Uri.tryParse(resolvedUrl);
+    final scheme = uri?.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') {
+      _showMessage('登录地址不是有效网页地址');
       return;
     }
 
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceWebVerifyView(initialUrl: url),
+        builder: (_) => SourceWebVerifyView(initialUrl: resolvedUrl),
       ),
     );
   }

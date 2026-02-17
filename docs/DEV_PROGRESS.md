@@ -1,5 +1,38 @@
 # DEV Progress
 
+## 2026-02-17 - 书源管理页结构与校验流程收敛
+
+### 做了什么
+- `lib/features/source/views/source_list_view.dart`
+  - 顶部操作入口重排为“排序 / 分组 / 更多”三入口，替换原“新增 / 管理”双入口。
+  - 分组菜单收敛为“分组管理 + 快捷筛选 + 动态分组项”同一菜单结构。
+  - 列表项新增校验状态行内展示：
+    - 依据校验任务状态显示“待校验/校验中/校验成功/空列表/校验失败/已跳过”；
+    - 校验中显示活动指示器。
+  - 批量“校验”改为管理页内联任务启动，不再跳转独立校验页；
+    - 批量栏新增“停止校验”动作（任务运行中可用）。
+    - 校验结束后增加收尾逻辑：若存在“失效”分组且当前未搜索，自动筛选“失效”。
+  - 单项菜单调整：
+    - “置顶/置底”仅在手动排序模式显示。
+  - 代码结构清理：
+    - 移除未使用的导入弹窗入口函数，保留主流程入口。
+
+### 为什么
+- 书源管理页仍存在与目标行为不一致的关键点：顶部入口层级、批量校验路径、列表内校验反馈、单项菜单可见条件。
+- 本次优先收敛阻塞项，确保管理页核心流程与操作节奏一致。
+
+### 如何验证
+- `flutter analyze`
+- `flutter test test/search_scope_group_helper_test.dart`
+- `flutter test test/source_filter_helper_test.dart`
+- `flutter test test/source_import_export_conflict_logic_test.dart`
+
+### 兼容影响
+- **有兼容影响（界面交互）**：
+  - 顶部操作入口与批量校验路径发生变化，用户操作路径更集中于管理页主流程。
+- **逻辑影响（正向）**：
+  - 校验结果可在列表内直接观察，校验结束后的“失效”筛选触发更接近目标行为。
+
 ## 2026-02-17 - 书源管理页语义收敛（管理流程与排版结构）
 
 ### 做了什么
@@ -936,3 +969,209 @@
 ### 兼容影响
 - **无功能语义变更**：本次主要是文案与注释收敛，不改变书源处理流程与规则解析行为。
 - 调试输出中的请求编码说明文本有变更，依赖该固定文案的外部解析需同步更新。
+
+## 2026-02-17 - 书源管理页结构收敛（导航栏搜索与拖拽条件）
+
+### 做了什么
+- 更新 `lib/features/source/views/source_list_view.dart`：
+  - 将“搜索书源”输入框从页面内容区上移到导航栏中部（`middle`），并复用原有查询/筛选逻辑；
+  - 移除列表上方的“独立搜索条 + 排序摘要行”，页面结构收敛为“列表 + 底部批量栏”；
+  - 手动拖拽条件调整为仅依赖“手动排序 + 非域名分组”，不再受当前搜索词是否为空影响。
+  - 返回行为调整：当搜索词不为空时，首次返回先清空搜索词并刷新列表，再执行页面退出。
+  - 快捷筛选语义修正：
+    - “无分组”包含空分组与包含“未分组”字样的记录；
+    - “启用发现/禁用发现”仅依据 `enabledExplore` 状态过滤。
+  - 分组菜单移除“清空搜索”额外项，仅保留固定筛选与分组项。
+  - 单项“搜索”改为直接进入单源搜索页，不再额外弹出关键词输入对话框。
+  - 拖拽排序语义修正：
+    - 拖拽时仅重排受影响区间内条目的 `customOrder` 映射；
+    - 不再按可见列表整体重编号，避免筛选视图下影响未显示条目的顺序。
+  - 手动排序比较规则收敛为仅按 `customOrder` 比较。
+  - 列表项展示收敛：
+    - 书源名称与分组改为同一行显示（`名称 (分组)`）；
+    - 移除 URL 次行与“分组：”单独行；
+    - “发现”状态改为菜单角标点（绿/红）展示。
+  - “新增分组（应用到无分组）”的数据范围补齐：同时包含空分组与包含“未分组”字样的记录。
+  - 空列表提示文案调整为“点击右上角更多导入书源”。
+  - 底部批量栏结构收敛为“全选计数 / 反选 / 删除 / 更多”四入口：
+    - `全选（x/y）` 与 `取消全选（x/y）` 按当前可见列表计数切换；
+    - 反选与删除在未选择时禁用；
+    - 其余批量动作收敛到“更多”菜单，顺序按“启用、禁用、分组、发现、置顶置底、导出分享、校验、区间补选”排列。
+  - 批量动作作用范围调整为“当前可见列表中的已选项”，避免筛选切换后误操作隐藏项。
+  - 分组管理弹层结构收敛：
+    - 顶部改为“标题 + 新增 + 关闭”三元素，移除大面积“新增分组（应用到无分组）”按钮；
+    - 分组列表改为流式刷新（跟随书源数据实时更新），不再依赖弹层内手动 refresh；
+    - 列表项简化为“分组名 + 编辑 + 删除”单行，并使用分隔线样式。
+  - 书源列表排版进一步收敛为“列表行 + 分隔线”结构：
+    - 移除卡片外观与行间大空隙，改为连续行列表；
+    - 普通列表与手动拖拽列表统一使用分隔线；
+    - 域名分组头部与条目对齐到统一左边距。
+  - 列表行右侧控件排版调整为横向并列（开关 / 编辑 / 更多），移除竖向堆叠布局。
+  - 批量分组操作语义补齐：
+    - “加入分组/移除分组”支持一次输入多个分组（按 `, ; ， ；` 拆分）；
+    - 批量提示文案改为通用结果提示，避免仅展示单一分组名。
+  - 选择交互细节收敛：
+    - 行主体点击不直接切换勾选，避免与行内操作按钮事件冲突；
+    - “选中所选区间”允许单个已选项触发（单选时保持原选中范围）。
+  - 批量“启用发现/禁用发现”范围修正为“全部已选书源”，不再限定 `exploreUrl` 非空后才生效。
+  - 分组管理“新增分组”应用范围修正为仅空分组记录（`bookSourceGroup` 为空/null），不包含仅名字命中的“未分组”文本组。
+  - 拖拽排序补齐重复序号兜底：受影响区间存在重复 `customOrder` 时，按当前可见顺序统一重编序号后再落库。
+
+### 为什么
+- 书源管理页在结构与交互细节上仍有偏差：搜索框位置与拖拽可用条件和目标语义不完全一致。
+- 本次以最小改动收敛关键差异，避免继续放大页面结构分叉。
+
+### 如何验证
+- `flutter analyze`
+- `flutter test test/search_scope_group_helper_test.dart`
+- `flutter test test/source_filter_helper_test.dart`
+- `flutter test test/source_import_export_conflict_logic_test.dart`
+
+### 兼容影响
+- **有兼容影响（交互行为）**：
+  - 手动排序下即使有搜索词，也允许拖拽调整顺序。
+- 不涉及书源数据结构与导入导出协议，旧书源兼容性无负面影响。
+
+## 2026-02-17 - 登录地址解析补齐（支持相对地址）
+
+### 做了什么
+- 新增 `lib/features/source/services/source_login_url_resolver.dart`：
+  - 统一登录地址解析规则：支持绝对地址、协议相对地址、相对路径地址；
+  - 当书源地址带逗号后缀时，仅使用首段地址作为解析基准；
+  - `javascript:` 登录地址按空地址处理，避免无效跳转。
+- 更新以下页面的“登录”入口逻辑，改为先解析再打开网页验证：
+  - `lib/features/source/views/source_list_view.dart`
+  - `lib/features/source/views/source_edit_legacy_view.dart`
+  - `lib/features/discovery/views/discovery_view.dart`
+- 三处登录入口统一错误提示文案为业务语义短句（未配置登录地址 / 登录地址不是有效网页地址）。
+- 新增测试 `test/source_login_url_resolver_test.dart`，覆盖空值、绝对地址、协议相对地址、根路径地址、逗号后缀基准、`javascript:` 边界。
+
+### 为什么
+- 书源的 `loginUrl` 在实际数据中可能是相对地址；此前仅允许 `http/https` 绝对地址，导致可登录书源被误判为无效。
+- 需要补齐登录入口的地址解析语义，避免书源管理、编辑、发现三处入口行为不一致。
+
+### 如何验证
+- `flutter analyze`
+- `flutter test test/source_login_url_resolver_test.dart`
+- `flutter test test/search_scope_group_helper_test.dart test/source_filter_helper_test.dart test/source_import_export_conflict_logic_test.dart`
+
+### 兼容影响
+- **有兼容影响（正向）**：相对 `loginUrl` 可正常解析并进入登录页，降低误报“地址无效”。
+- 不涉及书源数据库结构变更；旧书源 JSON 与导入导出协议保持兼容。
+
+## 2026-02-17 - 书源管理域名分组修正（主域名聚合）
+
+### 做了什么
+- 新增 `lib/features/source/services/source_host_group_helper.dart`：
+  - 提供 `SourceHostGroupHelper.groupHost(url)`，用于域名分组键计算；
+  - 分组规则从“完整 host”调整为“主域名聚合”：
+    - `www.example.com` 与 `m.api.example.com` 统一为 `example.com`；
+    - 对常见多段后缀（如 `com.cn` / `co.uk`）按主域名聚合；
+    - IPv4/IPv6 保持原 host；
+    - 非法 URL 返回 `#`。
+- 更新 `lib/features/source/views/source_list_view.dart`：
+  - 域名分组排序与分组头展示统一改为使用 `SourceHostGroupHelper`。
+- 新增测试 `test/source_host_group_helper_test.dart`：
+  - 覆盖普通子域名聚合、多段后缀聚合、IP 地址与非法 URL 边界。
+
+### 为什么
+- 之前按完整 host 分组会把同站不同子域拆成多个分组，分组粒度偏细，影响“按域名分组”可读性与操作连贯性。
+- 调整为主域名聚合后，分组排序与分组头展示更贴近管理场景预期。
+
+### 如何验证
+- `flutter analyze`
+- `flutter test test/source_host_group_helper_test.dart`
+- `flutter test test/source_login_url_resolver_test.dart test/search_scope_group_helper_test.dart test/source_filter_helper_test.dart test/source_import_export_conflict_logic_test.dart`
+
+### 兼容影响
+- **有兼容影响（交互展示）**：开启“按域名分组”时，分组头与分组顺序会发生变化（同站子域名将聚合到同一组）。
+- 不涉及书源数据结构修改，导入导出与存储兼容性不受影响。
+
+## 2026-02-17 - 登录入口补齐（loginUi 表单分支）
+
+### 做了什么
+- 新增 `lib/features/source/services/source_login_ui_helper.dart`：
+  - 解析 `loginUi` JSON 列表，支持 `text/password/button` 三类行；
+  - 提供 `hasLoginUi` 与绝对 URL 判断。
+- 新增 `lib/features/source/views/source_login_form_view.dart`：
+  - 为 `loginUi` 书源提供独立登录表单页；
+  - 自动读取并回填已保存的登录信息；
+  - 提交时按键值对保存登录信息（空表单则清除已保存信息）；
+  - `button` 行支持打开绝对地址动作。
+- 更新以下入口的“登录”分支：
+  - `lib/features/source/views/source_list_view.dart`
+  - `lib/features/discovery/views/discovery_view.dart`
+  - `lib/features/source/views/source_edit_legacy_view.dart`
+  - 行为改为：若书源含 `loginUi`，优先进入登录表单页；否则走网页登录流程。
+- 新增测试 `test/source_login_ui_helper_test.dart`，覆盖解析、类型归一化、`hasLoginUi` 与 URL 判断。
+
+### 为什么
+- 之前“登录”统一进入网页页签，`loginUi` 书源无法进入表单分支，入口语义不完整。
+- 需要先补齐分支路由与登录信息录入能力，保证登录入口行为与书源配置语义一致。
+
+### 如何验证
+- `flutter analyze`
+- `flutter test test/source_login_ui_helper_test.dart`
+- `flutter test test/source_host_group_helper_test.dart test/source_login_url_resolver_test.dart test/search_scope_group_helper_test.dart test/source_filter_helper_test.dart test/source_import_export_conflict_logic_test.dart`
+
+### 兼容影响
+- **有兼容影响（正向）**：配置了 `loginUi` 的书源登录入口从“网页验证”调整为“表单登录”优先。
+- 登录信息仍按书源键本地保存，不影响书源 JSON 结构与导入导出协议。
+
+## 2026-02-17 - 登录脚本执行补齐（表单分支）
+
+### 做了什么
+- 新增 `lib/features/source/services/source_login_script_service.dart`：
+  - 补齐登录脚本文本解析（支持 `@js:` 与 `<js>...</js>`）。
+  - 在 `loginUi` 表单流程中执行登录脚本，提供 `source` / `java` 基础对象：
+    - `source.getLoginInfo / getLoginInfoMap / getLoginHeader / getLoginHeaderMap`
+    - `source.putLoginHeader / removeLoginHeader / log`
+    - `java.randomUUID / java.timeFormatUTC`
+  - 脚本里通过 `source.putLoginHeader` 写入的请求头会回写到本地登录头缓存，并同步 Cookie 字段到 `CookieStore`。
+  - 对脚本中的网络调用占位（`java.ajax / java.connect`）给出明确失败结果，避免静默成功。
+- 更新 `lib/features/source/views/source_login_form_view.dart`：
+  - 表单“完成”从“仅保存信息”调整为“保存信息 + 执行登录脚本 + 反馈结果”。
+  - 表单按钮动作支持执行脚本分支（绝对地址动作仍保留外部打开）。
+- 新增测试 `test/source_login_script_service_test.dart`：
+  - 覆盖登录脚本包装语法解析边界。
+
+### 为什么
+- 仅有表单入口不足以完成登录语义，仍缺少“保存信息后执行登录脚本并回写登录头”的关键链路。
+- 补齐后可让更多表单登录书源在应用内直接完成登录态写入。
+
+### 如何验证
+- `flutter analyze`
+- `flutter test test/source_login_script_service_test.dart`
+- `flutter test test/source_login_ui_helper_test.dart test/source_host_group_helper_test.dart test/source_login_url_resolver_test.dart test/search_scope_group_helper_test.dart test/source_filter_helper_test.dart test/source_import_export_conflict_logic_test.dart`
+
+### 兼容影响
+- **有兼容影响（正向）**：表单登录提交后会尝试执行登录脚本并更新登录头缓存。
+- 当前脚本网络桥接未完整实现，依赖 `java.ajax/java.connect` 的登录脚本会收到明确失败提示，不再静默成功。
+
+## 2026-02-17 - 登录脚本网络桥接补齐（java.ajax / java.connect）
+
+### 做了什么
+- 更新 `lib/features/source/services/rule_parser_engine.dart`：
+  - 新增 `fetchForLoginScript(...)` 公开方法，复用现有请求链路（URL 选项、请求头合并、CookieJar、编码回退、并发率与重试）供登录脚本桥接调用；
+  - 新增 `ScriptHttpResponse` 结构，用于统一返回脚本侧需要的 `body/code/message/url/headers` 数据。
+- 更新 `lib/features/source/services/source_login_script_service.dart`：
+  - `java.ajax` 与 `java.connect` 从占位失败改为真实请求桥接；
+  - `java.connect(url, header)` 支持覆盖头语义：当第二参数为合法 JSON 对象时，按覆盖头作为请求基础头；
+  - 登录脚本执行改为异步 Promise 收敛，支持脚本内网络调用后再返回执行结果；
+  - 保留并继续支持 `source.putLoginHeader / removeLoginHeader / log` 与 `java.randomUUID / java.timeFormatUTC`。
+- 更新 `test/source_login_script_service_test.dart`：
+  - 新增 `java.ajax` 返回 body 与 `java.connect` 返回响应对象字段覆盖测试；
+  - 覆盖 `connect(url, header)` 的覆盖头参数传递断言。
+
+### 为什么
+- 登录脚本里大量使用 `java.ajax/java.connect` 获取 token 或刷新会话，之前仅返回“暂不支持”，导致书源登录链路不完整。
+- 需要把登录脚本请求并入现有书源请求语义，避免登录阶段与搜索/发现等链路出现请求行为分叉。
+
+### 如何验证
+- `flutter test test/source_login_script_service_test.dart`
+- `flutter test test/source_login_ui_helper_test.dart test/source_login_url_resolver_test.dart test/source_host_group_helper_test.dart`
+- `flutter analyze`
+
+### 兼容影响
+- **有兼容影响（正向）**：依赖 `java.ajax/java.connect` 的登录脚本可在应用内直接执行请求并回写登录态。
+- 旧脚本若包含不受支持的异步写法，仍会在脚本异常中暴露错误信息，不会静默成功。

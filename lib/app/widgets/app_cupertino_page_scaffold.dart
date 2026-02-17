@@ -5,6 +5,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 class AppCupertinoPageScaffold extends StatelessWidget {
   final String title;
   final Widget child;
+  final Widget? middle;
   final Widget? leading;
   final Widget? trailing;
   final bool includeTopSafeArea;
@@ -14,6 +15,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     super.key,
     required this.title,
     required this.child,
+    this.middle,
     this.leading,
     this.trailing,
     this.includeTopSafeArea = true,
@@ -48,7 +50,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
 
     return CupertinoPageScaffold(
       navigationBar: CupertinoNavigationBar(
-        middle: Text(title),
+        middle: middle ?? Text(title),
         leading: _buildNavBarItem(
           context,
           leading,

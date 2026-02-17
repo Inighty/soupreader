@@ -18,11 +18,15 @@ import '../../../core/utils/legado_json.dart';
 import '../../search/views/search_view.dart';
 import '../constants/source_help_texts.dart';
 import '../models/book_source.dart';
+import '../services/source_availability_check_task_service.dart';
+import '../services/source_host_group_helper.dart';
 import '../services/source_import_export_service.dart';
+import '../services/source_login_url_resolver.dart';
+import '../services/source_login_ui_helper.dart';
 import '../../search/models/search_scope_group_helper.dart';
-import 'source_availability_check_view.dart';
 import 'source_edit_legacy_view.dart';
 import 'source_edit_view.dart';
+import 'source_login_form_view.dart';
 import 'source_web_verify_view.dart';
 
 enum _SourceSortMode {
@@ -103,9 +107,12 @@ class _SourceListViewState extends State<SourceListView> {
   _SourceSortMode _sortMode = _SourceSortMode.manual;
   bool _sortAscending = true;
   bool _groupSourcesByDomain = false;
+  SourceCheckTaskSnapshot? _lastCheckSnapshot;
 
   late final SourceRepository _sourceRepo;
   late final DatabaseService _db;
+  final SourceAvailabilityCheckTaskService _checkTaskService =
+      SourceAvailabilityCheckTaskService.instance;
   final SourceImportExportService _importExportService =
       SourceImportExportService();
 
@@ -127,10 +134,13 @@ class _SourceListViewState extends State<SourceListView> {
     super.initState();
     _db = DatabaseService();
     _sourceRepo = SourceRepository(_db);
+    _lastCheckSnapshot = _checkTaskService.snapshot;
+    _checkTaskService.listenable.addListener(_onCheckTaskChanged);
   }
 
   @override
   void dispose() {
+    _checkTaskService.listenable.removeListener(_onCheckTaskChanged);
     _urlController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -138,49 +148,58 @@ class _SourceListViewState extends State<SourceListView> {
 
   @override
   Widget build(BuildContext context) {
-    return AppCupertinoPageScaffold(
-      title: '书源管理',
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(30, 30),
-            onPressed: _showImportOptions,
-            child: const Icon(CupertinoIcons.add),
-          ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(30, 30),
-            onPressed: _showManageOptions,
-            child: const Icon(CupertinoIcons.ellipsis),
-          ),
-        ],
-      ),
-      child: StreamBuilder<List<BookSource>>(
-        stream: _sourceRepo.watchAllSources(),
-        builder: (context, snapshot) {
-          final allSources = snapshot.data ?? _sourceRepo.getAllSources();
-          final cleanedAll = _normalizeSources(allSources);
-          _cleanupSelection(cleanedAll);
-          final filtered = _buildVisibleList(cleanedAll);
+    return PopScope<void>(
+      canPop: _searchController.text.trim().isEmpty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || _searchController.text.trim().isEmpty) return;
+        setState(() => _searchController.clear());
+      },
+      child: AppCupertinoPageScaffold(
+        title: '书源管理',
+        middle: _buildNavigationSearchField(),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(30, 30),
+              onPressed: _showSortOptions,
+              child: const Icon(CupertinoIcons.arrow_up_arrow_down),
+            ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(30, 30),
+              onPressed: _showGroupFilterOptions,
+              child: const Icon(CupertinoIcons.folder),
+            ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(30, 30),
+              onPressed: _showMainOptions,
+              child: const Icon(CupertinoIcons.ellipsis_circle),
+            ),
+          ],
+        ),
+        child: StreamBuilder<List<BookSource>>(
+          stream: _sourceRepo.watchAllSources(),
+          builder: (context, snapshot) {
+            final allSources = snapshot.data ?? _sourceRepo.getAllSources();
+            final cleanedAll = _normalizeSources(allSources);
+            _cleanupSelection(cleanedAll);
+            final filtered = _buildVisibleList(cleanedAll);
 
-          return Column(
-            children: [
-              _buildSearchBar(),
-              _buildSortSummary(filtered.length),
-              Expanded(
-                child: filtered.isEmpty
-                    ? _buildEmptyState()
-                    : _buildSourceList(cleanedAll, filtered),
-              ),
-              _buildBatchActionBar(
-                allSources: cleanedAll,
-                visibleSources: filtered,
-              ),
-            ],
-          );
-        },
+            return Column(
+              children: [
+                Expanded(
+                  child: filtered.isEmpty
+                      ? _buildEmptyState()
+                      : _buildSourceList(cleanedAll, filtered),
+                ),
+                _buildBatchActionBar(visibleSources: filtered),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -203,6 +222,78 @@ class _SourceListViewState extends State<SourceListView> {
     _selectedUrls.removeAll(toRemove);
   }
 
+  void _onCheckTaskChanged() {
+    final current = _checkTaskService.snapshot;
+    final previous = _lastCheckSnapshot;
+    final finished = previous?.running == true && current?.running != true;
+    _lastCheckSnapshot = current;
+    if (!mounted) return;
+    setState(() {});
+    if (!finished || current == null) return;
+    _handleInlineCheckFinished(current);
+  }
+
+  void _handleInlineCheckFinished(SourceCheckTaskSnapshot snapshot) {
+    final items = snapshot.items;
+    if (items.isEmpty) return;
+    final failed = items
+        .where((e) =>
+            e.status == SourceCheckStatus.fail ||
+            e.status == SourceCheckStatus.empty)
+        .length;
+    final ok = items.where((e) => e.status == SourceCheckStatus.ok).length;
+    final groups = _buildGroups(_sourceRepo.getAllSources());
+    final hasInvalidGroup = groups.any((g) => g.contains('失效'));
+    if (_searchController.text.trim().isEmpty && hasInvalidGroup) {
+      setState(() => _searchController.text = '失效');
+      _showMessage('发现有失效书源，已自动筛选');
+      return;
+    }
+    _showMessage('校验完成：成功 $ok 条，失败/空列表 $failed 条');
+  }
+
+  SourceCheckItem? _findCheckItem(String bookSourceUrl) {
+    final snapshot = _checkTaskService.snapshot;
+    if (snapshot == null) return null;
+    for (final item in snapshot.items) {
+      if (item.source.bookSourceUrl == bookSourceUrl) return item;
+    }
+    return null;
+  }
+
+  String? _inlineCheckMessage(BookSource source) {
+    final item = _findCheckItem(source.bookSourceUrl);
+    if (item == null) return null;
+    final base = switch (item.status) {
+      SourceCheckStatus.pending => '待校验',
+      SourceCheckStatus.running => '校验中',
+      SourceCheckStatus.ok => '校验成功',
+      SourceCheckStatus.empty => '空列表',
+      SourceCheckStatus.fail => '校验失败',
+      SourceCheckStatus.skipped => '已跳过',
+    };
+    final detail = (item.message ?? '').trim();
+    if (detail.isEmpty || detail == base) return base;
+    return '$base：$detail';
+  }
+
+  Color _inlineCheckColor(SourceCheckStatus status) {
+    switch (status) {
+      case SourceCheckStatus.ok:
+        return CupertinoColors.systemGreen.resolveFrom(context);
+      case SourceCheckStatus.empty:
+        return CupertinoColors.systemOrange.resolveFrom(context);
+      case SourceCheckStatus.fail:
+        return CupertinoColors.systemRed.resolveFrom(context);
+      case SourceCheckStatus.running:
+        return CupertinoTheme.of(context).primaryColor;
+      case SourceCheckStatus.skipped:
+        return CupertinoColors.systemGrey.resolveFrom(context);
+      case SourceCheckStatus.pending:
+        return CupertinoColors.secondaryLabel.resolveFrom(context);
+    }
+  }
+
   List<String> _buildGroups(List<BookSource> sources) {
     final rawGroups = sources
         .map((source) => source.bookSourceGroup?.trim() ?? '')
@@ -210,40 +301,13 @@ class _SourceListViewState extends State<SourceListView> {
     return SearchScopeGroupHelper.dealGroups(rawGroups);
   }
 
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+  Widget _buildNavigationSearchField() {
+    return SizedBox(
+      height: 34,
       child: CupertinoSearchTextField(
         controller: _searchController,
         placeholder: '搜索书源',
         onChanged: (_) => setState(() {}),
-      ),
-    );
-  }
-
-  Widget _buildSortSummary(int count) {
-    final sortText = _sortLabel(_sortMode);
-    final orderText = _sortAscending ? '升序' : '降序';
-    final domainText = _groupSourcesByDomain ? ' · 按域名分组' : '';
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              '共 $count 条 · $sortText · $orderText$domainText',
-              style: TextStyle(
-                fontSize: 12,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-            ),
-          ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: _showSortOptions,
-            child: const Text('排序'),
-          ),
-        ],
       ),
     );
   }
@@ -275,23 +339,16 @@ class _SourceListViewState extends State<SourceListView> {
           .toList(growable: false);
     }
     if (q == '无分组' || q == 'no_group') {
-      return input
-          .where((s) => (s.bookSourceGroup ?? '').trim().isEmpty)
-          .toList(growable: false);
+      return input.where((s) {
+        final group = (s.bookSourceGroup ?? '').trim();
+        return group.isEmpty || group.contains('未分组');
+      }).toList(growable: false);
     }
     if (q == '启用发现' || q == 'enabled_explore') {
-      return input
-          .where(
-            (s) => (s.exploreUrl ?? '').trim().isNotEmpty && s.enabledExplore,
-          )
-          .toList(growable: false);
+      return input.where((s) => s.enabledExplore).toList(growable: false);
     }
     if (q == '禁用发现' || q == 'disabled_explore') {
-      return input
-          .where(
-            (s) => (s.exploreUrl ?? '').trim().isNotEmpty && !s.enabledExplore,
-          )
-          .toList(growable: false);
+      return input.where((s) => !s.enabledExplore).toList(growable: false);
     }
     if (q.startsWith('group:')) {
       final key = query.substring(6).trim();
@@ -333,9 +390,7 @@ class _SourceListViewState extends State<SourceListView> {
     int compareByMode(BookSource a, BookSource b) {
       switch (_sortMode) {
         case _SourceSortMode.manual:
-          final c = a.customOrder.compareTo(b.customOrder);
-          if (c != 0) return c;
-          return b.weight.compareTo(a.weight);
+          return a.customOrder.compareTo(b.customOrder);
         case _SourceSortMode.weight:
           return a.weight.compareTo(b.weight);
         case _SourceSortMode.name:
@@ -368,16 +423,11 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   String _hostOf(String url) {
-    final uri = Uri.tryParse(url);
-    final host = uri?.host.trim() ?? '';
-    if (host.isEmpty) return '#';
-    return host;
+    return SourceHostGroupHelper.groupHost(url);
   }
 
   bool get _canManualReorder {
-    return _sortMode == _SourceSortMode.manual &&
-        !_groupSourcesByDomain &&
-        _searchController.text.trim().isEmpty;
+    return _sortMode == _SourceSortMode.manual && !_groupSourcesByDomain;
   }
 
   Widget _buildSourceList(
@@ -388,23 +438,25 @@ class _SourceListViewState extends State<SourceListView> {
 
     Widget buildItem(BookSource source, int index) {
       final selected = _selectedUrls.contains(source.bookSourceUrl);
+      final checkItem = _findCheckItem(source.bookSourceUrl);
+      final checkMessage = _inlineCheckMessage(source);
       final showHeader = _groupSourcesByDomain &&
           (index == 0 ||
               _hostOf(visible[index - 1].bookSourceUrl) !=
                   _hostOf(source.bookSourceUrl));
 
-      final exploreTag = (source.exploreUrl ?? '').trim().isEmpty
-          ? null
-          : source.enabledExplore
-              ? '发现已启用'
-              : '发现已禁用';
+      final groupText = (source.bookSourceGroup ?? '').trim();
+      final displayName = groupText.isEmpty
+          ? source.bookSourceName
+          : '${source.bookSourceName} ($groupText)';
+      final hasExplore = (source.exploreUrl ?? '').trim().isNotEmpty;
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (showHeader)
             Padding(
-              padding: const EdgeInsets.only(left: 2, bottom: 4),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
               child: Text(
                 _hostOf(source.bookSourceUrl),
                 style: TextStyle(
@@ -414,150 +466,161 @@ class _SourceListViewState extends State<SourceListView> {
                 ),
               ),
             ),
-          ShadCard(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          Container(
+            color: CupertinoColors.systemBackground.resolveFrom(context),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onLongPress: () {
                 setState(() => _toggleSelection(source.bookSourceUrl));
               },
-              onTap: () => _showSourceActions(source),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 10, right: 8),
-                    child: CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(24, 24),
-                      onPressed: () {
-                        setState(() => _toggleSelection(source.bookSourceUrl));
-                      },
-                      child: Icon(
-                        selected
-                            ? CupertinoIcons.check_mark_circled_solid
-                            : CupertinoIcons.circle,
-                        color: selected
-                            ? CupertinoTheme.of(context).primaryColor
-                            : CupertinoColors.systemGrey,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 10, 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10, right: 8),
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(24, 24),
+                        onPressed: () {
+                          setState(
+                              () => _toggleSelection(source.bookSourceUrl));
+                        },
+                        child: Icon(
+                          selected
+                              ? CupertinoIcons.check_mark_circled_solid
+                              : CupertinoIcons.circle,
+                          color: selected
+                              ? CupertinoTheme.of(context).primaryColor
+                              : CupertinoColors.systemGrey,
+                        ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                source.bookSourceName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.p.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: scheme.foreground,
-                                ),
-                              ),
-                            ),
-                            if (exploreTag != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: source.enabledExplore
-                                      ? CupertinoColors.systemGreen
-                                          .resolveFrom(context)
-                                          .withValues(alpha: 0.15)
-                                      : CupertinoColors.systemRed
-                                          .resolveFrom(context)
-                                          .withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
                                 child: Text(
-                                  exploreTag,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: source.enabledExplore
-                                        ? CupertinoColors.systemGreen
-                                        : CupertinoColors.systemRed,
+                                  displayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.p.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: scheme.foreground,
                                   ),
                                 ),
                               ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          source.bookSourceUrl,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.small.copyWith(
-                            color: scheme.mutedForeground,
+                            ],
                           ),
-                        ),
-                        if ((source.bookSourceGroup ?? '').trim().isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              '分组：${source.bookSourceGroup}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: CupertinoColors.secondaryLabel
-                                    .resolveFrom(context),
+                          if (checkMessage != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 3),
+                              child: Row(
+                                children: [
+                                  if (checkItem?.status ==
+                                      SourceCheckStatus.running)
+                                    const Padding(
+                                      padding: EdgeInsets.only(right: 6),
+                                      child: SizedBox(
+                                        width: 11,
+                                        height: 11,
+                                        child: CupertinoActivityIndicator(
+                                          radius: 5.5,
+                                        ),
+                                      ),
+                                    ),
+                                  Expanded(
+                                    child: Text(
+                                      checkMessage,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: _inlineCheckColor(
+                                          checkItem?.status ??
+                                              SourceCheckStatus.pending,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (reorderEnabled)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6, right: 6),
+                        child: ReorderableDragStartListener(
+                          index: index,
+                          child: Icon(
+                            CupertinoIcons.line_horizontal_3,
+                            color: CupertinoColors.secondaryLabel.resolveFrom(
+                              context,
+                            ),
                           ),
+                        ),
+                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ShadSwitch(
+                          value: source.enabled,
+                          onChanged: (value) async {
+                            await _sourceRepo
+                                .updateSource(source.copyWith(enabled: value));
+                          },
+                        ),
+                        const SizedBox(width: 2),
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(28, 28),
+                          onPressed: () => _openEditor(source.bookSourceUrl),
+                          child: const Icon(
+                            CupertinoIcons.pencil_circle,
+                            size: 19,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(28, 28),
+                          onPressed: () => _showSourceActions(source),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              const Icon(
+                                CupertinoIcons.ellipsis_circle,
+                                size: 19,
+                              ),
+                              if (hasExplore)
+                                Positioned(
+                                  right: -1,
+                                  top: -1,
+                                  child: Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: source.enabledExplore
+                                          ? CupertinoColors.systemGreen
+                                          : CupertinoColors.systemRed,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (reorderEnabled)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6, right: 6),
-                      child: ReorderableDragStartListener(
-                        index: index,
-                        child: Icon(
-                          CupertinoIcons.line_horizontal_3,
-                          color: CupertinoColors.secondaryLabel.resolveFrom(
-                            context,
-                          ),
-                        ),
-                      ),
-                    ),
-                  Column(
-                    children: [
-                      ShadSwitch(
-                        value: source.enabled,
-                        onChanged: (value) async {
-                          await _sourceRepo
-                              .updateSource(source.copyWith(enabled: value));
-                        },
-                      ),
-                      CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(28, 28),
-                        onPressed: () => _openEditor(source.bookSourceUrl),
-                        child: const Icon(
-                          CupertinoIcons.pencil_circle,
-                          size: 19,
-                        ),
-                      ),
-                      CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(28, 28),
-                        onPressed: () => _showSourceActions(source),
-                        child: const Icon(
-                          CupertinoIcons.ellipsis_circle,
-                          size: 19,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -568,16 +631,15 @@ class _SourceListViewState extends State<SourceListView> {
     if (reorderEnabled) {
       return ReorderableListView.builder(
         buildDefaultDragHandles: false,
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
         itemCount: visible.length,
         onReorder: (oldIndex, newIndex) async {
           await _onReorderVisible(visible, oldIndex, newIndex);
         },
         itemBuilder: (context, index) {
           final source = visible[index];
-          return Container(
+          return KeyedSubtree(
             key: ValueKey(source.bookSourceUrl),
-            margin: const EdgeInsets.only(bottom: 8),
             child: buildItem(source, index),
           );
         },
@@ -585,9 +647,12 @@ class _SourceListViewState extends State<SourceListView> {
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
       itemCount: visible.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => Container(
+        height: 0.5,
+        color: CupertinoColors.systemGrey4.resolveFrom(context),
+      ),
       itemBuilder: (context, index) {
         final source = visible[index];
         return buildItem(source, index);
@@ -601,54 +666,91 @@ class _SourceListViewState extends State<SourceListView> {
     int newIndex,
   ) async {
     if (!_canManualReorder || visible.isEmpty) return;
+    if (oldIndex < 0 || oldIndex >= visible.length) return;
     var targetIndex = newIndex;
     if (oldIndex < targetIndex) {
       targetIndex -= 1;
     }
+    if (targetIndex < 0 || targetIndex >= visible.length) return;
     if (oldIndex == targetIndex) return;
+
+    final start = math.min(oldIndex, targetIndex);
+    final end = math.max(oldIndex, targetIndex);
+    final originalOrders =
+        visible.sublist(start, end + 1).map((e) => e.customOrder).toList();
 
     final reordered = visible.toList(growable: true);
     final moved = reordered.removeAt(oldIndex);
     reordered.insert(targetIndex, moved);
 
-    final updated = reordered.asMap().entries.map((entry) {
-      final index = entry.key;
-      final source = entry.value;
-      return source.copyWith(
-        customOrder: _sortAscending ? index : -index,
-      );
-    }).toList(growable: false);
+    var hasDuplicateOrderInAffectedRange = false;
+    final affectedOrders = <int>{};
+    for (var i = start; i <= end; i++) {
+      if (!affectedOrders.add(reordered[i].customOrder)) {
+        hasDuplicateOrderInAffectedRange = true;
+        break;
+      }
+    }
+    if (hasDuplicateOrderInAffectedRange) {
+      final normalized = reordered
+          .asMap()
+          .entries
+          .map(
+            (entry) => entry.value.copyWith(
+              customOrder: _sortAscending ? entry.key : -entry.key,
+            ),
+          )
+          .toList(growable: false);
+      await _sourceRepo.addSources(normalized);
+      return;
+    }
+
+    final updated = <BookSource>[];
+    for (var i = start; i <= end; i++) {
+      final source = reordered[i];
+      final nextOrder = originalOrders[i - start];
+      if (source.customOrder == nextOrder) continue;
+      updated.add(source.copyWith(customOrder: nextOrder));
+    }
+    if (updated.isEmpty) return;
     await _sourceRepo.addSources(updated);
   }
 
   Widget _buildBatchActionBar({
-    required List<BookSource> allSources,
     required List<BookSource> visibleSources,
   }) {
-    final selectedCount = _selectedUrls.length;
+    final selectedCount = _selectedSources(visibleSources).length;
+    final totalCount = visibleSources.length;
+    final allSelected = totalCount > 0 && selectedCount >= totalCount;
+    final hasSelection = selectedCount > 0;
+    final enabledColor = CupertinoTheme.of(context).primaryColor;
+    final disabledColor = CupertinoColors.systemGrey.resolveFrom(context);
 
-    Widget action(String text, VoidCallback onTap, {bool destructive = false}) {
-      return Padding(
-        padding: const EdgeInsets.only(right: 6),
-        child: CupertinoButton(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          minimumSize: const Size(30, 30),
-          color: destructive
-              ? CupertinoColors.systemRed.resolveFrom(context)
-              : CupertinoTheme.of(context).primaryColor,
-          onPressed: onTap,
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 12, color: CupertinoColors.white),
-          ),
-        ),
-      );
+    void selectAllOrClearVisible() {
+      setState(() {
+        final visibleSet =
+            visibleSources.map((source) => source.bookSourceUrl).toSet();
+        if (allSelected) {
+          _selectedUrls.removeAll(visibleSet);
+          return;
+        }
+        _selectedUrls.addAll(visibleSet);
+      });
+    }
+
+    void invertVisibleSelection() {
+      setState(() {
+        final visibleSet = visibleSources.map((e) => e.bookSourceUrl).toSet();
+        for (final url in visibleSet) {
+          _toggleSelection(url);
+        }
+      });
     }
 
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+        padding: const EdgeInsets.fromLTRB(12, 6, 8, 8),
         decoration: BoxDecoration(
           color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
           border: Border(
@@ -658,61 +760,173 @@ class _SourceListViewState extends State<SourceListView> {
             ),
           ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
           children: [
-            Text(
-              '已选 $selectedCount 条',
-              style: TextStyle(
-                fontSize: 12,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
+            Expanded(
+              child: CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                minimumSize: const Size(30, 30),
+                alignment: Alignment.centerLeft,
+                onPressed: totalCount == 0 ? null : selectAllOrClearVisible,
+                child: Text(
+                  allSelected
+                      ? '取消全选（$selectedCount/$totalCount）'
+                      : '全选（$selectedCount/$totalCount）',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: totalCount == 0 ? disabledColor : enabledColor,
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 6),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  action(
-                    '删除',
-                    () => _batchDeleteSelected(allSources),
-                    destructive: true,
-                  ),
-                  action('全选', () {
-                    setState(() {
-                      _selectedUrls
-                        ..clear()
-                        ..addAll(visibleSources.map((s) => s.bookSourceUrl));
-                    });
-                  }),
-                  action('反选', () {
-                    setState(() {
-                      final visibleSet =
-                          visibleSources.map((e) => e.bookSourceUrl).toSet();
-                      for (final url in visibleSet) {
-                        _toggleSelection(url);
-                      }
-                    });
-                  }),
-                  action('区间补选', () {
-                    setState(() => _expandSelectionInterval(visibleSources));
-                  }),
-                  action('启用', () => _batchSetEnabled(allSources, true)),
-                  action('禁用', () => _batchSetEnabled(allSources, false)),
-                  action('加分组', () => _batchAddGroup(allSources)),
-                  action('移分组', () => _batchRemoveGroup(allSources)),
-                  action('启发现', () => _batchSetExplore(allSources, true)),
-                  action('停发现', () => _batchSetExplore(allSources, false)),
-                  action('置顶', () => _batchMoveToTopBottom(allSources, true)),
-                  action('置底', () => _batchMoveToTopBottom(allSources, false)),
-                  action('导出', () => _batchExportSelected(allSources)),
-                  action('分享', () => _batchShareSelected(allSources)),
-                  action('校验', () => _batchCheckSelected(allSources)),
-                ],
+            CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              minimumSize: const Size(30, 30),
+              onPressed: hasSelection ? invertVisibleSelection : null,
+              child: Text(
+                '反选',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: hasSelection ? enabledColor : disabledColor,
+                ),
+              ),
+            ),
+            CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              minimumSize: const Size(30, 30),
+              onPressed: hasSelection
+                  ? () => _batchDeleteSelected(visibleSources)
+                  : null,
+              child: Text(
+                '删除',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: hasSelection
+                      ? CupertinoColors.systemRed.resolveFrom(context)
+                      : disabledColor,
+                ),
+              ),
+            ),
+            CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              minimumSize: const Size(30, 30),
+              onPressed: hasSelection
+                  ? () => _showBatchMoreActions(visibleSources)
+                  : null,
+              child: Icon(
+                CupertinoIcons.ellipsis_circle,
+                size: 19,
+                color: hasSelection ? enabledColor : disabledColor,
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _showBatchMoreActions(List<BookSource> visibleSources) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('批量操作'),
+        actions: [
+          CupertinoActionSheetAction(
+            child: const Text('启用所选'),
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _batchSetEnabled(visibleSources, true);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('禁用所选'),
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _batchSetEnabled(visibleSources, false);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('加入分组'),
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _batchAddGroup(visibleSources);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('移除分组'),
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _batchRemoveGroup(visibleSources);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('启用发现'),
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _batchSetExplore(visibleSources, true);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('禁用发现'),
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _batchSetExplore(visibleSources, false);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('置顶'),
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _batchMoveToTopBottom(visibleSources, true);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('置底'),
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _batchMoveToTopBottom(visibleSources, false);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('导出所选'),
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _batchExportSelected(visibleSources);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('分享所选'),
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _batchShareSelected(visibleSources);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('校验所选'),
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              _batchCheckSelected(visibleSources);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('选中所选区间'),
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              setState(() => _expandSelectionInterval(visibleSources));
+            },
+          ),
+          if (_checkTaskService.isRunning)
+            CupertinoActionSheetAction(
+              child: const Text('停止校验'),
+              onPressed: () {
+                Navigator.pop(sheetContext);
+                _checkTaskService.requestStop();
+              },
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.pop(sheetContext),
         ),
       ),
     );
@@ -734,7 +948,7 @@ class _SourceListViewState extends State<SourceListView> {
           Text('暂无书源', style: theme.textTheme.h4),
           const SizedBox(height: 8),
           Text(
-            '点击右上角 + 导入书源',
+            '点击右上角更多导入书源',
             style:
                 theme.textTheme.muted.copyWith(color: scheme.mutedForeground),
           ),
@@ -743,12 +957,11 @@ class _SourceListViewState extends State<SourceListView> {
     );
   }
 
-  void _showImportOptions() {
+  void _showMainOptions() {
     showCupertinoModalPopup<void>(
       context: context,
       builder: (context) => CupertinoActionSheet(
-        title: const Text('导入书源'),
-        message: const Text('支持新建、扫码、文件、网络导入。'),
+        title: const Text('更多'),
         actions: [
           CupertinoActionSheetAction(
             child: const Text('新建书源'),
@@ -776,42 +989,6 @@ class _SourceListViewState extends State<SourceListView> {
             onPressed: () {
               Navigator.pop(context);
               _importFromUrl();
-            },
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          child: const Text('取消'),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-    );
-  }
-
-  void _showManageOptions() {
-    showCupertinoModalPopup<void>(
-      context: context,
-      builder: (context) => CupertinoActionSheet(
-        title: const Text('管理菜单'),
-        actions: [
-          CupertinoActionSheetAction(
-            child: const Text('排序选项'),
-            onPressed: () {
-              Navigator.pop(context);
-              _showSortOptions();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('分组筛选'),
-            onPressed: () {
-              Navigator.pop(context);
-              _showGroupFilterOptions();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('分组管理'),
-            onPressed: () {
-              Navigator.pop(context);
-              _showGroupManageSheet();
             },
           ),
           CupertinoActionSheetAction(
@@ -901,8 +1078,15 @@ class _SourceListViewState extends State<SourceListView> {
     showCupertinoModalPopup<void>(
       context: context,
       builder: (context) => CupertinoActionSheet(
-        title: const Text('分组筛选'),
+        title: const Text('分组'),
         actions: <Widget>[
+          CupertinoActionSheetAction(
+            child: const Text('分组管理'),
+            onPressed: () {
+              Navigator.pop(context);
+              _showGroupManageSheet();
+            },
+          ),
           CupertinoActionSheetAction(
             child: const Text('启用'),
             onPressed: () => _applySearchQuery('启用', context),
@@ -933,10 +1117,6 @@ class _SourceListViewState extends State<SourceListView> {
               onPressed: () => _applySearchQuery('group:$group', context),
             ),
           ),
-          CupertinoActionSheetAction(
-            child: const Text('清空搜索'),
-            onPressed: () => _applySearchQuery('', context),
-          ),
         ],
         cancelButton: CupertinoActionSheetAction(
           child: const Text('取消'),
@@ -954,150 +1134,128 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Future<void> _showGroupManageSheet() async {
-    final allSources = _sourceRepo.getAllSources();
-    final groups = _buildGroups(allSources);
-
     await showCupertinoModalPopup<void>(
       context: context,
-      builder: (context) {
+      builder: (sheetContext) {
         return CupertinoPopupSurface(
           isSurfacePainted: true,
           child: SizedBox(
-            height: math.min(MediaQuery.of(context).size.height * 0.78, 560),
-            child: StatefulBuilder(
-              builder: (context, setSheetState) {
-                Future<void> refreshAfter(
-                    Future<void> Function() action) async {
-                  await action();
-                  final latest = _buildGroups(_sourceRepo.getAllSources());
-                  setSheetState(() {
-                    groups
-                      ..clear()
-                      ..addAll(latest);
-                  });
-                  if (mounted) setState(() {});
-                }
+            height:
+                math.min(MediaQuery.of(sheetContext).size.height * 0.78, 560),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          '分组管理',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(32, 32),
+                        onPressed: () async {
+                          final name = await _askGroupName('新增分组');
+                          if (name == null || name.trim().isEmpty) return;
+                          await _assignGroupToNoGroupSources(name.trim());
+                        },
+                        child: const Icon(CupertinoIcons.add_circled),
+                      ),
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(32, 32),
+                        onPressed: () => Navigator.pop(sheetContext),
+                        child: const Icon(CupertinoIcons.clear_circled),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  height: 0.5,
+                  color: CupertinoColors.systemGrey4.resolveFrom(sheetContext),
+                ),
+                Expanded(
+                  child: StreamBuilder<List<BookSource>>(
+                    stream: _sourceRepo.watchAllSources(),
+                    builder: (context, snapshot) {
+                      final all = snapshot.data ?? _sourceRepo.getAllSources();
+                      final groups = _buildGroups(_normalizeSources(all));
+                      if (groups.isEmpty) {
+                        return Center(
+                          child: Text(
+                            '暂无可管理分组',
+                            style: TextStyle(
+                              color: CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                            ),
+                          ),
+                        );
+                      }
 
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
-                      child: Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              '分组管理',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('关闭'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: CupertinoButton.filled(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              onPressed: () async {
-                                await refreshAfter(() async {
-                                  final name = await _askGroupName('新增分组');
-                                  if (name == null || name.trim().isEmpty) {
-                                    return;
-                                  }
-                                  await _assignGroupToNoGroupSources(
-                                      name.trim());
-                                });
-                              },
-                              child: const Text('新增分组（应用到无分组）'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: groups.isEmpty
-                          ? Center(
-                              child: Text(
-                                '暂无可管理分组',
-                                style: TextStyle(
-                                  color: CupertinoColors.secondaryLabel
-                                      .resolveFrom(context),
-                                ),
-                              ),
-                            )
-                          : ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                              itemCount: groups.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 6),
-                              itemBuilder: (context, index) {
-                                final group = groups[index];
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    color: CupertinoColors.systemGrey6
-                                        .resolveFrom(context),
-                                    borderRadius: BorderRadius.circular(10),
+                      return ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                        itemCount: groups.length,
+                        separatorBuilder: (_, __) => Container(
+                          height: 0.5,
+                          color:
+                              CupertinoColors.systemGrey4.resolveFrom(context),
+                        ),
+                        itemBuilder: (context, index) {
+                          final group = groups[index];
+                          return SizedBox(
+                            height: 44,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    group,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  child: Padding(
-                                    padding:
-                                        const EdgeInsets.fromLTRB(10, 6, 10, 6),
-                                    child: Row(
-                                      children: [
-                                        Expanded(child: Text(group)),
-                                        CupertinoButton(
-                                          padding: EdgeInsets.zero,
-                                          minimumSize: const Size(28, 28),
-                                          onPressed: () async {
-                                            await refreshAfter(() async {
-                                              final renamed =
-                                                  await _askGroupName(
-                                                '重命名分组',
-                                                initialValue: group,
-                                              );
-                                              if (renamed == null) return;
-                                              await _renameGroup(
-                                                  group, renamed.trim());
-                                            });
-                                          },
-                                          child: const Text('编辑'),
-                                        ),
-                                        CupertinoButton(
-                                          padding: EdgeInsets.zero,
-                                          minimumSize: const Size(28, 28),
-                                          onPressed: () async {
-                                            await refreshAfter(() async {
-                                              await _removeGroupEverywhere(
-                                                  group);
-                                            });
-                                          },
-                                          child: const Text(
-                                            '删除',
-                                            style: TextStyle(
-                                              color: CupertinoColors.systemRed,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                ),
+                                CupertinoButton(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 6),
+                                  minimumSize: const Size(36, 30),
+                                  onPressed: () async {
+                                    final renamed = await _askGroupName(
+                                      '重命名分组',
+                                      initialValue: group,
+                                    );
+                                    if (renamed == null) return;
+                                    await _renameGroup(group, renamed.trim());
+                                  },
+                                  child: const Text('编辑'),
+                                ),
+                                CupertinoButton(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 6),
+                                  minimumSize: const Size(36, 30),
+                                  onPressed: () async {
+                                    await _removeGroupEverywhere(group);
+                                  },
+                                  child: const Text(
+                                    '删除',
+                                    style: TextStyle(
+                                      color: CupertinoColors.systemRed,
                                     ),
                                   ),
-                                );
-                              },
+                                ),
+                              ],
                             ),
-                    ),
-                  ],
-                );
-              },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -1112,20 +1270,22 @@ class _SourceListViewState extends State<SourceListView> {
         title: Text(source.bookSourceName),
         message: Text(source.bookSourceUrl),
         actions: [
-          CupertinoActionSheetAction(
-            child: const Text('置顶'),
-            onPressed: () {
-              Navigator.pop(context);
-              _toTop(source);
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('置底'),
-            onPressed: () {
-              Navigator.pop(context);
-              _toBottom(source);
-            },
-          ),
+          if (_sortMode == _SourceSortMode.manual)
+            CupertinoActionSheetAction(
+              child: const Text('置顶'),
+              onPressed: () {
+                Navigator.pop(context);
+                _toTop(source);
+              },
+            ),
+          if (_sortMode == _SourceSortMode.manual)
+            CupertinoActionSheetAction(
+              child: const Text('置底'),
+              onPressed: () {
+                Navigator.pop(context);
+                _toBottom(source);
+              },
+            ),
           if ((source.loginUrl ?? '').trim().isNotEmpty)
             CupertinoActionSheetAction(
               child: const Text('登录'),
@@ -1138,15 +1298,11 @@ class _SourceListViewState extends State<SourceListView> {
             child: const Text('搜索'),
             onPressed: () async {
               Navigator.pop(context);
-              final keyword = await _askSearchKeyword(source);
-              if (keyword == null || keyword.trim().isEmpty) return;
               if (!mounted) return;
               await Navigator.of(this.context).push(
                 CupertinoPageRoute<void>(
                   builder: (_) => SearchView.scoped(
                     sourceUrls: [source.bookSourceUrl],
-                    initialKeyword: keyword.trim(),
-                    autoSearchOnOpen: true,
                   ),
                 ),
               );
@@ -1276,17 +1432,28 @@ class _SourceListViewState extends State<SourceListView> {
     }
     final keyword = await _askCheckKeyword();
     if (keyword == null) return;
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      CupertinoPageRoute<void>(
-        builder: (_) => SourceAvailabilityCheckView(
-          includeDisabled: true,
-          sourceUrls:
-              selected.map((e) => e.bookSourceUrl).toList(growable: false),
-          keywordOverride: keyword,
-        ),
+    final startResult = await _checkTaskService.start(
+      SourceCheckTaskConfig(
+        includeDisabled: true,
+        sourceUrls:
+            selected.map((e) => e.bookSourceUrl).toList(growable: false),
+        keywordOverride: keyword,
       ),
+      forceRestart: true,
     );
+    if (startResult.type == SourceCheckStartType.runningOtherTask) {
+      _showMessage(startResult.message);
+      return;
+    }
+    if (startResult.type == SourceCheckStartType.emptySource) {
+      _showMessage(startResult.message);
+      return;
+    }
+    if (startResult.type == SourceCheckStartType.attachedExisting) {
+      _showMessage(startResult.message);
+      return;
+    }
+    _showMessage('已开始校验（${selected.length} 条）');
   }
 
   void _toggleSelection(String url) {
@@ -1298,14 +1465,14 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   void _expandSelectionInterval(List<BookSource> visible) {
-    if (_selectedUrls.length < 2 || visible.isEmpty) return;
+    if (_selectedUrls.isEmpty || visible.isEmpty) return;
     final selectedIndexes = <int>[];
     for (var i = 0; i < visible.length; i++) {
       if (_selectedUrls.contains(visible[i].bookSourceUrl)) {
         selectedIndexes.add(i);
       }
     }
-    if (selectedIndexes.length < 2) return;
+    if (selectedIndexes.isEmpty) return;
 
     final minIndex = selectedIndexes.reduce(math.min);
     final maxIndex = selectedIndexes.reduce(math.max);
@@ -1339,7 +1506,6 @@ class _SourceListViewState extends State<SourceListView> {
   Future<void> _batchSetExplore(
       List<BookSource> allSources, bool enabled) async {
     final targets = _selectedSources(allSources)
-        .where((s) => (s.exploreUrl ?? '').trim().isNotEmpty)
         .where((s) => s.enabledExplore != enabled)
         .toList(growable: false);
     if (targets.isEmpty) {
@@ -1356,8 +1522,10 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Future<void> _batchAddGroup(List<BookSource> allSources) async {
-    final group = await _askGroupName('加入分组');
-    if (group == null || group.trim().isEmpty) return;
+    final groupInput = await _askGroupName('加入分组');
+    if (groupInput == null || groupInput.trim().isEmpty) return;
+    final addGroups = _extractGroups(groupInput);
+    if (addGroups.isEmpty) return;
     final selected = _selectedSources(allSources);
     if (selected.isEmpty) {
       _showMessage('当前未选择书源');
@@ -1365,17 +1533,19 @@ class _SourceListViewState extends State<SourceListView> {
     }
     await Future.wait(selected.map((source) async {
       final groups = _extractGroups(source.bookSourceGroup);
-      groups.add(group.trim());
+      groups.addAll(addGroups);
       await _sourceRepo.updateSource(
         source.copyWith(bookSourceGroup: _joinGroups(groups)),
       );
     }));
-    _showMessage('已将 ${selected.length} 条书源加入分组“${group.trim()}”');
+    _showMessage('已将 ${selected.length} 条书源加入分组');
   }
 
   Future<void> _batchRemoveGroup(List<BookSource> allSources) async {
-    final group = await _askGroupName('移除分组');
-    if (group == null || group.trim().isEmpty) return;
+    final groupInput = await _askGroupName('移除分组');
+    if (groupInput == null || groupInput.trim().isEmpty) return;
+    final removeGroups = _extractGroups(groupInput).toSet();
+    if (removeGroups.isEmpty) return;
     final selected = _selectedSources(allSources);
     if (selected.isEmpty) {
       _showMessage('当前未选择书源');
@@ -1384,12 +1554,12 @@ class _SourceListViewState extends State<SourceListView> {
 
     await Future.wait(selected.map((source) async {
       final groups = _extractGroups(source.bookSourceGroup);
-      groups.remove(group.trim());
+      groups.removeWhere(removeGroups.contains);
       await _sourceRepo.updateSource(
         source.copyWith(bookSourceGroup: _joinGroups(groups)),
       );
     }));
-    _showMessage('已从 ${selected.length} 条书源移除分组“${group.trim()}”');
+    _showMessage('已从 ${selected.length} 条书源移除分组');
   }
 
   Future<void> _batchDeleteSelected(List<BookSource> allSources) async {
@@ -1670,55 +1840,35 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Future<void> _openSourceLogin(BookSource source) async {
-    final url = source.loginUrl?.trim() ?? '';
-    if (url.isEmpty) {
-      _showMessage('当前书源未配置 loginUrl');
+    if (SourceLoginUiHelper.hasLoginUi(source.loginUi)) {
+      await Navigator.of(context).push(
+        CupertinoPageRoute<void>(
+          builder: (_) => SourceLoginFormView(source: source),
+        ),
+      );
       return;
     }
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      _showMessage('loginUrl 不是有效网页地址');
+
+    final resolvedUrl = SourceLoginUrlResolver.resolve(
+      baseUrl: source.bookSourceUrl,
+      loginUrl: source.loginUrl ?? '',
+    );
+    if (resolvedUrl.isEmpty) {
+      _showMessage('当前书源未配置登录地址');
+      return;
+    }
+    final uri = Uri.tryParse(resolvedUrl);
+    final scheme = uri?.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') {
+      _showMessage('登录地址不是有效网页地址');
       return;
     }
 
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceWebVerifyView(initialUrl: url),
+        builder: (_) => SourceWebVerifyView(initialUrl: resolvedUrl),
       ),
     );
-  }
-
-  Future<String?> _askSearchKeyword(BookSource source) async {
-    final defaultKeyword = source.ruleSearch?.checkKeyWord?.trim();
-    final controller = TextEditingController(
-      text: (defaultKeyword == null || defaultKeyword.isEmpty)
-          ? '我的'
-          : defaultKeyword,
-    );
-    final value = await showCupertinoDialog<String>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('单源搜索测试'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            placeholder: '输入搜索关键词',
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('开始搜索'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    return value;
   }
 
   Future<void> _importFromFile() async {
@@ -2739,25 +2889,6 @@ class _SourceListViewState extends State<SourceListView> {
       if (more > 0) lines.add('…其余 $more 条省略');
     }
     _showMessage(lines.join('\n'));
-  }
-
-  String _sortLabel(_SourceSortMode mode) {
-    switch (mode) {
-      case _SourceSortMode.manual:
-        return '手动排序';
-      case _SourceSortMode.weight:
-        return '权重';
-      case _SourceSortMode.name:
-        return '名称';
-      case _SourceSortMode.url:
-        return '地址';
-      case _SourceSortMode.update:
-        return '更新时间';
-      case _SourceSortMode.respond:
-        return '响应时间';
-      case _SourceSortMode.enabled:
-        return '启用状态';
-    }
   }
 
   bool _ensureSettingsReady({required String actionName}) {
