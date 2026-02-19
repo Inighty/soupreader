@@ -43,6 +43,43 @@ void main() {
     expect(legacyDecoded.noAnimScrollPage, isFalse);
   });
 
+  test('ReadingSettings keeps legado-like pageTouchSlop range', () {
+    final defaults = ReadingSettings.fromJson(<String, dynamic>{});
+    expect(defaults.pageTouchSlop, 0);
+
+    final custom = ReadingSettings.fromJson(<String, dynamic>{
+      'pageTouchSlop': 4096,
+    });
+    expect(custom.pageTouchSlop, 4096);
+
+    final invalid = ReadingSettings.fromJson(<String, dynamic>{
+      'pageTouchSlop': 12000,
+    });
+    expect(invalid.pageTouchSlop, 0);
+  });
+
+  test('ReadingSettings keeps legacy fixed pageAnimDuration', () {
+    final defaults = ReadingSettings.fromJson(<String, dynamic>{});
+    expect(
+      defaults.pageAnimDuration,
+      ReadingSettings.legacyPageAnimDuration,
+    );
+
+    final custom = ReadingSettings.fromJson(<String, dynamic>{
+      'pageAnimDuration': 120,
+    });
+    expect(
+      custom.pageAnimDuration,
+      ReadingSettings.legacyPageAnimDuration,
+    );
+
+    final copied = defaults.copyWith(pageAnimDuration: 600);
+    expect(
+      copied.pageAnimDuration,
+      ReadingSettings.legacyPageAnimDuration,
+    );
+  });
+
   test('ReadingSettings migrates legacy chineseTraditional to converter type',
       () {
     final legacyTrue = ReadingSettings.fromJson(<String, dynamic>{
@@ -70,5 +107,111 @@ void main() {
       ChineseConverterType.traditionalToSimplified,
     );
     expect(decoded.chineseTraditional, isFalse);
+  });
+
+  test('ClickAction uses legado default 9-grid mapping', () {
+    final normalized = ClickAction.normalizeConfig(const <String, int>{});
+    expect(
+      normalized,
+      equals(<String, int>{
+        'tl': ClickAction.prevPage,
+        'tc': ClickAction.prevPage,
+        'tr': ClickAction.nextPage,
+        'ml': ClickAction.prevPage,
+        'mc': ClickAction.showMenu,
+        'mr': ClickAction.nextPage,
+        'bl': ClickAction.prevPage,
+        'bc': ClickAction.nextPage,
+        'br': ClickAction.nextPage,
+      }),
+    );
+  });
+
+  test('ClickAction auto recovers middle menu when all zones are non-menu', () {
+    final noMenu = <String, int>{
+      'tl': ClickAction.nextPage,
+      'tc': ClickAction.nextPage,
+      'tr': ClickAction.nextPage,
+      'ml': ClickAction.nextPage,
+      'mc': ClickAction.prevPage,
+      'mr': ClickAction.nextPage,
+      'bl': ClickAction.nextPage,
+      'bc': ClickAction.nextPage,
+      'br': ClickAction.nextPage,
+    };
+    expect(ClickAction.hasMenuZone(noMenu), isFalse);
+
+    final normalized = ClickAction.normalizeConfig(noMenu);
+    expect(ClickAction.hasMenuZone(normalized), isTrue);
+    expect(normalized['mc'], ClickAction.showMenu);
+  });
+
+  test('ReadingSettings sanitizes click actions with legado action set', () {
+    final decoded = ReadingSettings.fromJson(<String, dynamic>{
+      'clickActions': <String, int>{
+        'mc': ClickAction.off,
+        'tl': 99,
+        'tr': ClickAction.off,
+        'bc': ClickAction.searchContent,
+      },
+    });
+
+    expect(decoded.clickActions['tl'], ClickAction.showMenu);
+    expect(decoded.clickActions['tr'], ClickAction.off);
+    expect(decoded.clickActions['bc'], ClickAction.searchContent);
+    expect(decoded.clickActions['mc'], ClickAction.off);
+    expect(ClickAction.hasMenuZone(decoded.clickActions), isTrue);
+  });
+
+  test('ReadingSettings keeps legado-like header/footer mode defaults', () {
+    const defaults = ReadingSettings();
+    expect(
+      defaults.headerMode,
+      ReadingSettings.headerModeHideWhenStatusBarShown,
+    );
+    expect(defaults.footerMode, ReadingSettings.footerModeShow);
+    expect(defaults.shouldShowHeader(showStatusBar: true), isFalse);
+    expect(defaults.shouldShowHeader(showStatusBar: false), isTrue);
+    expect(defaults.shouldShowFooter(), isTrue);
+  });
+
+  test('ReadingSettings migrates legacy hideHeader/hideFooter to mode fields',
+      () {
+    final hideAll = ReadingSettings.fromJson(<String, dynamic>{
+      'hideHeader': true,
+      'hideFooter': true,
+    });
+    expect(hideAll.headerMode, ReadingSettings.headerModeHide);
+    expect(hideAll.footerMode, ReadingSettings.footerModeHide);
+
+    final showAll = ReadingSettings.fromJson(<String, dynamic>{
+      'hideHeader': false,
+      'hideFooter': false,
+    });
+    expect(showAll.headerMode, ReadingSettings.headerModeShow);
+    expect(showAll.footerMode, ReadingSettings.footerModeShow);
+
+    final explicitMode = ReadingSettings.fromJson(<String, dynamic>{
+      'headerMode': ReadingSettings.headerModeHideWhenStatusBarShown,
+      'hideHeader': true,
+    });
+    expect(
+      explicitMode.headerMode,
+      ReadingSettings.headerModeHideWhenStatusBarShown,
+    );
+  });
+
+  test('ReadingSettings sanitizes tip color fields with legacy signed ints',
+      () {
+    final decoded = ReadingSettings.fromJson(<String, dynamic>{
+      'tipColor': -16711936, // legacy signed 0xFF00FF00
+      'tipDividerColor': -15584170, // legacy signed 0xFF123456
+    });
+    expect(decoded.tipColor, 0xFF00FF00);
+    expect(decoded.tipDividerColor, 0xFF123456);
+
+    final roundtrip = ReadingSettings.fromJson(decoded.toJson());
+    expect(roundtrip.tipColor, 0xFF00FF00);
+    expect(roundtrip.tipDividerColor, 0xFF123456);
   });
 }

@@ -80,7 +80,7 @@ class _ReadingInterfaceSettingsHubViewState
               children: [
                 _buildItem(
                   title: '样式与排版',
-                  info: '主题 / 字体 / 排版 / 翻页动画',
+                  info: '主题 / 字体 / 排版',
                   onTap: _openPreferences,
                 ),
                 const ShadSeparator.horizontal(
@@ -88,7 +88,7 @@ class _ReadingInterfaceSettingsHubViewState
                 ),
                 _buildItem(
                   title: '页眉页脚与标题',
-                  info: '内容位 / 分割线 / 标题显示',
+                  info: '标题间距 / 内容位 / 分割线',
                   onTap: _openTipSettings,
                 ),
               ],

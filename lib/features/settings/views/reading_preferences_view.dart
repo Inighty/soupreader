@@ -4,14 +4,12 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/theme/typography.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../reader/widgets/typography_settings_dialog.dart';
 
-/// 阅读偏好（全局默认）
-///
-/// 目标：把“高频项”集中到一个页面，避免用户在多个弹窗/多级菜单里来回找。
 class ReadingPreferencesView extends StatefulWidget {
   const ReadingPreferencesView({super.key});
 
@@ -48,6 +46,22 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
       return AppColors.readingThemes[index].name;
     }
     return AppColors.readingThemes.first.name;
+  }
+
+  String get _fontLabel {
+    return ReadingFontFamily.getFontName(_settings.fontFamilyIndex);
+  }
+
+  String get _fontWeightLabel {
+    switch (_settings.textBold) {
+      case 1:
+        return '粗体';
+      case 2:
+        return '细体';
+      case 0:
+      default:
+        return '正常';
+    }
   }
 
   Future<void> _pickTheme() async {
@@ -140,6 +154,92 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
     );
   }
 
+  Future<void> _pickFontFamily() async {
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('选择字体'),
+        actions: ReadingFontFamily.presets.asMap().entries.map((entry) {
+          final index = entry.key;
+          final preset = entry.value;
+          final isSelected = _settings.fontFamilyIndex == index;
+          return CupertinoActionSheetAction(
+            onPressed: () {
+              _update(_settings.copyWith(fontFamilyIndex: index));
+              Navigator.pop(ctx);
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  preset.name,
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+                if (isSelected) ...[
+                  const SizedBox(width: 8),
+                  Icon(CupertinoIcons.checkmark,
+                      size: 18, color: _accent(context)),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickFontWeight() async {
+    const options = <(int, String)>[
+      (0, '正常'),
+      (1, '粗体'),
+      (2, '细体'),
+    ];
+
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('选择字重'),
+        actions: options.map((option) {
+          final isSelected = _settings.textBold == option.$1;
+          return CupertinoActionSheetAction(
+            onPressed: () {
+              _update(_settings.copyWith(textBold: option.$1));
+              Navigator.pop(ctx);
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  option.$2,
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+                if (isSelected) ...[
+                  const SizedBox(width: 8),
+                  Icon(CupertinoIcons.checkmark,
+                      size: 18, color: _accent(context)),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
   void _openAdvancedTypography() {
     showCupertinoModalPopup<void>(
       context: context,
@@ -168,20 +268,13 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
 
   @override
   Widget build(BuildContext context) {
-    final brightnessPercent =
-        ((_settings.brightness.isFinite
-                    ? _settings.brightness.clamp(0.0, 1.0)
-                    : 1.0) *
-                100)
-            .round();
-
     return AppCupertinoPageScaffold(
       title: '样式与排版',
       child: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
-            header: const Text('常用'),
+            header: const Text('样式'),
             children: [
               CupertinoListTile.notched(
                 title: const Text('主题'),
@@ -190,20 +283,60 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                 onTap: _pickTheme,
               ),
               CupertinoListTile.notched(
+                title: const Text('字体'),
+                additionalInfo: Text(_fontLabel),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _pickFontFamily,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('字重'),
+                additionalInfo: Text(_fontWeightLabel),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _pickFontWeight,
+              ),
+              CupertinoListTile.notched(
                 title: const Text('翻页模式'),
                 additionalInfo: Text(_settings.pageTurnMode.name),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _pickPageTurnMode,
               ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('排版'),
+            children: [
               _SliderTile(
-                title: '翻页动画时长',
-                value: _settings.pageAnimDuration.toDouble(),
-                min: 100,
-                max: 600,
-                display: '${_settings.pageAnimDuration}ms',
-                onChanged: (v) => _update(
-                  _settings.copyWith(pageAnimDuration: v.toInt()),
-                ),
+                title: '字号',
+                value: _settings.fontSize,
+                min: 10,
+                max: 40,
+                display: _settings.fontSize.toInt().toString(),
+                onChanged: (v) => _update(_settings.copyWith(fontSize: v)),
+              ),
+              _SliderTile(
+                title: '字距',
+                value: _settings.letterSpacing,
+                min: -2,
+                max: 5,
+                display: _settings.letterSpacing.toStringAsFixed(1),
+                onChanged: (v) => _update(_settings.copyWith(letterSpacing: v)),
+              ),
+              _SliderTile(
+                title: '行距',
+                value: _settings.lineHeight,
+                min: 1.0,
+                max: 3.0,
+                display: _settings.lineHeight.toStringAsFixed(1),
+                onChanged: (v) => _update(_settings.copyWith(lineHeight: v)),
+              ),
+              _SliderTile(
+                title: '段距',
+                value: _settings.paragraphSpacing,
+                min: 0,
+                max: 50,
+                display: _settings.paragraphSpacing.toInt().toString(),
+                onChanged: (v) =>
+                    _update(_settings.copyWith(paragraphSpacing: v)),
               ),
               CupertinoListTile.notched(
                 title: const Text('两端对齐'),
@@ -225,58 +358,6 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('排版'),
-            children: [
-              _SliderTile(
-                title: '字体大小',
-                value: _settings.fontSize,
-                min: 10,
-                max: 40,
-                display: _settings.fontSize.toInt().toString(),
-                onChanged: (v) => _update(_settings.copyWith(fontSize: v)),
-              ),
-              _SliderTile(
-                title: '行距',
-                value: _settings.lineHeight,
-                min: 1.0,
-                max: 3.0,
-                display: _settings.lineHeight.toStringAsFixed(1),
-                onChanged: (v) => _update(_settings.copyWith(lineHeight: v)),
-              ),
-              _SliderTile(
-                title: '段距',
-                value: _settings.paragraphSpacing,
-                min: 0,
-                max: 50,
-                display: _settings.paragraphSpacing.toInt().toString(),
-                onChanged: (v) =>
-                    _update(_settings.copyWith(paragraphSpacing: v)),
-              ),
-            ],
-          ),
-          CupertinoListSection.insetGrouped(
-            header: const Text('亮度'),
-            children: [
-              CupertinoListTile.notched(
-                title: const Text('跟随系统亮度'),
-                trailing: CupertinoSwitch(
-                  value: _settings.useSystemBrightness,
-                  onChanged: (value) => _update(
-                    _settings.copyWith(useSystemBrightness: value),
-                  ),
-                ),
-              ),
-              _SliderTile(
-                title: '手动亮度',
-                value: _settings.brightness,
-                min: 0.0,
-                max: 1.0,
-                display: '$brightnessPercent%',
-                onChanged: (v) => _update(_settings.copyWith(brightness: v)),
-              ),
-            ],
-          ),
-          CupertinoListSection.insetGrouped(
             header: const Text('高级'),
             children: [
               CupertinoListTile.notched(
@@ -284,11 +365,6 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                 additionalInfo: const Text('更多选项'),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _openAdvancedTypography,
-              ),
-              CupertinoListTile.notched(
-                title: const Text('恢复默认阅读设置'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _update(const ReadingSettings()),
               ),
             ],
           ),

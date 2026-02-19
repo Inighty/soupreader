@@ -1019,20 +1019,9 @@ class _PageTab extends StatelessWidget {
           ),
         ),
         _Section(
-          title: '动画与按键',
+          title: '按键',
           child: Column(
             children: [
-              _SliderRow(
-                label: '动画',
-                value: settings.pageAnimDuration.toDouble(),
-                min: 100,
-                max: 600,
-                format: (v) => '${v.round()}ms',
-                onChanged: (v) => onSettingsChanged(
-                  settings.copyWith(pageAnimDuration: v.round()),
-                ),
-              ),
-              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [

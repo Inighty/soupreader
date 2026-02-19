@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:soupreader/core/models/app_settings.dart';
 import 'package:soupreader/core/services/settings_service.dart';
+import 'package:soupreader/features/reader/models/reading_settings.dart';
 
 void main() {
   test('AppSettings JSON roundtrip', () {
@@ -114,5 +115,49 @@ void main() {
 
     expect(service.getChapterPageProgress('book-2', chapterIndex: 0), 1.0);
     expect(service.getChapterPageProgress('book-2', chapterIndex: 1), 0.0);
+  });
+
+  test(
+      'SettingsService readingSettingsListenable syncs keepScreenOn/chinese mode',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final service = SettingsService();
+    await service.init();
+
+    final observedModes = <int>[];
+    void listener() {
+      observedModes
+          .add(service.readingSettingsListenable.value.chineseConverterType);
+    }
+
+    service.readingSettingsListenable.addListener(listener);
+    await service.saveReadingSettings(
+      service.readingSettings.copyWith(
+        keepScreenOn: true,
+        chineseConverterType: ChineseConverterType.traditionalToSimplified,
+      ),
+    );
+
+    expect(service.readingSettings.keepScreenOn, isTrue);
+    expect(
+      service.readingSettings.chineseConverterType,
+      ChineseConverterType.traditionalToSimplified,
+    );
+    expect(service.readingSettingsListenable.value.keepScreenOn, isTrue);
+    expect(
+      service.readingSettingsListenable.value.chineseConverterType,
+      ChineseConverterType.traditionalToSimplified,
+    );
+    expect(observedModes, isNotEmpty);
+    expect(observedModes.last, ChineseConverterType.traditionalToSimplified);
+
+    await service.init();
+    expect(service.readingSettings.keepScreenOn, isTrue);
+    expect(
+      service.readingSettings.chineseConverterType,
+      ChineseConverterType.traditionalToSimplified,
+    );
+
+    service.readingSettingsListenable.removeListener(listener);
   });
 }

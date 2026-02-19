@@ -79,6 +79,14 @@ class _ReadingStatusActionSettingsViewState
                   onChanged: (v) => _update(_settings.copyWith(showBattery: v)),
                 ),
               ),
+              CupertinoListTile.notched(
+                title: const Text('显示亮度条'),
+                trailing: CupertinoSwitch(
+                  value: _settings.showBrightnessView,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(showBrightnessView: v)),
+                ),
+              ),
             ],
           ),
           CupertinoListSection.insetGrouped(

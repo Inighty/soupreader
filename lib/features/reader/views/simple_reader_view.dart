@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -19,7 +20,9 @@ import '../../replace/services/replace_rule_service.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../models/reading_settings.dart';
 import '../services/chapter_title_display_helper.dart';
+import '../services/reader_key_paging_helper.dart';
 import '../services/reader_source_switch_helper.dart';
+import '../services/reader_tip_selection_helper.dart';
 import '../utils/chapter_progress_utils.dart';
 import '../widgets/auto_pager.dart';
 import '../widgets/click_action_config_dialog.dart';
@@ -33,6 +36,7 @@ import '../widgets/scroll_page_step_calculator.dart';
 import '../widgets/scroll_segment_paint_view.dart';
 import '../widgets/scroll_text_layout_engine.dart';
 import '../widgets/scroll_runtime_helper.dart';
+import '../widgets/source_switch_candidate_sheet.dart';
 import '../widgets/typography_settings_dialog.dart';
 
 /// 简洁阅读器 - Cupertino 风格 (增强版)
@@ -162,6 +166,25 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _TipOption(8, '页码/总页'),
     _TipOption(9, '时间+电量'),
   ];
+  static const int _customColorPickerValue = -2;
+  static const List<_TipOption> _headerModeOptions = [
+    _TipOption(ReadingSettings.headerModeHideWhenStatusBarShown, '显示状态栏时隐藏'),
+    _TipOption(ReadingSettings.headerModeShow, '显示'),
+    _TipOption(ReadingSettings.headerModeHide, '隐藏'),
+  ];
+  static const List<_TipOption> _footerModeOptions = [
+    _TipOption(ReadingSettings.footerModeShow, '显示'),
+    _TipOption(ReadingSettings.footerModeHide, '隐藏'),
+  ];
+  static const List<_TipOption> _tipColorOptions = [
+    _TipOption(ReadingSettings.tipColorFollowContent, '同正文颜色'),
+    _TipOption(_customColorPickerValue, '自定义'),
+  ];
+  static const List<_TipOption> _tipDividerColorOptions = [
+    _TipOption(ReadingSettings.tipDividerColorDefault, '默认'),
+    _TipOption(ReadingSettings.tipDividerColorFollowContent, '同正文颜色'),
+    _TipOption(_customColorPickerValue, '自定义'),
+  ];
   static const int _scrollUiSyncIntervalMs = 16;
   static const int _scrollSaveProgressIntervalMs = 450;
   static const int _scrollPreloadIntervalMs = 80;
@@ -221,6 +244,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _bookmarkRepo = BookmarkRepository();
     _settingsService = SettingsService();
     _settings = _settingsService.readingSettings.sanitize();
+    _settingsService.readingSettingsListenable
+        .addListener(_handleReadingSettingsChanged);
     _autoPager.setSpeed(_settings.autoReadSpeed);
     _autoPager.setMode(_settings.pageTurnMode == PageTurnMode.scroll
         ? AutoPagerMode.scroll
@@ -315,6 +340,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   @override
   void dispose() {
+    _settingsService.readingSettingsListenable
+        .removeListener(_handleReadingSettingsChanged);
     _pageFactory.removeContentChangedListener(_handlePageFactoryContentChanged);
     _saveProgress();
     _scrollController.removeListener(_handleScrollControllerTick);
@@ -419,6 +446,27 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   Future<void> _syncNativeKeepScreenOn(ReadingSettings settings) async {
     await _keepScreenOnService.setEnabled(settings.keepScreenOn);
+  }
+
+  void _handleReadingSettingsChanged() {
+    if (!mounted) return;
+    final latest = _settingsService.readingSettings.sanitize();
+    if (_isSameReadingSettings(_settings, latest)) return;
+    _updateSettings(latest, persist: false);
+  }
+
+  bool _isSameReadingSettings(ReadingSettings a, ReadingSettings b) {
+    final aJson = Map<String, dynamic>.from(a.toJson());
+    final bJson = Map<String, dynamic>.from(b.toJson());
+    final aActionsRaw = aJson.remove('clickActions');
+    final bActionsRaw = bJson.remove('clickActions');
+    final aActions = aActionsRaw is Map
+        ? aActionsRaw.map((key, value) => MapEntry('$key', value))
+        : const <String, dynamic>{};
+    final bActions = bActionsRaw is Map
+        ? bActionsRaw.map((key, value) => MapEntry('$key', value))
+        : const <String, dynamic>{};
+    return mapEquals(aJson, bJson) && mapEquals(aActions, bActions);
   }
 
   /// 保存进度：章节 + 滚动偏移
@@ -1343,8 +1391,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final safeArea = MediaQuery.of(context).padding;
 
     // 对标 flutter_reader 的布局计算
-    final showHeader = _settings.showStatusBar && !_settings.hideHeader;
-    final showFooter = _settings.showStatusBar && !_settings.hideFooter;
+    final showHeader =
+        _settings.shouldShowHeader(showStatusBar: _settings.showStatusBar);
+    final showFooter = _settings.shouldShowFooter();
     final topOffset = showHeader ? PagedReaderWidget.topOffset : 0.0;
     final bottomOffset = showFooter ? PagedReaderWidget.bottomOffset : 0.0;
 
@@ -1388,7 +1437,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   /// 更新设置
-  void _updateSettings(ReadingSettings newSettings) {
+  void _updateSettings(ReadingSettings newSettings, {bool persist = true}) {
     newSettings = newSettings.sanitize();
 
     // 产品约束：除“滚动”外一律水平翻页；滚动模式固定纵向滚动。
@@ -1402,6 +1451,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         newSettings =
             newSettings.copyWith(pageDirection: PageDirection.horizontal);
       }
+    }
+
+    if (_isSameReadingSettings(_settings, newSettings)) {
+      return;
     }
 
     final oldSettings = _settings;
@@ -1472,7 +1525,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         final cached = _replaceStageCache[chapter.id];
         final title = cached?.title ?? chapter.title;
         final content = cached?.content ?? (chapter.content ?? '');
-        _currentTitle = title;
+        _currentTitle = _postProcessTitle(title);
         _currentContent = _postProcessContent(content, title);
       }
       if (contentTransformChanged) {
@@ -1497,7 +1550,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (oldSettings.keepScreenOn != newSettings.keepScreenOn) {
       unawaited(_syncNativeKeepScreenOn(newSettings));
     }
-    unawaited(_settingsService.saveReadingSettings(newSettings));
+    if (persist) {
+      unawaited(_settingsService.saveReadingSettings(newSettings));
+    }
     if (!modeChanged && contentTransformChanged) {
       _syncScrollSegmentsAfterTransformChange();
     }
@@ -1600,9 +1655,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       );
 
   Map<String, int> get _clickActions {
-    final config = Map<String, int>.from(ClickAction.defaultZoneConfig);
-    config.addAll(_settings.clickActions);
-    return config;
+    return ClickAction.normalizeConfig(_settings.clickActions);
   }
 
   /// 左右点击翻页处理
@@ -1620,19 +1673,22 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _handleKeyEvent(KeyEvent event) {
-    if (!_settings.volumeKeyPage) return;
     if (_showMenu || _showSearchMenu || _showAutoReadPanel) return;
     if (event is! KeyDownEvent) return;
 
-    final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.audioVolumeDown ||
-        key == LogicalKeyboardKey.arrowRight ||
-        key == LogicalKeyboardKey.pageDown) {
-      _handlePageStep(next: true);
-    } else if (key == LogicalKeyboardKey.audioVolumeUp ||
-        key == LogicalKeyboardKey.arrowLeft ||
-        key == LogicalKeyboardKey.pageUp) {
-      _handlePageStep(next: false);
+    final action = ReaderKeyPagingHelper.resolveKeyDownAction(
+      key: event.logicalKey,
+      volumeKeyPageEnabled: _settings.volumeKeyPage,
+    );
+    switch (action) {
+      case ReaderKeyPagingAction.next:
+        _handlePageStep(next: true);
+        break;
+      case ReaderKeyPagingAction.prev:
+        _handlePageStep(next: false);
+        break;
+      case ReaderKeyPagingAction.none:
+        break;
     }
   }
 
@@ -1676,6 +1732,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _handleClickAction(int action) {
     switch (action) {
+      case ClickAction.off:
+        break;
       case ClickAction.showMenu:
         _setReaderMenuVisible(true);
         break;
@@ -1697,8 +1755,25 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       case ClickAction.openChapterList:
         _showChapterList();
         break;
+      case ClickAction.searchContent:
+        _showContentSearchDialog();
+        break;
+      case ClickAction.editContent:
+        _showToast('正文编辑暂未实现');
+        break;
+      case ClickAction.toggleReplaceRule:
+        _showToast('替换规则开关暂未实现');
+        break;
+      case ClickAction.syncBookProgress:
+        _showToast('云端进度同步暂未实现');
+        break;
+      case ClickAction.readAloudPrevParagraph:
+      case ClickAction.readAloudNextParagraph:
+      case ClickAction.readAloudPauseResume:
+        _openReadAloudAction();
+        break;
       default:
-        _setReaderMenuVisible(true);
+        break;
     }
   }
 
@@ -1744,6 +1819,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _settings.fontFamilyIndex,
       _settings.textFullJustify,
       _settings.showStatusBar,
+      _settings.headerMode,
+      _settings.footerMode,
     ]);
   }
 
@@ -1764,6 +1841,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final titleBottomSpacing = _settings.titleBottomSpacing > 0
         ? _settings.titleBottomSpacing
         : _settings.paragraphSpacing * 1.5;
+    final showFooter = _settings.shouldShowFooter();
 
     final snapshot = ScrollPageStepCalculator.buildLayoutSnapshot(
       title: _currentTitle,
@@ -1771,8 +1849,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       showTitle: _settings.titleMode != 2,
       maxWidth: contentWidth,
       paddingTop: _settings.paddingTop,
-      paddingBottom:
-          _settings.showStatusBar ? 30.0 : _settings.paddingBottom.toDouble(),
+      paddingBottom: showFooter ? 30.0 : _settings.paddingBottom.toDouble(),
       paragraphSpacing: _settings.paragraphSpacing,
       titleTopSpacing: titleTopSpacing,
       titleBottomSpacing: titleBottomSpacing,
@@ -1863,9 +1940,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         await _scrollController.animateTo(
           clampedOffset,
           duration: Duration(
-            milliseconds: _settings.pageAnimDuration <= 0
-                ? 1
-                : _settings.pageAnimDuration,
+            milliseconds: ReadingSettings.legacyPageAnimDuration,
           ),
           curve: Curves.linear,
         );
@@ -2149,11 +2224,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       ),
 
                     // 底部状态栏 - 只在滚动模式显示（翻页模式由PagedReaderWidget内部处理）
-                    if (_settings.showStatusBar &&
-                        !_showMenu &&
+                    if (!_showMenu &&
                         !_showSearchMenu &&
                         !_showAutoReadPanel &&
-                        isScrollMode)
+                        isScrollMode &&
+                        _settings.shouldShowFooter())
                       ReaderStatusBar(
                         settings: _settings,
                         currentTheme: _currentTheme,
@@ -2167,11 +2242,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       ),
 
                     // 顶部状态栏（滚动模式）
-                    if (_settings.showStatusBar &&
-                        !_showMenu &&
+                    if (!_showMenu &&
                         !_showSearchMenu &&
                         !_showAutoReadPanel &&
-                        isScrollMode)
+                        isScrollMode &&
+                        _settings.shouldShowHeader(
+                          showStatusBar: _settings.showStatusBar,
+                        ))
                       ReaderHeaderBar(
                         settings: _settings,
                         currentTheme: _currentTheme,
@@ -2324,8 +2401,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       showStatusBar: _settings.showStatusBar,
       settings: _settings,
       bookTitle: widget.bookTitle,
-      // 翻页动画增强参数
-      animDuration: _settings.pageAnimDuration,
+      // 对标 legado：翻页动画时长固定 300ms
+      animDuration: ReadingSettings.legacyPageAnimDuration,
       pageDirection: _settings.pageDirection,
       pageTouchSlop: _settings.pageTouchSlop,
       onAction: _handleClickAction,
@@ -2400,7 +2477,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           right: _settings.paddingRight,
           top: _settings.paddingTop,
           bottom: isTailSegment
-              ? (_settings.showStatusBar ? 30 : _settings.paddingBottom)
+              ? (_settings.shouldShowFooter() ? 30 : _settings.paddingBottom)
               : _settings.paddingBottom,
         ),
         child: Column(
@@ -2512,6 +2589,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _openReadAloudFromMenu() {
     _closeReaderMenuOverlay();
+    _openReadAloudAction();
+  }
+
+  void _openReadAloudAction() {
     final capability = _detectReadAloudCapability();
     if (!capability.available) {
       _showToast(capability.reason);
@@ -3202,33 +3283,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       return;
     }
 
-    showCupertinoModalPopup<void>(
+    final selected = await showSourceSwitchCandidateSheet(
       context: context,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: Text('换源（$keyword）'),
-        message: const Text('按“书名匹配 + 作者优先”筛选候选'),
-        actions: [
-          for (final candidate in candidates.take(12))
-            CupertinoActionSheetAction(
-              onPressed: () async {
-                Navigator.pop(sheetContext);
-                await _switchToSourceCandidate(candidate);
-              },
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '${candidate.source.bookSourceName} · ${candidate.book.author}',
-                  textAlign: TextAlign.left,
-                ),
-              ),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
-        ),
-      ),
+      keyword: keyword,
+      candidates: candidates,
     );
+    if (selected == null) return;
+    await _switchToSourceCandidate(selected);
   }
 
   Future<void> _switchToSourceCandidate(
@@ -4036,12 +4097,23 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             title: '页眉页脚',
             child: Column(
               children: [
-                _buildSwitchRow('显示页眉', !_settings.hideHeader, (value) {
-                  _updateSettingsFromSheet(
-                    setPopupState,
-                    _settings.copyWith(hideHeader: !value),
-                  );
-                }),
+                _buildOptionRow(
+                  '页眉显示',
+                  _headerModeLabel(_settings.headerMode),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页眉显示',
+                      options: _headerModeOptions,
+                      currentValue: _settings.headerMode,
+                      onSelected: (value) {
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(headerMode: value),
+                        );
+                      },
+                    );
+                  },
+                ),
                 _buildSwitchRow('页眉分割线', _settings.showHeaderLine, (value) {
                   _updateSettingsFromSheet(
                     setPopupState,
@@ -4057,9 +4129,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       options: _headerTipOptions,
                       currentValue: _settings.headerLeftContent,
                       onSelected: (value) {
-                        _updateSettingsFromSheet(
+                        _applyTipSelectionFromSheet(
                           setPopupState,
-                          _settings.copyWith(headerLeftContent: value),
+                          slot: ReaderTipSlot.headerLeft,
+                          value: value,
                         );
                       },
                     );
@@ -4074,9 +4147,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       options: _headerTipOptions,
                       currentValue: _settings.headerCenterContent,
                       onSelected: (value) {
-                        _updateSettingsFromSheet(
+                        _applyTipSelectionFromSheet(
                           setPopupState,
-                          _settings.copyWith(headerCenterContent: value),
+                          slot: ReaderTipSlot.headerCenter,
+                          value: value,
                         );
                       },
                     );
@@ -4091,21 +4165,33 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       options: _headerTipOptions,
                       currentValue: _settings.headerRightContent,
                       onSelected: (value) {
-                        _updateSettingsFromSheet(
+                        _applyTipSelectionFromSheet(
                           setPopupState,
-                          _settings.copyWith(headerRightContent: value),
+                          slot: ReaderTipSlot.headerRight,
+                          value: value,
                         );
                       },
                     );
                   },
                 ),
                 const SizedBox(height: 4),
-                _buildSwitchRow('显示页脚', !_settings.hideFooter, (value) {
-                  _updateSettingsFromSheet(
-                    setPopupState,
-                    _settings.copyWith(hideFooter: !value),
-                  );
-                }),
+                _buildOptionRow(
+                  '页脚显示',
+                  _footerModeLabel(_settings.footerMode),
+                  () {
+                    _showTipOptionPicker(
+                      title: '页脚显示',
+                      options: _footerModeOptions,
+                      currentValue: _settings.footerMode,
+                      onSelected: (value) {
+                        _updateSettingsFromSheet(
+                          setPopupState,
+                          _settings.copyWith(footerMode: value),
+                        );
+                      },
+                    );
+                  },
+                ),
                 _buildSwitchRow('页脚分割线', _settings.showFooterLine, (value) {
                   _updateSettingsFromSheet(
                     setPopupState,
@@ -4121,9 +4207,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       options: _footerTipOptions,
                       currentValue: _settings.footerLeftContent,
                       onSelected: (value) {
-                        _updateSettingsFromSheet(
+                        _applyTipSelectionFromSheet(
                           setPopupState,
-                          _settings.copyWith(footerLeftContent: value),
+                          slot: ReaderTipSlot.footerLeft,
+                          value: value,
                         );
                       },
                     );
@@ -4138,9 +4225,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       options: _footerTipOptions,
                       currentValue: _settings.footerCenterContent,
                       onSelected: (value) {
-                        _updateSettingsFromSheet(
+                        _applyTipSelectionFromSheet(
                           setPopupState,
-                          _settings.copyWith(footerCenterContent: value),
+                          slot: ReaderTipSlot.footerCenter,
+                          value: value,
                         );
                       },
                     );
@@ -4155,14 +4243,70 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       options: _footerTipOptions,
                       currentValue: _settings.footerRightContent,
                       onSelected: (value) {
-                        _updateSettingsFromSheet(
+                        _applyTipSelectionFromSheet(
                           setPopupState,
-                          _settings.copyWith(footerRightContent: value),
+                          slot: ReaderTipSlot.footerRight,
+                          value: value,
                         );
                       },
                     );
                   },
                 ),
+                const SizedBox(height: 4),
+                _buildOptionRow('文字颜色', _tipColorLabel(_settings.tipColor), () {
+                  _showTipOptionPicker(
+                    title: '页眉页脚文字颜色',
+                    options: _tipColorOptions,
+                    currentValue: _settings.tipColor ==
+                            ReadingSettings.tipColorFollowContent
+                        ? ReadingSettings.tipColorFollowContent
+                        : _customColorPickerValue,
+                    onSelected: (value) {
+                      if (value == _customColorPickerValue) {
+                        unawaited(
+                          _showTipColorInputDialog(
+                            setPopupState,
+                            forDivider: false,
+                          ),
+                        );
+                        return;
+                      }
+                      _updateSettingsFromSheet(
+                        setPopupState,
+                        _settings.copyWith(tipColor: value),
+                      );
+                    },
+                  );
+                }),
+                _buildOptionRow(
+                    '分割线颜色', _tipDividerColorLabel(_settings.tipDividerColor),
+                    () {
+                  _showTipOptionPicker(
+                    title: '页眉页脚分割线颜色',
+                    options: _tipDividerColorOptions,
+                    currentValue: _settings.tipDividerColor ==
+                                ReadingSettings.tipDividerColorDefault ||
+                            _settings.tipDividerColor ==
+                                ReadingSettings.tipDividerColorFollowContent
+                        ? _settings.tipDividerColor
+                        : _customColorPickerValue,
+                    onSelected: (value) {
+                      if (value == _customColorPickerValue) {
+                        unawaited(
+                          _showTipColorInputDialog(
+                            setPopupState,
+                            forDivider: true,
+                          ),
+                        );
+                        return;
+                      }
+                      _updateSettingsFromSheet(
+                        setPopupState,
+                        _settings.copyWith(tipDividerColor: value),
+                      );
+                    },
+                  );
+                }),
               ],
             ),
           ),
@@ -4180,7 +4324,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSettingsCard(
-            title: '翻页模式与动画',
+            title: '翻页模式',
             child: Column(
               children: [
                 Wrap(
@@ -4233,20 +4377,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     );
                   }).toList(),
                 ),
-                const SizedBox(height: 12),
-                _buildSliderSetting(
-                  '动画',
-                  _settings.pageAnimDuration.toDouble(),
-                  100,
-                  600,
-                  (val) {
-                    _updateSettingsFromSheet(
-                      setPopupState,
-                      _settings.copyWith(pageAnimDuration: val.toInt()),
-                    );
-                  },
-                  displayFormat: (v) => '${v.toInt()}ms',
-                ),
               ],
             ),
           ),
@@ -4295,12 +4425,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       );
                     },
                   ),
-                _buildSwitchRow('净化章节标题', _settings.cleanChapterTitle, (value) {
-                  _updateSettingsFromSheet(
-                    setPopupState,
-                    _settings.copyWith(cleanChapterTitle: value),
-                  );
-                }),
               ],
             ),
           ),
@@ -4308,18 +4432,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             title: '翻页手感',
             child: Column(
               children: [
-                _buildSliderSetting(
-                  '灵敏',
-                  _settings.pageTouchSlop.toDouble(),
-                  0,
-                  100,
-                  (val) {
-                    _updateSettingsFromSheet(
-                      setPopupState,
-                      _settings.copyWith(pageTouchSlop: val.toInt()),
-                    );
-                  },
-                  displayFormat: (v) => v.toInt().toString(),
+                _buildOptionRow(
+                  '翻页触发阈值',
+                  _touchSlopLabel(_settings.pageTouchSlop),
+                  () => _showPageTouchSlopPicker(setPopupState),
                 ),
               ],
             ),
@@ -4423,6 +4539,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     _settings.copyWith(keepScreenOn: value),
                   );
                 }),
+                _buildSwitchRow('净化章节标题', _settings.cleanChapterTitle, (value) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(cleanChapterTitle: value),
+                  );
+                }),
                 const SizedBox(height: 8),
                 _buildChineseConverterTypeSegment(
                   currentType: _settings.chineseConverterType,
@@ -4485,6 +4607,21 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       StateSetter setPopupState, ReadingSettings newSettings) {
     _updateSettings(newSettings);
     setPopupState(() {});
+  }
+
+  void _applyTipSelectionFromSheet(
+    StateSetter setPopupState, {
+    required ReaderTipSlot slot,
+    required int value,
+  }) {
+    _updateSettingsFromSheet(
+      setPopupState,
+      ReaderTipSelectionHelper.applySelection(
+        settings: _settings,
+        slot: slot,
+        selectedValue: value,
+      ),
+    );
   }
 
   Widget _buildSettingsCard({required String title, required Widget child}) {
@@ -4564,6 +4701,157 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           child: const Text('取消'),
         ),
       ),
+    );
+  }
+
+  Future<void> _showPageTouchSlopPicker(StateSetter setPopupState) async {
+    final controller =
+        TextEditingController(text: _settings.pageTouchSlop.toString());
+    final result = await showCupertinoDialog<int>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('翻页触发阈值'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            placeholder: '0 - 9999（0=系统默认）',
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () {
+              final raw = int.tryParse(controller.text.trim());
+              Navigator.pop(dialogContext, raw);
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null) return;
+    _updateSettingsFromSheet(
+      setPopupState,
+      _settings.copyWith(pageTouchSlop: result.clamp(0, 9999)),
+    );
+  }
+
+  String _touchSlopLabel(int value) {
+    return value == 0 ? '系统默认' : value.toString();
+  }
+
+  String _headerModeLabel(int value) {
+    switch (value) {
+      case ReadingSettings.headerModeShow:
+        return '显示';
+      case ReadingSettings.headerModeHide:
+        return '隐藏';
+      case ReadingSettings.headerModeHideWhenStatusBarShown:
+      default:
+        return '显示状态栏时隐藏';
+    }
+  }
+
+  String _footerModeLabel(int value) {
+    switch (value) {
+      case ReadingSettings.footerModeHide:
+        return '隐藏';
+      case ReadingSettings.footerModeShow:
+      default:
+        return '显示';
+    }
+  }
+
+  String _tipColorLabel(int value) {
+    if (value == ReadingSettings.tipColorFollowContent) {
+      return '同正文颜色';
+    }
+    return '#${_hexRgb(value)}';
+  }
+
+  String _tipDividerColorLabel(int value) {
+    if (value == ReadingSettings.tipDividerColorDefault) {
+      return '默认';
+    }
+    if (value == ReadingSettings.tipDividerColorFollowContent) {
+      return '同正文颜色';
+    }
+    return '#${_hexRgb(value)}';
+  }
+
+  String _hexRgb(int colorValue) {
+    final rgb = colorValue & 0x00FFFFFF;
+    return rgb.toRadixString(16).padLeft(6, '0').toUpperCase();
+  }
+
+  int? _parseRgbColor(String raw) {
+    var text = raw.trim();
+    if (text.isEmpty) return null;
+    if (text.startsWith('#')) {
+      text = text.substring(1);
+    }
+    if (text.startsWith('0x') || text.startsWith('0X')) {
+      text = text.substring(2);
+    }
+    if (text.length != 6) return null;
+    final rgb = int.tryParse(text, radix: 16);
+    if (rgb == null) return null;
+    return 0xFF000000 | rgb;
+  }
+
+  Future<void> _showTipColorInputDialog(
+    StateSetter setPopupState, {
+    required bool forDivider,
+  }) async {
+    final currentValue =
+        forDivider ? _settings.tipDividerColor : _settings.tipColor;
+    final initialHex = currentValue > 0 ? _hexRgb(currentValue) : '';
+    final controller = TextEditingController(text: initialHex);
+    final title = forDivider ? '分割线颜色' : '文字颜色';
+    final parsed = await showCupertinoDialog<int>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            textCapitalization: TextCapitalization.characters,
+            placeholder: '输入 6 位十六进制，如 FF6600',
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () {
+              final value = _parseRgbColor(controller.text);
+              if (value == null) {
+                _showToast('请输入 6 位十六进制颜色（如 FF6600）');
+                return;
+              }
+              Navigator.pop(dialogContext, value);
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (parsed == null) return;
+    _updateSettingsFromSheet(
+      setPopupState,
+      forDivider
+          ? _settings.copyWith(tipDividerColor: parsed)
+          : _settings.copyWith(tipColor: parsed),
     );
   }
 

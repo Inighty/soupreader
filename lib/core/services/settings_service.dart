@@ -19,11 +19,15 @@ class SettingsService {
   late SharedPreferences _prefs;
   late ReadingSettings _readingSettings;
   late AppSettings _appSettings;
+  final ValueNotifier<ReadingSettings> _readingSettingsNotifier =
+      ValueNotifier(const ReadingSettings());
   final ValueNotifier<AppSettings> _appSettingsNotifier =
       ValueNotifier(const AppSettings());
 
   ReadingSettings get readingSettings => _readingSettings;
   AppSettings get appSettings => _appSettings;
+  ValueListenable<ReadingSettings> get readingSettingsListenable =>
+      _readingSettingsNotifier;
   ValueListenable<AppSettings> get appSettingsListenable =>
       _appSettingsNotifier;
 
@@ -43,6 +47,7 @@ class SettingsService {
 
     await _migrateReadingSettingsSchema();
     await _normalizePageDirectionByMode();
+    _readingSettingsNotifier.value = _readingSettings;
 
     final appJson = _prefs.getString(_keyAppSettings);
     if (appJson != null) {
@@ -90,6 +95,7 @@ class SettingsService {
   Future<void> saveReadingSettings(ReadingSettings settings) async {
     final safeSettings = settings.sanitize();
     _readingSettings = safeSettings;
+    _readingSettingsNotifier.value = safeSettings;
     await _prefs.setString(
       _keyReadingSettings,
       json.encode(safeSettings.toJson()),

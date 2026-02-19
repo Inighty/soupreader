@@ -114,6 +114,29 @@ class ReaderSourceSwitchHelper {
     return <ReaderSourceSwitchCandidate>[...exact, ...fallback];
   }
 
+  static List<ReaderSourceSwitchCandidate> filterCandidates({
+    required List<ReaderSourceSwitchCandidate> candidates,
+    required String query,
+  }) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      return List<ReaderSourceSwitchCandidate>.from(
+        candidates,
+        growable: false,
+      );
+    }
+    final keyword = trimmed.toLowerCase();
+
+    bool containsKeyword(String raw) {
+      return raw.toLowerCase().contains(keyword);
+    }
+
+    return candidates.where((candidate) {
+      return containsKeyword(candidate.source.bookSourceName) ||
+          containsKeyword(candidate.book.lastChapter);
+    }).toList(growable: false);
+  }
+
   static String normalizeChapterTitle(String value) {
     return _pureChapterName(value);
   }

@@ -24,13 +24,6 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   late Map<String, int> _config;
   String? _selectedZone;
 
-  // 9宫格区域定义 (3x3)
-  static const List<String> _zones = [
-    'tl', 'tc', 'tr', // top-left, top-center, top-right
-    'ml', 'mc', 'mr', // middle-left, middle-center, middle-right
-    'bl', 'bc', 'br', // bottom-left, bottom-center, bottom-right
-  ];
-
   // 默认配置
   static const Map<String, int> _defaultConfig = ClickAction.defaultZoneConfig;
 
@@ -62,11 +55,9 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   @override
   void initState() {
     super.initState();
-    _config = Map<String, int>.from(widget.initialConfig);
-    // 填充缺失的区域
-    for (final zone in _zones) {
-      _config.putIfAbsent(zone, () => _defaultConfig[zone]!);
-    }
+    _config = ClickAction.normalizeConfig(
+      Map<String, int>.from(widget.initialConfig),
+    );
   }
 
   String _getZoneName(String zone) {
@@ -210,22 +201,6 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
             ),
           ),
           CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            minimumSize: const Size(30, 30),
-            onPressed: () {
-              widget.onSave(_config);
-              Navigator.pop(context);
-            },
-            child: Text(
-              '保存',
-              style: TextStyle(
-                color: _accent,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          CupertinoButton(
             padding: const EdgeInsets.all(6),
             minimumSize: const Size(30, 30),
             onPressed: () => Navigator.pop(context),
@@ -257,7 +232,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
           ),
           itemCount: 9,
           itemBuilder: (context, index) {
-            final zone = _zones[index];
+            final zone = ClickAction.zoneOrder[index];
             final action = _config[zone] ?? ClickAction.showMenu;
             final isSelected = _selectedZone == zone;
             final actionColor = _getActionColor(action);
@@ -345,10 +320,8 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
           final actionColor = _getActionColor(action);
           return CupertinoActionSheetAction(
             onPressed: () {
-              setState(() {
-                _config[zone] = action;
-                _selectedZone = null;
-              });
+              final next = Map<String, int>.from(_config)..[zone] = action;
+              _applyConfig(next);
               Navigator.pop(context);
             },
             child: Row(
@@ -383,10 +356,44 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   }
 
   void _resetToDefault() {
+    _applyConfig(
+      Map<String, int>.from(_defaultConfig),
+      showRecoveryNotice: false,
+    );
+  }
+
+  void _applyConfig(
+    Map<String, int> nextConfig, {
+    bool showRecoveryNotice = true,
+  }) {
+    final hadMenuZone = ClickAction.hasMenuZone(nextConfig);
+    final normalized = ClickAction.normalizeConfig(nextConfig);
+    final recoveredMenuZone =
+        !hadMenuZone && ClickAction.hasMenuZone(normalized);
     setState(() {
-      _config = Map<String, int>.from(_defaultConfig);
+      _config = normalized;
       _selectedZone = null;
     });
+    widget.onSave(Map<String, int>.from(normalized));
+    if (recoveredMenuZone && showRecoveryNotice) {
+      _showMenuRecoveryNotice();
+    }
+  }
+
+  void _showMenuRecoveryNotice() {
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('提示'),
+        content: const Text('\n当前没有配置菜单区域，已自动恢复中间区域为菜单。'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('好'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

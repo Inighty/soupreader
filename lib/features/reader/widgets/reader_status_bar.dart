@@ -81,8 +81,9 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
 
   @override
   Widget build(BuildContext context) {
-    // 如果隐藏页脚则不显示
-    if (widget.settings.hideFooter) return const SizedBox.shrink();
+    if (!widget.settings.shouldShowFooter()) {
+      return const SizedBox.shrink();
+    }
 
     return Positioned(
       bottom: 0,
@@ -251,11 +252,15 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
 
   bool get _isDarkTheme => widget.currentTheme.isDark;
 
-  Color get _textColor =>
-      widget.currentTheme.text.withValues(alpha: _isDarkTheme ? 0.5 : 0.62);
+  Color get _textColor => widget.settings.resolveTipTextColor(
+        widget.currentTheme.text,
+      );
 
-  Color get _lineColor =>
-      widget.currentTheme.text.withValues(alpha: _isDarkTheme ? 0.14 : 0.18);
+  Color get _lineColor => widget.settings.resolveTipDividerColor(
+        contentColor: _textColor,
+        defaultDividerColor: widget.currentTheme.text
+            .withValues(alpha: _isDarkTheme ? 0.14 : 0.18),
+      );
 
   TextStyle get _textStyle => TextStyle(
         color: _textColor,
@@ -334,7 +339,11 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.settings.hideHeader) return const SizedBox.shrink();
+    if (!widget.settings.shouldShowHeader(
+      showStatusBar: widget.settings.showStatusBar,
+    )) {
+      return const SizedBox.shrink();
+    }
 
     return Positioned(
       top: 0,
@@ -495,11 +504,15 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
 
   bool get _isDarkTheme => widget.currentTheme.isDark;
 
-  Color get _textColor =>
-      widget.currentTheme.text.withValues(alpha: _isDarkTheme ? 0.5 : 0.62);
+  Color get _textColor => widget.settings.resolveTipTextColor(
+        widget.currentTheme.text,
+      );
 
-  Color get _lineColor =>
-      widget.currentTheme.text.withValues(alpha: _isDarkTheme ? 0.14 : 0.18);
+  Color get _lineColor => widget.settings.resolveTipDividerColor(
+        contentColor: _textColor,
+        defaultDividerColor: widget.currentTheme.text
+            .withValues(alpha: _isDarkTheme ? 0.14 : 0.18),
+      );
 
   TextStyle get _textStyle => TextStyle(
         color: _textColor,

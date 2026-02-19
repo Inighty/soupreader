@@ -32,16 +32,37 @@ SearchResult _search({
   required String bookUrl,
   required String sourceUrl,
   required String sourceName,
+  String lastChapter = '',
 }) {
   return SearchResult(
     name: name,
     author: author,
     coverUrl: '',
     intro: '',
-    lastChapter: '',
+    lastChapter: lastChapter,
     bookUrl: bookUrl,
     sourceUrl: sourceUrl,
     sourceName: sourceName,
+  );
+}
+
+ReaderSourceSwitchCandidate _candidate({
+  required String sourceUrl,
+  required String sourceName,
+  required String author,
+  required String lastChapter,
+  required String bookUrl,
+}) {
+  return ReaderSourceSwitchCandidate(
+    source: _source(url: sourceUrl, name: sourceName),
+    book: _search(
+      name: '测试书',
+      author: author,
+      lastChapter: lastChapter,
+      bookUrl: bookUrl,
+      sourceUrl: sourceUrl,
+      sourceName: sourceName,
+    ),
   );
 }
 
@@ -179,6 +200,80 @@ void main() {
       searchResults: results,
     );
     expect(candidates.length, 1);
+  });
+
+  test('filterCandidates returns full list when query empty', () {
+    final candidates = <ReaderSourceSwitchCandidate>[
+      _candidate(
+        sourceUrl: 'https://source-a',
+        sourceName: '甲源',
+        author: '作者甲',
+        lastChapter: '第10章 夜雨',
+        bookUrl: 'https://book-a',
+      ),
+      _candidate(
+        sourceUrl: 'https://source-b',
+        sourceName: '乙源',
+        author: '作者乙',
+        lastChapter: '第20章 晨光',
+        bookUrl: 'https://book-b',
+      ),
+    ];
+
+    final filtered = ReaderSourceSwitchHelper.filterCandidates(
+      candidates: candidates,
+      query: '   ',
+    );
+
+    expect(filtered.length, 2);
+    expect(filtered.first.source.bookSourceName, '甲源');
+    expect(filtered.last.source.bookSourceName, '乙源');
+  });
+
+  test('filterCandidates supports source name and latest chapter matching', () {
+    final candidates = <ReaderSourceSwitchCandidate>[
+      _candidate(
+        sourceUrl: 'https://source-a',
+        sourceName: '星河书源',
+        author: '作者甲',
+        lastChapter: '第128章 深空',
+        bookUrl: 'https://book-a',
+      ),
+      _candidate(
+        sourceUrl: 'https://source-b',
+        sourceName: '晨光书源',
+        author: '作者乙',
+        lastChapter: '第129章 终章',
+        bookUrl: 'https://book-b',
+      ),
+      _candidate(
+        sourceUrl: 'https://source-c',
+        sourceName: '山海书源',
+        author: '作者丙',
+        lastChapter: '番外篇',
+        bookUrl: 'https://book-c',
+      ),
+    ];
+
+    final bySource = ReaderSourceSwitchHelper.filterCandidates(
+      candidates: candidates,
+      query: '晨光',
+    );
+    expect(bySource.length, 1);
+    expect(bySource.first.source.bookSourceName, '晨光书源');
+
+    final byChapter = ReaderSourceSwitchHelper.filterCandidates(
+      candidates: candidates,
+      query: '终章',
+    );
+    expect(byChapter.length, 1);
+    expect(byChapter.first.source.bookSourceName, '晨光书源');
+
+    final notFound = ReaderSourceSwitchHelper.filterCandidates(
+      candidates: candidates,
+      query: '不存在的关键字',
+    );
+    expect(notFound, isEmpty);
   });
 
   test('resolveTargetChapterIndex uses normalized title match', () {

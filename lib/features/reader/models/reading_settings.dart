@@ -12,7 +12,7 @@ class ReadingSettings {
   final int fontFamilyIndex; // 字体选择索引
   final PageTurnMode pageTurnMode;
   final bool keepScreenOn;
-  final bool showStatusBar; // 是否显示底部状态栏
+  final bool showStatusBar; // 是否显示系统状态栏
   final bool showBattery;
   final bool showTime;
   final bool showProgress;
@@ -45,10 +45,10 @@ class ReadingSettings {
   // 自动阅读
   final int autoReadSpeed; // 自动阅读速度 (1-100)
 
-  // === 翻页动画增强 ===
-  final int pageAnimDuration; // 翻页动画时长 (100-600ms)
+  // === 翻页动画 ===
+  final int pageAnimDuration; // 对标 legado：固定 300ms
   final PageDirection pageDirection; // 翻页方向 (水平/垂直)
-  final int pageTouchSlop; // 翻页触发灵敏度 (0-100, 百分比)
+  final int pageTouchSlop; // 翻页触发阈值（0=系统默认，1-9999=自定义）
   final bool noAnimScrollPage; // 滚动翻页无动画（对标 legado）
   final bool volumeKeyPage; // 音量键翻页
 
@@ -57,6 +57,10 @@ class ReadingSettings {
   final bool hideFooter; // 隐藏页脚
   final bool showHeaderLine; // 显示页眉分割线
   final bool showFooterLine; // 显示页脚分割线
+  final int headerMode; // 0:显示状态栏时隐藏 1:显示 2:隐藏
+  final int footerMode; // 0:显示 1:隐藏
+  final int tipColor; // 0:同正文颜色 其它:自定义色(ARGB)
+  final int tipDividerColor; // -1:默认 0:同正文颜色 其它:自定义色(ARGB)
   final int headerLeftContent; // 页眉左侧内容：0=书名 1=章节名 2=无
   final int headerCenterContent; // 页眉中间内容
   final int headerRightContent; // 页眉右侧内容
@@ -72,6 +76,15 @@ class ReadingSettings {
   static const int chineseConverterOff = 0;
   static const int chineseConverterTraditionalToSimplified = 1;
   static const int chineseConverterSimplifiedToTraditional = 2;
+  static const int legacyPageAnimDuration = 300;
+  static const int headerModeHideWhenStatusBarShown = 0;
+  static const int headerModeShow = 1;
+  static const int headerModeHide = 2;
+  static const int footerModeShow = 0;
+  static const int footerModeHide = 1;
+  static const int tipColorFollowContent = 0;
+  static const int tipDividerColorDefault = -1;
+  static const int tipDividerColorFollowContent = 0;
 
   const ReadingSettings({
     // 安装后默认值：尽量对齐 Legado 的阅读默认体验
@@ -112,8 +125,8 @@ class ReadingSettings {
     this.paddingRight = 22.0,
     this.clickActions = const {},
     this.autoReadSpeed = 10,
-    // 翻页动画增强默认值
-    this.pageAnimDuration = 300,
+    // 对标 legado：翻页动画时长固定为 300ms
+    this.pageAnimDuration = legacyPageAnimDuration,
     // 产品约束：除“滚动”以外的翻页模式一律水平；滚动模式由渲染层决定纵向滚动
     this.pageDirection = PageDirection.horizontal,
     this.pageTouchSlop = 0,
@@ -125,6 +138,10 @@ class ReadingSettings {
     this.hideFooter = false,
     this.showHeaderLine = true,
     this.showFooterLine = true,
+    this.headerMode = headerModeHideWhenStatusBarShown,
+    this.footerMode = footerModeShow,
+    this.tipColor = tipColorFollowContent,
+    this.tipDividerColor = tipDividerColorDefault,
     this.headerLeftContent = 3, // 时间
     this.headerCenterContent = 2, // 无
     this.headerRightContent = 4, // 电量
@@ -146,6 +163,53 @@ class ReadingSettings {
         horizontal: marginHorizontal,
         vertical: marginVertical,
       );
+
+  bool shouldShowHeader({required bool showStatusBar}) {
+    switch (headerMode) {
+      case headerModeShow:
+        return true;
+      case headerModeHide:
+        return false;
+      case headerModeHideWhenStatusBarShown:
+      default:
+        return !showStatusBar;
+    }
+  }
+
+  bool shouldShowFooter() {
+    return footerMode != footerModeHide;
+  }
+
+  Color resolveTipTextColor(Color contentColor) {
+    if (tipColor == tipColorFollowContent) {
+      return contentColor;
+    }
+    return Color(_normalizeColorInt(
+      tipColor,
+      fallback: tipColorFollowContent,
+      allowNegativeOne: false,
+      allowZero: true,
+    ));
+  }
+
+  Color resolveTipDividerColor({
+    required Color contentColor,
+    required Color defaultDividerColor,
+  }) {
+    final normalized = _normalizeColorInt(
+      tipDividerColor,
+      fallback: tipDividerColorDefault,
+      allowNegativeOne: true,
+      allowZero: true,
+    );
+    if (normalized == tipDividerColorDefault) {
+      return defaultDividerColor;
+    }
+    if (normalized == tipDividerColorFollowContent) {
+      return contentColor;
+    }
+    return Color(normalized);
+  }
 
   static double _toDouble(dynamic raw, double fallback) {
     if (raw is num && raw.isFinite) return raw.toDouble();
@@ -200,13 +264,43 @@ class ReadingSettings {
     return safeRaw.clamp(safeMin, safeMax).toInt();
   }
 
+  static int _normalizeColorInt(
+    int raw, {
+    required int fallback,
+    required bool allowNegativeOne,
+    required bool allowZero,
+  }) {
+    if (allowNegativeOne && raw == -1) {
+      return -1;
+    }
+    if (allowZero && raw == 0) {
+      return 0;
+    }
+    var value = raw;
+    if (value < 0) {
+      value = value & 0xFFFFFFFF;
+    }
+    if (value < 0 || value > 0xFFFFFFFF) {
+      return fallback;
+    }
+    if (value == 0 && !allowZero) {
+      return fallback;
+    }
+    if (value != 0xFFFFFFFF && (value & 0xFF000000) == 0) {
+      value = value | 0xFF000000;
+    }
+    return value;
+  }
+
   static Map<String, int> _parseClickActions(dynamic raw) {
-    if (raw is! Map) return const {};
+    if (raw is! Map) {
+      return ClickAction.normalizeConfig(const <String, int>{});
+    }
     final parsed = <String, int>{};
     for (final entry in raw.entries) {
       parsed[entry.key.toString()] = _toInt(entry.value, ClickAction.showMenu);
     }
-    return parsed;
+    return ClickAction.normalizeConfig(parsed);
   }
 
   static ProgressBarBehavior _parseProgressBarBehavior(
@@ -246,6 +340,24 @@ class ReadingSettings {
         : (legacyChineseTraditional
             ? chineseConverterSimplifiedToTraditional
             : chineseConverterOff);
+    final hasHeaderMode = json.containsKey('headerMode');
+    final hasFooterMode = json.containsKey('footerMode');
+    final hasHideHeader = json.containsKey('hideHeader');
+    final hasHideFooter = json.containsKey('hideFooter');
+    final parsedHeaderMode = hasHeaderMode
+        ? _toInt(json['headerMode'], headerModeHideWhenStatusBarShown)
+        : (hasHideHeader
+            ? (_toBool(json['hideHeader'], false)
+                ? headerModeHide
+                : headerModeShow)
+            : headerModeHideWhenStatusBarShown);
+    final parsedFooterMode = hasFooterMode
+        ? _toInt(json['footerMode'], footerModeShow)
+        : (hasHideFooter
+            ? (_toBool(json['hideFooter'], false)
+                ? footerModeHide
+                : footerModeShow)
+            : footerModeShow);
 
     return ReadingSettings(
       fontSize: _toDouble(json['fontSize'], 24.0),
@@ -288,17 +400,23 @@ class ReadingSettings {
       paddingRight: _toDouble(json['paddingRight'], 22.0),
       clickActions: _parseClickActions(json['clickActions']),
       autoReadSpeed: _toInt(json['autoReadSpeed'], 10),
-      // 翻页动画增强
-      pageAnimDuration: _toInt(json['pageAnimDuration'], 300),
+      // 对标 legado：翻页动画时长固定为 300ms（兼容读取旧字段但不生效）
+      pageAnimDuration: legacyPageAnimDuration,
       pageDirection: PageDirection.values[safePageDirectionIndex],
       pageTouchSlop: _toInt(json['pageTouchSlop'], 0),
       noAnimScrollPage: _toBool(json['noAnimScrollPage'], false),
       volumeKeyPage: _toBool(json['volumeKeyPage'], true),
       // 页眉/页脚配置
-      hideHeader: _toBool(json['hideHeader'], false),
-      hideFooter: _toBool(json['hideFooter'], false),
+      hideHeader:
+          _toBool(json['hideHeader'], parsedHeaderMode == headerModeHide),
+      hideFooter:
+          _toBool(json['hideFooter'], parsedFooterMode == footerModeHide),
       showHeaderLine: _toBool(json['showHeaderLine'], true),
       showFooterLine: _toBool(json['showFooterLine'], true),
+      headerMode: parsedHeaderMode,
+      footerMode: parsedFooterMode,
+      tipColor: _toInt(json['tipColor'], tipColorFollowContent),
+      tipDividerColor: _toInt(json['tipDividerColor'], tipDividerColorDefault),
       headerLeftContent: _toInt(json['headerLeftContent'], 3),
       headerCenterContent: _toInt(json['headerCenterContent'], 2),
       headerRightContent: _toInt(json['headerRightContent'], 4),
@@ -347,10 +465,10 @@ class ReadingSettings {
       'paddingBottom': paddingBottom,
       'paddingLeft': paddingLeft,
       'paddingRight': paddingRight,
-      'clickActions': clickActions,
+      'clickActions': ClickAction.normalizeConfig(clickActions),
       'autoReadSpeed': autoReadSpeed,
-      // 翻页动画增强
-      'pageAnimDuration': pageAnimDuration,
+      // 对标 legado：翻页动画时长固定 300ms
+      'pageAnimDuration': legacyPageAnimDuration,
       'pageDirection': pageDirection.index,
       'pageTouchSlop': pageTouchSlop,
       'noAnimScrollPage': noAnimScrollPage,
@@ -360,6 +478,10 @@ class ReadingSettings {
       'hideFooter': hideFooter,
       'showHeaderLine': showHeaderLine,
       'showFooterLine': showFooterLine,
+      'headerMode': headerMode,
+      'footerMode': footerMode,
+      'tipColor': tipColor,
+      'tipDividerColor': tipDividerColor,
       'headerLeftContent': headerLeftContent,
       'headerCenterContent': headerCenterContent,
       'headerRightContent': headerRightContent,
@@ -375,6 +497,18 @@ class ReadingSettings {
   }
 
   ReadingSettings sanitize() {
+    final safeHeaderMode = _safeInt(
+      headerMode,
+      min: headerModeHideWhenStatusBarShown,
+      max: headerModeHide,
+      fallback: headerModeHideWhenStatusBarShown,
+    );
+    final safeFooterMode = _safeInt(
+      footerMode,
+      min: footerModeShow,
+      max: footerModeHide,
+      fallback: footerModeShow,
+    );
     return ReadingSettings(
       fontSize: _safeDouble(
         fontSize,
@@ -473,18 +607,33 @@ class ReadingSettings {
         max: 120.0,
         fallback: 22.0,
       ),
-      clickActions: Map<String, int>.from(clickActions),
+      clickActions: ClickAction.normalizeConfig(
+        Map<String, int>.from(clickActions),
+      ),
       autoReadSpeed: _safeInt(autoReadSpeed, min: 1, max: 100, fallback: 10),
-      pageAnimDuration:
-          _safeInt(pageAnimDuration, min: 100, max: 600, fallback: 300),
+      pageAnimDuration: legacyPageAnimDuration,
       pageDirection: pageDirection,
-      pageTouchSlop: _safeInt(pageTouchSlop, min: 0, max: 100, fallback: 0),
+      pageTouchSlop: _safeInt(pageTouchSlop, min: 0, max: 9999, fallback: 0),
       noAnimScrollPage: noAnimScrollPage,
       volumeKeyPage: volumeKeyPage,
-      hideHeader: hideHeader,
-      hideFooter: hideFooter,
+      hideHeader: safeHeaderMode == headerModeHide,
+      hideFooter: safeFooterMode == footerModeHide,
       showHeaderLine: showHeaderLine,
       showFooterLine: showFooterLine,
+      headerMode: safeHeaderMode,
+      footerMode: safeFooterMode,
+      tipColor: _normalizeColorInt(
+        tipColor,
+        fallback: tipColorFollowContent,
+        allowNegativeOne: false,
+        allowZero: true,
+      ),
+      tipDividerColor: _normalizeColorInt(
+        tipDividerColor,
+        fallback: tipDividerColorDefault,
+        allowNegativeOne: true,
+        allowZero: true,
+      ),
       headerLeftContent:
           _safeInt(headerLeftContent, min: 0, max: 9, fallback: 3),
       headerCenterContent:
@@ -551,6 +700,10 @@ class ReadingSettings {
     bool? noAnimScrollPage,
     bool? volumeKeyPage,
     // 页眉/页脚配置
+    int? headerMode,
+    int? footerMode,
+    int? tipColor,
+    int? tipDividerColor,
     bool? hideHeader,
     bool? hideFooter,
     bool? showHeaderLine,
@@ -573,6 +726,14 @@ class ReadingSettings {
             : (chineseTraditional
                 ? chineseConverterSimplifiedToTraditional
                 : chineseConverterOff));
+    final resolvedHeaderMode = headerMode ??
+        (hideHeader == null
+            ? this.headerMode
+            : (hideHeader ? headerModeHide : headerModeShow));
+    final resolvedFooterMode = footerMode ??
+        (hideFooter == null
+            ? this.footerMode
+            : (hideFooter ? footerModeHide : footerModeShow));
 
     return ReadingSettings(
       fontSize: fontSize ?? this.fontSize,
@@ -617,10 +778,14 @@ class ReadingSettings {
       noAnimScrollPage: noAnimScrollPage ?? this.noAnimScrollPage,
       volumeKeyPage: volumeKeyPage ?? this.volumeKeyPage,
       // 页眉/页脚配置
-      hideHeader: hideHeader ?? this.hideHeader,
-      hideFooter: hideFooter ?? this.hideFooter,
+      hideHeader: resolvedHeaderMode == headerModeHide,
+      hideFooter: resolvedFooterMode == footerModeHide,
       showHeaderLine: showHeaderLine ?? this.showHeaderLine,
       showFooterLine: showFooterLine ?? this.showFooterLine,
+      headerMode: resolvedHeaderMode,
+      footerMode: resolvedFooterMode,
+      tipColor: tipColor ?? this.tipColor,
+      tipDividerColor: tipDividerColor ?? this.tipDividerColor,
       headerLeftContent: headerLeftContent ?? this.headerLeftContent,
       headerCenterContent: headerCenterContent ?? this.headerCenterContent,
       headerRightContent: headerRightContent ?? this.headerRightContent,
@@ -679,28 +844,93 @@ class ChineseConverterType {
 
 /// 点击动作类型
 class ClickAction {
+  static const int off = -1;
   static const int showMenu = 0;
   static const int nextPage = 1;
   static const int prevPage = 2;
   static const int nextChapter = 3;
   static const int prevChapter = 4;
+  static const int readAloudPrevParagraph = 5;
+  static const int readAloudNextParagraph = 6;
   static const int addBookmark = 7;
+  static const int editContent = 8;
+  static const int toggleReplaceRule = 9;
   static const int openChapterList = 10;
+  static const int searchContent = 11;
+  static const int syncBookProgress = 12;
+  static const int readAloudPauseResume = 13;
 
-  static const Map<String, int> defaultZoneConfig = {
+  static const List<String> zoneOrder = <String>[
+    'tl',
+    'tc',
+    'tr',
+    'ml',
+    'mc',
+    'mr',
+    'bl',
+    'bc',
+    'br',
+  ];
+
+  static const Map<String, int> defaultZoneConfig = <String, int>{
     'tl': prevPage,
-    'tc': showMenu,
+    'tc': prevPage,
     'tr': nextPage,
     'ml': prevPage,
     'mc': showMenu,
     'mr': nextPage,
     'bl': prevPage,
-    'bc': showMenu,
+    'bc': nextPage,
     'br': nextPage,
   };
 
+  static const List<int> allActions = <int>[
+    off,
+    showMenu,
+    nextPage,
+    prevPage,
+    nextChapter,
+    prevChapter,
+    readAloudPrevParagraph,
+    readAloudNextParagraph,
+    addBookmark,
+    editContent,
+    toggleReplaceRule,
+    openChapterList,
+    searchContent,
+    syncBookProgress,
+    readAloudPauseResume,
+  ];
+
+  static bool isValidAction(int action) => allActions.contains(action);
+
+  static bool hasMenuZone(Map<String, int> config) {
+    for (final zone in zoneOrder) {
+      if ((config[zone] ?? defaultZoneConfig[zone] ?? showMenu) == showMenu) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static Map<String, int> normalizeConfig(Map<String, int> rawConfig) {
+    final normalized = <String, int>{...defaultZoneConfig};
+    for (final zone in zoneOrder) {
+      if (!rawConfig.containsKey(zone)) continue;
+      final action = rawConfig[zone];
+      if (action == null) continue;
+      normalized[zone] = isValidAction(action) ? action : showMenu;
+    }
+    if (!hasMenuZone(normalized)) {
+      normalized['mc'] = showMenu;
+    }
+    return normalized;
+  }
+
   static String getName(int action) {
     switch (action) {
+      case off:
+        return '无';
       case showMenu:
         return '菜单';
       case nextPage:
@@ -711,24 +941,28 @@ class ClickAction {
         return '下一章';
       case prevChapter:
         return '上一章';
+      case readAloudPrevParagraph:
+        return '朗读上一段';
+      case readAloudNextParagraph:
+        return '朗读下一段';
       case addBookmark:
         return '书签';
+      case editContent:
+        return '编辑正文';
+      case toggleReplaceRule:
+        return '替换开关';
       case openChapterList:
         return '目录';
+      case searchContent:
+        return '搜索正文';
+      case syncBookProgress:
+        return '同步进度';
+      case readAloudPauseResume:
+        return '朗读暂停/继续';
       default:
-        return '菜单';
+        return '无';
     }
   }
-
-  static List<int> get allActions => [
-        showMenu,
-        nextPage,
-        prevPage,
-        nextChapter,
-        prevChapter,
-        addBookmark,
-        openChapterList,
-      ];
 }
 
 /// 翻页模式

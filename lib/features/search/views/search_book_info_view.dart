@@ -15,6 +15,7 @@ import '../../bookshelf/services/book_add_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../reader/services/chapter_title_display_helper.dart';
 import '../../reader/services/reader_source_switch_helper.dart';
+import '../../reader/widgets/source_switch_candidate_sheet.dart';
 import '../../reader/views/simple_reader_view.dart';
 import '../../replace/services/replace_rule_service.dart';
 import '../services/search_book_toc_filter_helper.dart';
@@ -892,33 +893,13 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       return;
     }
 
-    await showCupertinoModalPopup<void>(
+    final selected = await showSourceSwitchCandidateSheet(
       context: context,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: Text('换源（$keyword）'),
-        message: const Text('按“书名匹配 + 作者优先”筛选候选'),
-        actions: [
-          for (final candidate in candidates.take(16))
-            CupertinoActionSheetAction(
-              onPressed: () async {
-                Navigator.pop(sheetContext);
-                await _applySourceCandidate(candidate);
-              },
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '${candidate.source.bookSourceName} · ${candidate.book.author}',
-                  textAlign: TextAlign.left,
-                ),
-              ),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
-        ),
-      ),
+      keyword: keyword,
+      candidates: candidates,
     );
+    if (selected == null) return;
+    await _applySourceCandidate(selected);
   }
 
   Future<void> _applySourceCandidate(

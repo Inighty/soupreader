@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
 import '../models/reading_settings.dart';
 import 'package:battery_plus/battery_plus.dart';
@@ -27,7 +28,7 @@ class PagedReaderWidget extends StatefulWidget {
   // === 翻页动画增强 ===
   final int animDuration; // 动画时长 (100-600ms)
   final PageDirection pageDirection; // 翻页方向
-  final int pageTouchSlop; // 翻页触发灵敏度 (0-100)
+  final int pageTouchSlop; // 翻页触发阈值（0=系统默认，1-9999=自定义）
 
   static const double topOffset = 37;
   static const double bottomOffset = 37;
@@ -48,7 +49,7 @@ class PagedReaderWidget extends StatefulWidget {
     // 翻页动画增强默认值
     this.animDuration = 300,
     this.pageDirection = PageDirection.horizontal,
-    this.pageTouchSlop = 25,
+    this.pageTouchSlop = 0,
     this.enableGestures = true,
   });
 
@@ -95,9 +96,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // 页眉/页脚坐标使用稳定系统安全区，避免系统栏 inset 延迟变化导致分割线抖动
   EdgeInsets? _stableSystemPadding;
   Orientation? _stablePaddingOrientation;
-  bool? _stableShowStatusBar;
-  bool? _stableHideHeader;
-  bool? _stableHideFooter;
+  bool? _stableShowHeader;
+  bool? _stableShowFooter;
   bool _pendingSystemPaddingRefresh = false;
 
   // Shader Program
@@ -273,9 +273,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       }
       return;
     }
-    if (_needsPictureCache &&
-        widget.showStatusBar &&
-        widget.settings.showBattery) {
+    if (_needsPictureCache && _showAnyTipBar && widget.settings.showBattery) {
       _pendingPictureInvalidation = false;
       _invalidatePictures();
       _schedulePrecache();
@@ -299,13 +297,29 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       widget.pageTurnMode == PageTurnMode.cover ||
       widget.pageTurnMode == PageTurnMode.none;
 
-  double get _topOffset => (!widget.showStatusBar || widget.settings.hideHeader)
-      ? 0.0
-      : PagedReaderWidget.topOffset;
+  bool get _showHeader =>
+      widget.settings.shouldShowHeader(showStatusBar: widget.showStatusBar);
+  bool get _showFooter =>
+      widget.settings.shouldShowFooter();
+  bool get _showAnyTipBar => _showHeader || _showFooter;
+
+  Color get _tipTextColor {
+    final contentColor = widget.textStyle.color ?? const Color(0xff8B7961);
+    return widget.settings.resolveTipTextColor(contentColor);
+  }
+
+  Color get _tipDividerColor {
+    final defaultDivider = widget.textStyle.color?.withValues(alpha: 0.2) ??
+        const Color(0x4C8B7961);
+    return widget.settings.resolveTipDividerColor(
+      contentColor: _tipTextColor,
+      defaultDividerColor: defaultDivider,
+    );
+  }
+
+  double get _topOffset => _showHeader ? PagedReaderWidget.topOffset : 0.0;
   double get _bottomOffset =>
-      (!widget.showStatusBar || widget.settings.hideFooter)
-          ? 0.0
-          : PagedReaderWidget.bottomOffset;
+      _showFooter ? PagedReaderWidget.bottomOffset : 0.0;
 
   void _applyStableSystemPadding({
     required EdgeInsets padding,
@@ -313,9 +327,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }) {
     _stableSystemPadding = padding;
     _stablePaddingOrientation = orientation;
-    _stableShowStatusBar = widget.showStatusBar;
-    _stableHideHeader = widget.settings.hideHeader;
-    _stableHideFooter = widget.settings.hideFooter;
+    _stableShowHeader = _showHeader;
+    _stableShowFooter = _showFooter;
     _pendingSystemPaddingRefresh = false;
     _debugTrace(
       'apply_stable_padding top=${padding.top.toStringAsFixed(1)} bottom=${padding.bottom.toStringAsFixed(1)} orientation=$orientation',
@@ -340,9 +353,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final orientation = mediaQuery.orientation;
     final shouldRefresh = _stableSystemPadding == null ||
         _stablePaddingOrientation != orientation ||
-        _stableShowStatusBar != widget.showStatusBar ||
-        _stableHideHeader != widget.settings.hideHeader ||
-        _stableHideFooter != widget.settings.hideFooter;
+        _stableShowHeader != _showHeader ||
+        _stableShowFooter != _showFooter;
     if (shouldRefresh) {
       if (_isInteractionRunning && _stableSystemPadding != null) {
         _pendingSystemPaddingRefresh = true;
@@ -401,7 +413,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     }
 
     // 绘制状态栏
-    if (widget.showStatusBar) {
+    if (_showAnyTipBar) {
       _paintHeaderFooter(
         canvas,
         size,
@@ -421,14 +433,14 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     double bottomSafe, {
     required PageRenderPosition renderPosition,
   }) {
-    final statusColor = widget.textStyle.color?.withValues(alpha: 0.4) ??
-        const Color(0xff8B7961);
+    final statusColor = _tipTextColor;
+    final dividerColor = _tipDividerColor;
     final headerStyle =
         widget.textStyle.copyWith(fontSize: 12, color: statusColor);
     final footerStyle =
         widget.textStyle.copyWith(fontSize: 11, color: statusColor);
 
-    if (!widget.settings.hideHeader) {
+    if (_showHeader) {
       final y = topSafe + 6;
       _paintTipRow(
         canvas,
@@ -451,7 +463,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       if (widget.settings.showHeaderLine) {
         final lineY = y + headerStyle.fontSize!.toDouble() + 6;
         final paint = Paint()
-          ..color = statusColor.withValues(alpha: 0.2)
+          ..color = dividerColor
           ..strokeWidth = 0.5;
         canvas.drawLine(
           Offset(widget.padding.left, lineY),
@@ -461,7 +473,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       }
     }
 
-    if (!widget.settings.hideFooter) {
+    if (_showFooter) {
       final sample = _tipTextForFooter(
             widget.settings.footerLeftContent,
             renderPosition: renderPosition,
@@ -501,7 +513,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       if (widget.settings.showFooterLine) {
         final lineY = y - 6;
         final paint = Paint()
-          ..color = statusColor.withValues(alpha: 0.2)
+          ..color = dividerColor
           ..strokeWidth = 0.5;
         canvas.drawLine(
           Offset(widget.padding.left, lineY),
@@ -1099,8 +1111,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       ['bl', 'bc', 'br'],
     ];
     final zone = zones[row][col];
-    final config = Map<String, int>.from(ClickAction.defaultZoneConfig)
-      ..addAll(widget.clickActions);
+    final config = ClickAction.normalizeConfig(widget.clickActions);
     return config[zone] ?? ClickAction.showMenu;
   }
 
@@ -1876,7 +1887,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       final deltaX = (focusX - _startX).abs();
       final deltaY = (focusY - _startY).abs();
       final distance = deltaX * deltaX + deltaY * deltaY;
-      final slop = 5.0 + (widget.pageTouchSlop.clamp(0, 100) / 100) * 45.0;
+      // 对齐 legado：0 使用系统 touch slop；非 0 直接作为阈值像素。
+      final configuredSlop = widget.pageTouchSlop;
+      final slop = configuredSlop == 0 ? kTouchSlop : configuredSlop.toDouble();
       final slopSquare = slop * slop; // 触发阈值
 
       _isMoved = distance > slopSquare;
@@ -1992,7 +2005,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
               ),
             ),
           ),
-          if (widget.showStatusBar)
+          if (_showAnyTipBar)
             _buildOverlay(
               topSafe,
               bottomSafe,
@@ -2008,11 +2021,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     double bottomSafe, {
     required PageRenderSlot slot,
   }) {
-    if (widget.settings.hideHeader && widget.settings.hideFooter) {
+    if (!_showAnyTipBar) {
       return const SizedBox.shrink();
     }
-    final statusColor = widget.textStyle.color?.withValues(alpha: 0.4) ??
-        const Color(0xff8B7961);
+    final statusColor = _tipTextColor;
+    final dividerColor = _tipDividerColor;
     final renderPosition = _factory.resolveRenderPosition(slot);
 
     return IgnorePointer(
@@ -2026,7 +2039,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!widget.settings.hideHeader)
+            if (_showHeader)
               _buildTipRowWidget(
                 _tipTextForHeader(
                   widget.settings.headerLeftContent,
@@ -2042,24 +2055,24 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                 ),
                 widget.textStyle.copyWith(fontSize: 12, color: statusColor),
               ),
-            if (!widget.settings.hideHeader && widget.settings.showHeaderLine)
+            if (_showHeader && widget.settings.showHeaderLine)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Container(
                   height: 0.5,
-                  color: statusColor.withValues(alpha: 0.2),
+                  color: dividerColor,
                 ),
               ),
             const Expanded(child: SizedBox.shrink()),
-            if (!widget.settings.hideFooter && widget.settings.showFooterLine)
+            if (_showFooter && widget.settings.showFooterLine)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Container(
                   height: 0.5,
-                  color: statusColor.withValues(alpha: 0.2),
+                  color: dividerColor,
                 ),
               ),
-            if (!widget.settings.hideFooter)
+            if (_showFooter)
               _buildTipRowWidget(
                 _tipTextForFooter(
                   widget.settings.footerLeftContent,

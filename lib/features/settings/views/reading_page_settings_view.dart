@@ -40,15 +40,23 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
             header: const Text('翻页触发'),
             children: [
               CupertinoListTile.notched(
-                title: const Text('翻页触发灵敏度'),
-                additionalInfo: Text('${_settings.pageTouchSlop}%'),
+                title: const Text('翻页触发阈值'),
+                additionalInfo: Text(_touchSlopLabel),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _pickTouchSlop,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('滚动翻页无动画'),
+                trailing: CupertinoSwitch(
+                  value: _settings.noAnimScrollPage,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(noAnimScrollPage: v)),
+                ),
               ),
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('按键与文本'),
+            header: const Text('按键'),
             children: [
               CupertinoListTile.notched(
                 title: const Text('音量键翻页'),
@@ -56,14 +64,6 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
                   value: _settings.volumeKeyPage,
                   onChanged: (v) =>
                       _update(_settings.copyWith(volumeKeyPage: v)),
-                ),
-              ),
-              CupertinoListTile.notched(
-                title: const Text('净化章节标题'),
-                trailing: CupertinoSwitch(
-                  value: _settings.cleanChapterTitle,
-                  onChanged: (v) =>
-                      _update(_settings.copyWith(cleanChapterTitle: v)),
                 ),
               ),
             ],
@@ -80,13 +80,13 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
     final result = await showCupertinoDialog<int>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
-        title: const Text('翻页灵敏度 (%)'),
+        title: const Text('翻页触发阈值'),
         content: Padding(
           padding: const EdgeInsets.only(top: 12),
           child: CupertinoTextField(
             controller: controller,
             keyboardType: TextInputType.number,
-            placeholder: '0 - 100',
+            placeholder: '0 - 9999（0=系统默认）',
           ),
         ),
         actions: [
@@ -106,6 +106,11 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
       ),
     );
     if (result == null) return;
-    _update(_settings.copyWith(pageTouchSlop: result.clamp(0, 100)));
+    _update(_settings.copyWith(pageTouchSlop: result.clamp(0, 9999)));
+  }
+
+  String get _touchSlopLabel {
+    final value = _settings.pageTouchSlop;
+    return value == 0 ? '系统默认' : value.toString();
   }
 }

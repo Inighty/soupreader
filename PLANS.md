@@ -4,21 +4,21 @@
 
 ## 活跃计划
 
-1. `docs/plans/2026-02-19-legado-core-first-execplan.md`
-   - 标题：Legado -> SoupReader 核心优先迁移（iOS 优先）
+1. `docs/plans/2026-02-19-reader-core-config-parity-execplan.md`
+   - 标题：Legado -> SoupReader 核心链路与阅读器配置迁移（排版/交互一致）
    - 状态：`active`
-   - 口径：核心功能先完成；扩展能力记录并后续迭代；仿真翻页保留现有 Shader 实现
-2. `docs/plans/2026-02-19-legado-extension-roadmap-execplan.md`
-   - 标题：Legado -> SoupReader 扩展能力分期迁移（RSS/TTS/Dict/Android API）
-   - 状态：`active`
-   - 口径：在核心链路稳定基础上，按分期推进扩展能力，逐阶段提供可验证证据
+   - 口径：先完成核心链路与文本阅读配置迁移；排版一致性与交互一致性为阻塞验收门槛
+
+## 阻塞计划
+
+1. `docs/plans/2026-02-19-reader-extensions-blocked-execplan.md`
+   - 标题：Legado -> SoupReader 扩展阅读能力冻结（漫画/TTS/朗读引擎）
+   - 状态：`blocked`
+   - 口径：未收到“开始做扩展功能”指令前保持冻结，不得并行启动
 
 ## 已完成计划
 
-1. `docs/plans/2026-02-19-codex-monitor-landlock-execplan.md`
-   - 标题：Codex 监控脚本沙箱模式稳定化
-   - 状态：`done`
-   - 口径：默认使用 Full access 命令，避免 `workspace-write` 在 Landlock 环境下失败
+- 暂无
 
 ## 状态定义
 
