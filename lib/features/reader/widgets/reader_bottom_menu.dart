@@ -19,9 +19,12 @@ class ReaderBottomMenuNew extends StatefulWidget {
   final ValueChanged<ReadingSettings> onSettingsChanged;
   final VoidCallback onShowChapterList;
   final VoidCallback onShowReadAloud;
+  final VoidCallback? onReadAloudLongPress;
   final VoidCallback onShowInterfaceSettings;
   final VoidCallback onShowBehaviorSettings;
   final bool readBarStyleFollowPage;
+  final bool readAloudRunning;
+  final bool readAloudPaused;
 
   const ReaderBottomMenuNew({
     super.key,
@@ -37,9 +40,12 @@ class ReaderBottomMenuNew extends StatefulWidget {
     required this.onSettingsChanged,
     required this.onShowChapterList,
     required this.onShowReadAloud,
+    this.onReadAloudLongPress,
     required this.onShowInterfaceSettings,
     required this.onShowBehaviorSettings,
     this.readBarStyleFollowPage = false,
+    this.readAloudRunning = false,
+    this.readAloudPaused = false,
   });
 
   @override
@@ -52,6 +58,11 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   static const Key _brightnessPositionToggleKey = Key('reader_brightness_pos');
   static const double _brightnessPanelTopOffset = 78.0;
   static const double _brightnessPanelBottomOffset = 98.0;
+  static const double _brightnessPanelWidth = 42.0;
+  static const double _brightnessPanelButtonHeight = 40.0;
+  static const double _brightnessPanelMinHeight = 180.0;
+  static const double _brightnessPanelMaxHeight = 400.0;
+  static const double _brightnessSliderMaxLength = 320.0;
 
   bool _isDragging = false;
   double _dragValue = 0;
@@ -258,109 +269,145 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         : AppDesignTokens.brandPrimary;
     final autoBrightness = widget.settings.useSystemBrightness;
     final iconColor = autoBrightness ? accent : mutedForeground;
-    final panelColor = panelBg.withValues(alpha: _isDarkMode ? 0.48 : 0.66);
+    // legado 亮度栏语义保持不变：顶部自动亮度 + 中段滑杆 + 底部左右切换。
+    // 仅限制面板可见高度，避免长屏设备出现过长白条。
+    final panelColor = panelBg.withValues(alpha: _isDarkMode ? 0.56 : 0.50);
 
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Container(
-        key: _brightnessPanelKey,
-        width: 42,
-        decoration: BoxDecoration(
-          color: panelColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: borderColor,
-          ),
-        ),
-        child: Column(
-          children: [
-            GestureDetector(
-              key: _brightnessAutoToggleKey,
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                widget.onSettingsChanged(
-                  widget.settings.copyWith(
-                    useSystemBrightness: !widget.settings.useSystemBrightness,
-                  ),
-                );
-              },
-              child: SizedBox(
-                width: 42,
-                height: 40,
-                child: Icon(
-                  CupertinoIcons.brightness,
-                  size: 22,
-                  color: iconColor,
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final rawAvailableHeight = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : _brightnessPanelMaxHeight;
+        final availableHeight = rawAvailableHeight.clamp(
+          0.0,
+          double.infinity,
+        ).toDouble();
+        final panelHeight = availableHeight < _brightnessPanelMinHeight
+            ? availableHeight
+            : availableHeight.clamp(
+                _brightnessPanelMinHeight,
+                _brightnessPanelMaxHeight,
+              ).toDouble();
+        final sliderRegionHeight = (panelHeight - _brightnessPanelButtonHeight * 2)
+            .clamp(0.0, _brightnessSliderMaxLength)
+            .toDouble();
+
+        return Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            key: _brightnessPanelKey,
+            width: _brightnessPanelWidth,
+            height: panelHeight,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: panelColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: borderColor),
               ),
-            ),
-            Expanded(
-              child: IgnorePointer(
-                ignoring: autoBrightness,
-                child: Opacity(
-                  opacity: autoBrightness ? 0.35 : 1.0,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final sliderLength = (constraints.maxHeight - 6)
-                          .clamp(64.0, 320.0)
-                          .toDouble();
-                      return Center(
-                        child: SizedBox(
-                          width: sliderLength,
-                          child: RotatedBox(
-                            quarterTurns: 3,
-                            child: CupertinoSlider(
-                              value: _safeFinite(
-                                widget.settings.brightness,
-                                fallback: 1.0,
-                              ).clamp(0.0, 1.0).toDouble(),
-                              min: 0.0,
-                              max: 1.0,
-                              activeColor: accent,
-                              thumbColor:
-                                  _isDarkMode ? CupertinoColors.white : accent,
-                              onChanged: (value) {
-                                widget.onSettingsChanged(
-                                  widget.settings.copyWith(brightness: value),
-                                );
-                              },
-                            ),
-                          ),
+              child: Column(
+                children: [
+                  GestureDetector(
+                    key: _brightnessAutoToggleKey,
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      widget.onSettingsChanged(
+                        widget.settings.copyWith(
+                          useSystemBrightness:
+                              !widget.settings.useSystemBrightness,
                         ),
                       );
                     },
+                    child: SizedBox(
+                      width: _brightnessPanelWidth,
+                      height: _brightnessPanelButtonHeight,
+                      child: Icon(
+                        CupertinoIcons.brightness,
+                        size: 22,
+                        color: iconColor,
+                      ),
+                    ),
                   ),
-                ),
+                  SizedBox(
+                    height: sliderRegionHeight,
+                    child: IgnorePointer(
+                      ignoring: autoBrightness,
+                      child: Opacity(
+                        opacity: autoBrightness ? 0.35 : 1.0,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final sliderLength = (constraints.maxHeight - 6)
+                                .clamp(24.0, _brightnessSliderMaxLength)
+                                .toDouble();
+                            return Center(
+                              child: SizedBox(
+                                width: sliderLength,
+                                child: RotatedBox(
+                                  quarterTurns: 3,
+                                  child: CupertinoSlider(
+                                    value: _safeFinite(
+                                      widget.settings.brightness,
+                                      fallback: 1.0,
+                                    ).clamp(0.0, 1.0).toDouble(),
+                                    min: 0.0,
+                                    max: 1.0,
+                                    activeColor: accent,
+                                    thumbColor: _isDarkMode
+                                        ? CupertinoColors.white
+                                        : accent,
+                                    onChanged: (value) {
+                                      widget.onSettingsChanged(
+                                        widget.settings
+                                            .copyWith(brightness: value),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    key: _brightnessPositionToggleKey,
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      widget.onSettingsChanged(
+                        widget.settings.copyWith(
+                          brightnessViewOnRight:
+                              !widget.settings.brightnessViewOnRight,
+                        ),
+                      );
+                    },
+                    child: SizedBox(
+                      width: _brightnessPanelWidth,
+                      height: _brightnessPanelButtonHeight,
+                      child: Icon(
+                        CupertinoIcons.arrow_left_right,
+                        size: 20,
+                        color: foreground,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            GestureDetector(
-              key: _brightnessPositionToggleKey,
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                widget.onSettingsChanged(
-                  widget.settings.copyWith(
-                    brightnessViewOnRight:
-                        !widget.settings.brightnessViewOnRight,
-                  ),
-                );
-              },
-              child: SizedBox(
-                width: 42,
-                height: 40,
-                child: Icon(
-                  CupertinoIcons.arrow_left_right,
-                  size: 20,
-                  color: foreground,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildBottomTabs({required Color foreground}) {
+    final readAloudActive = widget.readAloudRunning;
+    final readAloudIcon = widget.readAloudPaused
+        ? CupertinoIcons.pause_circle
+        : CupertinoIcons.speaker_2_fill;
+    final accent = _isDarkMode
+        ? AppDesignTokens.brandSecondary
+        : AppDesignTokens.brandPrimary;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 6, top: 1),
       child: Row(
@@ -375,9 +422,12 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
           const Spacer(flex: 2),
           _buildTabItem(
             foreground: foreground,
-            icon: CupertinoIcons.speaker_2_fill,
+            icon: readAloudIcon,
             label: '朗读',
             onTap: widget.onShowReadAloud,
+            onLongPress: widget.onReadAloudLongPress,
+            active: readAloudActive,
+            activeColor: accent,
           ),
           const Spacer(flex: 2),
           _buildTabItem(
@@ -404,12 +454,17 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    VoidCallback? onLongPress,
+    bool active = false,
+    Color? activeColor,
   }) {
+    final contentColor = active ? (activeColor ?? foreground) : foreground;
     return SizedBox(
       width: 60,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.only(bottom: 7),
           child: Column(
@@ -421,7 +476,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                   child: Icon(
                     icon,
                     size: 19,
-                    color: foreground,
+                    color: contentColor,
                   ),
                 ),
               ),
@@ -432,8 +487,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 11.5,
-                  color: foreground,
-                  fontWeight: FontWeight.w600,
+                  color: contentColor,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w600,
                 ),
               ),
             ],

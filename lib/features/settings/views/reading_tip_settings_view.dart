@@ -7,6 +7,7 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../reader/services/reader_tip_selection_helper.dart';
+import '../../reader/widgets/reader_color_picker_dialog.dart';
 
 class ReadingTipSettingsView extends StatefulWidget {
   const ReadingTipSettingsView({super.key});
@@ -385,55 +386,15 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
     return rgb.toRadixString(16).padLeft(6, '0').toUpperCase();
   }
 
-  int? _parseRgb(String raw) {
-    var text = raw.trim();
-    if (text.isEmpty) return null;
-    if (text.startsWith('#')) {
-      text = text.substring(1);
-    }
-    if (text.startsWith('0x') || text.startsWith('0X')) {
-      text = text.substring(2);
-    }
-    if (text.length != 6) return null;
-    final rgb = int.tryParse(text, radix: 16);
-    if (rgb == null) return null;
-    return 0xFF000000 | rgb;
-  }
-
   Future<void> _showColorInputDialog({required bool forDivider}) async {
     final currentValue =
         forDivider ? _settings.tipDividerColor : _settings.tipColor;
-    final initialHex = currentValue > 0 ? _hexRgb(currentValue) : '';
-    final controller = TextEditingController(text: initialHex);
-    final parsed = await showCupertinoDialog<int>(
+    final parsed = await showReaderColorPickerDialog(
       context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(forDivider ? '分割线颜色' : '文字颜色'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            textCapitalization: TextCapitalization.characters,
-            placeholder: '输入 6 位十六进制，如 FF6600',
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            onPressed: () {
-              final value = _parseRgb(controller.text);
-              if (value == null) return;
-              Navigator.pop(ctx, value);
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+      title: forDivider ? '分割线颜色' : '文字颜色',
+      initialColor: currentValue > 0 ? currentValue : 0xFFADADAD,
+      invalidHexMessage: '请输入 6 位十六进制颜色（如 FF6600）',
     );
-    controller.dispose();
     if (parsed == null) return;
     _update(
       forDivider

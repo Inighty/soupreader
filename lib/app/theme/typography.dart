@@ -1,13 +1,13 @@
 import 'package:flutter/painting.dart';
 
 /// SoupReader 字体样式系统
-/// 使用 Noto Serif TC (标题) + Noto Sans TC (正文)
+/// 对齐 legado 系统字体语义：默认/衬线/无衬线/等宽。
 class AppTypography {
   AppTypography._();
 
   // ===== 字体族 =====
-  static const String fontFamilySerif = 'NotoSerifTC';
-  static const String fontFamilySans = 'NotoSansTC';
+  static const String fontFamilySerif = 'serif';
+  static const String fontFamilySans = 'sans-serif';
   static const String fontFamilySystem = '.SF Pro Text'; // iOS系统字体
 
   // ===== 标题样式 =====
@@ -168,14 +168,15 @@ class ReadingFontSize {
 /// 阅读字体预设
 class ReadingFontFamily {
   static const String system = ''; // 系统默认
-  static const String notoSerif = 'NotoSerifTC';
-  static const String notoSans = 'NotoSansTC';
-  static const String sourceHanMono = 'SourceHanMono';
+  // 对齐 legado 的系统字体语义，避免引用未注册字体导致回退失效。
+  static const String notoSerif = 'serif';
+  static const String notoSans = 'sans-serif';
+  static const String sourceHanMono = 'monospace';
 
   static const List<ReadingFontConfig> presets = [
     ReadingFontConfig(name: '系统默认', fontFamily: system),
-    ReadingFontConfig(name: '思源宋体', fontFamily: notoSerif),
-    ReadingFontConfig(name: '思源黑体', fontFamily: notoSans),
+    ReadingFontConfig(name: '衬线字体', fontFamily: notoSerif),
+    ReadingFontConfig(name: '无衬线字体', fontFamily: notoSans),
     ReadingFontConfig(name: '等宽字体', fontFamily: sourceHanMono),
   ];
 

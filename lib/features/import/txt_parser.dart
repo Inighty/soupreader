@@ -34,32 +34,84 @@ class TxtParser {
   ];
 
   /// 从文件路径导入 TXT
-  static Future<TxtImportResult> importFromFile(String filePath) async {
+  static Future<TxtImportResult> importFromFile(
+    String filePath, {
+    String? forcedCharset,
+  }) async {
     final file = File(filePath);
     if (!await file.exists()) {
       throw Exception('文件不存在: $filePath');
     }
 
     final bytes = await file.readAsBytes();
-    final content = _decodeContent(bytes);
+    final decoded = _decodeContent(bytes, forcedCharset: forcedCharset);
     final fileName = file.path.split(Platform.pathSeparator).last;
     final bookName =
         fileName.replaceAll(RegExp(r'\.txt$', caseSensitive: false), '');
 
-    return _parseContent(content, bookName, filePath);
+    return _parseContent(
+      decoded.content,
+      bookName,
+      filePath,
+      charset: decoded.charset,
+    );
   }
 
   /// 从字节数据导入（iOS 使用）
-  static TxtImportResult importFromBytes(Uint8List bytes, String fileName) {
-    final content = _decodeContent(bytes);
+  static TxtImportResult importFromBytes(
+    Uint8List bytes,
+    String fileName, {
+    String? forcedCharset,
+  }) {
+    final decoded = _decodeContent(bytes, forcedCharset: forcedCharset);
     final bookName =
         fileName.replaceAll(RegExp(r'\.txt$', caseSensitive: false), '');
-    return _parseContent(content, bookName, null);
+    return _parseContent(
+      decoded.content,
+      bookName,
+      null,
+      charset: decoded.charset,
+    );
+  }
+
+  /// 以既有书籍 ID 重解析 TXT（用于阅读器设置编码后的重载）。
+  static Future<TxtImportResult> reparseFromFile({
+    required String filePath,
+    required String bookId,
+    required String bookName,
+    String? forcedCharset,
+  }) async {
+    final file = File(filePath);
+    if (!await file.exists()) {
+      throw Exception('文件不存在: $filePath');
+    }
+    final bytes = await file.readAsBytes();
+    final decoded = _decodeContent(bytes, forcedCharset: forcedCharset);
+    return _parseContent(
+      decoded.content,
+      bookName,
+      filePath,
+      charset: decoded.charset,
+      forcedBookId: bookId,
+    );
   }
 
   /// 自动检测编码并解码
-  static String _decodeContent(Uint8List bytes) {
-    if (bytes.isEmpty) return '';
+  static _DecodedTxtContent _decodeContent(
+    Uint8List bytes, {
+    String? forcedCharset,
+  }) {
+    if (bytes.isEmpty) {
+      return const _DecodedTxtContent(
+        content: '',
+        charset: 'UTF-8',
+      );
+    }
+
+    final normalizedForced = _normalizeForcedCharset(forcedCharset);
+    if (normalizedForced != null) {
+      return _decodeContentByCharset(bytes, normalizedForced);
+    }
 
     // 检测 BOM
     if (bytes.length >= 3 &&
@@ -67,29 +119,154 @@ class TxtParser {
         bytes[1] == 0xBB &&
         bytes[2] == 0xBF) {
       // UTF-8 with BOM
-      return utf8.decode(bytes.sublist(3));
+      return _DecodedTxtContent(
+        content: utf8.decode(bytes.sublist(3), allowMalformed: true),
+        charset: 'UTF-8',
+      );
     }
     if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
       // UTF-16 LE BOM
-      return _decodeUtf16(bytes.sublist(2), littleEndian: true);
+      return _DecodedTxtContent(
+        content: _decodeUtf16(bytes.sublist(2), littleEndian: true),
+        charset: 'UTF-16LE',
+      );
     }
     if (bytes.length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
       // UTF-16 BE BOM
-      return _decodeUtf16(bytes.sublist(2), littleEndian: false);
+      return _DecodedTxtContent(
+        content: _decodeUtf16(bytes.sublist(2), littleEndian: false),
+        charset: 'UTF-16',
+      );
     }
 
     // 优先 UTF-8（对标 legado：优先使用探测结果中的 Unicode 编码）
     try {
-      return utf8.decode(bytes, allowMalformed: false);
+      return _DecodedTxtContent(
+        content: utf8.decode(bytes, allowMalformed: false),
+        charset: 'UTF-8',
+      );
     } catch (_) {}
 
     // 非 UTF-8 时，优先按 GBK 解码（中文 TXT 常见；对齐 legado 的编码探测目标）
     try {
-      return gbk.decode(bytes, allowMalformed: true);
+      return _DecodedTxtContent(
+        content: gbk.decode(bytes, allowMalformed: true),
+        charset: 'GBK',
+      );
     } catch (_) {}
 
     // 最后回退：UTF-8 容错，尽量不崩溃
-    return utf8.decode(bytes, allowMalformed: true);
+    return _DecodedTxtContent(
+      content: utf8.decode(bytes, allowMalformed: true),
+      charset: 'UTF-8',
+    );
+  }
+
+  static String? _normalizeForcedCharset(String? raw) {
+    final value = (raw ?? '').trim();
+    if (value.isEmpty) return null;
+    final upper = value.toUpperCase().replaceAll('_', '-');
+    switch (upper) {
+      case 'UTF8':
+      case 'UTF-8':
+        return 'UTF-8';
+      case 'GB2312':
+        return 'GB2312';
+      case 'GB18030':
+        return 'GB18030';
+      case 'GBK':
+        return 'GBK';
+      case 'UNICODE':
+        return 'Unicode';
+      case 'UTF16':
+      case 'UTF-16':
+        return 'UTF-16';
+      case 'UTF16LE':
+      case 'UTF-16LE':
+        return 'UTF-16LE';
+      case 'ASCII':
+        return 'ASCII';
+      default:
+        return value;
+    }
+  }
+
+  static _DecodedTxtContent _decodeContentByCharset(
+    Uint8List bytes,
+    String charset,
+  ) {
+    try {
+      final upper = charset.toUpperCase();
+      switch (upper) {
+        case 'UTF-8':
+          final noBom = _trimUtf8Bom(bytes);
+          return _DecodedTxtContent(
+            content: utf8.decode(noBom, allowMalformed: true),
+            charset: 'UTF-8',
+          );
+        case 'GB2312':
+        case 'GB18030':
+        case 'GBK':
+          return _DecodedTxtContent(
+            content: gbk.decode(bytes, allowMalformed: true),
+            charset: upper,
+          );
+        case 'UNICODE':
+        case 'UTF-16':
+          if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
+            return _DecodedTxtContent(
+              content: _decodeUtf16(bytes.sublist(2), littleEndian: true),
+              charset: 'UTF-16LE',
+            );
+          }
+          if (bytes.length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
+            return _DecodedTxtContent(
+              content: _decodeUtf16(bytes.sublist(2), littleEndian: false),
+              charset: 'UTF-16',
+            );
+          }
+          return _DecodedTxtContent(
+            content: _decodeUtf16(bytes, littleEndian: true),
+            charset: 'UTF-16',
+          );
+        case 'UTF-16LE':
+          if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
+            return _DecodedTxtContent(
+              content: _decodeUtf16(bytes.sublist(2), littleEndian: true),
+              charset: 'UTF-16LE',
+            );
+          }
+          return _DecodedTxtContent(
+            content: _decodeUtf16(bytes, littleEndian: true),
+            charset: 'UTF-16LE',
+          );
+        case 'ASCII':
+          return _DecodedTxtContent(
+            content: ascii.decode(bytes, allowInvalid: true),
+            charset: 'ASCII',
+          );
+        default:
+          return _DecodedTxtContent(
+            content: utf8.decode(bytes, allowMalformed: true),
+            charset: charset,
+          );
+      }
+    } catch (_) {
+      return _DecodedTxtContent(
+        content: utf8.decode(bytes, allowMalformed: true),
+        charset: charset,
+      );
+    }
+  }
+
+  static Uint8List _trimUtf8Bom(Uint8List bytes) {
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xEF &&
+        bytes[1] == 0xBB &&
+        bytes[2] == 0xBF) {
+      return bytes.sublist(3);
+    }
+    return bytes;
   }
 
   static String _decodeUtf16(
@@ -110,7 +287,12 @@ class TxtParser {
 
   /// 解析内容
   static TxtImportResult _parseContent(
-      String content, String bookName, String? filePath) {
+    String content,
+    String bookName,
+    String? filePath, {
+    required String charset,
+    String? forcedBookId,
+  }) {
     // 清理内容 - 统一换行符
     content = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
@@ -118,7 +300,7 @@ class TxtParser {
     final chapters = _splitChapters(content);
 
     // 创建书籍
-    final bookId = _uuid.v4();
+    final bookId = forcedBookId ?? _uuid.v4();
     final book = Book(
       id: bookId,
       title: bookName,
@@ -143,7 +325,11 @@ class TxtParser {
       );
     }).toList();
 
-    return TxtImportResult(book: book, chapters: chapterList);
+    return TxtImportResult(
+      book: book,
+      chapters: chapterList,
+      charset: charset,
+    );
   }
 
   /// TXT 段落归一化（对标 Legado 的“按段落阅读”的体验，而非逐行阅读）。
@@ -288,7 +474,8 @@ class TxtParser {
     // 是否主要为中文内容：中文小说里“去掉段落内空白”更接近 legado；
     // 英文内容则保留空格，避免单词黏连。
     final cjkPreferred = _isPredominantlyCjk(lines.take(80).join('\n'));
-    final innerSpaceRegex = RegExp(r'[\u3000\s]+', multiLine: true); // 对齐 legado
+    final innerSpaceRegex =
+        RegExp(r'[\u3000\s]+', multiLine: true); // 对齐 legado
 
     void flushParagraph() {
       final p = paragraph.trim();
@@ -334,7 +521,8 @@ class TxtParser {
       }
 
       // 继续黏合：中文直接拼接；英文/数字用 smart join 避免单词黏连
-      paragraph = cjkPreferred ? '$paragraph$line' : _smartJoin(paragraph, line);
+      paragraph =
+          cjkPreferred ? '$paragraph$line' : _smartJoin(paragraph, line);
     }
 
     flushParagraph();
@@ -368,9 +556,7 @@ class TxtParser {
       }
 
       // 处理 “。”后紧跟右引号 的常见情况：。” / ?” / !”
-      if (_isRightQuote(ch) &&
-          i >= 1 &&
-          _isSentenceEndChar(paragraph[i - 1])) {
+      if (_isRightQuote(ch) && i >= 1 && _isSentenceEndChar(paragraph[i - 1])) {
         if (i + 1 < paragraph.length && paragraph[i + 1] != '\n') {
           sb.write('\n');
           sinceBreak = 0;
@@ -504,6 +690,21 @@ class _ChapterInfo {
 class TxtImportResult {
   final Book book;
   final List<Chapter> chapters;
+  final String charset;
 
-  TxtImportResult({required this.book, required this.chapters});
+  TxtImportResult({
+    required this.book,
+    required this.chapters,
+    required this.charset,
+  });
+}
+
+class _DecodedTxtContent {
+  final String content;
+  final String charset;
+
+  const _DecodedTxtContent({
+    required this.content,
+    required this.charset,
+  });
 }

@@ -12,13 +12,8 @@ class ReaderTopMenu extends StatelessWidget {
   final VoidCallback onOpenBookInfo;
   final VoidCallback onOpenChapterLink;
   final VoidCallback onToggleChapterLinkOpenMode;
-  final VoidCallback onShowChapterList;
-  final VoidCallback onSearchContent;
   final VoidCallback onShowSourceActions;
-  final VoidCallback onToggleCleanChapterTitle;
-  final VoidCallback onRefreshChapter;
   final VoidCallback onShowMoreMenu;
-  final bool cleanChapterTitleEnabled;
   final bool showSourceAction;
   final bool showChapterLink;
   final bool showTitleAddition;
@@ -34,13 +29,8 @@ class ReaderTopMenu extends StatelessWidget {
     required this.onOpenBookInfo,
     required this.onOpenChapterLink,
     required this.onToggleChapterLinkOpenMode,
-    required this.onShowChapterList,
-    required this.onSearchContent,
     required this.onShowSourceActions,
-    required this.onToggleCleanChapterTitle,
-    required this.onRefreshChapter,
     required this.onShowMoreMenu,
-    required this.cleanChapterTitleEnabled,
     this.showSourceAction = true,
     this.showChapterLink = true,
     this.showTitleAddition = true,
@@ -51,9 +41,6 @@ class ReaderTopMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final horizontalPadding =
         MediaQuery.of(context).size.width < 390 ? 8.0 : 12.0;
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final accent =
-        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
     final source = sourceName?.trim() ?? '';
     final chapterLabel = chapterTitle.trim().isEmpty ? '暂无章节' : chapterTitle;
     final chapterUrlLabel = chapterUrl?.trim() ?? '';
@@ -83,7 +70,7 @@ class ReaderTopMenu extends StatelessWidget {
           top: MediaQuery.of(context).padding.top + 7,
           left: horizontalPadding,
           right: horizontalPadding,
-          bottom: 8,
+          bottom: 10,
         ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -104,22 +91,22 @@ class ReaderTopMenu extends StatelessWidget {
             ),
           ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _buildRoundIcon(
-              icon: CupertinoIcons.back,
-              onTap: () => Navigator.pop(context),
-              iconColor: menuPrimaryText,
-              backgroundColor: controlBg,
-              borderColor: controlBorder,
-            ),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  GestureDetector(
+            Row(
+              children: [
+                _buildRoundIcon(
+                  icon: CupertinoIcons.back,
+                  onTap: () => Navigator.pop(context),
+                  iconColor: menuPrimaryText,
+                  backgroundColor: controlBg,
+                  borderColor: controlBorder,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: onOpenBookInfo,
                     child: Text(
@@ -128,101 +115,78 @@ class ReaderTopMenu extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: menuPrimaryText,
-                        fontSize: 15,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                  if (showTitleAddition) ...[
-                    const SizedBox(height: 1),
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: onOpenChapterLink,
-                      onLongPress: onToggleChapterLinkOpenMode,
-                      child: Text(
-                        chapterLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: menuSecondaryText,
-                          fontSize: 11.5,
+                ),
+                const SizedBox(width: 8),
+                _buildRoundIcon(
+                  icon: CupertinoIcons.ellipsis,
+                  onTap: onShowMoreMenu,
+                  iconColor: menuPrimaryText,
+                  backgroundColor: controlBg,
+                  borderColor: controlBorder,
+                ),
+              ],
+            ),
+            if (showTitleAddition) ...[
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onOpenChapterLink,
+                          onLongPress: onToggleChapterLinkOpenMode,
+                          child: Text(
+                            chapterLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: menuSecondaryText,
+                              fontSize: 12.5,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (hasChapterUrl) ...[
+                          const SizedBox(height: 1),
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: onOpenChapterLink,
+                            onLongPress: onToggleChapterLinkOpenMode,
+                            child: Text(
+                              chapterUrlLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: menuTertiaryText,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (showSourceAction) ...[
+                    const SizedBox(width: 8),
+                    _buildSourceActionChip(
+                      label: sourceActionLabel,
+                      onTap: onShowSourceActions,
+                      textColor: menuPrimaryText,
+                      backgroundColor: controlBg,
+                      borderColor: controlBorder,
                     ),
                   ],
-                  if (hasChapterUrl)
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: onOpenChapterLink,
-                      onLongPress: onToggleChapterLinkOpenMode,
-                      child: Text(
-                        chapterUrlLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: menuTertiaryText,
-                          fontSize: 10.5,
-                        ),
-                      ),
-                    ),
                 ],
               ),
-            ),
-            const SizedBox(width: 5),
-            if (showSourceAction && showTitleAddition) ...[
-              _buildActionChip(
-                label: sourceActionLabel,
-                onTap: onShowSourceActions,
-                active: false,
-                accent: accent,
-                textColor: menuPrimaryText,
-                backgroundColor: controlBg,
-                borderColor: controlBorder,
-                maxWidth: MediaQuery.of(context).size.width < 390 ? 56 : 74,
-              ),
-              const SizedBox(width: 5),
             ],
-            _buildActionChip(
-              label: cleanChapterTitleEnabled ? '净化中' : '净化',
-              onTap: onToggleCleanChapterTitle,
-              active: cleanChapterTitleEnabled,
-              accent: accent,
-              textColor: menuPrimaryText,
-              backgroundColor: controlBg,
-              borderColor: controlBorder,
-            ),
-            const SizedBox(width: 5),
-            _buildRoundIcon(
-              icon: CupertinoIcons.refresh,
-              onTap: onRefreshChapter,
-              iconColor: menuPrimaryText,
-              backgroundColor: controlBg,
-              borderColor: controlBorder,
-            ),
-            const SizedBox(width: 5),
-            _buildRoundIcon(
-              icon: CupertinoIcons.search,
-              onTap: onSearchContent,
-              iconColor: menuPrimaryText,
-              backgroundColor: controlBg,
-              borderColor: controlBorder,
-            ),
-            const SizedBox(width: 5),
-            _buildRoundIcon(
-              icon: CupertinoIcons.list_bullet,
-              onTap: onShowChapterList,
-              iconColor: menuPrimaryText,
-              backgroundColor: controlBg,
-              borderColor: controlBorder,
-            ),
-            const SizedBox(width: 5),
-            _buildRoundIcon(
-              icon: CupertinoIcons.ellipsis,
-              onTap: onShowMoreMenu,
-              iconColor: menuPrimaryText,
-              backgroundColor: controlBg,
-              borderColor: controlBorder,
-            ),
           ],
         ),
       ),
@@ -258,28 +222,24 @@ class ReaderTopMenu extends StatelessWidget {
     );
   }
 
-  Widget _buildActionChip({
+  Widget _buildSourceActionChip({
     required String label,
     required VoidCallback onTap,
-    required bool active,
-    required Color accent,
     required Color textColor,
     required Color backgroundColor,
     required Color borderColor,
-    double? maxWidth,
   }) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
-        constraints:
-            maxWidth == null ? null : BoxConstraints(maxWidth: maxWidth),
+        constraints: const BoxConstraints(maxWidth: 120),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? accent.withValues(alpha: 0.2) : backgroundColor,
-          borderRadius: BorderRadius.circular(13),
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(4),
           border: Border.all(
-            color: active ? accent : borderColor,
+            color: borderColor,
           ),
         ),
         child: Text(
@@ -287,7 +247,7 @@ class ReaderTopMenu extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            color: active ? accent : textColor,
+            color: textColor,
             fontSize: 11.5,
             fontWeight: FontWeight.w600,
           ),

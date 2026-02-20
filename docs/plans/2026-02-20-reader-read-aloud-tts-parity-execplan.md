@@ -1,9 +1,9 @@
 # 阅读器“朗读（TTS）”入口与点击动作对齐 legado ExecPlan
 
-- 状态：`active`
+- 状态：`done`
 - 日期：`2026-02-20`
 - 负责人：`codex`
-- 范围类型：`迁移级别（扩展功能，已冻结）`
+- 范围类型：`迁移级别（扩展功能，已按指令解锁并完成）`
 
 ## 背景与目标
 
@@ -78,7 +78,7 @@ legado 对照基准（已完整读取）：
 - 预期结果：
   - 具备 `start/pause/resume/stop/prevParagraph/nextParagraph` 语义；
   - 与当前章节内容、章节切换、页面销毁正确联动。
-- 状态：`in_progress`
+- 状态：`completed`
 
 ### Step 3（可并行，依赖 Step 2）
 
@@ -87,13 +87,13 @@ legado 对照基准（已完整读取）：
   - 涉及：
     - `lib/features/reader/widgets/reader_bottom_menu.dart`
     - `lib/features/reader/views/simple_reader_view.dart`
-  - 状态：`pending`
+  - 状态：`completed`
 - 分支 3B（owner: B）
   - 目标：九宫格朗读动作接入真实控制。
   - 涉及：
     - `lib/features/reader/views/simple_reader_view.dart`
     - `lib/features/reader/models/reading_settings.dart`（仅在动作映射需要时调整）
-  - 状态：`pending`
+  - 状态：`completed`
 
 ### Step 4（串行，依赖 Step 3）
 
@@ -102,7 +102,17 @@ legado 对照基准（已完整读取）：
   - `test/read_aloud_service_test.dart`（新增）
   - `test/simple_reader_view_compile_test.dart`（必要时补充）
   - 本 ExecPlan 文档回填
-- 状态：`pending`
+- 状态：`completed`
+
+## 逐项对照清单（实现后）
+
+| 编号 | 差异项 | 对照结果 | 说明 |
+|---|---|---|---|
+| T1 | 底部菜单朗读入口占位 | 已同义 | `朗读` 点击已接入 `开始/暂停/继续` 状态流转，并在不可用场景给出可观测提示。 |
+| T2 | 九宫格朗读动作占位 | 已同义 | `朗读上一段/下一段/暂停继续` 已接到真实服务方法，动作文案与结果提示可观测。 |
+| T3 | 能力检测固定不可用 | 已同义 | 能力检测改为按平台/章节/正文内容判定，不再固定禁用入口。 |
+| T4 | 底部菜单无长按与状态反馈 | 保留差异 | 已补长按回调与运行态视觉反馈；长按弹窗高级设置按本轮 Non-goals 保持未实现并提示“朗读设置暂未实现”。 |
+| T5 | 缺少朗读服务抽象 | 已同义 | 新增独立 `ReadAloudService`，覆盖段落游标、章节切换、生命周期清理与错误可观测。 |
 
 ## 风险与回滚
 
@@ -143,12 +153,18 @@ legado 对照基准（已完整读取）：
 - `2026-02-20`：
   - 已完成：Step 1（ExecPlan 建立 + 差异清单 + 检查清单）。
   - 已变更：根据需求方最新指令“continue to next task”，恢复本计划执行，状态由 `blocked` 切换为 `active`。
-  - 当前进行中：Step 2（朗读服务层与阅读页状态机接线）。
+  - 已完成：Step 2（新增 `ReadAloudService` 并接入 `SimpleReaderView` 状态机，完成章节切换联动与页面销毁清理）。
+  - 已完成：Step 3A（底部菜单朗读入口支持点击、长按、运行态/暂停态图标反馈）。
+  - 已完成：Step 3B（九宫格 `朗读上一段/下一段/暂停继续` 动作接入真实服务控制）。
+  - 已完成：Step 4（新增 `test/read_aloud_service_test.dart` 边界用例，补齐朗读行为与异常可观测验证；同步 `test/reader_bottom_menu_new_test.dart` 覆盖长按与暂停态图标）。
+  - 验证命令：`flutter test test/read_aloud_service_test.dart test/reader_bottom_menu_new_test.dart` 通过。
+  - 兼容影响：朗读入口从占位改为真实执行，旧设置项与非朗读链路（search/explore/bookInfo/toc/content）无破坏性改动。
 
 ## Surprises & Discoveries
 
 1. 当前 Flutter 阅读器已具备朗读相关点击动作枚举，但全部未接线到真实能力。
 2. legacy 中朗读与章节/页面状态高度耦合，需优先保证生命周期与状态回放，不宜只做单点按钮替换。
+3. `flutter_tts` 运行依赖平台插件，服务层测试需通过可注入引擎假实现隔离平台通道。
 
 ## Decision Log
 
@@ -156,7 +172,13 @@ legado 对照基准（已完整读取）：
 2. `ReadAloudDialog` 的高级设置（定时器/引擎管理）拆分为后续任务，避免本轮跨模块过度扩散。
 3. `2026-02-20` 按需求方最新指令暂停 TTS 支线，优先继续阅读器“界面/设置”迁移，TTS 计划状态调整为 `blocked`。
 4. `2026-02-20` 接收需求方“continue to next task”后，按计划索引中的下一待办恢复 TTS 任务并转为 `active`。
+5. 底部菜单长按行为保留 legacy 入口语义，但高级设置弹窗按 Non-goals 延后，当前以明确提示替代，避免引入未经验证的扩展流程。
 
 ## Outcomes & Retrospective
 
-- 待实现后回填。
+- 结果：
+  - 阅读器朗读链路已从占位实现迁移为可用闭环：入口可用、动作可用、章节联动可用、退出可清理。
+  - 通过服务层与菜单层定向测试覆盖关键状态流与边界处理，满足本轮“核心交互可用 + 可观测”目标。
+- 后续改进：
+  - 需在后续扩展任务中补齐 legacy 的朗读设置弹窗（定时器/引擎管理/高级选项）。
+  - 提交前阶段再执行一次 `flutter analyze`（按仓库规则仅在提交推送前执行一次）。

@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import '../bookshelf/models/book.dart';
 import '../../core/database/database_service.dart';
 import '../../core/database/repositories/book_repository.dart';
+import '../reader/services/reader_charset_service.dart';
 import 'txt_parser.dart';
 import 'epub_parser.dart';
 
@@ -9,10 +10,12 @@ import 'epub_parser.dart';
 class ImportService {
   final BookRepository _bookRepo;
   final ChapterRepository _chapterRepo;
+  final ReaderCharsetService _charsetService;
 
   ImportService()
       : _bookRepo = BookRepository(DatabaseService()),
-        _chapterRepo = ChapterRepository(DatabaseService());
+        _chapterRepo = ChapterRepository(DatabaseService()),
+        _charsetService = ReaderCharsetService();
 
   /// 选择并导入本地书籍（支持 TXT 和 EPUB）
   Future<ImportResult> importLocalBook() async {
@@ -95,6 +98,8 @@ class ImportService {
     // 保存到数据库
     await _bookRepo.addBook(parseResult.book);
     await _chapterRepo.addChapters(parseResult.chapters);
+    await _charsetService.setBookCharset(
+        parseResult.book.id, parseResult.charset);
 
     return ImportResult.success(
       book: parseResult.book,

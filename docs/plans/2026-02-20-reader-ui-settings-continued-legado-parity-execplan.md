@@ -205,10 +205,10 @@
       - 替代方案：保留现有默认按键映射（方向键/PageUpDown/空格/音量键）并提供可观测提示。
       - 回补计划：在“扩展功能解锁”后新增键位采集弹层与键码持久化，再接线到按键翻页解析。
     - 例外 B：`volumeKeyPageOnPlay` 运行态联动
-      - 原因：该能力依赖 TTS 播放状态；当前 TTS 计划在独立 ExecPlan 中为 `blocked`。
-      - 影响范围：朗读功能未启用时该开关无可观测行为差异（仅完成配置迁移与持久化）。
-      - 替代方案：先保留字段与入口，避免后续数据结构再次迁移。
-      - 回补计划：TTS 计划解锁后，在按键事件分发中补齐“朗读中禁用/启用音量翻页”条件。
+      - 原因（历史）：该能力最初依赖 TTS 播放状态，执行本计划阶段尚不可接线。
+      - 影响范围（历史）：朗读功能未启用时该开关无可观测行为差异（仅完成配置迁移与持久化）。
+      - 替代方案（历史）：先保留字段与入口，避免后续数据结构再次迁移。
+      - 回补结果：已在后续计划 `2026-02-20-reader-volume-key-page-on-play-parity-execplan.md` 完成按键事件联动与测试闭环。
     - 例外 C：`设置编码`
       - 原因：当前正文解析链路缺少“书籍级 charset 覆盖”注入点；`RuleParserEngine.getContent` 仅按书源规则/响应推断。
       - 影响范围：阅读菜单中的“设置编码”无法像 legado 一样即时重载正文编码。
@@ -228,6 +228,8 @@
     - `ReadingSettings` 新增 `keepLightSeconds`，并保留 `keepScreenOn` 兼容映射，已有配置可无损迁移；
     - `ReadingSettings` 新增 `paddingDisplayCutouts` / `volumeKeyPageOnPlay` / `showReadTitleAddition` / `readBarStyleFollowPage`，旧配置缺失字段时按 legado 默认值回填；
     - `keep_light` 语义差异已消除（现为 legado 同义时长列表与交互触发重置策略）。
+  - 后续回补记录：
+    - `volumeKeyPageOnPlay` 已于 `2026-02-20` 在独立 ExecPlan 中完成运行态接线与单测，状态由 `blocked` 变更为 `已同义`。
 
 ## 逐项对照清单（Step 2/3 回填）
 
@@ -242,7 +244,7 @@
 | `paddingDisplayCutouts` | `PageView.upPaddingDisplayCutouts` | 新增设置字段并接入 paged/scroll 安全区留边计算 | 已同义（平台 Insets 机制差异） |
 | `showReadTitleAddition` | `ReadMenu.titleBarAddition` 显隐 | 新增开关控制顶部菜单附加信息（章节/书源）显隐 | 已同义 |
 | `readBarStyleFollowPage` | `ReadMenu.immersiveMenu` 着色 | 新增开关控制顶部/底部菜单随阅读主题着色 | 已同义（配色插值实现差异） |
-| `volumeKeyPageOnPlay` | 朗读时音量键翻页条件 | 已补字段与入口，待 TTS 状态接线 | `blocked`（依赖 TTS 计划） |
+| `volumeKeyPageOnPlay` | 朗读时音量键翻页条件 | 已补字段与入口，并在后续任务完成运行态接线与测试（见 `2026-02-20-reader-volume-key-page-on-play-parity-execplan.md`） | 已同义 |
 | `customPageKey` | `PageKeyDialog` 自定义键位 | 已补入口映射，当前仅提示不可用 | `blocked`（扩展冻结 + 平台能力缺口） |
 | `设置编码` | `showCharsetConfig -> ReadBook.setCharset` | 保留入口并输出明确不可用原因 | `blocked`（解析链路缺口） |
 
@@ -273,7 +275,8 @@
   - `信息` 入口已恢复独立 `TipConfig` 链路（标题/页眉/页脚/颜色配置可达）；
 - 当前里程碑（Step 4）已完成：
   - `paddingDisplayCutouts` / `showReadTitleAddition` / `readBarStyleFollowPage` 已落地并可持久化；
-  - `customPageKey` / `volumeKeyPageOnPlay`（运行态联动）/ `设置编码` 已按规则记录为 `blocked` 例外项；
+  - `customPageKey` / `设置编码` 已按规则记录为 `blocked` 例外项；
+  - `volumeKeyPageOnPlay` 已在后续计划中完成运行态回补与测试闭环；
 - 当前里程碑（Step 5）已完成：
   - 逐项检查清单六项全部完成回填并给出证据；
   - 任务主线实现与文档收尾完成，ExecPlan 状态切换为 `done`；

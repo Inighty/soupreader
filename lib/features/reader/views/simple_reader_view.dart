@@ -23,6 +23,7 @@ import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
 import '../../bookshelf/models/book.dart';
 import '../../bookshelf/services/bookshelf_catalog_update_service.dart';
+import '../../import/txt_parser.dart';
 import '../../replace/views/replace_rule_list_view.dart';
 import '../../replace/services/replace_rule_service.dart';
 import '../../source/models/book_source.dart';
@@ -37,14 +38,17 @@ import '../../settings/views/exception_logs_view.dart';
 import '../models/reading_settings.dart';
 import '../services/chapter_title_display_helper.dart';
 import '../services/reader_bookmark_export_service.dart';
+import '../services/reader_charset_service.dart';
 import '../services/reader_key_paging_helper.dart';
 import '../services/reader_legacy_quick_action_helper.dart';
 import '../services/reader_legacy_menu_helper.dart';
+import '../services/reader_search_navigation_helper.dart';
 import '../services/reader_source_action_helper.dart';
 import '../services/reader_source_switch_helper.dart';
 import '../services/reader_system_ui_helper.dart';
 import '../services/reader_top_bar_action_helper.dart';
 import '../services/reader_tip_selection_helper.dart';
+import '../services/read_aloud_service.dart';
 import '../services/read_style_import_export_service.dart';
 import '../utils/chapter_progress_utils.dart';
 import '../widgets/auto_pager.dart';
@@ -55,6 +59,7 @@ import '../widgets/reader_menus.dart';
 import '../widgets/reader_bottom_menu.dart';
 import '../widgets/reader_status_bar.dart';
 import '../widgets/reader_catalog_sheet.dart';
+import '../widgets/reader_color_picker_dialog.dart';
 import '../widgets/scroll_page_step_calculator.dart';
 import '../widgets/scroll_segment_paint_view.dart';
 import '../widgets/scroll_text_layout_engine.dart';
@@ -131,6 +136,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       ReaderBookmarkExportService();
   final ReadStyleImportExportService _readStyleImportExportService =
       ReadStyleImportExportService();
+  final ReaderCharsetService _readerCharsetService = ReaderCharsetService();
 
   List<Chapter> _chapters = [];
   int _currentChapterIndex = 0;
@@ -156,6 +162,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   // 自动阅读
   final AutoPager _autoPager = AutoPager();
   bool _showAutoReadPanel = false;
+  late final ReadAloudService _readAloudService;
+  ReadAloudStatusSnapshot _readAloudSnapshot =
+      const ReadAloudStatusSnapshot.stopped();
 
   // 当前书籍信息
   String _bookAuthor = '';
@@ -242,6 +251,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _TipOption(ReadingSettings.tipDividerColorFollowContent, '同正文颜色'),
     _TipOption(_customColorPickerValue, '自定义'),
   ];
+  static const List<String> _legacyCharsetOptions =
+      ReaderCharsetService.legacyCharsetOptions;
   static const int _scrollUiSyncIntervalMs = 16;
   static const int _scrollSaveProgressIntervalMs = 450;
   static const int _scrollPreloadIntervalMs = 80;
@@ -314,6 +325,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _autoPager.setMode(_settings.pageTurnMode == PageTurnMode.scroll
         ? AutoPagerMode.scroll
         : AutoPagerMode.page);
+    _readAloudService = ReadAloudService(
+      onStateChanged: _handleReadAloudStateChanged,
+      onMessage: _handleReadAloudMessage,
+      onRequestChapterSwitch: _handleReadAloudChapterSwitchRequest,
+    );
 
     _currentChapterIndex = widget.initialChapter;
     unawaited(() async {
@@ -341,13 +357,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _autoPager.setScrollController(_scrollController);
     _scrollController.addListener(_handleScrollControllerTick);
     _autoPager.setOnNextPage(() {
-      if (_settings.pageTurnMode == PageTurnMode.scroll) {
-        unawaited(_scrollPage(up: false));
-        return;
-      }
-      if (_currentChapterIndex < _chapters.length - 1) {
-        _loadChapter(_currentChapterIndex + 1);
-      }
+      _handleAutoPagerNextTick();
     });
 
     _syncSystemUiForOverlay(force: true);
@@ -413,6 +423,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _scrollController.dispose();
     _keyboardFocusNode.dispose();
     _autoPager.dispose();
+    unawaited(_readAloudService.dispose());
     _keepLightTimer?.cancel();
     _keepLightTimer = null;
     // 离开阅读器时恢复系统亮度（iOS 还原原始亮度；Android 还原窗口亮度为跟随系统）
@@ -472,6 +483,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _showMenu = visible;
       if (visible) {
         _showSearchMenu = false;
+        _showAutoReadPanel = false;
       }
     });
     _syncSystemUiForOverlay();
@@ -486,6 +498,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _showSearchMenu = visible;
       if (visible) {
         _showMenu = false;
+        _showAutoReadPanel = false;
       }
     });
     _syncSystemUiForOverlay();
@@ -1216,6 +1229,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         if (!mounted) return;
         _updateBookmarkStatus();
         _syncPageFactoryChapters();
+        _syncReadAloudChapterContext();
         unawaited(_prefetchNeighborChapters(centerIndex: index));
       } finally {
         _isRestoringProgress = false;
@@ -1257,6 +1271,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _invalidateScrollLayoutSnapshot();
     });
     _updateBookmarkStatus();
+    _syncReadAloudChapterContext();
 
     _syncPageFactoryChapters();
     unawaited(_prefetchNeighborChapters(centerIndex: index));
@@ -1335,6 +1350,21 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
   }
 
+  String _resolvedChapterTitleForIndex(int chapterIndex) {
+    final chapter = _chapters[chapterIndex];
+    final cached = _replaceStageCache[chapter.id];
+    final title = cached?.title ?? chapter.title;
+    return _postProcessTitle(title);
+  }
+
+  String _resolvedChapterContentForIndex(int chapterIndex) {
+    final chapter = _chapters[chapterIndex];
+    final cached = _replaceStageCache[chapter.id];
+    final title = cached?.title ?? chapter.title;
+    final content = cached?.content ?? (chapter.content ?? '');
+    return _postProcessContent(content, title);
+  }
+
   void _handlePageFactoryContentChanged() {
     if (!mounted || _chapters.isEmpty) return;
     _screenOffTimerStart();
@@ -1347,10 +1377,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final chapterChanged = factoryChapterIndex != _currentChapterIndex;
     setState(() {
       _currentChapterIndex = factoryChapterIndex;
-      _currentTitle = _pageFactory.currentChapterTitle;
+      _currentTitle = _resolvedChapterTitleForIndex(factoryChapterIndex);
+      _currentContent = _resolvedChapterContentForIndex(factoryChapterIndex);
     });
     unawaited(_saveProgress());
     if (chapterChanged) {
+      _syncReadAloudChapterContext();
       unawaited(_prefetchNeighborChapters(centerIndex: factoryChapterIndex));
     }
 
@@ -1859,6 +1891,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return family.isEmpty ? null : family;
   }
 
+  String get _currentFontName =>
+      ReadingFontFamily.getFontName(_settings.fontFamilyIndex);
+
   FontWeight get _currentFontWeight {
     switch (_settings.textBold) {
       case 1:
@@ -1897,6 +1932,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _setSearchMenuVisible(false);
       return;
     }
+    if (_showAutoReadPanel) {
+      setState(() {
+        _showAutoReadPanel = false;
+      });
+      return;
+    }
     if (_showMenu) {
       _setReaderMenuVisible(false);
       return;
@@ -1911,10 +1952,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final isKeyDown = event is KeyDownEvent || isRepeat;
     if (!isKeyDown) return;
     if (isRepeat && !_settings.keyPageOnLongPress) return;
+    final key = event.logicalKey;
+    if (ReaderKeyPagingHelper.shouldBlockVolumePagingDuringReadAloud(
+      key: key,
+      readAloudPlaying: _readAloudSnapshot.isPlaying,
+      volumeKeyPageOnPlayEnabled: _settings.volumeKeyPageOnPlay,
+    )) {
+      return;
+    }
     _screenOffTimerStart();
 
     final action = ReaderKeyPagingHelper.resolveKeyDownAction(
-      key: event.logicalKey,
+      key: key,
       volumeKeyPageEnabled: _settings.volumeKeyPage,
     );
     switch (action) {
@@ -1976,7 +2025,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       case ClickAction.off:
         break;
       case ClickAction.showMenu:
-        _setReaderMenuVisible(true);
+        if (_autoPager.isRunning) {
+          _openAutoReadPanel();
+        } else {
+          _setReaderMenuVisible(true);
+        }
         break;
       case ClickAction.nextPage:
         _handlePageStep(next: true);
@@ -2009,9 +2062,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         _showToast('云端进度同步暂未实现');
         break;
       case ClickAction.readAloudPrevParagraph:
+        unawaited(_triggerReadAloudPreviousParagraph());
+        break;
       case ClickAction.readAloudNextParagraph:
+        unawaited(_triggerReadAloudNextParagraph());
+        break;
       case ClickAction.readAloudPauseResume:
-        _openReadAloudAction();
+        unawaited(_triggerReadAloudPauseResume());
         break;
       default:
         break;
@@ -2528,14 +2585,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                             unawaited(_openChapterLinkFromTopMenu()),
                         onToggleChapterLinkOpenMode: () =>
                             unawaited(_toggleChapterLinkOpenModeFromTopMenu()),
-                        onShowChapterList: _showChapterList,
-                        onSearchContent: _showContentSearchDialog,
                         onShowSourceActions: _showSourceActionsMenu,
-                        onToggleCleanChapterTitle:
-                            _toggleCleanChapterTitleFromTopMenu,
-                        onRefreshChapter: _refreshChapter,
                         onShowMoreMenu: _showReaderActionsMenu,
-                        cleanChapterTitleEnabled: _settings.cleanChapterTitle,
                         showSourceAction: !_isCurrentBookLocal(),
                         showChapterLink: !_isCurrentBookLocal(),
                         showTitleAddition: _settings.showReadTitleAddition,
@@ -2571,10 +2622,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                             _updateSettings(settings),
                         onShowChapterList: _openChapterListFromMenu,
                         onShowReadAloud: _openReadAloudFromMenu,
+                        onReadAloudLongPress: _openReadAloudDialogFromMenu,
                         onShowInterfaceSettings: _openInterfaceSettingsFromMenu,
                         onShowBehaviorSettings: _openBehaviorSettingsFromMenu,
                         readBarStyleFollowPage:
                             _settings.readBarStyleFollowPage,
+                        readAloudRunning: _readAloudSnapshot.isRunning,
+                        readAloudPaused: _readAloudSnapshot.isPaused,
                       ),
 
                     if (_showSearchMenu) _buildSearchMenuOverlay(),
@@ -2969,12 +3023,72 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _openReadAloudFromMenu() {
     _closeReaderMenuOverlay();
-    _openReadAloudAction();
+    unawaited(_openReadAloudAction());
   }
 
-  void _toggleAutoPageFromQuickAction() {
+  void _openReadAloudDialogFromMenu() {
     _closeReaderMenuOverlay();
+    _showToast('朗读设置暂未实现');
+  }
+
+  void _openAutoReadPanel() {
+    if (_showAutoReadPanel) return;
+    setState(() {
+      _showAutoReadPanel = true;
+      _showMenu = false;
+      _showSearchMenu = false;
+    });
+    _syncSystemUiForOverlay();
+  }
+
+  void _stopAutoPagerAtBoundary() {
+    if (!_autoPager.isRunning) return;
+    _autoPager.stop();
+    if (!mounted) return;
+    if (_showAutoReadPanel) {
+      setState(() {
+        _showAutoReadPanel = false;
+      });
+    }
+    _showToast('已到最后一页，自动阅读已停止');
+  }
+
+  void _handleAutoPagerNextTick() {
+    if (!mounted) return;
+    if (_settings.pageTurnMode == PageTurnMode.scroll) {
+      if (_scrollController.hasClients) {
+        final position = _scrollController.position;
+        final atBottom =
+            _scrollController.offset >= position.maxScrollExtent - 1;
+        final hasNextChapter = _currentChapterIndex < _chapters.length - 1;
+        if (atBottom && !hasNextChapter) {
+          _stopAutoPagerAtBoundary();
+          return;
+        }
+      }
+      unawaited(_scrollPage(up: false));
+      return;
+    }
+
+    final moved = _pageFactory.moveToNext();
+    if (!moved) {
+      _stopAutoPagerAtBoundary();
+    }
+  }
+
+  Future<void> _toggleAutoPageFromQuickAction() async {
+    _closeReaderMenuOverlay();
+    final willStartAutoPager = !_autoPager.isRunning;
+    if (willStartAutoPager && _readAloudSnapshot.isRunning) {
+      await _readAloudService.stop();
+      if (!mounted) return;
+    }
     _autoPager.toggle();
+    if (_showAutoReadPanel && !_autoPager.isRunning) {
+      setState(() {
+        _showAutoReadPanel = false;
+      });
+    }
     _screenOffTimerStart(force: true);
   }
 
@@ -3029,14 +3143,96 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _updateSettings(_settings.copyWith(themeIndex: targetIndex));
   }
 
-  void _openReadAloudAction() {
+  Future<void> _triggerReadAloudPreviousParagraph() async {
+    final result = await _readAloudService.previousParagraph();
+    if (!mounted) return;
+    if (!result.success) {
+      _showToast(result.message);
+    }
+  }
+
+  Future<void> _triggerReadAloudNextParagraph() async {
+    final result = await _readAloudService.nextParagraph();
+    if (!mounted) return;
+    if (!result.success) {
+      _showToast(result.message);
+    }
+  }
+
+  Future<void> _triggerReadAloudPauseResume() async {
+    final result = await _readAloudService.togglePauseResume();
+    if (!mounted) return;
+    _showToast(result.message);
+  }
+
+  Future<void> _openReadAloudAction() async {
     final capability = _detectReadAloudCapability();
     if (!capability.available) {
       _showToast(capability.reason);
       return;
     }
-    // 后续接入真实朗读流程时，从这里进入。
-    _showToast('语音朗读即将上线');
+
+    if (_autoPager.isRunning) {
+      _autoPager.stop();
+      if (_showAutoReadPanel) {
+        setState(() {
+          _showAutoReadPanel = false;
+        });
+      }
+    }
+
+    ReadAloudActionResult result;
+    if (!_readAloudSnapshot.isRunning) {
+      result = await _readAloudService.start(
+        chapterIndex: _currentChapterIndex,
+        chapterTitle: _currentTitle,
+        content: _currentContent,
+      );
+    } else if (_readAloudSnapshot.isPaused) {
+      result = await _readAloudService.resume();
+    } else {
+      result = await _readAloudService.pause();
+    }
+    if (!mounted) return;
+    _showToast(result.message);
+  }
+
+  Future<bool> _handleReadAloudChapterSwitchRequest(
+    ReadAloudChapterDirection direction,
+  ) async {
+    if (_chapters.isEmpty) return false;
+    final step = direction == ReadAloudChapterDirection.next ? 1 : -1;
+    final targetIndex = _currentChapterIndex + step;
+    if (targetIndex < 0 || targetIndex >= _chapters.length) {
+      return false;
+    }
+    await _loadChapter(
+      targetIndex,
+      goToLastPage: direction == ReadAloudChapterDirection.previous,
+    );
+    return true;
+  }
+
+  void _handleReadAloudStateChanged(ReadAloudStatusSnapshot snapshot) {
+    if (!mounted) return;
+    setState(() {
+      _readAloudSnapshot = snapshot;
+    });
+  }
+
+  void _handleReadAloudMessage(String message) {
+    if (!mounted) return;
+    _showToast(message);
+  }
+
+  void _syncReadAloudChapterContext() {
+    unawaited(
+      _readAloudService.updateChapter(
+        chapterIndex: _currentChapterIndex,
+        chapterTitle: _currentTitle,
+        content: _currentContent,
+      ),
+    );
   }
 
   Future<void> _seekByChapterProgress(int targetChapterIndex) async {
@@ -3178,84 +3374,259 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   List<_ReaderSearchHit> _collectContentSearchHits(String query) {
     final content = _currentContent;
-    final lowerContent = content.toLowerCase();
-    final lowerQuery = query.toLowerCase();
-    if (lowerContent.isEmpty || lowerQuery.isEmpty) return const [];
+    final normalizedQuery = query.trim();
+    if (content.isEmpty || normalizedQuery.isEmpty) return const [];
 
     final hits = <_ReaderSearchHit>[];
     var from = 0;
-    while (from < lowerContent.length) {
-      final found = lowerContent.indexOf(lowerQuery, from);
+    var occurrenceIndex = 0;
+    while (from < content.length) {
+      final found = content.indexOf(normalizedQuery, from);
       if (found == -1) break;
-      final end = found + lowerQuery.length;
-      final previewStart = (found - 16).clamp(0, content.length).toInt();
-      final previewEnd = (end + 18).clamp(0, content.length).toInt();
-      final preview =
+      final end = found + normalizedQuery.length;
+      final previewStart = (found - 20).clamp(0, content.length).toInt();
+      final previewEnd = (end + 24).clamp(0, content.length).toInt();
+      final previewRaw =
           content.substring(previewStart, previewEnd).replaceAll('\n', ' ');
+      final localStart =
+          (found - previewStart).clamp(0, previewRaw.length).toInt();
+      final localEnd = (localStart + normalizedQuery.length)
+          .clamp(localStart, previewRaw.length)
+          .toInt();
+      final previewBefore = previewRaw.substring(0, localStart);
+      final previewMatch = previewRaw.substring(localStart, localEnd);
+      final previewAfter = previewRaw.substring(localEnd);
       final pageIndex = _settings.pageTurnMode == PageTurnMode.scroll
           ? null
-          : _resolveSearchHitPageIndex(found);
+          : _resolveSearchHitPageIndex(
+              contentOffset: found,
+              occurrenceIndex: occurrenceIndex,
+              query: normalizedQuery,
+            );
       hits.add(
         _ReaderSearchHit(
           start: found,
           end: end,
-          preview: preview,
+          query: normalizedQuery,
+          occurrenceIndex: occurrenceIndex,
+          previewBefore: previewBefore,
+          previewMatch: previewMatch,
+          previewAfter: previewAfter,
           pageIndex: pageIndex,
         ),
       );
+      occurrenceIndex += 1;
       from = end;
     }
     return hits;
   }
 
-  int? _resolveSearchHitPageIndex(int contentOffset) {
-    final pages = _pageFactory.currentPages;
-    if (pages.isEmpty) return null;
+  int? _resolveSearchHitPageIndex({
+    required int contentOffset,
+    required int occurrenceIndex,
+    required String query,
+  }) {
+    final byOccurrence = _resolveSearchHitPageIndexByOccurrence(
+      occurrenceIndex: occurrenceIndex,
+      query: query,
+    );
+    if (byOccurrence != null) return byOccurrence;
+    return _resolveSearchHitPageIndexByOffset(contentOffset);
+  }
 
-    var cursor = 0;
-    for (var i = 0; i < pages.length; i++) {
-      final page = pages[i];
-      final nextCursor = cursor + page.length;
-      if (contentOffset < nextCursor) {
-        return i;
-      }
-      cursor = nextCursor;
-    }
-    return pages.length - 1;
+  int? _resolveSearchHitPageIndexByOccurrence({
+    required int occurrenceIndex,
+    required String query,
+  }) {
+    return ReaderSearchNavigationHelper.resolvePageIndexByOccurrence(
+      pages: _pageFactory.currentPages,
+      query: query,
+      occurrenceIndex: occurrenceIndex,
+      chapterTitle: _currentTitle,
+      trimFirstPageTitlePrefix: _settings.titleMode != 2,
+    );
+  }
+
+  int? _resolveSearchHitPageIndexByOffset(int contentOffset) {
+    return ReaderSearchNavigationHelper.resolvePageIndexByOffset(
+      pages: _pageFactory.currentPages,
+      contentOffset: contentOffset,
+    );
   }
 
   void _jumpToSearchHit(_ReaderSearchHit hit) {
     if (_settings.pageTurnMode == PageTurnMode.scroll) {
-      if (!_scrollController.hasClients) return;
-      final maxOffset = _scrollController.position.maxScrollExtent;
-      if (maxOffset <= 0 || _currentContent.isEmpty) return;
-      final ratio = (hit.start / _currentContent.length).clamp(0.0, 1.0);
-      final target = (maxOffset * ratio).clamp(0.0, maxOffset).toDouble();
-      _scrollController.animateTo(
-        target,
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-      );
+      unawaited(_jumpToSearchHitInScroll(hit));
       return;
     }
 
     final totalPages = _pageFactory.totalPages;
     if (totalPages <= 0) return;
-    final targetPage = (hit.pageIndex ?? 0).clamp(0, totalPages - 1);
+    final resolvedPage = _resolveSearchHitPageIndex(
+      contentOffset: hit.start,
+      occurrenceIndex: hit.occurrenceIndex,
+      query: hit.query,
+    );
+    final targetPage = (resolvedPage ?? hit.pageIndex ?? 0).clamp(
+      0,
+      totalPages - 1,
+    );
     _pageFactory.jumpToPage(targetPage);
     if (mounted) {
       setState(() {});
     }
   }
 
+  Future<void> _jumpToSearchHitInScroll(_ReaderSearchHit hit) async {
+    if (!_scrollController.hasClients) return;
+    final target = _resolveScrollSearchTargetOffset(hit);
+    if (target == null) return;
+
+    _programmaticScrollInFlight = true;
+    try {
+      if (_settings.noAnimScrollPage) {
+        _scrollController.jumpTo(target);
+      } else {
+        await _scrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    } finally {
+      _programmaticScrollInFlight = false;
+    }
+    if (mounted) {
+      _syncCurrentChapterFromScroll(saveProgress: true);
+    }
+  }
+
+  double? _resolveScrollSearchTargetOffset(_ReaderSearchHit hit) {
+    if (!_scrollController.hasClients) return null;
+    if (_scrollSegments.isEmpty) return null;
+
+    _refreshScrollSegmentHeights();
+    final range = _findCurrentChapterScrollOffsetRange();
+    if (range == null) {
+      final maxOffset = _scrollController.position.maxScrollExtent;
+      if (maxOffset <= 0 || _currentContent.isEmpty) {
+        return null;
+      }
+      final ratio = (hit.start / _currentContent.length).clamp(0.0, 1.0);
+      return (maxOffset * ratio).clamp(0.0, maxOffset).toDouble();
+    }
+
+    final localAnchor = _resolveScrollHitLocalAnchor(
+      segment: range.segment,
+      hit: hit,
+    );
+    final offsetWithAnchor =
+        range.start + localAnchor - _scrollAnchorWithinViewport;
+    final minOffset = _scrollController.position.minScrollExtent;
+    final maxOffset = _scrollController.position.maxScrollExtent;
+    return offsetWithAnchor.clamp(minOffset, maxOffset).toDouble();
+  }
+
+  _ScrollSegmentOffsetRange? _findCurrentChapterScrollOffsetRange() {
+    for (final range in _scrollSegmentOffsetRanges) {
+      if (range.segment.chapterIndex == _currentChapterIndex) {
+        return range;
+      }
+    }
+    return null;
+  }
+
+  double _resolveScrollHitLocalAnchor({
+    required _ScrollSegment segment,
+    required _ReaderSearchHit hit,
+  }) {
+    final paragraphStyle = _scrollParagraphStyle();
+    final layout = _resolveScrollTextLayout(
+      seed: _ScrollSegmentSeed(
+        chapterId: segment.chapterId,
+        title: segment.title,
+        content: segment.content,
+      ),
+      maxWidth: _scrollBodyWidth(),
+      style: paragraphStyle,
+    );
+    final contentTop = _scrollSegmentContentTopInset(segment);
+    if (layout.lines.isEmpty) {
+      return contentTop;
+    }
+
+    var occurrenceCursor = 0;
+    for (final line in layout.lines) {
+      final lineText = _lineText(line);
+      if (lineText.isEmpty) {
+        continue;
+      }
+      var from = 0;
+      while (from < lineText.length) {
+        final found = lineText.indexOf(hit.query, from);
+        if (found == -1) break;
+        if (occurrenceCursor == hit.occurrenceIndex) {
+          return contentTop + line.y + line.height * 0.32;
+        }
+        occurrenceCursor += 1;
+        from = found + hit.query.length;
+      }
+    }
+
+    final totalLength = _currentContent.isEmpty ? 1 : _currentContent.length;
+    final ratio = (hit.start / totalLength).clamp(0.0, 1.0).toDouble();
+    return contentTop + layout.bodyHeight * ratio;
+  }
+
+  double _scrollSegmentContentTopInset(_ScrollSegment segment) {
+    return _settings.paddingTop + _scrollSegmentTitleBlockHeight(segment);
+  }
+
+  double _scrollSegmentTitleBlockHeight(_ScrollSegment segment) {
+    if (_settings.titleMode == 2 || segment.title.trim().isEmpty) {
+      return 0.0;
+    }
+    final topSpacing =
+        _settings.titleTopSpacing > 0 ? _settings.titleTopSpacing : 20.0;
+    final bottomSpacing = _settings.titleBottomSpacing > 0
+        ? _settings.titleBottomSpacing
+        : _settings.paragraphSpacing * 1.5;
+    final titlePainter = TextPainter(
+      text: TextSpan(
+        text: segment.title,
+        style: TextStyle(
+          fontSize: _settings.fontSize + _settings.titleSize,
+          fontWeight: FontWeight.w600,
+          fontFamily: _currentFontFamily,
+        ),
+      ),
+      textAlign: _titleTextAlign,
+      textDirection: TextDirection.ltr,
+      maxLines: null,
+    )..layout(maxWidth: _scrollBodyWidth());
+    return topSpacing + titlePainter.height + bottomSpacing;
+  }
+
+  String _lineText(ScrollTextLine line) {
+    if (line.runs.isEmpty) return '';
+    final buffer = StringBuffer();
+    for (final run in line.runs) {
+      buffer.write(run.text);
+    }
+    return buffer.toString();
+  }
+
   void _navigateSearchHit(int delta) {
     if (_contentSearchHits.isEmpty) return;
     final size = _contentSearchHits.length;
-    var nextIndex = _currentSearchHitIndex + delta;
-    while (nextIndex < 0) {
-      nextIndex += size;
+    final nextIndex = ReaderSearchNavigationHelper.resolveNextHitIndex(
+      currentIndex: _currentSearchHitIndex,
+      delta: delta,
+      totalHits: size,
+    );
+    if (nextIndex < 0) {
+      return;
     }
-    nextIndex %= size;
     setState(() {
       _currentSearchHitIndex = nextIndex;
     });
@@ -3277,72 +3648,44 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             _currentSearchHitIndex < _contentSearchHits.length)
         ? _contentSearchHits[_currentSearchHitIndex]
         : null;
-    final info = _contentSearchHits.isEmpty
-        ? '未找到结果'
-        : '结果 ${_currentSearchHitIndex + 1}/${_contentSearchHits.length} · 章节：$_currentTitle';
-    final preview = currentHit?.preview.trim();
+    final hasHits = _contentSearchHits.isNotEmpty;
+    final info = hasHits
+        ? '结果 ${_currentSearchHitIndex + 1}/${_contentSearchHits.length} · $_currentTitle'
+        : '当前章节未找到结果';
+    final location = hasHits && currentHit != null
+        ? '位置 ${currentHit.start + 1}/${_currentContent.length}'
+        : null;
     final accent = _isUiDark
         ? AppDesignTokens.brandSecondary
         : AppDesignTokens.brandPrimary;
-    final navBtnBg = _uiPanelBg.withValues(alpha: _isUiDark ? 0.88 : 0.94);
+    final navBtnBg = _uiPanelBg.withValues(alpha: _isUiDark ? 0.9 : 0.98);
     final navBtnShadow = CupertinoColors.black.withValues(
       alpha: _isUiDark ? 0.32 : 0.12,
     );
-    final sideButtonTop = MediaQuery.of(context).size.height * 0.44;
+    final sideButtonTop = MediaQuery.of(context).size.height * 0.42;
 
     return Stack(
       children: [
         Positioned(
-          left: 16,
+          left: 12,
           top: sideButtonTop,
-          child: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: _contentSearchHits.isEmpty
-                ? null
-                : () => _navigateSearchHit(-1),
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: navBtnBg,
-                borderRadius: BorderRadius.circular(19),
-                border: Border.all(color: _uiBorder),
-                boxShadow: [
-                  BoxShadow(
-                    color: navBtnShadow,
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Icon(CupertinoIcons.chevron_left, color: _uiTextStrong),
-            ),
+          child: _buildSearchSideNavButton(
+            icon: CupertinoIcons.chevron_left,
+            onTap: hasHits ? () => _navigateSearchHit(-1) : null,
+            color: navBtnBg,
+            shadowColor: navBtnShadow,
+            semanticsLabel: '上一个',
           ),
         ),
         Positioned(
-          right: 16,
+          right: 12,
           top: sideButtonTop,
-          child: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed:
-                _contentSearchHits.isEmpty ? null : () => _navigateSearchHit(1),
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: navBtnBg,
-                borderRadius: BorderRadius.circular(19),
-                border: Border.all(color: _uiBorder),
-                boxShadow: [
-                  BoxShadow(
-                    color: navBtnShadow,
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Icon(CupertinoIcons.chevron_right, color: _uiTextStrong),
-            ),
+          child: _buildSearchSideNavButton(
+            icon: CupertinoIcons.chevron_right,
+            onTap: hasHits ? () => _navigateSearchHit(1) : null,
+            color: navBtnBg,
+            shadowColor: navBtnShadow,
+            semanticsLabel: '下一个',
           ),
         ),
         Positioned(
@@ -3352,11 +3695,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           child: SafeArea(
             top: false,
             child: Container(
-              margin: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+              margin: const EdgeInsets.fromLTRB(6, 0, 6, 0),
               decoration: BoxDecoration(
                 color: _uiPanelBg.withValues(alpha: 0.97),
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(14),
+                  top: Radius.circular(12),
                 ),
                 border: Border.all(color: _uiBorder),
                 boxShadow: [
@@ -3367,96 +3710,109 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   ),
                 ],
               ),
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 9),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      info,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: _uiTextNormal,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  if (preview != null && preview.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        '...$preview...',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: _uiTextSubtle,
-                          fontSize: 12,
+                  Container(
+                    height: 38,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color:
+                          _uiCardBg.withValues(alpha: _isUiDark ? 0.4 : 0.72),
+                      border: Border(
+                        bottom: BorderSide(
+                          color: _uiBorder.withValues(alpha: 0.9),
                         ),
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildSearchMenuAction(
-                          icon: CupertinoIcons.search,
-                          label: '结果',
-                          onTap: _showContentSearchDialog,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildSearchMenuAction(
-                          icon: CupertinoIcons.square_grid_2x2,
-                          label: '主菜单',
-                          onTap: () {
-                            _setSearchMenuVisible(false);
-                            _setReaderMenuVisible(true);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildSearchMenuAction(
-                          icon: CupertinoIcons.clear_circled,
-                          label: '退出',
-                          onTap: _exitSearchMenu,
-                          activeColor: CupertinoColors.destructiveRed,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildSearchMenuAction(
+                    child: Row(
+                      children: [
+                        _buildSearchTopIconButton(
                           icon: CupertinoIcons.chevron_up,
-                          label: '上一个',
-                          onTap: _contentSearchHits.isEmpty
-                              ? null
-                              : () => _navigateSearchHit(-1),
-                          activeColor: accent,
+                          onTap: hasHits ? () => _navigateSearchHit(-1) : null,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildSearchMenuAction(
+                        _buildSearchTopIconButton(
                           icon: CupertinoIcons.chevron_down,
-                          label: '下一个',
-                          onTap: _contentSearchHits.isEmpty
-                              ? null
-                              : () => _navigateSearchHit(1),
-                          activeColor: accent,
+                          onTap: hasHits ? () => _navigateSearchHit(1) : null,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                info,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: _uiTextNormal,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (location != null)
+                                Text(
+                                  location,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: _uiTextSubtle,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (currentHit != null)
+                    SizedBox(
+                      width: double.infinity,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                        child: _buildSearchPreviewText(currentHit, accent),
+                      ),
+                    ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(10, 7, 10, 9),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: _uiBorder.withValues(alpha: 0.78),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Expanded(child: SizedBox.shrink()),
-                    ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildSearchMenuMainAction(
+                            icon: CupertinoIcons.search,
+                            label: '结果',
+                            onTap: _showContentSearchDialog,
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildSearchMenuMainAction(
+                            icon: CupertinoIcons.square_grid_2x2,
+                            label: '主菜单',
+                            onTap: () {
+                              _setSearchMenuVisible(false);
+                              _setReaderMenuVisible(true);
+                            },
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildSearchMenuMainAction(
+                            icon: CupertinoIcons.clear_circled_solid,
+                            label: '退出',
+                            onTap: _exitSearchMenu,
+                            activeColor: CupertinoColors.destructiveRed,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -3467,42 +3823,114 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  Widget _buildSearchMenuAction({
+  Widget _buildSearchPreviewText(_ReaderSearchHit hit, Color accent) {
+    final before = hit.previewBefore.trimLeft();
+    final match = hit.previewMatch.trim();
+    final after = hit.previewAfter.trimRight();
+    return RichText(
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        style: TextStyle(
+          color: _uiTextSubtle,
+          fontSize: 12,
+          height: 1.35,
+        ),
+        children: [
+          const TextSpan(text: '...'),
+          TextSpan(text: before),
+          TextSpan(
+            text: match,
+            style: TextStyle(
+              color: accent,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          TextSpan(text: after),
+          const TextSpan(text: '...'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchTopIconButton({
+    required IconData icon,
+    required VoidCallback? onTap,
+  }) {
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      minSize: 30,
+      onPressed: onTap,
+      child: Icon(
+        icon,
+        size: 18,
+        color: onTap == null ? _uiTextSubtle : _uiTextStrong,
+      ),
+    );
+  }
+
+  Widget _buildSearchMenuMainAction({
     required IconData icon,
     required String label,
     required VoidCallback? onTap,
     Color? activeColor,
   }) {
     final enabled = onTap != null;
-    final color = activeColor ?? _uiTextStrong;
+    final color = enabled ? (activeColor ?? _uiTextStrong) : _uiTextSubtle;
     return CupertinoButton(
-      padding: EdgeInsets.zero,
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      minSize: 0,
       onPressed: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: _uiCardBg.withValues(alpha: _isUiDark ? 0.82 : 0.96),
-          borderRadius: BorderRadius.circular(11),
-          border: Border.all(color: _uiBorder),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: enabled ? color : _uiTextSubtle,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 19, color: color),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: enabled ? color : _uiTextSubtle,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchSideNavButton({
+    required IconData icon,
+    required VoidCallback? onTap,
+    required Color color,
+    required Color shadowColor,
+    required String semanticsLabel,
+  }) {
+    return Semantics(
+      label: semanticsLabel,
+      button: true,
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        onPressed: onTap,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: _uiBorder),
+            boxShadow: [
+              BoxShadow(
+                color: shadowColor,
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-            ),
-          ],
+            ],
+          ),
+          child: Icon(
+            icon,
+            color: onTap == null ? _uiTextSubtle : _uiTextStrong,
+          ),
         ),
       ),
     );
@@ -3556,7 +3984,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           icon: running ? CupertinoIcons.pause_fill : CupertinoIcons.play_fill,
           semanticLabel: running ? '停止自动翻页' : '自动翻页',
           active: running,
-          onTap: _toggleAutoPageFromQuickAction,
+          onTap: () => unawaited(_toggleAutoPageFromQuickAction()),
         );
       case ReaderLegacyQuickAction.replaceRule:
         return _buildFloatingActionButton(
@@ -3633,10 +4061,27 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   _ReadAloudCapability _detectReadAloudCapability() {
-    // 当前版本尚未接入 TTS 引擎；保留入口并给出明确可观测提示。
+    if (kIsWeb) {
+      return const _ReadAloudCapability(
+        available: false,
+        reason: '当前平台暂不支持语音朗读',
+      );
+    }
+    if (_chapters.isEmpty) {
+      return const _ReadAloudCapability(
+        available: false,
+        reason: '当前书籍暂无可朗读章节',
+      );
+    }
+    if (_currentContent.trim().isEmpty) {
+      return const _ReadAloudCapability(
+        available: false,
+        reason: '当前章节暂无可朗读内容',
+      );
+    }
     return const _ReadAloudCapability(
-      available: false,
-      reason: '语音朗读（TTS）暂未实现',
+      available: true,
+      reason: '',
     );
   }
 
@@ -3703,6 +4148,144 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _showToast('$label$suffix');
   }
 
+  Future<void> _showCharsetConfigFromMenu() async {
+    final book = _bookRepo.getBookById(widget.bookId);
+    if (book == null) {
+      _showToast('书籍信息不存在');
+      return;
+    }
+
+    final currentCharset =
+        _readerCharsetService.getBookCharset(widget.bookId) ??
+            ReaderCharsetService.defaultCharset;
+    final selected = await _showCharsetPicker(currentCharset: currentCharset);
+    if (selected == null || selected.trim().isEmpty) return;
+    await _applyBookCharsetSetting(
+      book: book,
+      charset: selected,
+    );
+  }
+
+  Future<String?> _showCharsetPicker({
+    required String currentCharset,
+  }) {
+    final normalizedCurrent =
+        ReaderCharsetService.normalizeCharset(currentCharset) ??
+            ReaderCharsetService.defaultCharset;
+    return showCupertinoModalPopup<String>(
+      context: context,
+      builder: (popupContext) => CupertinoActionSheet(
+        title: const Text('设置编码'),
+        actions: _legacyCharsetOptions
+            .map(
+              (charset) => CupertinoActionSheetAction(
+                onPressed: () => Navigator.pop(popupContext, charset),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(charset),
+                    if (charset == normalizedCurrent)
+                      Icon(CupertinoIcons.check_mark, color: _uiAccent),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(popupContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _applyBookCharsetSetting({
+    required Book book,
+    required String charset,
+  }) async {
+    final normalized =
+        ReaderCharsetService.normalizeCharset(charset) ?? charset.trim();
+    await _readerCharsetService.setBookCharset(widget.bookId, normalized);
+
+    if (!_isCurrentBookLocalTxt()) {
+      _showToast('编码已保存：$normalized');
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _isLoadingChapter = true);
+    try {
+      await _reparseLocalTxtBookWithCharset(
+        book: book,
+        charset: normalized,
+      );
+      if (!mounted) return;
+      _showToast('编码已切换：$normalized');
+    } catch (e) {
+      if (!mounted) return;
+      _showToast('编码已保存：$normalized（重载失败：$e）');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingChapter = false);
+      }
+    }
+  }
+
+  Future<void> _reparseLocalTxtBookWithCharset({
+    required Book book,
+    required String charset,
+  }) async {
+    final localPath = (book.localPath ?? book.bookUrl ?? '').trim();
+    if (localPath.isEmpty) {
+      throw StateError('缺少本地 TXT 文件路径');
+    }
+
+    final previousRawTitle = _chapters.isEmpty
+        ? _currentTitle
+        : _chapters[_currentChapterIndex.clamp(0, _chapters.length - 1)].title;
+
+    final parsed = await TxtParser.reparseFromFile(
+      filePath: localPath,
+      bookId: widget.bookId,
+      bookName: book.title,
+      forcedCharset: charset,
+    );
+    final newChapters = parsed.chapters;
+    if (newChapters.isEmpty) {
+      throw StateError('重解析后章节为空');
+    }
+
+    final targetIndex = ReaderSourceSwitchHelper.resolveTargetChapterIndex(
+      newChapters: newChapters,
+      currentChapterTitle: previousRawTitle,
+      currentChapterIndex: _currentChapterIndex,
+      oldChapterCount: _chapters.length,
+    );
+
+    if (!widget.isEphemeral) {
+      await _chapterRepo.clearChaptersForBook(widget.bookId);
+      await _chapterRepo.addChapters(newChapters);
+      await _bookRepo.updateBook(
+        book.copyWith(
+          totalChapters: newChapters.length,
+          latestChapter: newChapters.last.title,
+          currentChapter: targetIndex,
+        ),
+      );
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _replaceStageCache.clear();
+      _catalogDisplayTitleCacheByChapterId.clear();
+      _chapterContentInFlight.clear();
+      _chapters = newChapters;
+      _chapterVipByUrl.clear();
+      _chapterPayByUrl.clear();
+    });
+    await _loadChapter(targetIndex, restoreOffset: true);
+  }
+
   Future<void> _exportBookmarksFromReader({
     required bool markdown,
   }) async {
@@ -3749,10 +4332,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         _showReaderActionUnavailable('TXT 目录规则');
         return;
       case ReaderLegacyReadMenuAction.setCharset:
-        _showReaderActionUnavailable(
-          '设置编码',
-          reason: '书籍级编码覆盖尚未接入正文解析链路',
-        );
+        await _showCharsetConfigFromMenu();
         return;
       case ReaderLegacyReadMenuAction.addBookmark:
         await _toggleBookmark();
@@ -5338,40 +5918,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     required String title,
     required int initialColor,
   }) async {
-    final controller = TextEditingController(text: _hexRgb(initialColor));
-    final parsed = await showCupertinoDialog<int>(
+    return showReaderColorPickerDialog(
       context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            textCapitalization: TextCapitalization.characters,
-            placeholder: '输入 6 位十六进制，如 FF6600',
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            onPressed: () {
-              final value = _parseRgbColor(controller.text);
-              if (value == null) {
-                _showToast('请输入 6 位十六进制颜色（如 FF6600）');
-                return;
-              }
-              Navigator.pop(dialogContext, value);
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+      title: title,
+      initialColor: initialColor,
+      invalidHexMessage: '请输入 6 位十六进制颜色（如 FF6600）',
     );
-    controller.dispose();
-    return parsed;
   }
 
   Future<int?> _showReadStylePresetPicker({
@@ -6675,7 +7227,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('字体: ${_currentFontFamily ?? "系统默认"}',
+                        Text('字体: $_currentFontName',
                             style: TextStyle(color: _uiTextStrong)),
                         Icon(CupertinoIcons.chevron_right,
                             color: _uiTextSubtle, size: 16),
@@ -7794,62 +8346,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return rgb.toRadixString(16).padLeft(6, '0').toUpperCase();
   }
 
-  int? _parseRgbColor(String raw) {
-    var text = raw.trim();
-    if (text.isEmpty) return null;
-    if (text.startsWith('#')) {
-      text = text.substring(1);
-    }
-    if (text.startsWith('0x') || text.startsWith('0X')) {
-      text = text.substring(2);
-    }
-    if (text.length != 6) return null;
-    final rgb = int.tryParse(text, radix: 16);
-    if (rgb == null) return null;
-    return 0xFF000000 | rgb;
-  }
-
   Future<void> _showTipColorInputDialog(
     StateSetter setPopupState, {
     required bool forDivider,
   }) async {
     final currentValue =
         forDivider ? _settings.tipDividerColor : _settings.tipColor;
-    final initialHex = currentValue > 0 ? _hexRgb(currentValue) : '';
-    final controller = TextEditingController(text: initialHex);
-    final title = forDivider ? '分割线颜色' : '文字颜色';
-    final parsed = await showCupertinoDialog<int>(
+    final parsed = await showReaderColorPickerDialog(
       context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            textCapitalization: TextCapitalization.characters,
-            placeholder: '输入 6 位十六进制，如 FF6600',
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            onPressed: () {
-              final value = _parseRgbColor(controller.text);
-              if (value == null) {
-                _showToast('请输入 6 位十六进制颜色（如 FF6600）');
-                return;
-              }
-              Navigator.pop(dialogContext, value);
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+      title: forDivider ? '分割线颜色' : '文字颜色',
+      initialColor: currentValue > 0 ? currentValue : 0xFFADADAD,
+      invalidHexMessage: '请输入 6 位十六进制颜色（如 FF6600）',
     );
-    controller.dispose();
     if (parsed == null) return;
     _updateSettingsFromSheet(
       setPopupState,
@@ -8035,6 +8543,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                             style: TextStyle(
                               color: isSelected ? _uiAccent : _uiTextStrong,
                               fontSize: 15,
+                              fontFamily: font.fontFamily.isEmpty
+                                  ? null
+                                  : font.fontFamily,
                             ),
                           ),
                         ),
@@ -8294,13 +8805,21 @@ class _ReplaceStageCache {
 class _ReaderSearchHit {
   final int start;
   final int end;
-  final String preview;
+  final String query;
+  final int occurrenceIndex;
+  final String previewBefore;
+  final String previewMatch;
+  final String previewAfter;
   final int? pageIndex;
 
   const _ReaderSearchHit({
     required this.start,
     required this.end,
-    required this.preview,
+    required this.query,
+    required this.occurrenceIndex,
+    required this.previewBefore,
+    required this.previewMatch,
+    required this.previewAfter,
     required this.pageIndex,
   });
 }

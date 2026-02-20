@@ -207,4 +207,72 @@ void main() {
     final panelDx = tester.getCenter(panel).dx;
     expect(panelDx, greaterThan(220));
   });
+
+  testWidgets('ReaderBottomMenuNew 亮度侧栏在长屏下高度受限', (tester) async {
+    final view = tester.view;
+    view.physicalSize = const Size(1080, 3600);
+    view.devicePixelRatio = 3.0;
+    addTearDown(() {
+      view.resetPhysicalSize();
+      view.resetDevicePixelRatio();
+    });
+
+    await pumpMenu(
+      tester,
+      menu: ReaderBottomMenuNew(
+        currentChapterIndex: 1,
+        totalChapters: 5,
+        currentPageIndex: 0,
+        totalPages: 10,
+        settings: const ReadingSettings(),
+        currentTheme: AppColors.readingThemes.first,
+        onChapterChanged: (_) {},
+        onPageChanged: (_) {},
+        onSeekChapterProgress: (_) {},
+        onSettingsChanged: (_) {},
+        onShowChapterList: () {},
+        onShowReadAloud: () {},
+        onShowInterfaceSettings: () {},
+        onShowBehaviorSettings: () {},
+      ),
+    );
+
+    final panel = find.byKey(const Key('reader_brightness_panel'));
+    expect(panel, findsOneWidget);
+    final panelHeight = tester.getSize(panel).height;
+    expect(panelHeight, lessThanOrEqualTo(400));
+    expect(panelHeight, greaterThanOrEqualTo(180));
+  });
+
+  testWidgets('ReaderBottomMenuNew 朗读入口支持长按与暂停态图标', (tester) async {
+    var longPressed = false;
+
+    await pumpMenu(
+      tester,
+      menu: ReaderBottomMenuNew(
+        currentChapterIndex: 1,
+        totalChapters: 5,
+        currentPageIndex: 0,
+        totalPages: 10,
+        settings: const ReadingSettings(),
+        currentTheme: AppColors.readingThemes.first,
+        onChapterChanged: (_) {},
+        onPageChanged: (_) {},
+        onSeekChapterProgress: (_) {},
+        onSettingsChanged: (_) {},
+        onShowChapterList: () {},
+        onShowReadAloud: () {},
+        onReadAloudLongPress: () => longPressed = true,
+        onShowInterfaceSettings: () {},
+        onShowBehaviorSettings: () {},
+        readAloudRunning: true,
+        readAloudPaused: true,
+      ),
+    );
+
+    expect(find.byIcon(CupertinoIcons.pause_circle), findsOneWidget);
+    await tester.longPress(find.text('朗读'));
+    await tester.pump();
+    expect(longPressed, isTrue);
+  });
 }

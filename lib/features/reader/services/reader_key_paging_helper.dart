@@ -7,6 +7,15 @@ enum ReaderKeyPagingAction {
 }
 
 class ReaderKeyPagingHelper {
+  static bool shouldBlockVolumePagingDuringReadAloud({
+    required LogicalKeyboardKey key,
+    required bool readAloudPlaying,
+    required bool volumeKeyPageOnPlayEnabled,
+  }) {
+    final isVolumeKey = _isVolumeNextKey(key) || _isVolumePrevKey(key);
+    return isVolumeKey && readAloudPlaying && !volumeKeyPageOnPlayEnabled;
+  }
+
   static ReaderKeyPagingAction resolveKeyDownAction({
     required LogicalKeyboardKey key,
     required bool volumeKeyPageEnabled,

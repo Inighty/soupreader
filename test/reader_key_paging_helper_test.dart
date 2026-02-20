@@ -4,6 +4,53 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:soupreader/features/reader/services/reader_key_paging_helper.dart';
 
 void main() {
+  test(
+      'volume key paging is blocked while read-aloud playing when switch is off',
+      () {
+    final blockedDown =
+        ReaderKeyPagingHelper.shouldBlockVolumePagingDuringReadAloud(
+      key: LogicalKeyboardKey.audioVolumeDown,
+      readAloudPlaying: true,
+      volumeKeyPageOnPlayEnabled: false,
+    );
+    final blockedUp =
+        ReaderKeyPagingHelper.shouldBlockVolumePagingDuringReadAloud(
+      key: LogicalKeyboardKey.audioVolumeUp,
+      readAloudPlaying: true,
+      volumeKeyPageOnPlayEnabled: false,
+    );
+
+    expect(blockedDown, isTrue);
+    expect(blockedUp, isTrue);
+  });
+
+  test(
+      'volume key paging is not blocked when read-aloud not playing or switch on',
+      () {
+    final notPlaying =
+        ReaderKeyPagingHelper.shouldBlockVolumePagingDuringReadAloud(
+      key: LogicalKeyboardKey.audioVolumeDown,
+      readAloudPlaying: false,
+      volumeKeyPageOnPlayEnabled: false,
+    );
+    final switchOn =
+        ReaderKeyPagingHelper.shouldBlockVolumePagingDuringReadAloud(
+      key: LogicalKeyboardKey.audioVolumeDown,
+      readAloudPlaying: true,
+      volumeKeyPageOnPlayEnabled: true,
+    );
+    final nonVolume =
+        ReaderKeyPagingHelper.shouldBlockVolumePagingDuringReadAloud(
+      key: LogicalKeyboardKey.arrowRight,
+      readAloudPlaying: true,
+      volumeKeyPageOnPlayEnabled: false,
+    );
+
+    expect(notPlaying, isFalse);
+    expect(switchOn, isFalse);
+    expect(nonVolume, isFalse);
+  });
+
   test('volume keys follow volumeKeyPage switch', () {
     final nextWhenEnabled = ReaderKeyPagingHelper.resolveKeyDownAction(
       key: LogicalKeyboardKey.audioVolumeDown,
