@@ -11,15 +11,32 @@ void main() {
     );
     expect(
       ReadingFontFamily.presets.map((preset) => preset.fontFamily).toList(),
-      equals(<String>['', 'serif', 'sans-serif', 'monospace']),
+      equals(<String>[
+        '',
+        'Noto Serif CJK SC',
+        'Noto Sans CJK SC',
+        'Roboto Mono',
+      ]),
+    );
+    expect(
+      ReadingFontFamily.getFontFamilyFallback(1),
+      contains('serif'),
+    );
+    expect(
+      ReadingFontFamily.getFontFamilyFallback(2),
+      contains('sans-serif'),
+    );
+    expect(
+      ReadingFontFamily.getFontFamilyFallback(3),
+      contains('monospace'),
     );
   });
 
   test('ReadingFontFamily keeps stable index lookup and default fallback', () {
     expect(ReadingFontFamily.getFontFamily(0), '');
-    expect(ReadingFontFamily.getFontFamily(1), 'serif');
-    expect(ReadingFontFamily.getFontFamily(2), 'sans-serif');
-    expect(ReadingFontFamily.getFontFamily(3), 'monospace');
+    expect(ReadingFontFamily.getFontFamily(1), 'Noto Serif CJK SC');
+    expect(ReadingFontFamily.getFontFamily(2), 'Noto Sans CJK SC');
+    expect(ReadingFontFamily.getFontFamily(3), 'Roboto Mono');
 
     expect(ReadingFontFamily.getFontFamily(-1), '');
     expect(ReadingFontFamily.getFontFamily(999), '');

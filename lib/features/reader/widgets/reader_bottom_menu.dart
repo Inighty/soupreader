@@ -57,11 +57,12 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   static const Key _brightnessAutoToggleKey = Key('reader_brightness_auto');
   static const Key _brightnessPositionToggleKey = Key('reader_brightness_pos');
   static const double _brightnessPanelTopOffset = 78.0;
+  static const double _brightnessPanelTopOffsetWithTitleAddition = 94.0;
   static const double _brightnessPanelBottomOffset = 98.0;
   static const double _brightnessPanelWidth = 42.0;
   static const double _brightnessPanelButtonHeight = 40.0;
   static const double _brightnessPanelMinHeight = 180.0;
-  static const double _brightnessPanelMaxHeight = 400.0;
+  static const double _brightnessPanelMaxHeight = 360.0;
   static const double _brightnessSliderMaxLength = 320.0;
 
   bool _isDragging = false;
@@ -95,13 +96,16 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         : CupertinoColors.black.withValues(alpha: _isDarkMode ? 0.26 : 0.12);
     final mediaQuery = MediaQuery.of(context);
     final bottomPadding = mediaQuery.padding.bottom;
+    final brightnessTopOffset = widget.settings.showReadTitleAddition
+        ? _brightnessPanelTopOffsetWithTitleAddition
+        : _brightnessPanelTopOffset;
 
     return Positioned.fill(
       child: Stack(
         children: [
           if (widget.settings.showBrightnessView)
             Positioned(
-              top: mediaQuery.padding.top + _brightnessPanelTopOffset,
+              top: mediaQuery.padding.top + brightnessTopOffset,
               bottom: bottomPadding + _brightnessPanelBottomOffset,
               left: widget.settings.brightnessViewOnRight ? null : 16,
               right: widget.settings.brightnessViewOnRight ? 16 : null,
@@ -271,26 +275,37 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     final iconColor = autoBrightness ? accent : mutedForeground;
     // legado 亮度栏语义保持不变：顶部自动亮度 + 中段滑杆 + 底部左右切换。
     // 仅限制面板可见高度，避免长屏设备出现过长白条。
-    final panelColor = panelBg.withValues(alpha: _isDarkMode ? 0.56 : 0.50);
+    final panelOverlay = _isDarkMode
+        ? CupertinoColors.white.withValues(alpha: 0.02)
+        : CupertinoColors.black.withValues(alpha: 0.08);
+    final panelColor = Color.alphaBlend(
+      panelOverlay,
+      panelBg.withValues(alpha: _isDarkMode ? 0.54 : 0.42),
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final rawAvailableHeight = constraints.maxHeight.isFinite
             ? constraints.maxHeight
             : _brightnessPanelMaxHeight;
-        final availableHeight = rawAvailableHeight.clamp(
-          0.0,
-          double.infinity,
-        ).toDouble();
+        final availableHeight = rawAvailableHeight
+            .clamp(
+              0.0,
+              double.infinity,
+            )
+            .toDouble();
         final panelHeight = availableHeight < _brightnessPanelMinHeight
             ? availableHeight
-            : availableHeight.clamp(
-                _brightnessPanelMinHeight,
-                _brightnessPanelMaxHeight,
-              ).toDouble();
-        final sliderRegionHeight = (panelHeight - _brightnessPanelButtonHeight * 2)
-            .clamp(0.0, _brightnessSliderMaxLength)
-            .toDouble();
+            : availableHeight
+                .clamp(
+                  _brightnessPanelMinHeight,
+                  _brightnessPanelMaxHeight,
+                )
+                .toDouble();
+        final sliderRegionHeight =
+            (panelHeight - _brightnessPanelButtonHeight * 2)
+                .clamp(0.0, _brightnessSliderMaxLength)
+                .toDouble();
 
         return Align(
           alignment: Alignment.topCenter,
@@ -409,7 +424,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         : AppDesignTokens.brandPrimary;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6, top: 1),
+      padding: const EdgeInsets.only(bottom: 0, top: 0),
       child: Row(
         children: [
           const Spacer(),
@@ -475,7 +490,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 child: Center(
                   child: Icon(
                     icon,
-                    size: 19,
+                    size: 20,
                     color: contentColor,
                   ),
                 ),
@@ -486,9 +501,9 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 12,
                   color: contentColor,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
             ],

@@ -22,6 +22,7 @@ class ReaderPageAgent {
     double letterSpacing = 0,
     double paragraphSpacing = 0,
     String? fontFamily,
+    List<String>? fontFamilyFallback,
     String? title,
     String paragraphIndent = defaultIndent,
     TextAlign textAlign = TextAlign.left,
@@ -38,6 +39,7 @@ class ReaderPageAgent {
       height: lineHeight,
       letterSpacing: letterSpacing,
       fontFamily: fontFamily,
+      fontFamilyFallback: fontFamilyFallback,
       fontWeight: fontWeight,
       decoration: underline ? TextDecoration.underline : TextDecoration.none,
       color: const Color(0xFF000000), // 颜色不影响排版，但必须指定以避免 assert 错误

@@ -169,20 +169,55 @@ class ReadingFontSize {
 class ReadingFontFamily {
   static const String system = ''; // 系统默认
   // 对齐 legado 的系统字体语义，避免引用未注册字体导致回退失效。
-  static const String notoSerif = 'serif';
-  static const String notoSans = 'sans-serif';
-  static const String sourceHanMono = 'monospace';
+  static const String notoSerif = 'Noto Serif CJK SC';
+  static const String notoSans = 'Noto Sans CJK SC';
+  static const String sourceHanMono = 'Roboto Mono';
+  static const List<String> serifFallback = <String>[
+    'Noto Serif CJK TC',
+    'Songti SC',
+    'STSong',
+    'serif',
+  ];
+  static const List<String> sansFallback = <String>[
+    'Noto Sans CJK TC',
+    'PingFang SC',
+    'Heiti SC',
+    'sans-serif',
+  ];
+  static const List<String> monoFallback = <String>[
+    'Noto Sans Mono CJK SC',
+    'Menlo',
+    'Courier New',
+    'monospace',
+  ];
 
   static const List<ReadingFontConfig> presets = [
     ReadingFontConfig(name: '系统默认', fontFamily: system),
-    ReadingFontConfig(name: '衬线字体', fontFamily: notoSerif),
-    ReadingFontConfig(name: '无衬线字体', fontFamily: notoSans),
-    ReadingFontConfig(name: '等宽字体', fontFamily: sourceHanMono),
+    ReadingFontConfig(
+      name: '衬线字体',
+      fontFamily: notoSerif,
+      fontFamilyFallback: serifFallback,
+    ),
+    ReadingFontConfig(
+      name: '无衬线字体',
+      fontFamily: notoSans,
+      fontFamilyFallback: sansFallback,
+    ),
+    ReadingFontConfig(
+      name: '等宽字体',
+      fontFamily: sourceHanMono,
+      fontFamilyFallback: monoFallback,
+    ),
   ];
 
   static String getFontFamily(int index) {
     if (index < 0 || index >= presets.length) return system;
     return presets[index].fontFamily;
+  }
+
+  static List<String> getFontFamilyFallback(int index) {
+    if (index < 0 || index >= presets.length) return const <String>[];
+    return presets[index].fontFamilyFallback;
   }
 
   static String getFontName(int index) {
@@ -195,9 +230,11 @@ class ReadingFontFamily {
 class ReadingFontConfig {
   final String name;
   final String fontFamily;
+  final List<String> fontFamilyFallback;
 
   const ReadingFontConfig({
     required this.name,
     required this.fontFamily,
+    this.fontFamilyFallback = const <String>[],
   });
 }

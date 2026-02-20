@@ -675,6 +675,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       color: _currentTheme.text,
       letterSpacing: _settings.letterSpacing,
       fontFamily: _currentFontFamily,
+      fontFamilyFallback: _currentFontFamilyFallback,
       fontWeight: _currentFontWeight,
       decoration: _currentTextDecoration,
     );
@@ -1597,6 +1598,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       letterSpacing: _settings.letterSpacing,
       paragraphSpacing: _settings.paragraphSpacing, // 传递段间距
       fontFamily: _currentFontFamily,
+      fontFamilyFallback: _currentFontFamilyFallback,
       // 对标 legado：缩进属于“排版参数”，由分页排版层统一处理
       paragraphIndent: _settings.paragraphIndent,
       textAlign: _bodyTextAlign,
@@ -1885,10 +1887,32 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       ? CupertinoColors.white.withValues(alpha: 0.54)
       : AppDesignTokens.textMuted;
 
+  String? get _activeSearchHighlightQuery {
+    if (!_showSearchMenu || _contentSearchHits.isEmpty) {
+      return null;
+    }
+    final query = _contentSearchQuery.trim();
+    if (query.isEmpty) return null;
+    return query;
+  }
+
+  Color get _searchHighlightColor =>
+      _uiAccent.withValues(alpha: _isUiDark ? 0.34 : 0.22);
+
+  Color get _searchHighlightTextColor =>
+      _isUiDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+
   /// 获取当前字体
   String? get _currentFontFamily {
     final family = ReadingFontFamily.getFontFamily(_settings.fontFamilyIndex);
     return family.isEmpty ? null : family;
+  }
+
+  List<String>? get _currentFontFamilyFallback {
+    final fallback =
+        ReadingFontFamily.getFontFamilyFallback(_settings.fontFamilyIndex);
+    if (fallback.isEmpty) return null;
+    return fallback;
   }
 
   String get _currentFontName =>
@@ -2159,6 +2183,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         color: _currentTheme.text,
         letterSpacing: _settings.letterSpacing,
         fontFamily: _currentFontFamily,
+        fontFamilyFallback: _currentFontFamilyFallback,
         fontWeight: _currentFontWeight,
         decoration: _currentTextDecoration,
       ),
@@ -2167,6 +2192,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         fontWeight: FontWeight.w600,
         color: _currentTheme.text,
         fontFamily: _currentFontFamily,
+        fontFamilyFallback: _currentFontFamilyFallback,
       ),
       paragraphTextAlign: _bodyTextAlign,
       titleTextAlign: _titleTextAlign,
@@ -2814,6 +2840,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         color: _currentTheme.text,
         letterSpacing: _settings.letterSpacing,
         fontFamily: _currentFontFamily,
+        fontFamilyFallback: _currentFontFamilyFallback,
         fontWeight: _currentFontWeight,
         decoration: _currentTextDecoration,
       ),
@@ -2835,6 +2862,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       animDuration: ReadingSettings.legacyPageAnimDuration,
       pageDirection: _settings.pageDirection,
       pageTouchSlop: _settings.pageTouchSlop,
+      searchHighlightQuery: _activeSearchHighlightQuery,
+      searchHighlightColor: _searchHighlightColor,
+      searchHighlightTextColor: _searchHighlightTextColor,
       onAction: _handleClickAction,
       clickActions: _clickActions,
     );
@@ -2939,6 +2969,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   fontWeight: FontWeight.w600,
                   color: _currentTheme.text,
                   fontFamily: _currentFontFamily,
+                  fontFamilyFallback: _currentFontFamilyFallback,
                 ),
               ),
               SizedBox(
@@ -2950,6 +2981,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             ScrollSegmentPaintView(
               layout: layout,
               style: paragraphStyle,
+              highlightQuery: _activeSearchHighlightQuery,
+              highlightColor: _searchHighlightColor,
+              highlightTextColor: _searchHighlightTextColor,
             ),
             SizedBox(height: isTailSegment ? 80 : 24),
           ],
@@ -2994,6 +3028,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               color: _currentTheme.text,
               letterSpacing: _settings.letterSpacing,
               fontFamily: _currentFontFamily,
+              fontFamilyFallback: _currentFontFamilyFallback,
             ),
           ),
         );
@@ -3013,12 +3048,20 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _openInterfaceSettingsFromMenu() {
     _closeReaderMenuOverlay();
-    _showReadStyleDialog();
+    _showReadingSettingsSheet(
+      title: '界面',
+      initialTab: 1,
+      allowedTabs: const <int>[0, 1, 2],
+    );
   }
 
   void _openBehaviorSettingsFromMenu() {
     _closeReaderMenuOverlay();
-    _showLegacyMoreConfigDialog();
+    _showReadingSettingsSheet(
+      title: '设置',
+      initialTab: 3,
+      allowedTabs: const <int>[3],
+    );
   }
 
   void _openReadAloudFromMenu() {
@@ -3078,13 +3121,26 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   Future<void> _toggleAutoPageFromQuickAction() async {
     _closeReaderMenuOverlay();
-    final willStartAutoPager = !_autoPager.isRunning;
-    if (willStartAutoPager && _readAloudSnapshot.isRunning) {
-      await _readAloudService.stop();
-      if (!mounted) return;
+    final isRunning = _autoPager.isRunning;
+    if (!isRunning) {
+      if (_readAloudSnapshot.isRunning) {
+        await _readAloudService.stop();
+        if (!mounted) return;
+      }
+      _autoPager.start();
+      _openAutoReadPanel();
+      _screenOffTimerStart(force: true);
+      return;
     }
-    _autoPager.toggle();
-    if (_showAutoReadPanel && !_autoPager.isRunning) {
+
+    if (!_showAutoReadPanel) {
+      _openAutoReadPanel();
+      _screenOffTimerStart(force: true);
+      return;
+    }
+
+    _autoPager.stop();
+    if (mounted && _showAutoReadPanel) {
       setState(() {
         _showAutoReadPanel = false;
       });
@@ -3598,6 +3654,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           fontSize: _settings.fontSize + _settings.titleSize,
           fontWeight: FontWeight.w600,
           fontFamily: _currentFontFamily,
+          fontFamilyFallback: _currentFontFamilyFallback,
         ),
       ),
       textAlign: _titleTextAlign,
@@ -5133,388 +5190,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _showReadStyleDialog() {
-    showCupertinoModalPopup<void>(
-      context: context,
-      builder: (popupContext) => StatefulBuilder(
-        builder: (context, setPopupState) {
-          final textSizeProgress = _legacyTextSizeProgress();
-          final letterSpacingProgress = _legacyLetterSpacingProgress();
-          final lineSpacingProgress = _legacyLineSpacingProgress();
-          final paragraphSpacingProgress = _legacyParagraphSpacingProgress();
-          final pageAnimMode = _legacyStyleDialogPageAnimMode();
-          final pageAnimItems = const <MapEntry<PageTurnMode, String>>[
-            MapEntry(PageTurnMode.cover, '覆盖'),
-            MapEntry(PageTurnMode.slide, '滑动'),
-            MapEntry(PageTurnMode.simulation, '仿真'),
-            MapEntry(PageTurnMode.scroll, '滚动'),
-            MapEntry(PageTurnMode.none, '无'),
-          ];
-          final readStyles = _activeReadStyles;
-          final styleConfigs = _activeReadStyleConfigs;
-          final styleCount = readStyles.length;
-          final activeThemeIndex = _activeReadStyleIndex;
-          final indentOptions = const <String>['', '　', '　　', '　　　'];
-          final currentIndentIndex =
-              indentOptions.indexOf(_settings.paragraphIndent);
-          final safeIndentIndex =
-              currentIndentIndex < 0 ? 2 : currentIndentIndex;
-
-          return Container(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.82,
-            ),
-            decoration: BoxDecoration(
-              color: _uiPanelBg,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            child: SafeArea(
-              top: false,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                      child: Row(
-                        children: [
-                          _buildReadStyleActionChip(
-                            label: '粗细',
-                            onTap: () => _updateSettingsFromSheet(
-                              setPopupState,
-                              _settings.copyWith(
-                                textBold:
-                                    _nextTextBoldValue(_settings.textBold),
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          _buildReadStyleActionChip(
-                            label: '字体',
-                            onTap: () => showCupertinoModalPopup<void>(
-                              context: context,
-                              builder: (_) =>
-                                  _buildFontSelectDialog(setPopupState),
-                            ),
-                          ),
-                          const Spacer(),
-                          _buildReadStyleActionChip(
-                            label: '缩进',
-                            onTap: () {
-                              final nextIndex =
-                                  (safeIndentIndex + 1) % indentOptions.length;
-                              _updateSettingsFromSheet(
-                                setPopupState,
-                                _settings.copyWith(
-                                  paragraphIndent: indentOptions[nextIndex],
-                                ),
-                              );
-                            },
-                          ),
-                          const Spacer(),
-                          _buildReadStyleActionChip(
-                            label: '简繁',
-                            onTap: () {
-                              final modes = ChineseConverterType.values;
-                              final currentModeIndex =
-                                  modes.indexOf(_settings.chineseConverterType);
-                              final safeModeIndex =
-                                  currentModeIndex < 0 ? 0 : currentModeIndex;
-                              final nextMode =
-                                  modes[(safeModeIndex + 1) % modes.length];
-                              _updateSettingsFromSheet(
-                                setPopupState,
-                                _settings.copyWith(
-                                  chineseConverterType: nextMode,
-                                ),
-                              );
-                            },
-                          ),
-                          const Spacer(),
-                          _buildReadStyleActionChip(
-                            label: '边距',
-                            onTap: () {
-                              Navigator.of(popupContext).pop();
-                              Future<void>.microtask(() {
-                                showTypographySettingsDialog(
-                                  this.context,
-                                  settings: _settings,
-                                  onSettingsChanged: _updateSettings,
-                                );
-                              });
-                            },
-                          ),
-                          const Spacer(),
-                          _buildReadStyleActionChip(
-                            label: '信息',
-                            onTap: () {
-                              _showLegacyTipConfigDialog();
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildReadStyleSeekBar(
-                      title: '字号',
-                      progress: textSizeProgress,
-                      max: 45,
-                      valueLabel: '${textSizeProgress + 5}',
-                      onChanged: (progress) => _updateSettingsFromSheet(
-                        setPopupState,
-                        _settings.copyWith(fontSize: (progress + 5).toDouble()),
-                      ),
-                    ),
-                    _buildReadStyleSeekBar(
-                      title: '字距',
-                      progress: letterSpacingProgress,
-                      max: 100,
-                      valueLabel:
-                          _legacyLetterSpacingLabel(letterSpacingProgress),
-                      onChanged: (progress) => _updateSettingsFromSheet(
-                        setPopupState,
-                        _settings.copyWith(
-                          letterSpacing: (progress - 50) / 100,
-                        ),
-                      ),
-                    ),
-                    _buildReadStyleSeekBar(
-                      title: '行距',
-                      progress: lineSpacingProgress,
-                      max: 20,
-                      valueLabel: _legacyLineSpacingLabel(lineSpacingProgress),
-                      onChanged: (progress) => _updateSettingsFromSheet(
-                        setPopupState,
-                        _settings.copyWith(
-                          lineHeight: (1.0 + (progress - 10) / 10).toDouble(),
-                        ),
-                      ),
-                    ),
-                    _buildReadStyleSeekBar(
-                      title: '段距',
-                      progress: paragraphSpacingProgress,
-                      max: 20,
-                      valueLabel: _legacyParagraphSpacingLabel(
-                          paragraphSpacingProgress),
-                      onChanged: (progress) => _updateSettingsFromSheet(
-                        setPopupState,
-                        _settings.copyWith(
-                          paragraphSpacing: progress.toDouble(),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      height: 0.8,
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      color: _uiBorder.withValues(alpha: 0.9),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                      child: Text(
-                        '翻页动画',
-                        style: TextStyle(
-                          color: _uiTextStrong.withValues(alpha: 0.75),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 11),
-                      child: Row(
-                        children: pageAnimItems.map((item) {
-                          final isSelected = pageAnimMode == item.key;
-                          return Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.all(4),
-                              child: GestureDetector(
-                                onTap: () => _updateSettingsFromSheet(
-                                  setPopupState,
-                                  _settings.copyWith(pageTurnMode: item.key),
-                                ),
-                                child: Container(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 5),
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: _uiCardBg,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: isSelected ? _uiAccent : _uiBorder,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    item.value,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: isSelected
-                                          ? _uiAccent
-                                          : _uiTextNormal,
-                                      fontSize: 13,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w600
-                                          : FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(growable: false),
-                      ),
-                    ),
-                    Container(
-                      height: 0.8,
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      color: _uiBorder.withValues(alpha: 0.9),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '背景文字样式',
-                              style: TextStyle(
-                                color: _uiTextStrong.withValues(alpha: 0.75),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            '共享布局',
-                            style: TextStyle(
-                              color: _uiTextNormal,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          GestureDetector(
-                            onTap: () => _updateSettingsFromSheet(
-                              setPopupState,
-                              _settings.copyWith(
-                                shareLayout: !_settings.shareLayout,
-                              ),
-                            ),
-                            child: Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                color: _settings.shareLayout
-                                    ? _uiAccent
-                                    : _uiCardBg,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: _settings.shareLayout
-                                      ? _uiAccent
-                                      : _uiBorder,
-                                ),
-                              ),
-                              child: _settings.shareLayout
-                                  ? const Icon(
-                                      CupertinoIcons.check_mark,
-                                      size: 14,
-                                      color: CupertinoColors.white,
-                                    )
-                                  : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(
-                      height: 110,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-                        itemCount: styleCount + 1,
-                        itemBuilder: (context, index) {
-                          if (index == styleCount) {
-                            return GestureDetector(
-                              onTap: () => _addReadStyleFromDialog(
-                                setPopupState,
-                              ),
-                              child: Container(
-                                width: 72,
-                                margin:
-                                    const EdgeInsets.symmetric(horizontal: 4),
-                                decoration: BoxDecoration(
-                                  color: _uiCardBg,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: _uiBorder),
-                                ),
-                                alignment: Alignment.center,
-                                child: Icon(
-                                  CupertinoIcons.add,
-                                  color: _uiTextNormal,
-                                  size: 20,
-                                ),
-                              ),
-                            );
-                          }
-
-                          final theme = readStyles[index];
-                          final config = styleConfigs[index];
-                          final isSelected = activeThemeIndex == index;
-                          return GestureDetector(
-                            onTap: () => _updateSettingsFromSheet(
-                              setPopupState,
-                              _settings.copyWith(themeIndex: index),
-                            ),
-                            onLongPress: () => _editReadStyleFromDialog(
-                              setPopupState,
-                              styleIndex: index,
-                            ),
-                            child: Container(
-                              width: 72,
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: _uiCardBg,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: isSelected ? _uiAccent : _uiBorder,
-                                  width: isSelected ? 1.5 : 1,
-                                ),
-                              ),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: theme.background,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  _readStyleDisplayName(config),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: theme.text,
-                                    fontSize: 12,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
+    _showReadingSettingsSheet(
+      title: '界面',
+      initialTab: 1,
+      allowedTabs: const <int>[0, 1, 2],
     );
   }
 
@@ -6383,92 +6062,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _showLegacyMoreConfigDialog() {
-    showCupertinoModalPopup<void>(
-      context: context,
-      builder: (popupContext) => StatefulBuilder(
-        builder: (context, setPopupState) {
-          final bottomInset = MediaQuery.of(context).padding.bottom;
-          return Container(
-            height: 360 + bottomInset,
-            decoration: BoxDecoration(
-              color: _uiPanelBg,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(14),
-              ),
-            ),
-            child: SafeArea(
-              top: false,
-              child: _buildLegacyMoreConfigPreferenceList(setPopupState),
-            ),
-          );
-        },
-      ),
+    _showReadingSettingsSheet(
+      title: '设置',
+      initialTab: 3,
+      allowedTabs: const <int>[3],
     );
   }
 
   void _showLegacyTipConfigDialog() {
-    showCupertinoModalPopup<void>(
-      context: context,
-      builder: (popupContext) => StatefulBuilder(
-        builder: (context, setPopupState) => Container(
-          height: MediaQuery.of(context).size.height * 0.78,
-          decoration: BoxDecoration(
-            color: _uiPanelBg,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(14),
-            ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              children: [
-                Center(
-                  child: Container(
-                    margin: const EdgeInsets.only(top: 10, bottom: 12),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: _isUiDark
-                          ? CupertinoColors.white.withValues(alpha: 0.24)
-                          : AppDesignTokens.textMuted.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '信息',
-                          style: TextStyle(
-                            color: _uiTextStrong,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: () => Navigator.pop(context),
-                        child: Icon(
-                          CupertinoIcons.xmark_circle_fill,
-                          color: _uiTextSubtle,
-                          size: 26,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: _buildLegacyTipConfigList(setPopupState),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    _showReadingSettingsSheet(
+      title: '信息',
+      initialTab: 1,
+      allowedTabs: const <int>[1],
     );
   }
 
@@ -8496,20 +8101,53 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   Widget _buildFontSelectDialog(StateSetter parentSetState) {
     return Container(
-      height: 300,
+      height: 360,
       decoration: BoxDecoration(
         color: _uiPanelBg,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
         children: [
-          const SizedBox(height: 16),
-          Text('选择字体',
-              style: TextStyle(
-                  color: _uiTextStrong,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _isUiDark
+                    ? CupertinoColors.white.withValues(alpha: 0.24)
+                    : AppDesignTokens.textMuted.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 12, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '选择字体',
+                    style: TextStyle(
+                      color: _uiTextStrong,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minSize: 30,
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Icon(
+                    CupertinoIcons.xmark_circle_fill,
+                    color: _uiTextSubtle,
+                    size: 24,
+                  ),
+                ),
+              ],
+            ),
+          ),
           Expanded(
             child: ListView.builder(
               itemCount: ReadingFontFamily.presets.length,
@@ -8546,6 +8184,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                               fontFamily: font.fontFamily.isEmpty
                                   ? null
                                   : font.fontFamily,
+                              fontFamilyFallback: font.fontFamilyFallback,
                             ),
                           ),
                         ),

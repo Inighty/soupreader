@@ -25,6 +25,9 @@ class PagedReaderWidget extends StatefulWidget {
   final String bookTitle;
   final Map<String, int> clickActions;
   final ValueChanged<int>? onAction;
+  final String? searchHighlightQuery;
+  final Color? searchHighlightColor;
+  final Color? searchHighlightTextColor;
 
   // === 翻页动画增强 ===
   final int animDuration; // 动画时长 (100-600ms)
@@ -48,6 +51,9 @@ class PagedReaderWidget extends StatefulWidget {
     required this.bookTitle,
     this.clickActions = const {},
     this.onAction,
+    this.searchHighlightQuery,
+    this.searchHighlightColor,
+    this.searchHighlightTextColor,
     // 翻页动画增强默认值
     this.animDuration = 300,
     this.pageDirection = PageDirection.horizontal,
@@ -222,7 +228,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         oldWidget.textStyle != widget.textStyle ||
         oldWidget.backgroundColor != widget.backgroundColor ||
         oldWidget.padding != widget.padding ||
-        oldWidget.settings != widget.settings) {
+        oldWidget.settings != widget.settings ||
+        oldWidget.searchHighlightQuery != widget.searchHighlightQuery ||
+        oldWidget.searchHighlightColor != widget.searchHighlightColor ||
+        oldWidget.searchHighlightTextColor != widget.searchHighlightTextColor) {
       _invalidatePictures();
       _schedulePrecache();
     }
@@ -429,6 +438,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         applyParagraphIndent: false,
         preserveEmptyLines: true,
         maxHeight: contentHeight,
+        highlightQuery: widget.searchHighlightQuery,
+        highlightBackgroundColor: widget.searchHighlightColor,
+        highlightTextColor: widget.searchHighlightTextColor,
       );
     }
 

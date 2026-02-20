@@ -38,6 +38,7 @@ class PageFactory {
   double _letterSpacing = 0;
   double _paragraphSpacing = 0;
   String? _fontFamily;
+  List<String>? _fontFamilyFallback;
   String _paragraphIndent = '';
   TextAlign _textAlign = TextAlign.left;
   double? _titleFontSize;
@@ -102,6 +103,7 @@ class PageFactory {
     double letterSpacing = 0,
     double paragraphSpacing = 0,
     String? fontFamily,
+    List<String>? fontFamilyFallback,
     String paragraphIndent = '',
     TextAlign textAlign = TextAlign.left,
     double? titleFontSize,
@@ -119,6 +121,7 @@ class PageFactory {
     _letterSpacing = letterSpacing;
     _paragraphSpacing = paragraphSpacing;
     _fontFamily = fontFamily;
+    _fontFamilyFallback = fontFamilyFallback;
     _paragraphIndent = paragraphIndent;
     _textAlign = textAlign;
     _titleFontSize = titleFontSize;
@@ -158,6 +161,7 @@ class PageFactory {
       letterSpacing: _letterSpacing,
       paragraphSpacing: _paragraphSpacing,
       fontFamily: _fontFamily,
+      fontFamilyFallback: _fontFamilyFallback,
       title: _showTitle ? chapter.title : null,
       paragraphIndent: _paragraphIndent,
       textAlign: _textAlign,

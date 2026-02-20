@@ -147,6 +147,46 @@ void main() {
     }
   });
 
+  testWidgets('ReaderBottomMenuNew 四入口图标与字号对齐 legacy 节奏', (tester) async {
+    await pumpMenu(
+      tester,
+      menu: ReaderBottomMenuNew(
+        currentChapterIndex: 1,
+        totalChapters: 5,
+        currentPageIndex: 0,
+        totalPages: 10,
+        settings: const ReadingSettings(),
+        currentTheme: AppColors.readingThemes.first,
+        onChapterChanged: (_) {},
+        onPageChanged: (_) {},
+        onSeekChapterProgress: (_) {},
+        onSettingsChanged: (_) {},
+        onShowChapterList: () {},
+        onShowReadAloud: () {},
+        onShowInterfaceSettings: () {},
+        onShowBehaviorSettings: () {},
+      ),
+    );
+
+    const labels = ['目录', '朗读', '界面', '设置'];
+    for (final label in labels) {
+      final text = tester.widget<Text>(find.text(label));
+      expect(text.style?.fontSize, 12);
+    }
+
+    expect(
+        tester.widget<Icon>(find.byIcon(CupertinoIcons.list_bullet)).size, 20);
+    expect(
+      tester.widget<Icon>(find.byIcon(CupertinoIcons.speaker_2_fill)).size,
+      20,
+    );
+    expect(
+      tester.widget<Icon>(find.byIcon(CupertinoIcons.circle_grid_3x3)).size,
+      20,
+    );
+    expect(tester.widget<Icon>(find.byIcon(CupertinoIcons.gear)).size, 20);
+  });
+
   testWidgets('ReaderBottomMenuNew 亮度侧栏默认在左侧且支持位置切换', (tester) async {
     ReadingSettings? latest;
 
@@ -179,6 +219,53 @@ void main() {
     await tester.pump();
     expect(latest, isNotNull);
     expect(latest!.brightnessViewOnRight, isTrue);
+  });
+
+  testWidgets('ReaderBottomMenuNew 标题附加信息开启时亮度栏下移', (tester) async {
+    await pumpMenu(
+      tester,
+      menu: ReaderBottomMenuNew(
+        currentChapterIndex: 1,
+        totalChapters: 5,
+        currentPageIndex: 0,
+        totalPages: 10,
+        settings: const ReadingSettings(showReadTitleAddition: false),
+        currentTheme: AppColors.readingThemes.first,
+        onChapterChanged: (_) {},
+        onPageChanged: (_) {},
+        onSeekChapterProgress: (_) {},
+        onSettingsChanged: (_) {},
+        onShowChapterList: () {},
+        onShowReadAloud: () {},
+        onShowInterfaceSettings: () {},
+        onShowBehaviorSettings: () {},
+      ),
+    );
+    final panel = find.byKey(const Key('reader_brightness_panel'));
+    expect(panel, findsOneWidget);
+    final topWithoutAddition = tester.getTopLeft(panel).dy;
+
+    await pumpMenu(
+      tester,
+      menu: ReaderBottomMenuNew(
+        currentChapterIndex: 1,
+        totalChapters: 5,
+        currentPageIndex: 0,
+        totalPages: 10,
+        settings: const ReadingSettings(showReadTitleAddition: true),
+        currentTheme: AppColors.readingThemes.first,
+        onChapterChanged: (_) {},
+        onPageChanged: (_) {},
+        onSeekChapterProgress: (_) {},
+        onSettingsChanged: (_) {},
+        onShowChapterList: () {},
+        onShowReadAloud: () {},
+        onShowInterfaceSettings: () {},
+        onShowBehaviorSettings: () {},
+      ),
+    );
+    final topWithAddition = tester.getTopLeft(panel).dy;
+    expect(topWithAddition, greaterThan(topWithoutAddition + 10));
   });
 
   testWidgets('ReaderBottomMenuNew 支持亮度侧栏右侧布局', (tester) async {

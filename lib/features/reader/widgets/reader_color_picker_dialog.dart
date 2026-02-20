@@ -38,29 +38,80 @@ class _ReaderColorPickerDialog extends StatefulWidget {
 }
 
 class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
-  static const List<int> _presetColors = <int>[
-    0xFF000000,
-    0xFF333333,
-    0xFF666666,
-    0xFF999999,
-    0xFFCCCCCC,
-    0xFFFFFFFF,
-    0xFFE53935,
-    0xFFF4511E,
-    0xFFFFB300,
-    0xFFFDD835,
-    0xFF43A047,
-    0xFF00897B,
-    0xFF00ACC1,
-    0xFF1E88E5,
-    0xFF3949AB,
-    0xFF8E24AA,
-    0xFFD81B60,
-    0xFF6D4C41,
-    0xFF546E7A,
-    0xFF015A86,
-    0xFFFDF6E3,
-    0xFFADADAD,
+  static const int _maxRecentColors = 16;
+  static final List<int> _recentColors = <int>[];
+
+  static const List<_ColorPaletteGroup> _paletteGroups = <_ColorPaletteGroup>[
+    _ColorPaletteGroup('中性色', <int>[
+      0xFF000000,
+      0xFF1F1F1F,
+      0xFF333333,
+      0xFF4D4D4D,
+      0xFF666666,
+      0xFF808080,
+      0xFF999999,
+      0xFFB3B3B3,
+      0xFFCCCCCC,
+      0xFFE6E6E6,
+      0xFFF2F2F2,
+      0xFFFFFFFF,
+    ]),
+    _ColorPaletteGroup('暖色', <int>[
+      0xFF7F0000,
+      0xFFB71C1C,
+      0xFFD32F2F,
+      0xFFE53935,
+      0xFFF4511E,
+      0xFFFF6F00,
+      0xFFFF8F00,
+      0xFFFFA000,
+      0xFFFFB300,
+      0xFFFFC107,
+      0xFFFDD835,
+      0xFFFFE082,
+    ]),
+    _ColorPaletteGroup('冷色', <int>[
+      0xFF0D47A1,
+      0xFF1565C0,
+      0xFF1E88E5,
+      0xFF42A5F5,
+      0xFF00ACC1,
+      0xFF00897B,
+      0xFF00796B,
+      0xFF00695C,
+      0xFF3949AB,
+      0xFF5E35B1,
+      0xFF7E57C2,
+      0xFF9575CD,
+    ]),
+    _ColorPaletteGroup('自然色', <int>[
+      0xFF1B5E20,
+      0xFF2E7D32,
+      0xFF388E3C,
+      0xFF43A047,
+      0xFF558B2F,
+      0xFF689F38,
+      0xFF827717,
+      0xFF9E9D24,
+      0xFFAFB42B,
+      0xFFC0CA33,
+      0xFFD4E157,
+      0xFFE6EE9C,
+    ]),
+    _ColorPaletteGroup('阅读常用', <int>[
+      0xFF015A86,
+      0xFF1A3A4A,
+      0xFF2F4F4F,
+      0xFF5D4037,
+      0xFF6D4C41,
+      0xFF8D6E63,
+      0xFFA1887F,
+      0xFFBCAAA4,
+      0xFFFDF6E3,
+      0xFFFAF3DD,
+      0xFFF5ECD7,
+      0xFFEAE0C8,
+    ]),
   ];
 
   late HSVColor _hsvColor;
@@ -153,12 +204,26 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
       setState(() => _errorText = widget.invalidHexMessage);
       return;
     }
+    _rememberRecentColor(parsed);
     Navigator.pop(context, parsed);
+  }
+
+  void _rememberRecentColor(int color) {
+    final normalized = 0xFF000000 | (color & 0x00FFFFFF);
+    _recentColors.removeWhere((item) => (item & 0x00FFFFFF) == normalized);
+    _recentColors.insert(0, normalized);
+    if (_recentColors.length > _maxRecentColors) {
+      _recentColors.removeRange(_maxRecentColors, _recentColors.length);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final color = _currentColor;
+    final rgb = color.value & 0x00FFFFFF;
+    final red = (rgb >> 16) & 0xFF;
+    final green = (rgb >> 8) & 0xFF;
+    final blue = rgb & 0xFF;
     return CupertinoAlertDialog(
       title: Text(widget.title),
       content: Padding(
@@ -171,7 +236,60 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
               children: [
                 _buildPreview(color),
                 const SizedBox(height: 12),
-                _buildPresetGrid(color),
+                if (_recentColors.isNotEmpty) ...[
+                  _buildColorSection('最近使用', _recentColors, color),
+                  const SizedBox(height: 8),
+                ],
+                for (final group in _paletteGroups) ...[
+                  _buildColorSection(group.label, group.colors, color),
+                  const SizedBox(height: 8),
+                ],
+                const SizedBox(height: 6),
+                _buildSliderRow(
+                  label: 'R',
+                  value: red.toDouble(),
+                  min: 0,
+                  max: 255,
+                  text: red.toString(),
+                  onChanged: (v) => _setColor(
+                    Color.fromARGB(
+                      255,
+                      v.round().clamp(0, 255),
+                      green,
+                      blue,
+                    ),
+                  ),
+                ),
+                _buildSliderRow(
+                  label: 'G',
+                  value: green.toDouble(),
+                  min: 0,
+                  max: 255,
+                  text: green.toString(),
+                  onChanged: (v) => _setColor(
+                    Color.fromARGB(
+                      255,
+                      red,
+                      v.round().clamp(0, 255),
+                      blue,
+                    ),
+                  ),
+                ),
+                _buildSliderRow(
+                  label: 'B',
+                  value: blue.toDouble(),
+                  min: 0,
+                  max: 255,
+                  text: blue.toString(),
+                  onChanged: (v) => _setColor(
+                    Color.fromARGB(
+                      255,
+                      red,
+                      green,
+                      v.round().clamp(0, 255),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 10),
                 _buildSliderRow(
                   label: '色相',
@@ -264,32 +382,50 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
     );
   }
 
-  Widget _buildPresetGrid(Color currentColor) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: _presetColors.map((value) {
-        final color = Color(value);
-        final selected =
-            (currentColor.value & 0x00FFFFFF) == (color.value & 0x00FFFFFF);
-        return GestureDetector(
-          onTap: () => _setColor(color),
-          child: Container(
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: selected
-                    ? CupertinoColors.activeBlue
-                    : CupertinoColors.separator,
-                width: selected ? 2 : 1,
-              ),
-            ),
+  Widget _buildColorSection(
+    String label,
+    List<int> colors,
+    Color currentColor,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            color: CupertinoColors.systemGrey,
           ),
-        );
-      }).toList(),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 7,
+          runSpacing: 7,
+          children: colors.map((value) {
+            final color = Color(value);
+            final selected =
+                (currentColor.value & 0x00FFFFFF) == (color.value & 0x00FFFFFF);
+            return GestureDetector(
+              key: Key('reader_color_${_hexRgb(color.value)}'),
+              onTap: () => _setColor(color),
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected
+                        ? CupertinoColors.activeBlue
+                        : CupertinoColors.separator,
+                    width: selected ? 2 : 1,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -342,14 +478,31 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
     if (text.startsWith('0x') || text.startsWith('0X')) {
       text = text.substring(2);
     }
+    if (text.length == 3) {
+      final r = text[0];
+      final g = text[1];
+      final b = text[2];
+      text = '$r$r$g$g$b$b';
+    }
+    if (text.length == 8) {
+      // 支持 AARRGGBB 输入，但对齐 legado 语义只保留 RGB。
+      text = text.substring(2);
+    }
     if (text.length != 6) return null;
     final rgb = int.tryParse(text, radix: 16);
     if (rgb == null) return null;
-    return 0xFF000000 | rgb;
+    return 0xFF000000 | (rgb & 0x00FFFFFF);
   }
 
   String _hexRgb(int colorValue) {
     final rgb = colorValue & 0x00FFFFFF;
     return rgb.toRadixString(16).padLeft(6, '0').toUpperCase();
   }
+}
+
+class _ColorPaletteGroup {
+  final String label;
+  final List<int> colors;
+
+  const _ColorPaletteGroup(this.label, this.colors);
 }
