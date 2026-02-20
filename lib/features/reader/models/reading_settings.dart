@@ -21,6 +21,7 @@ class ReadingSettings {
   final double brightness; // 0.0 - 1.0
   final bool useSystemBrightness;
   final bool showBrightnessView; // 是否显示阅读菜单亮度调节栏
+  final bool brightnessViewOnRight; // 亮度侧边栏位置（true:右侧，false:左侧）
   final ProgressBarBehavior progressBarBehavior; // 进度条行为（页内/章节）
   final bool confirmSkipChapter; // 章节进度条跳转确认（对标 legado）
 
@@ -34,6 +35,8 @@ class ReadingSettings {
   final bool textFullJustify; // 两端对齐
   final bool underline; // 下划线
   final bool shareLayout; // 样式面板共享排版布局（对标 legado）
+  final List<ReadStyleConfig>
+      readStyleConfigs; // 对标 legado configList（样式名+背景类型/背景值/透明度/文字色）
 
   // 精细化边距
   final double paddingTop;
@@ -126,6 +129,7 @@ class ReadingSettings {
     this.brightness = 1.0,
     this.useSystemBrightness = true,
     this.showBrightnessView = true,
+    this.brightnessViewOnRight = false,
     this.progressBarBehavior = ProgressBarBehavior.page,
     this.confirmSkipChapter = true,
     // 新增字段默认值
@@ -138,6 +142,7 @@ class ReadingSettings {
     this.textFullJustify = true,
     this.underline = false,
     this.shareLayout = true,
+    this.readStyleConfigs = const <ReadStyleConfig>[],
     this.paddingTop = 5.0,
     this.paddingBottom = 4.0,
     this.paddingLeft = 22.0,
@@ -326,6 +331,27 @@ class ReadingSettings {
     return ClickAction.normalizeConfig(parsed);
   }
 
+  static List<ReadStyleConfig> _parseReadStyleConfigs(dynamic raw) {
+    if (raw is! List) {
+      return const <ReadStyleConfig>[];
+    }
+    final parsed = <ReadStyleConfig>[];
+    for (final item in raw) {
+      if (item is Map<String, dynamic>) {
+        parsed.add(ReadStyleConfig.fromJson(item).sanitize());
+        continue;
+      }
+      if (item is Map) {
+        parsed.add(
+          ReadStyleConfig.fromJson(
+            item.map((key, value) => MapEntry('$key', value)),
+          ).sanitize(),
+        );
+      }
+    }
+    return parsed;
+  }
+
   static ProgressBarBehavior _parseProgressBarBehavior(
     dynamic raw, {
     ProgressBarBehavior fallback = ProgressBarBehavior.page,
@@ -405,6 +431,7 @@ class ReadingSettings {
       brightness: _toDouble(json['brightness'], 1.0),
       useSystemBrightness: _toBool(json['useSystemBrightness'], true),
       showBrightnessView: _toBool(json['showBrightnessView'], true),
+      brightnessViewOnRight: _toBool(json['brightnessViewOnRight'], false),
       progressBarBehavior:
           _parseProgressBarBehavior(json['progressBarBehavior']),
       confirmSkipChapter: _toBool(json['confirmSkipChapter'], true),
@@ -418,6 +445,7 @@ class ReadingSettings {
       textFullJustify: _toBool(json['textFullJustify'], true),
       underline: _toBool(json['underline'], false),
       shareLayout: _toBool(json['shareLayout'], true),
+      readStyleConfigs: _parseReadStyleConfigs(json['readStyleConfigs']),
       paddingTop: _toDouble(json['paddingTop'], 5.0),
       paddingBottom: _toDouble(json['paddingBottom'], 4.0),
       paddingLeft: _toDouble(json['paddingLeft'], 22.0),
@@ -482,6 +510,7 @@ class ReadingSettings {
       'brightness': brightness,
       'useSystemBrightness': useSystemBrightness,
       'showBrightnessView': showBrightnessView,
+      'brightnessViewOnRight': brightnessViewOnRight,
       'progressBarBehavior': progressBarBehavior.name,
       'confirmSkipChapter': confirmSkipChapter,
       // 新增字段
@@ -494,6 +523,9 @@ class ReadingSettings {
       'textFullJustify': textFullJustify,
       'underline': underline,
       'shareLayout': shareLayout,
+      'readStyleConfigs': readStyleConfigs
+          .map((config) => config.toJson())
+          .toList(growable: false),
       'paddingTop': paddingTop,
       'paddingBottom': paddingBottom,
       'paddingLeft': paddingLeft,
@@ -534,6 +566,12 @@ class ReadingSettings {
   }
 
   ReadingSettings sanitize() {
+    final safeReadStyleConfigs = readStyleConfigs
+        .map((config) => config.sanitize())
+        .toList(growable: false);
+    final safeThemeIndex = safeReadStyleConfigs.isEmpty
+        ? (themeIndex < 0 ? 0 : themeIndex)
+        : themeIndex.clamp(0, safeReadStyleConfigs.length - 1).toInt();
     final safeHeaderMode = _safeInt(
       headerMode,
       min: headerModeHideWhenStatusBarShown,
@@ -584,7 +622,7 @@ class ReadingSettings {
         max: 120.0,
         fallback: 5.0,
       ),
-      themeIndex: themeIndex < 0 ? 0 : themeIndex,
+      themeIndex: safeThemeIndex,
       fontFamilyIndex: fontFamilyIndex < 0 ? 0 : fontFamilyIndex,
       pageTurnMode: pageTurnMode,
       keepScreenOn: keepScreenOn,
@@ -602,6 +640,7 @@ class ReadingSettings {
       ),
       useSystemBrightness: useSystemBrightness,
       showBrightnessView: showBrightnessView,
+      brightnessViewOnRight: brightnessViewOnRight,
       progressBarBehavior: progressBarBehavior,
       confirmSkipChapter: confirmSkipChapter,
       textBold: _safeInt(textBold, min: 0, max: 2, fallback: 0),
@@ -623,6 +662,7 @@ class ReadingSettings {
       textFullJustify: textFullJustify,
       underline: underline,
       shareLayout: shareLayout,
+      readStyleConfigs: safeReadStyleConfigs,
       paddingTop: _safeDouble(
         paddingTop,
         min: 0.0,
@@ -726,6 +766,7 @@ class ReadingSettings {
     double? brightness,
     bool? useSystemBrightness,
     bool? showBrightnessView,
+    bool? brightnessViewOnRight,
     ProgressBarBehavior? progressBarBehavior,
     bool? confirmSkipChapter,
     // 新增字段
@@ -738,6 +779,7 @@ class ReadingSettings {
     bool? textFullJustify,
     bool? underline,
     bool? shareLayout,
+    List<ReadStyleConfig>? readStyleConfigs,
     double? paddingTop,
     double? paddingBottom,
     double? paddingLeft,
@@ -810,6 +852,8 @@ class ReadingSettings {
       brightness: brightness ?? this.brightness,
       useSystemBrightness: useSystemBrightness ?? this.useSystemBrightness,
       showBrightnessView: showBrightnessView ?? this.showBrightnessView,
+      brightnessViewOnRight:
+          brightnessViewOnRight ?? this.brightnessViewOnRight,
       progressBarBehavior: progressBarBehavior ?? this.progressBarBehavior,
       confirmSkipChapter: confirmSkipChapter ?? this.confirmSkipChapter,
       // 新增字段
@@ -822,6 +866,7 @@ class ReadingSettings {
       textFullJustify: textFullJustify ?? this.textFullJustify,
       underline: underline ?? this.underline,
       shareLayout: shareLayout ?? this.shareLayout,
+      readStyleConfigs: readStyleConfigs ?? this.readStyleConfigs,
       paddingTop: paddingTop ?? this.paddingTop,
       paddingBottom: paddingBottom ?? this.paddingBottom,
       paddingLeft: paddingLeft ?? this.paddingLeft,
@@ -858,6 +903,227 @@ class ReadingSettings {
       cleanChapterTitle: cleanChapterTitle ?? this.cleanChapterTitle,
       textBottomJustify: textBottomJustify ?? this.textBottomJustify,
     ).sanitize();
+  }
+}
+
+/// 阅读样式（对标 legado ReadBookConfig.Config 的样式卡片核心可见字段）
+class ReadStyleConfig {
+  final String name;
+  final int backgroundColor;
+  final int textColor;
+  final int bgType;
+  final String bgStr;
+  final int bgAlpha;
+
+  /// legado 删除样式时保留最少数量阈值
+  static const int minEditableCount = 5;
+  static const int legacyDefaultBackgroundColor = 0xFFEEEEEE;
+  static const int legacyDefaultTextColor = 0xFF3E3D3B;
+  static const int legacyDefaultBgAlpha = 100;
+  static const int bgTypeColor = 0;
+  static const int bgTypeAsset = 1;
+  static const int bgTypeFile = 2;
+
+  const ReadStyleConfig({
+    this.name = '',
+    this.backgroundColor = legacyDefaultBackgroundColor,
+    this.textColor = legacyDefaultTextColor,
+    this.bgType = bgTypeColor,
+    this.bgStr = '',
+    this.bgAlpha = legacyDefaultBgAlpha,
+  });
+
+  factory ReadStyleConfig.fromJson(Map<String, dynamic> json) {
+    final parsedBgType = _parseInt(json['bgType'], fallback: bgTypeColor)
+        .clamp(bgTypeColor, bgTypeFile)
+        .toInt();
+    final rawBgStr = _stringOrEmpty(json['bgStr']);
+
+    final parsedTextColor = _parseColor(
+      json.containsKey('textColor')
+          ? json['textColor']
+          : (json['textColorInt'] ?? json['fgColor'] ?? json['text']),
+      legacyDefaultTextColor,
+    );
+
+    int parsedBackgroundColor = _parseColor(
+      json.containsKey('backgroundColor')
+          ? json['backgroundColor']
+          : (json['bgColor'] ?? json['bg']),
+      legacyDefaultBackgroundColor,
+    );
+    if (!json.containsKey('backgroundColor') &&
+        !json.containsKey('bgColor') &&
+        parsedBgType == bgTypeColor) {
+      parsedBackgroundColor = _parseColor(
+        rawBgStr,
+        legacyDefaultBackgroundColor,
+      );
+    }
+
+    return ReadStyleConfig(
+      name: _stringOrEmpty(json['name']).trim(),
+      backgroundColor: parsedBackgroundColor,
+      textColor: parsedTextColor,
+      bgType: parsedBgType,
+      bgStr: rawBgStr,
+      bgAlpha: _parseInt(json['bgAlpha'], fallback: legacyDefaultBgAlpha),
+    ).sanitize();
+  }
+
+  Map<String, dynamic> toJson() {
+    final safe = sanitize();
+    return <String, dynamic>{
+      'name': safe.name,
+      'backgroundColor': safe.backgroundColor,
+      'textColor': safe.textColor,
+      'bgType': safe.bgType,
+      'bgStr': safe.bgStr,
+      'bgAlpha': safe.bgAlpha,
+    };
+  }
+
+  ReadStyleConfig sanitize() {
+    final safeName = name.trim();
+    final safeTextColor = _normalizeColor(textColor, fallback: legacyDefaultTextColor);
+    final safeBgAlpha = _parseInt(bgAlpha, fallback: legacyDefaultBgAlpha)
+        .clamp(0, 100)
+        .toInt();
+    final safeBgType = _parseInt(bgType, fallback: bgTypeColor)
+        .clamp(bgTypeColor, bgTypeFile)
+        .toInt();
+    final safeRawBgStr = bgStr.trim();
+    var safeBackgroundColor = _normalizeColor(
+      backgroundColor,
+      fallback: legacyDefaultBackgroundColor,
+    );
+
+    if (safeBgType == bgTypeColor) {
+      safeBackgroundColor = _parseColor(
+        safeRawBgStr,
+        safeBackgroundColor,
+      );
+      return ReadStyleConfig(
+        name: safeName,
+        backgroundColor: safeBackgroundColor,
+        textColor: safeTextColor,
+        bgType: bgTypeColor,
+        bgStr: '#${_hexRgb(safeBackgroundColor)}',
+        bgAlpha: safeBgAlpha,
+      );
+    }
+
+    if (safeRawBgStr.isEmpty) {
+      return ReadStyleConfig(
+        name: safeName,
+        backgroundColor: safeBackgroundColor,
+        textColor: safeTextColor,
+        bgType: bgTypeColor,
+        bgStr: '#${_hexRgb(safeBackgroundColor)}',
+        bgAlpha: safeBgAlpha,
+      );
+    }
+
+    return ReadStyleConfig(
+      name: safeName,
+      backgroundColor: safeBackgroundColor,
+      textColor: safeTextColor,
+      bgType: safeBgType,
+      bgStr: safeRawBgStr,
+      bgAlpha: safeBgAlpha,
+    );
+  }
+
+  ReadStyleConfig copyWith({
+    String? name,
+    int? backgroundColor,
+    int? textColor,
+    int? bgType,
+    String? bgStr,
+    int? bgAlpha,
+  }) {
+    return ReadStyleConfig(
+      name: name ?? this.name,
+      backgroundColor: backgroundColor ?? this.backgroundColor,
+      textColor: textColor ?? this.textColor,
+      bgType: bgType ?? this.bgType,
+      bgStr: bgStr ?? this.bgStr,
+      bgAlpha: bgAlpha ?? this.bgAlpha,
+    ).sanitize();
+  }
+
+  static String _stringOrEmpty(dynamic raw) {
+    if (raw == null) return '';
+    if (raw is String) return raw.trim();
+    return '$raw'.trim();
+  }
+
+  static int _parseInt(dynamic raw, {required int fallback}) {
+    if (raw is int) return raw;
+    if (raw is num && raw.isFinite) return raw.toInt();
+    if (raw is String) {
+      final text = raw.trim();
+      if (text.isEmpty) return fallback;
+      final parsed = int.tryParse(text);
+      if (parsed != null) return parsed;
+    }
+    return fallback;
+  }
+
+  static int _parseColor(dynamic raw, int fallback) {
+    if (raw is int) {
+      return _normalizeColor(raw, fallback: fallback);
+    }
+    if (raw is num && raw.isFinite) {
+      return _normalizeColor(raw.toInt(), fallback: fallback);
+    }
+    if (raw is! String) {
+      return fallback;
+    }
+    var text = raw.trim();
+    if (text.isEmpty) {
+      return fallback;
+    }
+    if (text.startsWith('#')) {
+      text = text.substring(1);
+    }
+    if (text.startsWith('0x') || text.startsWith('0X')) {
+      text = text.substring(2);
+    }
+    if (text.length == 6 || text.length == 8) {
+      final parsed = int.tryParse(text, radix: 16);
+      if (parsed == null) {
+        return fallback;
+      }
+      return _normalizeColor(parsed, fallback: fallback);
+    }
+    final parsedInt = int.tryParse(text);
+    if (parsedInt == null) {
+      return fallback;
+    }
+    return _normalizeColor(parsedInt, fallback: fallback);
+  }
+
+  static String _hexRgb(int colorValue) {
+    final rgb = colorValue & 0x00FFFFFF;
+    return rgb.toRadixString(16).padLeft(6, '0').toUpperCase();
+  }
+
+  static int _normalizeColor(
+    int raw, {
+    required int fallback,
+  }) {
+    var value = raw;
+    if (value < 0) {
+      value = value & 0xFFFFFFFF;
+    }
+    if (value < 0 || value > 0xFFFFFFFF) {
+      return fallback;
+    }
+    if ((value & 0xFF000000) == 0) {
+      value = value | 0xFF000000;
+    }
+    return value;
   }
 }
 

@@ -56,6 +56,50 @@ void main() {
     expect(legacyDecoded.shareLayout, isTrue);
   });
 
+  test(
+      'ReadingSettings keeps brightnessViewOnRight defaults and survives json roundtrip',
+      () {
+    const defaults = ReadingSettings();
+    expect(defaults.brightnessViewOnRight, isFalse);
+
+    final encoded = defaults.copyWith(brightnessViewOnRight: true).toJson();
+    final decoded = ReadingSettings.fromJson(encoded);
+    expect(decoded.brightnessViewOnRight, isTrue);
+
+    final legacyDecoded = ReadingSettings.fromJson(<String, dynamic>{});
+    expect(legacyDecoded.brightnessViewOnRight, isFalse);
+  });
+
+  test('ReadingSettings keeps readStyleConfigs and clamps themeIndex', () {
+    final decoded = ReadingSettings.fromJson(<String, dynamic>{
+      'themeIndex': 9,
+      'readStyleConfigs': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'name': '护眼',
+          'backgroundColor': 0xFFFDF6E3,
+          'textColor': 0xFF2D2D2D,
+        },
+      ],
+    });
+    expect(decoded.readStyleConfigs.length, 1);
+    expect(decoded.themeIndex, 0);
+
+    final roundtrip = ReadingSettings.fromJson(decoded.toJson());
+    expect(roundtrip.readStyleConfigs.length, 1);
+    expect(roundtrip.readStyleConfigs.first.name, '护眼');
+    expect(roundtrip.themeIndex, 0);
+  });
+
+  test('ReadStyleConfig accepts legacy signed and hex color values', () {
+    final config = ReadStyleConfig.fromJson(<String, dynamic>{
+      'name': '夜间',
+      'backgroundColor': '-16777216',
+      'textColor': '#ADADAD',
+    });
+    expect(config.backgroundColor, 0xFF000000);
+    expect(config.textColor, 0xFFADADAD);
+  });
+
   test('ReadingSettings keeps legado-like pageTouchSlop range', () {
     final defaults = ReadingSettings.fromJson(<String, dynamic>{});
     expect(defaults.pageTouchSlop, 0);

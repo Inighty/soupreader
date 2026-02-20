@@ -308,25 +308,30 @@ void main() {
     expect(prefs.getInt('reading_settings_schema_version'), 3);
   });
 
-  test('SettingsService 持久化书籍级允许更新与分割长章节开关', () async {
+  test('SettingsService 持久化书籍级允许更新/分割长章节/替换规则开关', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final service = SettingsService();
     await service.init();
 
     expect(service.getBookCanUpdate('book-1'), isTrue);
     expect(service.getBookSplitLongChapter('book-1'), isTrue);
+    expect(service.getBookUseReplaceRule('book-1'), isTrue);
 
     await service.saveBookCanUpdate('book-1', false);
     await service.saveBookSplitLongChapter('book-1', false);
+    await service.saveBookUseReplaceRule('book-1', false);
 
     expect(service.getBookCanUpdate('book-1'), isFalse);
     expect(service.getBookSplitLongChapter('book-1'), isFalse);
+    expect(service.getBookUseReplaceRule('book-1'), isFalse);
 
     await service.init();
     expect(service.getBookCanUpdate('book-1'), isFalse);
     expect(service.getBookSplitLongChapter('book-1'), isFalse);
+    expect(service.getBookUseReplaceRule('book-1'), isFalse);
     expect(service.getBookCanUpdate(''), isTrue);
     expect(service.getBookSplitLongChapter(''), isTrue);
+    expect(service.getBookUseReplaceRule(''), isTrue);
   });
 
   test('SettingsService 兼容旧格式书籍级开关映射', () async {
@@ -335,6 +340,8 @@ void main() {
           '{"book-a":0,"book-b":"true","book-c":"0","book-d":1}',
       'book_split_long_chapter_map':
           '{"book-a":"false","book-b":"1","book-c":0,"book-d":true}',
+      'book_use_replace_rule_map':
+          '{"book-a":0,"book-b":"true","book-c":"0","book-d":1}',
     });
     final service = SettingsService();
     await service.init();
@@ -348,5 +355,10 @@ void main() {
     expect(service.getBookSplitLongChapter('book-b'), isTrue);
     expect(service.getBookSplitLongChapter('book-c'), isFalse);
     expect(service.getBookSplitLongChapter('book-d'), isTrue);
+
+    expect(service.getBookUseReplaceRule('book-a'), isFalse);
+    expect(service.getBookUseReplaceRule('book-b'), isTrue);
+    expect(service.getBookUseReplaceRule('book-c'), isFalse);
+    expect(service.getBookUseReplaceRule('book-d'), isTrue);
   });
 }

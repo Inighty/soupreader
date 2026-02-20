@@ -19,6 +19,7 @@ class SettingsService {
   static const String _keyBookCanUpdateMap = 'book_can_update_map';
   static const String _keyBookSplitLongChapterMap =
       'book_split_long_chapter_map';
+  static const String _keyBookUseReplaceRuleMap = 'book_use_replace_rule_map';
   static const String _keyBookRemoteUploadUrlMap = 'book_remote_upload_url_map';
   static const int _readingSettingsSchemaVersion = 3;
 
@@ -28,6 +29,7 @@ class SettingsService {
   bool _isInitialized = false;
   Map<String, bool> _bookCanUpdateMap = <String, bool>{};
   Map<String, bool> _bookSplitLongChapterMap = <String, bool>{};
+  Map<String, bool> _bookUseReplaceRuleMap = <String, bool>{};
   Map<String, String> _bookRemoteUploadUrlMap = <String, String>{};
   final ValueNotifier<ReadingSettings> _readingSettingsNotifier =
       ValueNotifier(const ReadingSettings());
@@ -91,6 +93,8 @@ class SettingsService {
     _bookCanUpdateMap = _decodeBoolMap(_prefs.getString(_keyBookCanUpdateMap));
     _bookSplitLongChapterMap =
         _decodeBoolMap(_prefs.getString(_keyBookSplitLongChapterMap));
+    _bookUseReplaceRuleMap =
+        _decodeBoolMap(_prefs.getString(_keyBookUseReplaceRuleMap));
     _bookRemoteUploadUrlMap =
         _decodeStringMap(_prefs.getString(_keyBookRemoteUploadUrlMap));
   }
@@ -196,6 +200,28 @@ class SettingsService {
     await _persistBoolMap(
       _keyBookSplitLongChapterMap,
       _bookSplitLongChapterMap,
+    );
+  }
+
+  bool getBookUseReplaceRule(String bookId, {bool fallback = true}) {
+    if (!_isInitialized) return fallback;
+    final key = bookId.trim();
+    if (key.isEmpty) return fallback;
+    return _bookUseReplaceRuleMap[key] ?? fallback;
+  }
+
+  Future<void> saveBookUseReplaceRule(
+    String bookId,
+    bool useReplaceRule,
+  ) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    _bookUseReplaceRuleMap = Map<String, bool>.from(_bookUseReplaceRuleMap)
+      ..[key] = useReplaceRule;
+    await _persistBoolMap(
+      _keyBookUseReplaceRuleMap,
+      _bookUseReplaceRuleMap,
     );
   }
 

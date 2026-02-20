@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show listEquals, mapEquals;
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, listEquals;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
@@ -41,6 +45,7 @@ import '../services/reader_source_switch_helper.dart';
 import '../services/reader_system_ui_helper.dart';
 import '../services/reader_top_bar_action_helper.dart';
 import '../services/reader_tip_selection_helper.dart';
+import '../services/read_style_import_export_service.dart';
 import '../utils/chapter_progress_utils.dart';
 import '../widgets/auto_pager.dart';
 import '../widgets/click_action_config_dialog.dart';
@@ -124,6 +129,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       ChineseScriptConverter.instance;
   final ReaderBookmarkExportService _bookmarkExportService =
       ReaderBookmarkExportService();
+  final ReadStyleImportExportService _readStyleImportExportService =
+      ReadStyleImportExportService();
 
   List<Chapter> _chapters = [];
   int _currentChapterIndex = 0;
@@ -160,6 +167,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   bool _tocUiUseReplace = false;
   bool _tocUiLoadWordCount = false;
   bool _tocUiSplitLongChapter = false;
+  bool _useReplaceRule = true;
 
   // 翻页模式相关（对标 Legado PageFactory）
   final PageFactory _pageFactory = PageFactory();
@@ -261,6 +269,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   DateTime _lastScrollPreloadCheckAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _programmaticScrollInFlight = false;
   double _scrollAnchorWithinViewport = 32.0;
+  String? _readStyleBackgroundDirectoryPath;
 
   @override
   void initState() {
@@ -282,8 +291,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _bookmarkRepo = BookmarkRepository();
     _settingsService = SettingsService();
     _settings = _settingsService.readingSettings.sanitize();
+    _useReplaceRule = _settingsService.getBookUseReplaceRule(
+      widget.bookId,
+      fallback: _defaultUseReplaceRule(),
+    );
     _settingsService.readingSettingsListenable
         .addListener(_handleReadingSettingsChanged);
+    _warmUpReadStyleBackgroundDirectoryPath();
     _autoPager.setSpeed(_settings.autoReadSpeed);
     _autoPager.setMode(_settings.pageTurnMode == PageTurnMode.scroll
         ? AutoPagerMode.scroll
@@ -523,17 +537,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   bool _isSameReadingSettings(ReadingSettings a, ReadingSettings b) {
-    final aJson = Map<String, dynamic>.from(a.toJson());
-    final bJson = Map<String, dynamic>.from(b.toJson());
-    final aActionsRaw = aJson.remove('clickActions');
-    final bActionsRaw = bJson.remove('clickActions');
-    final aActions = aActionsRaw is Map
-        ? aActionsRaw.map((key, value) => MapEntry('$key', value))
-        : const <String, dynamic>{};
-    final bActions = bActionsRaw is Map
-        ? bActionsRaw.map((key, value) => MapEntry('$key', value))
-        : const <String, dynamic>{};
-    return mapEquals(aJson, bJson) && mapEquals(aActions, bActions);
+    return json.encode(a.toJson()) == json.encode(b.toJson());
   }
 
   /// 保存进度：章节 + 滚动偏移
@@ -1659,13 +1663,91 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
   }
 
+  List<ReadStyleConfig> get _defaultReadStyleConfigs => AppColors.readingThemes
+      .map(
+        (theme) => ReadStyleConfig(
+          name: theme.name,
+          backgroundColor: theme.background.toARGB32(),
+          textColor: theme.text.toARGB32(),
+        ),
+      )
+      .toList(growable: false);
+
+  List<ReadStyleConfig> get _activeReadStyleConfigs {
+    final configured = _settings.readStyleConfigs;
+    if (configured.isNotEmpty) {
+      return configured
+          .map((config) => config.sanitize())
+          .toList(growable: false);
+    }
+    return _defaultReadStyleConfigs;
+  }
+
+  List<ReadingThemeColors> get _activeReadStyles {
+    return _activeReadStyleConfigs
+        .map(
+          (config) => ReadingThemeColors(
+            background: Color(config.backgroundColor),
+            text: Color(config.textColor),
+            name: _readStyleDisplayName(config),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  int get _activeReadStyleIndex {
+    final styles = _activeReadStyleConfigs;
+    if (styles.isEmpty) return 0;
+    return _settings.themeIndex.clamp(0, styles.length - 1).toInt();
+  }
+
+  String _readStyleDisplayName(ReadStyleConfig config) {
+    final trimmed = config.name.trim();
+    return trimmed.isEmpty ? '文字' : trimmed;
+  }
+
+  List<ReadStyleConfig> _copyActiveReadStyleConfigs() {
+    final current = _activeReadStyleConfigs;
+    return current.map((config) => config.copyWith()).toList();
+  }
+
+  ReadStyleConfig _createLegacyReadStyleTemplate() {
+    return const ReadStyleConfig(
+      name: '',
+      backgroundColor: ReadStyleConfig.legacyDefaultBackgroundColor,
+      textColor: ReadStyleConfig.legacyDefaultTextColor,
+    );
+  }
+
+  ReadStyleConfig get _currentReadStyleConfig {
+    final styles = _activeReadStyleConfigs;
+    if (styles.isEmpty) {
+      return _createLegacyReadStyleTemplate();
+    }
+    return styles[_activeReadStyleIndex].sanitize();
+  }
+
+  Color get _readerBackgroundBaseColor =>
+      Color(_currentReadStyleConfig.backgroundColor);
+
+  bool get _readerUsesImageBackground {
+    final bgType = _currentReadStyleConfig.bgType;
+    return bgType == ReadStyleConfig.bgTypeAsset ||
+        bgType == ReadStyleConfig.bgTypeFile;
+  }
+
+  Color get _readerContentBackgroundColor => _readerUsesImageBackground
+      ? const Color(0x00000000)
+      : _readerBackgroundBaseColor;
+
   /// 获取当前主题
   ReadingThemeColors get _currentTheme {
-    final index = _settings.themeIndex;
-    if (index >= 0 && index < AppColors.readingThemes.length) {
-      return AppColors.readingThemes[index];
+    final styles = _activeReadStyles;
+    if (styles.isEmpty) {
+      return AppColors.readingThemes.first;
     }
-    return AppColors.readingThemes[0];
+    final safeIndex = _activeReadStyleIndex;
+    return styles[safeIndex];
   }
 
   bool get _isUiDark => _currentTheme.isDark;
@@ -1840,7 +1922,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         _showToast('正文编辑暂未实现');
         break;
       case ClickAction.toggleReplaceRule:
-        _showToast('替换规则开关暂未实现');
+        unawaited(_toggleReplaceRuleState());
         break;
       case ClickAction.syncBookProgress:
         _showToast('云端进度同步暂未实现');
@@ -2084,6 +2166,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       bookName: widget.bookTitle,
       sourceUrl: _catalogDisplaySourceUrl(),
       chineseConverterType: _settings.chineseConverterType,
+      useReplaceRule: _tocUiUseReplace && _useReplaceRule,
     );
     final safeTitle = resolved.trim().isEmpty ? chapter.title : resolved;
     _catalogDisplayTitleCacheByChapterId[chapter.id] = safeTitle;
@@ -2102,16 +2185,20 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       return cached;
     }
 
-    final title = await _replaceService.applyTitle(
-      rawTitle,
-      bookName: widget.bookTitle,
-      sourceUrl: _currentSourceUrl,
-    );
-    final content = await _replaceService.applyContent(
-      rawContent,
-      bookName: widget.bookTitle,
-      sourceUrl: _currentSourceUrl,
-    );
+    final title = _useReplaceRule
+        ? await _replaceService.applyTitle(
+            rawTitle,
+            bookName: widget.bookTitle,
+            sourceUrl: _currentSourceUrl,
+          )
+        : rawTitle;
+    final content = _useReplaceRule
+        ? await _replaceService.applyContent(
+            rawContent,
+            bookName: widget.bookTitle,
+            sourceUrl: _currentSourceUrl,
+          )
+        : rawContent;
 
     final stage = _ReplaceStageCache(
       rawTitle: rawTitle,
@@ -2242,7 +2329,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Widget build(BuildContext context) {
     if (!_isInitialized) {
       return CupertinoPageScaffold(
-        backgroundColor: _currentTheme.background,
+        backgroundColor: _readerBackgroundBaseColor,
         child: const Center(child: CupertinoActivityIndicator()),
       );
     }
@@ -2269,7 +2356,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         }
       },
       child: CupertinoPageScaffold(
-        backgroundColor: _currentTheme.background,
+        backgroundColor: _readerBackgroundBaseColor,
         child: KeyboardListener(
           focusNode: _keyboardFocusNode,
           autofocus: true,
@@ -2284,6 +2371,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 height: screenSize.height,
                 child: Stack(
                   children: [
+                    Positioned.fill(
+                      child: _buildReaderBackgroundLayer(),
+                    ),
+
                     // 阅读内容 - 固定全屏
                     Positioned.fill(
                       child: _buildReadingContent(),
@@ -2451,6 +2542,113 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return _buildScrollContent();
   }
 
+  void _warmUpReadStyleBackgroundDirectoryPath() {
+    if (kIsWeb) return;
+    unawaited(() async {
+      try {
+        final directory = await _resolveReadStyleBackgroundDirectory();
+        if (!mounted) return;
+        if (_readStyleBackgroundDirectoryPath == directory.path) {
+          return;
+        }
+        setState(() {
+          _readStyleBackgroundDirectoryPath = directory.path;
+        });
+      } catch (_) {
+        // ignore path lookup failure; reader will gracefully fallback to solid bg
+      }
+    }());
+  }
+
+  Widget _buildReaderBackgroundLayer() {
+    final style = _currentReadStyleConfig;
+    final baseColor = Color(style.backgroundColor);
+    final backgroundImage = _buildReaderBackgroundImage(style);
+    if (backgroundImage == null) {
+      return ColoredBox(color: baseColor);
+    }
+    final imageOpacity = style.bgAlpha.clamp(0, 100).toInt() / 100.0;
+    if (imageOpacity <= 0) {
+      return ColoredBox(color: baseColor);
+    }
+    return ColoredBox(
+      color: baseColor,
+      child: Opacity(
+        opacity: imageOpacity,
+        child: backgroundImage,
+      ),
+    );
+  }
+
+  Widget? _buildReaderBackgroundImage(ReadStyleConfig style) {
+    final safeStyle = style.sanitize();
+    switch (safeStyle.bgType) {
+      case ReadStyleConfig.bgTypeAsset:
+        final assetPath = _normalizeBundledReadStyleAssetPath(safeStyle.bgStr);
+        if (assetPath == null) {
+          return null;
+        }
+        return Image.asset(
+          assetPath,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          alignment: Alignment.center,
+          errorBuilder: (_, __, ___) => const SizedBox.expand(),
+        );
+      case ReadStyleConfig.bgTypeFile:
+        if (kIsWeb) {
+          return null;
+        }
+        final resolvedPath =
+            _resolveReadStyleBackgroundFilePath(safeStyle.bgStr);
+        if (resolvedPath == null || resolvedPath.isEmpty) {
+          return null;
+        }
+        return Image.file(
+          File(resolvedPath),
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          alignment: Alignment.center,
+          errorBuilder: (_, __, ___) => const SizedBox.expand(),
+        );
+      case ReadStyleConfig.bgTypeColor:
+      default:
+        return null;
+    }
+  }
+
+  String? _normalizeBundledReadStyleAssetPath(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return null;
+    final normalized = value.replaceAll('\\', '/');
+    if (normalized.startsWith('assets/bg/')) {
+      return normalized;
+    }
+    if (normalized.startsWith('bg/')) {
+      return 'assets/$normalized';
+    }
+    final name = p.basename(normalized).trim();
+    if (name.isEmpty) return null;
+    return 'assets/bg/$name';
+  }
+
+  String? _resolveReadStyleBackgroundFilePath(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return null;
+    final normalized = value.replaceAll('\\', '/');
+    if (p.isAbsolute(normalized)) {
+      return normalized;
+    }
+    final baseName = p.basename(normalized);
+    final bgDirectoryPath = _readStyleBackgroundDirectoryPath;
+    if (bgDirectoryPath == null || bgDirectoryPath.isEmpty) {
+      return normalized;
+    }
+    return p.join(bgDirectoryPath, baseName);
+  }
+
   Widget _buildBrightnessOverlay() {
     if (_settings.useSystemBrightness) return const SizedBox.shrink();
     // Android/iOS 使用原生亮度调节；仅在 Web/桌面端用遮罩模拟降低亮度。
@@ -2478,7 +2676,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         fontWeight: _currentFontWeight,
         decoration: _currentTextDecoration,
       ),
-      backgroundColor: _currentTheme.background,
+      backgroundColor: _readerContentBackgroundColor,
       padding: _contentPadding,
       enableGestures: !_showMenu && !_showSearchMenu, // 菜单显示时禁止翻页手势
       onTap: () {
@@ -2698,10 +2896,35 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
+  Future<void> _toggleReplaceRuleState() async {
+    final nextUseReplaceRule = !_useReplaceRule;
+    setState(() {
+      _useReplaceRule = nextUseReplaceRule;
+      _catalogDisplayTitleCacheByChapterId.clear();
+    });
+    await _settingsService.saveBookUseReplaceRule(
+      widget.bookId,
+      nextUseReplaceRule,
+    );
+
+    _replaceStageCache.clear();
+    if (_chapters.isNotEmpty) {
+      await _saveProgress();
+      final targetIndex =
+          _currentChapterIndex.clamp(0, _chapters.length - 1).toInt();
+      await _loadChapter(
+        targetIndex,
+        restoreOffset: true,
+      );
+    }
+    if (!mounted) return;
+    _showToast(nextUseReplaceRule ? '已开启替换规则' : '已关闭替换规则');
+  }
+
   void _toggleDayNightThemeFromQuickAction() {
     final targetIndex = ReaderLegacyQuickActionHelper.resolveToggleThemeIndex(
       currentIndex: _settings.themeIndex,
-      themes: AppColors.readingThemes,
+      themes: _activeReadStyles,
     );
     if (targetIndex == _settings.themeIndex) {
       return;
@@ -2772,7 +2995,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   Navigator.pop(sheetContext);
                   await _executeLegacyReadMenuAction(action);
                 },
-                child: Text(ReaderLegacyMenuHelper.readMenuLabel(action)),
+                child: Text(_readerActionLabel(action)),
               ),
             )
             .toList(growable: false),
@@ -2782,6 +3005,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         ),
       ),
     );
+  }
+
+  String _readerActionLabel(ReaderLegacyReadMenuAction action) {
+    final raw = ReaderLegacyMenuHelper.readMenuLabel(action);
+    final checked = switch (action) {
+      ReaderLegacyReadMenuAction.enableReplace => _useReplaceRule,
+      _ => false,
+    };
+    return checked ? '✓ $raw' : raw;
   }
 
   void _showContentSearchDialog() {
@@ -3318,6 +3550,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return lower.endsWith('.epub');
   }
 
+  bool _defaultUseReplaceRule() {
+    // 对齐 legado：epub（以及图片类）默认关闭替换规则；
+    // 当前项目暂无图片阅读模式，先按 epub 分支对齐默认语义。
+    if (_isCurrentBookEpub()) {
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _openExceptionLogsFromReader() async {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
@@ -3405,7 +3646,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         _showReaderActionUnavailable('模拟阅读');
         return;
       case ReaderLegacyReadMenuAction.enableReplace:
-        _showReaderActionUnavailable('启用替换规则');
+        await _toggleReplaceRuleState();
         return;
       case ReaderLegacyReadMenuAction.sameTitleRemoved:
         _showReaderActionUnavailable('同名标题去重');
@@ -4198,9 +4439,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             MapEntry(PageTurnMode.scroll, '滚动'),
             MapEntry(PageTurnMode.none, '无'),
           ];
-          final themeCount = AppColors.readingThemes.length;
-          final activeThemeIndex =
-              _settings.themeIndex.clamp(0, themeCount - 1);
+          final readStyles = _activeReadStyles;
+          final styleConfigs = _activeReadStyleConfigs;
+          final styleCount = readStyles.length;
+          final activeThemeIndex = _activeReadStyleIndex;
           final indentOptions = const <String>['', '　', '　　', '　　　'];
           final currentIndentIndex =
               indentOptions.indexOf(_settings.paragraphIndent);
@@ -4489,32 +4731,43 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-                        itemCount: themeCount + 1,
+                        itemCount: styleCount + 1,
                         itemBuilder: (context, index) {
-                          if (index == themeCount) {
-                            return Container(
-                              width: 72,
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              decoration: BoxDecoration(
-                                color: _uiCardBg,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: _uiBorder),
+                          if (index == styleCount) {
+                            return GestureDetector(
+                              onTap: () => _addReadStyleFromDialog(
+                                setPopupState,
                               ),
-                              alignment: Alignment.center,
-                              child: Icon(
-                                CupertinoIcons.add,
-                                color: _uiTextNormal,
-                                size: 20,
+                              child: Container(
+                                width: 72,
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                decoration: BoxDecoration(
+                                  color: _uiCardBg,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: _uiBorder),
+                                ),
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  CupertinoIcons.add,
+                                  color: _uiTextNormal,
+                                  size: 20,
+                                ),
                               ),
                             );
                           }
 
-                          final theme = AppColors.readingThemes[index];
+                          final theme = readStyles[index];
+                          final config = styleConfigs[index];
                           final isSelected = activeThemeIndex == index;
                           return GestureDetector(
                             onTap: () => _updateSettingsFromSheet(
                               setPopupState,
                               _settings.copyWith(themeIndex: index),
+                            ),
+                            onLongPress: () => _editReadStyleFromDialog(
+                              setPopupState,
+                              styleIndex: index,
                             ),
                             child: Container(
                               width: 72,
@@ -4535,7 +4788,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
-                                  theme.name,
+                                  _readStyleDisplayName(config),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -4560,6 +4813,698 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         },
       ),
     );
+  }
+
+  Future<void> _addReadStyleFromDialog(StateSetter setPopupState) async {
+    final styles = _copyActiveReadStyleConfigs();
+    styles.add(_createLegacyReadStyleTemplate());
+    final createdIndex = styles.length - 1;
+    _updateSettingsFromSheet(
+      setPopupState,
+      _settings.copyWith(
+        readStyleConfigs: styles,
+        themeIndex: createdIndex,
+      ),
+    );
+    await _editReadStyleFromDialog(
+      setPopupState,
+      styleIndex: createdIndex,
+    );
+  }
+
+  Future<void> _editReadStyleFromDialog(
+    StateSetter setPopupState, {
+    required int styleIndex,
+  }) async {
+    if (styleIndex < 0) return;
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setEditorState) {
+          final styles = _activeReadStyleConfigs;
+          if (styles.isEmpty || styleIndex >= styles.length) {
+            return const SizedBox.shrink();
+          }
+          final style = styles[styleIndex];
+          final canDelete = styles.length > ReadStyleConfig.minEditableCount;
+          final defaultStyles = _defaultReadStyleConfigs;
+
+          Future<void> applyStyle(ReadStyleConfig next) async {
+            final nextStyles = _copyActiveReadStyleConfigs();
+            if (styleIndex < 0 || styleIndex >= nextStyles.length) {
+              return;
+            }
+            nextStyles[styleIndex] = next.sanitize();
+            _updateSettingsFromSheet(
+              setPopupState,
+              _settings.copyWith(
+                readStyleConfigs: nextStyles,
+                themeIndex: styleIndex,
+              ),
+            );
+            setEditorState(() {});
+          }
+
+          Future<void> onDelete() async {
+            if (!canDelete) {
+              _showToast('数量已是最少,不能删除.');
+              return;
+            }
+            final confirmed = await showCupertinoDialog<bool>(
+              context: dialogContext,
+              builder: (confirmContext) => CupertinoAlertDialog(
+                title: const Text('删除样式'),
+                content: const Text('\n确定删除当前样式吗？'),
+                actions: [
+                  CupertinoDialogAction(
+                    onPressed: () => Navigator.pop(confirmContext, false),
+                    child: const Text('取消'),
+                  ),
+                  CupertinoDialogAction(
+                    isDestructiveAction: true,
+                    onPressed: () => Navigator.pop(confirmContext, true),
+                    child: const Text('删除'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed != true) {
+              return;
+            }
+            final nextStyles = _copyActiveReadStyleConfigs();
+            if (styleIndex < 0 || styleIndex >= nextStyles.length) {
+              return;
+            }
+            nextStyles.removeAt(styleIndex);
+            if (nextStyles.isEmpty) {
+              nextStyles.add(_createLegacyReadStyleTemplate());
+            }
+            var nextIndex = _settings.themeIndex;
+            if (styleIndex <= nextIndex) {
+              nextIndex -= 1;
+            }
+            nextIndex = nextIndex.clamp(0, nextStyles.length - 1).toInt();
+            _updateSettingsFromSheet(
+              setPopupState,
+              _settings.copyWith(
+                readStyleConfigs: nextStyles,
+                themeIndex: nextIndex,
+              ),
+            );
+            if (dialogContext.mounted) {
+              Navigator.pop(dialogContext);
+            }
+          }
+
+          Future<void> onImportFromFile() async {
+            final result = await _readStyleImportExportService.importFromFile();
+            if (result.cancelled) {
+              return;
+            }
+            if (!result.success || result.style == null) {
+              _showToast(result.message ?? '导入失败');
+              return;
+            }
+            await applyStyle(result.style!);
+            final warning = result.warning?.trim();
+            if (warning != null && warning.isNotEmpty) {
+              _showToast('导入成功（$warning）');
+              return;
+            }
+            _showToast(result.message ?? '导入成功');
+          }
+
+          Future<void> onImportFromUrl() async {
+            final url = await _showReadStyleImportUrlInputDialog();
+            if (url == null || url.trim().isEmpty) {
+              return;
+            }
+            final result =
+                await _readStyleImportExportService.importFromUrl(url);
+            if (result.cancelled) {
+              return;
+            }
+            if (!result.success || result.style == null) {
+              _showToast(result.message ?? '导入失败');
+              return;
+            }
+            await applyStyle(result.style!);
+            final warning = result.warning?.trim();
+            if (warning != null && warning.isNotEmpty) {
+              _showToast('导入成功（$warning）');
+              return;
+            }
+            _showToast(result.message ?? '导入成功');
+          }
+
+          Future<void> onExport() async {
+            final result =
+                await _readStyleImportExportService.exportStyle(style);
+            if (result.cancelled) {
+              return;
+            }
+            if (!result.success) {
+              _showToast(result.message ?? '导出失败');
+              return;
+            }
+            final path = result.outputPath?.trim();
+            if (path != null && path.isNotEmpty) {
+              _showToast('导出成功：$path');
+              return;
+            }
+            _showToast(result.message ?? '导出成功');
+          }
+
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(dialogContext).size.height * 0.66,
+            ),
+            decoration: BoxDecoration(
+              color: _uiPanelBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 10, bottom: 12),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: _isUiDark
+                            ? CupertinoColors.white.withValues(alpha: 0.24)
+                            : AppDesignTokens.textMuted.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '背景文字样式',
+                            style: TextStyle(
+                              color: _uiTextStrong,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          minSize: 30,
+                          onPressed: () => Navigator.pop(dialogContext),
+                          child: Icon(
+                            CupertinoIcons.xmark_circle_fill,
+                            color: _uiTextSubtle,
+                            size: 24,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: Column(
+                        children: [
+                          _buildOptionRow(
+                            '样式名称',
+                            _readStyleDisplayName(style),
+                            () async {
+                              final editedName =
+                                  await _showReadStyleNameInputDialog(
+                                initialValue: style.name,
+                              );
+                              if (editedName == null) return;
+                              await applyStyle(
+                                  style.copyWith(name: editedName));
+                            },
+                          ),
+                          _buildOptionRow(
+                            '文字颜色',
+                            '#${_hexRgb(style.textColor)}',
+                            () async {
+                              final nextColor =
+                                  await _showReadStyleColorInputDialog(
+                                title: '文字颜色',
+                                initialColor: style.textColor,
+                              );
+                              if (nextColor == null) return;
+                              await applyStyle(
+                                style.copyWith(textColor: nextColor),
+                              );
+                            },
+                          ),
+                          _buildOptionRow(
+                            '背景颜色',
+                            '#${_hexRgb(style.backgroundColor)}',
+                            () async {
+                              final nextColor =
+                                  await _showReadStyleColorInputDialog(
+                                title: '背景颜色',
+                                initialColor:
+                                    style.bgType == ReadStyleConfig.bgTypeColor
+                                        ? style.backgroundColor
+                                        : 0xFF015A86,
+                              );
+                              if (nextColor == null) return;
+                              await applyStyle(
+                                style.copyWith(
+                                  backgroundColor: nextColor,
+                                  bgType: ReadStyleConfig.bgTypeColor,
+                                  bgStr: '#${_hexRgb(nextColor)}',
+                                ),
+                              );
+                            },
+                          ),
+                          _buildOptionRow(
+                            '背景图片',
+                            _readStyleBackgroundValueLabel(style),
+                            () async {
+                              final next =
+                                  await _showReadStyleBackgroundSourceDialog(
+                                style: style,
+                              );
+                              if (next == null) {
+                                return;
+                              }
+                              await applyStyle(next);
+                            },
+                          ),
+                          _buildReadStyleSeekBar(
+                            title: '透明度',
+                            progress: style.bgAlpha.clamp(0, 100).toInt(),
+                            max: 100,
+                            valueLabel:
+                                '${style.bgAlpha.clamp(0, 100).toInt()}%',
+                            onChanged: (progress) {
+                              unawaited(
+                                applyStyle(style.copyWith(bgAlpha: progress)),
+                              );
+                            },
+                          ),
+                          _buildOptionRow(
+                            '恢复预设',
+                            '选择',
+                            () async {
+                              final presetIndex =
+                                  await _showReadStylePresetPicker(
+                                defaultStyles: defaultStyles,
+                              );
+                              if (presetIndex == null ||
+                                  presetIndex < 0 ||
+                                  presetIndex >= defaultStyles.length) {
+                                return;
+                              }
+                              await applyStyle(
+                                defaultStyles[presetIndex].copyWith(),
+                              );
+                            },
+                          ),
+                          _buildOptionRow(
+                            '导入配置',
+                            '选择文件',
+                            () => unawaited(onImportFromFile()),
+                          ),
+                          _buildOptionRow(
+                            '网络导入',
+                            '输入地址',
+                            () => unawaited(onImportFromUrl()),
+                          ),
+                          _buildOptionRow(
+                            '导出配置',
+                            '保存文件',
+                            () => unawaited(onExport()),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: CupertinoButton(
+                        color: canDelete
+                            ? CupertinoColors.systemRed.withValues(alpha: 0.16)
+                            : _uiCardBg,
+                        onPressed: onDelete,
+                        child: Text(
+                          '删除样式',
+                          style: TextStyle(
+                            color: canDelete
+                                ? CupertinoColors.systemRed
+                                : _uiTextSubtle,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<String?> _showReadStyleNameInputDialog({
+    required String initialValue,
+  }) async {
+    final controller = TextEditingController(text: initialValue);
+    final result = await showCupertinoDialog<String>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('样式名称'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            placeholder: '请输入样式名称',
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () {
+              Navigator.pop(dialogContext, controller.text.trim());
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
+  Future<int?> _showReadStyleColorInputDialog({
+    required String title,
+    required int initialColor,
+  }) async {
+    final controller = TextEditingController(text: _hexRgb(initialColor));
+    final parsed = await showCupertinoDialog<int>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            textCapitalization: TextCapitalization.characters,
+            placeholder: '输入 6 位十六进制，如 FF6600',
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () {
+              final value = _parseRgbColor(controller.text);
+              if (value == null) {
+                _showToast('请输入 6 位十六进制颜色（如 FF6600）');
+                return;
+              }
+              Navigator.pop(dialogContext, value);
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return parsed;
+  }
+
+  Future<int?> _showReadStylePresetPicker({
+    required List<ReadStyleConfig> defaultStyles,
+  }) {
+    if (defaultStyles.isEmpty) {
+      return Future<int?>.value(null);
+    }
+    return showCupertinoModalPopup<int>(
+      context: context,
+      builder: (popupContext) => CupertinoActionSheet(
+        title: const Text('选择预设布局'),
+        actions: List<Widget>.generate(defaultStyles.length, (index) {
+          final name = _readStyleDisplayName(defaultStyles[index]);
+          return CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(popupContext, index),
+            child: Text(name),
+          );
+        }),
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(popupContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  String _readStyleBackgroundValueLabel(ReadStyleConfig style) {
+    final safeStyle = style.sanitize();
+    switch (safeStyle.bgType) {
+      case ReadStyleConfig.bgTypeAsset:
+        final name = _readStyleBackgroundDisplayName(safeStyle.bgStr);
+        return name.isEmpty ? '内置背景' : '内置:$name';
+      case ReadStyleConfig.bgTypeFile:
+        final name = _readStyleBackgroundDisplayName(safeStyle.bgStr);
+        return name.isEmpty ? '本地图片' : '本地:$name';
+      case ReadStyleConfig.bgTypeColor:
+      default:
+        return '无';
+    }
+  }
+
+  String _readStyleBackgroundDisplayName(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return '';
+    final normalized = value.replaceAll('\\', '/');
+    final baseName = p.basename(normalized);
+    final withoutExt = p.basenameWithoutExtension(baseName).trim();
+    if (withoutExt.isNotEmpty) {
+      return withoutExt;
+    }
+    return baseName.trim();
+  }
+
+  Future<ReadStyleConfig?> _showReadStyleBackgroundSourceDialog({
+    required ReadStyleConfig style,
+  }) async {
+    final selectedAction = await showCupertinoModalPopup<_ReadStyleBgAction>(
+      context: context,
+      builder: (popupContext) => CupertinoActionSheet(
+        title: const Text('背景图片'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () =>
+                Navigator.pop(popupContext, _ReadStyleBgAction.asset),
+            child: const Text('选择内置背景'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () =>
+                Navigator.pop(popupContext, _ReadStyleBgAction.file),
+            child: const Text('选择本地图片'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () =>
+                Navigator.pop(popupContext, _ReadStyleBgAction.clear),
+            child: const Text('使用纯色背景'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(popupContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+
+    switch (selectedAction) {
+      case _ReadStyleBgAction.asset:
+        final assetName = await _showReadStyleAssetBackgroundPicker();
+        if (assetName == null || assetName.trim().isEmpty) {
+          return null;
+        }
+        return style.copyWith(
+          bgType: ReadStyleConfig.bgTypeAsset,
+          bgStr: assetName.trim(),
+        );
+      case _ReadStyleBgAction.file:
+        final filePath = await _pickReadStyleBackgroundImageFromDevice();
+        if (filePath == null || filePath.trim().isEmpty) {
+          return null;
+        }
+        return style.copyWith(
+          bgType: ReadStyleConfig.bgTypeFile,
+          bgStr: filePath.trim(),
+        );
+      case _ReadStyleBgAction.clear:
+        return style.copyWith(
+          bgType: ReadStyleConfig.bgTypeColor,
+          bgStr: '#${_hexRgb(style.backgroundColor)}',
+        );
+      case null:
+        return null;
+    }
+  }
+
+  Future<String?> _showReadStyleAssetBackgroundPicker() async {
+    final assetNames = await _loadBundledReadStyleAssetNames();
+    if (assetNames.isEmpty) {
+      _showToast('当前未配置内置背景图');
+      return null;
+    }
+    if (!mounted) {
+      return null;
+    }
+    return showCupertinoModalPopup<String>(
+      context: context,
+      builder: (popupContext) => CupertinoActionSheet(
+        title: const Text('选择内置背景'),
+        actions: List<Widget>.generate(assetNames.length, (index) {
+          final name = assetNames[index];
+          final displayName = _readStyleBackgroundDisplayName(name);
+          return CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(popupContext, name),
+            child: Text(displayName.isEmpty ? name : displayName),
+          );
+        }),
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(popupContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  Future<List<String>> _loadBundledReadStyleAssetNames() async {
+    try {
+      final manifestRaw = await rootBundle.loadString('AssetManifest.json');
+      final decoded = json.decode(manifestRaw);
+      if (decoded is! Map) {
+        return const <String>[];
+      }
+      final names = <String>{};
+      for (final key in decoded.keys) {
+        final assetPath = '$key'.trim();
+        if (!assetPath.startsWith('assets/bg/')) {
+          continue;
+        }
+        final name = assetPath.substring('assets/bg/'.length).trim();
+        if (name.isEmpty) {
+          continue;
+        }
+        names.add(name);
+      }
+      final sorted = names.toList()..sort();
+      return sorted;
+    } catch (_) {
+      return const <String>[];
+    }
+  }
+
+  Future<String?> _pickReadStyleBackgroundImageFromDevice() async {
+    if (kIsWeb) {
+      _showToast('当前平台暂不支持选择本地背景图');
+      return null;
+    }
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
+      if (picked == null || picked.files.isEmpty) {
+        return null;
+      }
+
+      final selected = picked.files.first;
+      final sourcePath = selected.path?.trim();
+      if (sourcePath == null || sourcePath.isEmpty) {
+        _showToast('无法读取图片路径');
+        return null;
+      }
+
+      final sourceFile = File(sourcePath);
+      if (!await sourceFile.exists()) {
+        _showToast('图片文件不存在');
+        return null;
+      }
+
+      final bgDirectory = await _resolveReadStyleBackgroundDirectory();
+      if (!await bgDirectory.exists()) {
+        await bgDirectory.create(recursive: true);
+      }
+
+      final originalName = selected.name.trim().isNotEmpty
+          ? selected.name.trim()
+          : p.basename(sourcePath);
+      final normalizedName =
+          originalName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+      final fallbackName =
+          normalizedName.isNotEmpty ? normalizedName : 'bg.jpg';
+      final extension = p.extension(fallbackName).toLowerCase();
+      final safeExtension = extension.isEmpty ? '.jpg' : extension;
+      final baseName = p.basenameWithoutExtension(fallbackName).trim();
+      final safeBaseName = baseName.isEmpty ? 'bg' : baseName;
+      final targetName =
+          '${safeBaseName}_${DateTime.now().millisecondsSinceEpoch}$safeExtension';
+      final targetPath = p.join(bgDirectory.path, targetName);
+      final saved = await sourceFile.copy(targetPath);
+      return saved.path;
+    } catch (e) {
+      _showToast('选择背景图失败: $e');
+      return null;
+    }
+  }
+
+  Future<Directory> _resolveReadStyleBackgroundDirectory() async {
+    final docsDirectory = await getApplicationDocumentsDirectory();
+    return Directory(p.join(docsDirectory.path, 'reader', 'bg'));
+  }
+
+  Future<String?> _showReadStyleImportUrlInputDialog() async {
+    final controller = TextEditingController();
+    final result = await showCupertinoDialog<String>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('网络导入'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            placeholder: '请输入 zip 下载地址',
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
   }
 
   Widget _buildReadStyleActionChip({
@@ -5200,6 +6145,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   Widget _buildThemeSettingsTab(StateSetter setPopupState) {
+    final readStyles = _activeReadStyles;
+    final activeStyleIndex = _activeReadStyleIndex;
     return SingleChildScrollView(
       key: const ValueKey('theme'),
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -5267,11 +6214,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               height: 92,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: AppColors.readingThemes.length,
+                itemCount: readStyles.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 12),
                 itemBuilder: (context, index) {
-                  final theme = AppColors.readingThemes[index];
-                  final isSelected = _settings.themeIndex == index;
+                  final theme = readStyles[index];
+                  final isSelected = activeStyleIndex == index;
                   return GestureDetector(
                     onTap: () {
                       _updateSettingsFromSheet(
@@ -6547,6 +7494,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         initialSplitLongChapter: _tocUiSplitLongChapter,
         onUseReplaceChanged: (value) {
           _tocUiUseReplace = value;
+          _catalogDisplayTitleCacheByChapterId.clear();
         },
         onLoadWordCountChanged: (value) {
           _tocUiLoadWordCount = value;
@@ -6569,6 +7517,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       ),
     );
   }
+}
+
+enum _ReadStyleBgAction {
+  asset,
+  file,
+  clear,
 }
 
 class _ReadAloudCapability {

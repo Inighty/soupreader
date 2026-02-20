@@ -44,15 +44,13 @@ class ReaderBottomMenuNew extends StatefulWidget {
   State<ReaderBottomMenuNew> createState() => _ReaderBottomMenuNewState();
 }
 
-enum _ReaderMenuTab {
-  catalog,
-  readAloud,
-  interface,
-  settings,
-}
-
 class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
-  _ReaderMenuTab? _selectedTab;
+  static const Key _brightnessPanelKey = Key('reader_brightness_panel');
+  static const Key _brightnessAutoToggleKey = Key('reader_brightness_auto');
+  static const Key _brightnessPositionToggleKey = Key('reader_brightness_pos');
+  static const double _brightnessPanelTopOffset = 78.0;
+  static const double _brightnessPanelBottomOffset = 98.0;
+
   bool _isDragging = false;
   double _dragValue = 0;
 
@@ -68,74 +66,50 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     final panelBg = _isDarkMode
         ? scheme.popover.withValues(alpha: 0.98)
         : scheme.background.withValues(alpha: 0.97);
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final mediaQuery = MediaQuery.of(context);
+    final bottomPadding = mediaQuery.padding.bottom;
 
-    return Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
-      child: Container(
-        decoration: BoxDecoration(
-          color: panelBg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-          boxShadow: [
-            BoxShadow(
-              color: _isDarkMode
-                  ? const Color(0xFF000000).withValues(alpha: 0.35)
-                  : const Color(0xFF000000).withValues(alpha: 0.12),
-              blurRadius: _isDarkMode ? 22 : 16,
-              offset: const Offset(0, -4),
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          if (widget.settings.showBrightnessView)
+            Positioned(
+              top: mediaQuery.padding.top + _brightnessPanelTopOffset,
+              bottom: bottomPadding + _brightnessPanelBottomOffset,
+              left: widget.settings.brightnessViewOnRight ? null : 16,
+              right: widget.settings.brightnessViewOnRight ? 16 : null,
+              child: _buildBrightnessPanel(scheme, panelBg),
             ),
-          ],
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 12,
-              right: 12,
-              top: 8,
-              bottom: bottomPadding > 0 ? 6 : 10,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildGrabber(scheme),
-                _buildSectionCard(
-                  child: _buildChapterSlider(scheme),
-                ),
-                if (widget.settings.showBrightnessView) ...[
-                  const SizedBox(height: 8),
-                  _buildSectionCard(
-                    child: _buildBrightnessRow(scheme),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: panelBg,
+                  border: Border(
+                    top: BorderSide(
+                      color: scheme.border.withValues(
+                        alpha: _isDarkMode ? 0.72 : 0.58,
+                      ),
+                    ),
                   ),
-                ],
-                const SizedBox(height: 10),
-                _buildBottomTabs(scheme),
-              ],
+                ),
+                padding: EdgeInsets.only(bottom: bottomPadding > 0 ? 4 : 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildChapterSlider(scheme),
+                    _buildBottomTabs(scheme),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildGrabber(ShadColorScheme scheme) {
-    return Container(
-      margin: const EdgeInsets.only(top: 2, bottom: 8),
-      width: 36,
-      height: 4,
-      decoration: BoxDecoration(
-        color: scheme.mutedForeground.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(2),
-      ),
-    );
-  }
-
-  Widget _buildSectionCard({required Widget child}) {
-    return ShadCard(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      child: child,
     );
   }
 
@@ -155,59 +129,27 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             ? widget.currentChapterIndex.toDouble()
             : widget.currentPageIndex.toDouble());
     final sliderValue = rawSliderValue.clamp(0.0, sliderMax).toDouble();
-    final leftLabel = chapterMode
-        ? '章节跳转'
-        : '第${widget.currentChapterIndex + 1}章 / ${widget.totalChapters}章';
-    final rightLabel = chapterMode
-        ? '${widget.currentChapterIndex + 1}/${widget.totalChapters}章'
-        : '${widget.currentPageIndex + 1}/${widget.totalPages}页';
     final accent = _isDarkMode
         ? AppDesignTokens.brandSecondary
         : AppDesignTokens.brandPrimary;
+    final canPrev = widget.currentChapterIndex > 0;
+    final canNext = widget.currentChapterIndex < widget.totalChapters - 1;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              leftLabel,
-              style: TextStyle(
-                color: scheme.foreground,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              rightLabel,
-              style: TextStyle(
-                color: scheme.mutedForeground,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            ShadButton.ghost(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              onPressed: widget.currentChapterIndex > 0
-                  ? () =>
-                      widget.onChapterChanged(widget.currentChapterIndex - 1)
-                  : null,
-              child: Text(
-                '上一章',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: widget.currentChapterIndex > 0
-                      ? accent
-                      : scheme.mutedForeground,
-                ),
-              ),
-            ),
-            Expanded(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 5, 20, 5),
+      child: Row(
+        children: [
+          _buildChapterTextButton(
+            label: '上一章',
+            enabled: canPrev,
+            color: canPrev ? scheme.foreground : scheme.mutedForeground,
+            onTap: canPrev
+                ? () => widget.onChapterChanged(widget.currentChapterIndex - 1)
+                : null,
+          ),
+          Expanded(
+            child: SizedBox(
+              height: 25,
               child: CupertinoSlider(
                 value: sliderValue,
                 min: 0,
@@ -238,207 +180,231 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                     : null,
               ),
             ),
-            ShadButton.ghost(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              onPressed: widget.currentChapterIndex < widget.totalChapters - 1
-                  ? () =>
-                      widget.onChapterChanged(widget.currentChapterIndex + 1)
-                  : null,
-              child: Text(
-                '下一章',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: widget.currentChapterIndex < widget.totalChapters - 1
-                      ? accent
-                      : scheme.mutedForeground,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBrightnessRow(ShadColorScheme scheme) {
-    final accent = _isDarkMode
-        ? AppDesignTokens.brandSecondary
-        : AppDesignTokens.brandPrimary;
-
-    return Row(
-      children: [
-        SizedBox(
-          width: 34,
-          child: Text(
-            '亮度',
-            style: TextStyle(color: scheme.mutedForeground, fontSize: 12),
           ),
-        ),
-        Expanded(
-          child: IgnorePointer(
-            ignoring: widget.settings.useSystemBrightness,
-            child: Opacity(
-              opacity: widget.settings.useSystemBrightness ? 0.35 : 1.0,
-              child: CupertinoSlider(
-                value: _safeFinite(
-                  widget.settings.brightness,
-                  fallback: 1.0,
-                ).clamp(0.0, 1.0).toDouble(),
-                min: 0.0,
-                max: 1.0,
-                activeColor: accent,
-                thumbColor: accent,
-                onChanged: (value) {
-                  widget.onSettingsChanged(
-                    widget.settings.copyWith(brightness: value),
-                  );
-                },
-              ),
-            ),
+          _buildChapterTextButton(
+            label: '下一章',
+            enabled: canNext,
+            color: canNext ? scheme.foreground : scheme.mutedForeground,
+            onTap: canNext
+                ? () => widget.onChapterChanged(widget.currentChapterIndex + 1)
+                : null,
           ),
-        ),
-        const SizedBox(width: 8),
-        _buildStateChip(
-          scheme: scheme,
-          label: '跟随系统',
-          active: widget.settings.useSystemBrightness,
-          accent: accent,
-          onTap: () {
-            widget.onSettingsChanged(
-              widget.settings.copyWith(
-                useSystemBrightness: !widget.settings.useSystemBrightness,
-              ),
-            );
-          },
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildBottomTabs(ShadColorScheme scheme) {
-    final accent = _isDarkMode
-        ? AppDesignTokens.brandSecondary
-        : AppDesignTokens.brandPrimary;
-    return Row(
-      children: [
-        _buildTabItem(
-          scheme: scheme,
-          tab: _ReaderMenuTab.catalog,
-          icon: CupertinoIcons.list_bullet,
-          label: '目录',
-          onTap: widget.onShowChapterList,
-          accent: accent,
-        ),
-        _buildTabItem(
-          scheme: scheme,
-          tab: _ReaderMenuTab.readAloud,
-          icon: CupertinoIcons.speaker_2_fill,
-          label: '朗读',
-          onTap: widget.onShowReadAloud,
-          accent: accent,
-        ),
-        _buildTabItem(
-          scheme: scheme,
-          tab: _ReaderMenuTab.interface,
-          icon: CupertinoIcons.circle_grid_3x3,
-          label: '界面',
-          onTap: widget.onShowInterfaceSettings,
-          accent: accent,
-        ),
-        _buildTabItem(
-          scheme: scheme,
-          tab: _ReaderMenuTab.settings,
-          icon: CupertinoIcons.gear,
-          label: '设置',
-          onTap: widget.onShowBehaviorSettings,
-          accent: accent,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTabItem({
-    required ShadColorScheme scheme,
-    required _ReaderMenuTab tab,
-    required IconData icon,
+  Widget _buildChapterTextButton({
     required String label,
-    required VoidCallback onTap,
-    required Color accent,
+    required bool enabled,
+    required Color color,
+    required VoidCallback? onTap,
   }) {
-    final isSelected = _selectedTab == tab;
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? accent.withValues(alpha: _isDarkMode ? 0.2 : 0.12)
-              : const Color(0x00000000),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? accent.withValues(alpha: 0.8)
-                : scheme.border.withValues(alpha: 0.7),
-          ),
-        ),
-        child: CupertinoButton(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          minimumSize: Size.zero,
-          onPressed: () {
-            setState(() => _selectedTab = tab);
-            onTap();
-          },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: isSelected ? accent : scheme.foreground,
-              ),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isSelected ? accent : scheme.mutedForeground,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                ),
-              ),
-            ],
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: color,
+            fontWeight: enabled ? FontWeight.w500 : FontWeight.w400,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildStateChip({
-    required ShadColorScheme scheme,
-    required String label,
-    required bool active,
-    required Color accent,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
+  Widget _buildBrightnessPanel(
+    ShadColorScheme scheme,
+    Color panelBg,
+  ) {
+    final accent = _isDarkMode
+        ? AppDesignTokens.brandSecondary
+        : AppDesignTokens.brandPrimary;
+    final autoBrightness = widget.settings.useSystemBrightness;
+    final iconColor = autoBrightness ? accent : scheme.mutedForeground;
+    final panelColor = panelBg.withValues(alpha: _isDarkMode ? 0.48 : 0.66);
+
+    return Align(
+      alignment: Alignment.topCenter,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        key: _brightnessPanelKey,
+        width: 40,
         decoration: BoxDecoration(
-          color: active
-              ? accent.withValues(alpha: _isDarkMode ? 0.2 : 0.14)
-              : scheme.muted.withValues(alpha: _isDarkMode ? 0.25 : 0.35),
-          borderRadius: BorderRadius.circular(14),
+          color: panelColor,
+          borderRadius: BorderRadius.circular(5),
           border: Border.all(
-            color: active
-                ? accent
-                : scheme.border.withValues(alpha: _isDarkMode ? 0.9 : 0.75),
+            color: scheme.border.withValues(alpha: _isDarkMode ? 0.8 : 0.45),
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: active ? accent : scheme.foreground,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+        child: Column(
+          children: [
+            GestureDetector(
+              key: _brightnessAutoToggleKey,
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                widget.onSettingsChanged(
+                  widget.settings.copyWith(
+                    useSystemBrightness: !widget.settings.useSystemBrightness,
+                  ),
+                );
+              },
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: Icon(
+                  CupertinoIcons.brightness,
+                  size: 22,
+                  color: iconColor,
+                ),
+              ),
+            ),
+            Expanded(
+              child: IgnorePointer(
+                ignoring: autoBrightness,
+                child: Opacity(
+                  opacity: autoBrightness ? 0.35 : 1.0,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final sliderLength = (constraints.maxHeight - 6)
+                          .clamp(64.0, 320.0)
+                          .toDouble();
+                      return Center(
+                        child: SizedBox(
+                          width: sliderLength,
+                          child: RotatedBox(
+                            quarterTurns: 3,
+                            child: CupertinoSlider(
+                              value: _safeFinite(
+                                widget.settings.brightness,
+                                fallback: 1.0,
+                              ).clamp(0.0, 1.0).toDouble(),
+                              min: 0.0,
+                              max: 1.0,
+                              activeColor: accent,
+                              thumbColor:
+                                  _isDarkMode ? CupertinoColors.white : accent,
+                              onChanged: (value) {
+                                widget.onSettingsChanged(
+                                  widget.settings.copyWith(brightness: value),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            GestureDetector(
+              key: _brightnessPositionToggleKey,
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                widget.onSettingsChanged(
+                  widget.settings.copyWith(
+                    brightnessViewOnRight:
+                        !widget.settings.brightnessViewOnRight,
+                  ),
+                );
+              },
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: Icon(
+                  CupertinoIcons.arrow_left_right,
+                  size: 20,
+                  color: scheme.foreground,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomTabs(ShadColorScheme scheme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        children: [
+          const Spacer(),
+          _buildTabItem(
+            scheme: scheme,
+            icon: CupertinoIcons.list_bullet,
+            label: '目录',
+            onTap: widget.onShowChapterList,
+          ),
+          const Spacer(flex: 2),
+          _buildTabItem(
+            scheme: scheme,
+            icon: CupertinoIcons.speaker_2_fill,
+            label: '朗读',
+            onTap: widget.onShowReadAloud,
+          ),
+          const Spacer(flex: 2),
+          _buildTabItem(
+            scheme: scheme,
+            icon: CupertinoIcons.circle_grid_3x3,
+            label: '界面',
+            onTap: widget.onShowInterfaceSettings,
+          ),
+          const Spacer(flex: 2),
+          _buildTabItem(
+            scheme: scheme,
+            icon: CupertinoIcons.gear,
+            label: '设置',
+            onTap: widget.onShowBehaviorSettings,
+          ),
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabItem({
+    required ShadColorScheme scheme,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      width: 60,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 7),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 20,
+                child: Center(
+                  child: Icon(
+                    icon,
+                    size: 20,
+                    color: scheme.foreground,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: scheme.foreground,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
       ),

@@ -39,6 +39,7 @@ class ChapterTitleDisplayHelper {
     required String bookName,
     required String? sourceUrl,
     required int chineseConverterType,
+    bool useReplaceRule = true,
     ChapterTitleApplyOverride? applyTitleOverride,
   }) async {
     final converted = normalizeAndConvertTitle(
@@ -48,6 +49,10 @@ class ChapterTitleDisplayHelper {
 
     if (applyTitleOverride != null) {
       return applyTitleOverride(converted);
+    }
+
+    if (!useReplaceRule) {
+      return converted;
     }
 
     final replaceService = _replaceRuleService;
@@ -66,6 +71,7 @@ class ChapterTitleDisplayHelper {
     required String bookName,
     required String? sourceUrl,
     required int chineseConverterType,
+    bool useReplaceRule = true,
     ChapterTitleApplyOverride? applyTitleOverride,
   }) async {
     final result = <String>[];
@@ -76,6 +82,7 @@ class ChapterTitleDisplayHelper {
           bookName: bookName,
           sourceUrl: sourceUrl,
           chineseConverterType: chineseConverterType,
+          useReplaceRule: useReplaceRule,
           applyTitleOverride: applyTitleOverride,
         ),
       );

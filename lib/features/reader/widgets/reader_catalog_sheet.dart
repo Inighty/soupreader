@@ -245,6 +245,14 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     );
   }
 
+  void _refreshDisplayTitlesAfterReplaceToggle() {
+    _displayTitleResolverToken++;
+    setState(() {
+      _displayTitlesByChapterIndex.clear();
+    });
+    _resolveDisplayTitlesAroundCurrent();
+  }
+
   Future<void> _resolveDisplayTitlesInDirection({
     required Future<String> Function(Chapter chapter) resolver,
     required int token,
@@ -703,6 +711,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       case ReaderLegacyTocMenuAction.useReplace:
         setState(() => _useReplace = !_useReplace);
         widget.onUseReplaceChanged?.call(_useReplace);
+        _refreshDisplayTitlesAfterReplaceToggle();
         _showToast(_useReplace ? '已开启目录替换规则' : '已关闭目录替换规则');
         return;
       case ReaderLegacyTocMenuAction.loadWordCount:
