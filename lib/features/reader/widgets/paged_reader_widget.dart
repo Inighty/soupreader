@@ -135,6 +135,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   int _precacheEpoch = 0;
   // 动画/拖拽期间延迟执行 Picture 失效，避免收尾阶段出现二次重绘。
   bool _pendingPictureInvalidation = false;
+  bool _pendingPictureInvalidationFlushScheduled = false;
 
   // 仿真翻页门闩：启动动画前必须等待关键帧资源就绪
   bool _isPreparingSimulationTurn = false;
@@ -159,13 +160,32 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (!mounted) return;
     _cancelPendingSimulationPreparation();
     if (_isInteractionRunning) {
-      _pendingPictureInvalidation = true;
+      _markPictureInvalidationPending();
       return;
     }
     _pendingPictureInvalidation = false;
     _invalidatePictures();
     setState(() {});
     _schedulePrecache();
+  }
+
+  void _markPictureInvalidationPending() {
+    _pendingPictureInvalidation = true;
+    _schedulePendingPictureInvalidationFlush();
+  }
+
+  void _schedulePendingPictureInvalidationFlush() {
+    if (!mounted) return;
+    if (_pendingPictureInvalidationFlushScheduled) return;
+    _pendingPictureInvalidationFlushScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pendingPictureInvalidationFlushScheduled = false;
+      if (!mounted) return;
+      _flushPendingPictureInvalidationIfIdle();
+      if (_pendingPictureInvalidation) {
+        _schedulePendingPictureInvalidationFlush();
+      }
+    });
   }
 
   void _flushPendingPictureInvalidationIfIdle({bool rebuild = true}) {
@@ -293,7 +313,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (!changed && !forceRebuild) return;
     if (_isInteractionRunning && !forceRebuild) {
       if (_needsPictureCache) {
-        _pendingPictureInvalidation = true;
+        _markPictureInvalidationPending();
       }
       return;
     }
@@ -452,25 +472,44 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       final contentHeight = size.height -
           (topSafe + _topOffset + widget.padding.top) -
           (bottomSafe + _bottomOffset + widget.padding.bottom);
-      LegacyJustifyComposer.paintContentOnCanvas(
-        canvas: canvas,
-        origin: Offset(
-          widget.padding.left,
-          topSafe + _topOffset + widget.padding.top,
-        ),
+      final titleData = _resolvePageTitleRenderData(
         content: pictureContent,
-        style: widget.textStyle,
-        maxWidth: contentWidth,
-        justify: widget.settings.textFullJustify,
-        paragraphIndent: widget.settings.paragraphIndent,
-        applyParagraphIndent: false,
-        preserveEmptyLines: true,
-        maxHeight: contentHeight,
-        bottomJustify: widget.settings.textBottomJustify,
-        highlightQuery: widget.searchHighlightQuery,
-        highlightBackgroundColor: widget.searchHighlightColor,
-        highlightTextColor: widget.searchHighlightTextColor,
+        renderPosition: renderPosition,
       );
+      var bodyOriginY = topSafe + _topOffset + widget.padding.top;
+      var bodyHeight = contentHeight;
+      if (titleData.shouldRenderTitle) {
+        final consumed = _paintPageTitleOnCanvas(
+          canvas: canvas,
+          origin: Offset(widget.padding.left, bodyOriginY),
+          maxWidth: contentWidth,
+          maxHeight: bodyHeight,
+          title: titleData.title!,
+        );
+        bodyOriginY += consumed;
+        bodyHeight -= consumed;
+      }
+      if (bodyHeight > 0) {
+        LegacyJustifyComposer.paintContentOnCanvas(
+          canvas: canvas,
+          origin: Offset(
+            widget.padding.left,
+            bodyOriginY,
+          ),
+          content: titleData.bodyContent,
+          style: widget.textStyle,
+          maxWidth: contentWidth,
+          justify: widget.settings.textFullJustify,
+          paragraphIndent: widget.settings.paragraphIndent,
+          applyParagraphIndent: false,
+          preserveEmptyLines: true,
+          maxHeight: bodyHeight,
+          bottomJustify: widget.settings.textBottomJustify,
+          highlightQuery: widget.searchHighlightQuery,
+          highlightBackgroundColor: widget.searchHighlightColor,
+          highlightTextColor: widget.searchHighlightTextColor,
+        );
+      }
     }
 
     // 绘制状态栏
@@ -1305,13 +1344,27 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   // === 对标 Legado: abortAnim ===
   void _abortAnim() {
     _cancelPendingSimulationPreparation();
+    final committedDirection = _direction;
     _isStarted = false;
     _isMoved = false;
     _isRunning = false;
     if (_animController.isAnimating) {
       _animController.stop();
-      if (!_isCancel) {
-        _fillPage(_direction);
+      if (!_isCancel && committedDirection != _PageDirection.none) {
+        _fillPage(committedDirection);
+        if (_needsPictureCache) {
+          final promoted =
+              _promoteCachedPicturesOnPageFilled(committedDirection);
+          if (promoted) {
+            _pendingPictureInvalidation = false;
+          } else {
+            _markPictureInvalidationPending();
+          }
+        }
+        if (mounted) {
+          setState(() {});
+          _schedulePrecache();
+        }
       }
     }
   }
@@ -2106,6 +2159,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final topSafe = systemPadding.top;
     final bottomSafe = systemPadding.bottom;
 
+    final renderPosition = _factory.resolveRenderPosition(slot);
     return Container(
       color: widget.backgroundColor,
       child: Stack(
@@ -2118,7 +2172,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
                 widget.padding.right,
                 bottomSafe + _bottomOffset + widget.padding.bottom,
               ),
-              child: _buildPageBodyContent(content),
+              child: _buildPageBodyContent(
+                content,
+                renderPosition: renderPosition,
+              ),
             ),
           ),
           if (_showAnyTipBar)
@@ -2132,11 +2189,19 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     );
   }
 
-  Widget _buildPageBodyContent(String content) {
-    final blocks = _parsePageRenderBlocks(content);
+  Widget _buildPageBodyContent(
+    String content, {
+    required PageRenderPosition renderPosition,
+  }) {
+    final titleData = _resolvePageTitleRenderData(
+      content: content,
+      renderPosition: renderPosition,
+    );
+    final blocks = _parsePageRenderBlocks(titleData.bodyContent);
+    Widget body;
     if (!blocks.any((block) => block.isImage)) {
-      return LegacyJustifiedTextBlock(
-        content: content,
+      body = LegacyJustifiedTextBlock(
+        content: titleData.bodyContent,
         style: widget.textStyle,
         justify: widget.settings.textFullJustify,
         bottomJustify: widget.settings.textBottomJustify,
@@ -2144,14 +2209,16 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         applyParagraphIndent: false,
         preserveEmptyLines: true,
       );
+    } else {
+      body = LayoutBuilder(
+        builder: (context, constraints) => _buildImageAwarePageBody(
+          blocks: blocks,
+          maxWidth: constraints.maxWidth,
+          maxHeight: constraints.maxHeight,
+        ),
+      );
     }
-    return LayoutBuilder(
-      builder: (context, constraints) => _buildImageAwarePageBody(
-        blocks: blocks,
-        maxWidth: constraints.maxWidth,
-        maxHeight: constraints.maxHeight,
-      ),
-    );
+    return _wrapPageBodyWithTitle(body: body, titleData: titleData);
   }
 
   String _normalizeLegacyImageStyleValue(String style) {
@@ -2222,6 +2289,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
             content: block.text ?? '',
             style: widget.textStyle,
             justify: widget.settings.textFullJustify,
+            bottomJustify: widget.settings.textBottomJustify,
             paragraphIndent: widget.settings.paragraphIndent,
             applyParagraphIndent: false,
             preserveEmptyLines: true,
@@ -2240,6 +2308,100 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: children,
     );
+  }
+
+  _PageTitleRenderData _resolvePageTitleRenderData({
+    required String content,
+    required PageRenderPosition renderPosition,
+  }) {
+    final normalizedContent = content.replaceAll('\r\n', '\n');
+    if (normalizedContent.isEmpty) {
+      return _PageTitleRenderData.none(normalizedContent);
+    }
+    if (widget.settings.titleMode == 2 || renderPosition.pageIndex != 0) {
+      return _PageTitleRenderData.none(normalizedContent);
+    }
+    final normalizedTitle = renderPosition.chapterTitle.trim();
+    if (normalizedTitle.isEmpty ||
+        !normalizedContent.startsWith(normalizedTitle)) {
+      return _PageTitleRenderData.none(normalizedContent);
+    }
+    return _PageTitleRenderData(
+      title: normalizedTitle,
+      bodyContent: normalizedContent.substring(normalizedTitle.length),
+    );
+  }
+
+  TextStyle get _pageTitleStyle => widget.textStyle.copyWith(
+        fontSize:
+            ((widget.textStyle.fontSize ?? 16.0) + widget.settings.titleSize)
+                .clamp(10.0, 72.0),
+        fontWeight: FontWeight.w600,
+      );
+
+  TextAlign get _pageTitleAlign =>
+      widget.settings.titleMode == 1 ? TextAlign.center : TextAlign.left;
+
+  double get _pageTitleTopSpacing => (widget.settings.titleTopSpacing > 0
+          ? widget.settings.titleTopSpacing
+          : 20.0)
+      .clamp(0.0, double.infinity);
+
+  double get _pageTitleBottomSpacing => (widget.settings.titleBottomSpacing > 0
+          ? widget.settings.titleBottomSpacing
+          : widget.settings.paragraphSpacing * 1.5)
+      .clamp(0.0, double.infinity);
+
+  Widget _wrapPageBodyWithTitle({
+    required Widget body,
+    required _PageTitleRenderData titleData,
+  }) {
+    if (!titleData.shouldRenderTitle) {
+      return body;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: _pageTitleTopSpacing),
+        SizedBox(
+          width: double.infinity,
+          child: Text(
+            titleData.title!,
+            style: _pageTitleStyle,
+            textAlign: _pageTitleAlign,
+          ),
+        ),
+        SizedBox(height: _pageTitleBottomSpacing),
+        body,
+      ],
+    );
+  }
+
+  double _paintPageTitleOnCanvas({
+    required Canvas canvas,
+    required Offset origin,
+    required double maxWidth,
+    required double maxHeight,
+    required String title,
+  }) {
+    if (maxHeight <= 0 || title.trim().isEmpty) {
+      return 0;
+    }
+    final topSpacing = _pageTitleTopSpacing.clamp(0.0, maxHeight);
+    final titlePainter = TextPainter(
+      text: TextSpan(text: title, style: _pageTitleStyle),
+      textDirection: ui.TextDirection.ltr,
+      textAlign: _pageTitleAlign,
+      maxLines: null,
+    )..layout(maxWidth: maxWidth);
+    final restHeight = (maxHeight - topSpacing).clamp(0.0, maxHeight);
+    final paintableTitleHeight = titlePainter.height.clamp(0.0, restHeight);
+    titlePainter.paint(canvas, Offset(origin.dx, origin.dy + topSpacing));
+    final remainingAfterTitle =
+        (restHeight - paintableTitleHeight).clamp(0.0, restHeight);
+    final bottomSpacing =
+        _pageTitleBottomSpacing.clamp(0.0, remainingAfterTitle);
+    return topSpacing + paintableTitleHeight + bottomSpacing;
   }
 
   double _estimatePagedImageHeight({
@@ -2558,6 +2720,20 @@ class _PagedRenderBlock {
         );
 
   bool get isImage => imageSrc != null;
+}
+
+class _PageTitleRenderData {
+  final String? title;
+  final String bodyContent;
+
+  const _PageTitleRenderData({
+    required this.title,
+    required this.bodyContent,
+  });
+
+  const _PageTitleRenderData.none(this.bodyContent) : title = null;
+
+  bool get shouldRenderTitle => title != null && title!.isNotEmpty;
 }
 
 class _PagePicturePainter extends CustomPainter {

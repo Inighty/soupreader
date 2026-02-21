@@ -196,6 +196,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   final _replaceStageCache = <String, _ReplaceStageCache>{};
   final _catalogDisplayTitleCacheByChapterId = <String, String>{};
+  final Map<String, _ResolvedChapterSnapshot>
+      _resolvedChapterSnapshotByChapterId =
+      <String, _ResolvedChapterSnapshot>{};
+  final Map<String, _ChapterImageMetaSnapshot>
+      _chapterImageMetaSnapshotByChapterId =
+      <String, _ChapterImageMetaSnapshot>{};
+  bool _hasDeferredChapterTransformRefresh = false;
 
   static const List<_TipOption> _headerTipOptions = [
     _TipOption(0, '书名'),
@@ -295,6 +302,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   static const Duration _prefetchImageWarmupMaxDuration =
       Duration(milliseconds: 180);
   static const int _persistedImageSizeSnapshotMaxEntries = 180;
+  static const int _chapterImageMetaSnapshotMaxEntries = 64;
   static const double _longImageAspectRatioThreshold = 1.6;
   static const double _longImageErrorBoostThreshold = 0.22;
   static const List<String> _legacyImageWidthQueryKeys = <String>[
@@ -507,16 +515,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _currentSourceName = source?.bookSourceName;
 
       // 初始化 PageFactory：设置章节数据
-      final chapterDataList = _chapters
-          .map((c) => ChapterData(
-                title: _postProcessTitle(c.title),
-                content: _postProcessContent(
-                  c.content ?? '',
-                  c.title,
-                  chapterId: c.id,
-                ),
-              ))
-          .toList();
+      final chapterDataList = List<ChapterData>.generate(
+        _chapters.length,
+        (index) {
+          final snapshot = _resolveChapterSnapshot(index);
+          return ChapterData(
+            title: snapshot.title,
+            content: snapshot.content,
+          );
+        },
+        growable: false,
+      );
       _pageFactory.setChapters(chapterDataList, _currentChapterIndex);
 
       // 监听章节变化
@@ -891,16 +900,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       rawTitle: chapter.title,
       rawContent: content,
     );
-    final processedTitle = _postProcessTitle(stage.title);
-    final processedContent = _postProcessContent(
-      stage.content,
-      stage.title,
-      chapterId: chapter.id,
+    final resolved = _resolveChapterSnapshotFromBase(
+      chapter: chapter,
+      baseTitle: stage.title,
+      baseContent: stage.content,
     );
     final seed = _ScrollSegmentSeed(
       chapterId: chapter.id,
-      title: processedTitle,
-      content: processedContent,
+      title: resolved.title,
+      content: resolved.content,
     );
     final paragraphStyle = _scrollParagraphStyle();
     final bodyWidth = _scrollBodyWidth();
@@ -1390,26 +1398,25 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       rawTitle: chapter.title,
       rawContent: content,
     );
-    final processedTitle = _postProcessTitle(stage.title);
-    final processedContent = _postProcessContent(
-      stage.content,
-      stage.title,
-      chapterId: chapter.id,
+    final resolved = _resolveChapterSnapshotFromBase(
+      chapter: chapter,
+      baseTitle: stage.title,
+      baseContent: stage.content,
     );
     final warmupFuture = _settings.pageTurnMode == PageTurnMode.scroll
         ? Future<bool>.value(false)
         : _warmupPagedImageSizeCache(
-            processedContent,
+            resolved.content,
             maxProbeCount: _chapterLoadImageWarmupMaxProbeCount,
             maxDuration: _chapterLoadImageWarmupMaxDuration,
           );
     setState(() {
       _currentChapterIndex = index;
-      _currentTitle = processedTitle;
-      _currentContent = processedContent;
+      _currentTitle = resolved.title;
+      _currentContent = resolved.content;
       _invalidateScrollLayoutSnapshot();
     });
-    _cacheCurrentChapterImageMetas(processedContent);
+    _cacheCurrentChapterImageMetasFromSnapshot(resolved);
     _updateBookmarkStatus();
     _syncReadAloudChapterContext();
 
@@ -1483,44 +1490,184 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
   }
 
-  void _syncPageFactoryChapters({bool keepPosition = false}) {
-    final chapterDataList = _chapters.map((chapter) {
-      final cached = _replaceStageCache[chapter.id];
-      final title = cached?.title ?? chapter.title;
-      final content = cached?.content ?? (chapter.content ?? '');
-      return ChapterData(
-        title: _postProcessTitle(title),
-        content: _postProcessContent(
-          content,
-          title,
-          chapterId: chapter.id,
-        ),
-      );
-    }).toList();
+  void _syncPageFactoryChapters({
+    bool keepPosition = false,
+    bool preferCachedForFarChapters = false,
+    int? centerIndex,
+  }) {
+    _pruneResolvedChapterCachesIfNeeded();
+    final center = _chapters.isEmpty
+        ? 0
+        : (centerIndex ?? _currentChapterIndex).clamp(0, _chapters.length - 1);
+    final chapterDataList = List<ChapterData>.generate(
+      _chapters.length,
+      (index) {
+        final isNearChapter = (index - center).abs() <= 1;
+        final snapshot = _resolveChapterSnapshot(
+          index,
+          allowStale: preferCachedForFarChapters && !isNearChapter,
+        );
+        return ChapterData(
+          title: snapshot.title,
+          content: snapshot.content,
+        );
+      },
+      growable: false,
+    );
     if (keepPosition) {
       _pageFactory.replaceChaptersKeepingPosition(chapterDataList);
     } else {
       _pageFactory.setChapters(chapterDataList, _currentChapterIndex);
     }
+    if (!preferCachedForFarChapters) {
+      _hasDeferredChapterTransformRefresh = false;
+    }
   }
 
-  String _resolvedChapterTitleForIndex(int chapterIndex) {
-    final chapter = _chapters[chapterIndex];
-    final cached = _replaceStageCache[chapter.id];
-    final title = cached?.title ?? chapter.title;
-    return _postProcessTitle(title);
+  int _chapterPostProcessSignature(String chapterId) {
+    final removeSameTitle =
+        _settings.cleanChapterTitle || _isChapterSameTitleRemoved(chapterId);
+    return Object.hashAll(<Object?>[
+      removeSameTitle,
+      _settings.chineseConverterType,
+      _reSegment,
+      _delRubyTag,
+      _delHTag,
+      _settings.pageTurnMode,
+      _normalizeLegacyImageStyle(_imageStyle),
+    ]);
   }
 
-  String _resolvedChapterContentForIndex(int chapterIndex) {
-    final chapter = _chapters[chapterIndex];
-    final cached = _replaceStageCache[chapter.id];
-    final title = cached?.title ?? chapter.title;
-    final content = cached?.content ?? (chapter.content ?? '');
-    return _postProcessContent(
-      content,
-      title,
+  _ResolvedChapterSnapshot _resolveChapterSnapshotFromBase({
+    required Chapter chapter,
+    required String baseTitle,
+    required String baseContent,
+  }) {
+    final signature = _chapterPostProcessSignature(chapter.id);
+    final baseTitleHash = baseTitle.hashCode;
+    final baseContentHash = baseContent.hashCode;
+    final cached = _resolvedChapterSnapshotByChapterId[chapter.id];
+    if (cached != null &&
+        cached.postProcessSignature == signature &&
+        cached.baseTitleHash == baseTitleHash &&
+        cached.baseContentHash == baseContentHash) {
+      return cached;
+    }
+
+    final snapshot = _ResolvedChapterSnapshot(
       chapterId: chapter.id,
+      postProcessSignature: signature,
+      baseTitleHash: baseTitleHash,
+      baseContentHash: baseContentHash,
+      title: _postProcessTitle(baseTitle),
+      content: _postProcessContent(
+        baseContent,
+        baseTitle,
+        chapterId: chapter.id,
+      ),
     );
+    _resolvedChapterSnapshotByChapterId[chapter.id] = snapshot;
+    return snapshot;
+  }
+
+  void _pruneResolvedChapterCachesIfNeeded() {
+    final activeChapterCount = _chapters.length;
+    final shouldPruneResolved =
+        _resolvedChapterSnapshotByChapterId.length > activeChapterCount + 8;
+    final shouldPruneImageMeta =
+        _chapterImageMetaSnapshotByChapterId.length > activeChapterCount + 8;
+    if (!shouldPruneResolved && !shouldPruneImageMeta) {
+      return;
+    }
+    final activeChapterIds = _chapters.map((chapter) => chapter.id).toSet();
+    if (shouldPruneResolved) {
+      _resolvedChapterSnapshotByChapterId.removeWhere(
+        (chapterId, _) => !activeChapterIds.contains(chapterId),
+      );
+    }
+    if (shouldPruneImageMeta) {
+      _chapterImageMetaSnapshotByChapterId.removeWhere(
+        (chapterId, _) => !activeChapterIds.contains(chapterId),
+      );
+    }
+  }
+
+  _ResolvedChapterSnapshot _resolveChapterSnapshot(
+    int chapterIndex, {
+    bool allowStale = false,
+  }) {
+    final chapter = _chapters[chapterIndex];
+    if (allowStale) {
+      final cached = _resolvedChapterSnapshotByChapterId[chapter.id];
+      if (cached != null) {
+        return cached;
+      }
+    }
+    final stage = _replaceStageCache[chapter.id];
+    return _resolveChapterSnapshotFromBase(
+      chapter: chapter,
+      baseTitle: stage?.title ?? chapter.title,
+      baseContent: stage?.content ?? (chapter.content ?? ''),
+    );
+  }
+
+  bool _isChapterSnapshotFresh(int chapterIndex) {
+    final chapter = _chapters[chapterIndex];
+    final stage = _replaceStageCache[chapter.id];
+    final baseTitle = stage?.title ?? chapter.title;
+    final baseContent = stage?.content ?? (chapter.content ?? '');
+    final cached = _resolvedChapterSnapshotByChapterId[chapter.id];
+    if (cached == null) {
+      return false;
+    }
+    return cached.postProcessSignature ==
+            _chapterPostProcessSignature(chapter.id) &&
+        cached.baseTitleHash == baseTitle.hashCode &&
+        cached.baseContentHash == baseContent.hashCode;
+  }
+
+  _ChapterImageMetaSnapshot _resolveChapterImageMetaSnapshot(
+    _ResolvedChapterSnapshot snapshot,
+  ) {
+    final contentHash = snapshot.content.hashCode;
+    final cached = _chapterImageMetaSnapshotByChapterId[snapshot.chapterId];
+    if (cached != null &&
+        cached.postProcessSignature == snapshot.postProcessSignature &&
+        cached.contentHash == contentHash) {
+      return cached;
+    }
+
+    final next = _ChapterImageMetaSnapshot(
+      chapterId: snapshot.chapterId,
+      postProcessSignature: snapshot.postProcessSignature,
+      contentHash: contentHash,
+      metas: _collectUniqueImageMarkerMetas(
+        snapshot.content,
+        maxCount: _persistedImageSizeSnapshotMaxEntries,
+      ),
+    );
+
+    _chapterImageMetaSnapshotByChapterId.remove(snapshot.chapterId);
+    _chapterImageMetaSnapshotByChapterId[snapshot.chapterId] = next;
+    while (_chapterImageMetaSnapshotByChapterId.length >
+        _chapterImageMetaSnapshotMaxEntries) {
+      _chapterImageMetaSnapshotByChapterId.remove(
+        _chapterImageMetaSnapshotByChapterId.keys.first,
+      );
+    }
+    return next;
+  }
+
+  void _cacheCurrentChapterImageMetasFromSnapshot(
+    _ResolvedChapterSnapshot snapshot,
+  ) {
+    _chapterImageMetaByCacheKey.clear();
+    final metas = _resolveChapterImageMetaSnapshot(snapshot).metas;
+    for (final meta in metas) {
+      final key = ReaderImageMarkerCodec.normalizeResolvedSizeKey(meta.src);
+      if (key.isEmpty) continue;
+      _chapterImageMetaByCacheKey[key] = meta;
+    }
   }
 
   void _handlePageFactoryContentChanged() {
@@ -1532,17 +1679,40 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       return;
     }
 
+    final chapterSnapshotFreshBeforeResolve =
+        _isChapterSnapshotFresh(factoryChapterIndex);
     final chapterChanged = factoryChapterIndex != _currentChapterIndex;
+    final snapshot = _resolveChapterSnapshot(factoryChapterIndex);
+    final chapterPayloadChanged = chapterChanged ||
+        _currentTitle != snapshot.title ||
+        _currentContent != snapshot.content;
     setState(() {
       _currentChapterIndex = factoryChapterIndex;
-      _currentTitle = _resolvedChapterTitleForIndex(factoryChapterIndex);
-      _currentContent = _resolvedChapterContentForIndex(factoryChapterIndex);
+      if (chapterPayloadChanged) {
+        _currentTitle = snapshot.title;
+        _currentContent = snapshot.content;
+      }
     });
-    _cacheCurrentChapterImageMetas(_currentContent);
+    if (chapterPayloadChanged) {
+      _cacheCurrentChapterImageMetasFromSnapshot(snapshot);
+    }
     unawaited(_saveProgress());
     if (chapterChanged) {
       _syncReadAloudChapterContext();
       unawaited(_prefetchNeighborChapters(centerIndex: factoryChapterIndex));
+    }
+
+    final shouldRefreshFactoryAroundCurrent =
+        _hasDeferredChapterTransformRefresh &&
+            !chapterSnapshotFreshBeforeResolve &&
+            _settings.pageTurnMode != PageTurnMode.scroll;
+    if (shouldRefreshFactoryAroundCurrent) {
+      _syncPageFactoryChapters(
+        keepPosition: true,
+        preferCachedForFarChapters: true,
+        centerIndex: factoryChapterIndex,
+      );
+      _paginateContentLogicOnly();
     }
 
     if (!chapterChanged || _isHydratingChapterFromPageFactory) return;
@@ -1619,15 +1789,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         rawContent: content,
       );
       final stageChanged = !identical(previousStage, stage);
-
-      final processedContent = _postProcessContent(
-        stage.content,
-        stage.title,
-        chapterId: chapter.id,
+      final resolved = _resolveChapterSnapshotFromBase(
+        chapter: chapter,
+        baseTitle: stage.title,
+        baseContent: stage.content,
       );
 
       await _warmupPagedImageSizeCache(
-        processedContent,
+        resolved.content,
         maxProbeCount: _prefetchImageWarmupMaxProbeCount,
         maxDuration: _prefetchImageWarmupMaxDuration,
       );
@@ -1804,19 +1973,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final normalized = ReaderImageMarkerCodec.normalizeResolvedSizeKey(src);
     if (normalized.isEmpty) return;
     _bookImageSizeCacheKeys.add(normalized);
-  }
-
-  void _cacheCurrentChapterImageMetas(String content) {
-    _chapterImageMetaByCacheKey.clear();
-    final metas = _collectUniqueImageMarkerMetas(
-      content,
-      maxCount: _persistedImageSizeSnapshotMaxEntries,
-    );
-    for (final meta in metas) {
-      final key = ReaderImageMarkerCodec.normalizeResolvedSizeKey(meta.src);
-      if (key.isEmpty) continue;
-      _chapterImageMetaByCacheKey[key] = meta;
-    }
   }
 
   ReaderImageMarkerMeta? _lookupCurrentChapterImageMeta(String src) {
@@ -2028,7 +2184,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final oldMode = oldSettings.pageTurnMode;
     final newMode = newSettings.pageTurnMode;
     final modeChanged = oldMode != newMode;
-    if (oldSettings.chineseConverterType != newSettings.chineseConverterType) {
+    final chineseConverterChanged =
+        oldSettings.chineseConverterType != newSettings.chineseConverterType;
+    if (chineseConverterChanged) {
       _catalogDisplayTitleCacheByChapterId.clear();
     }
 
@@ -2050,10 +2208,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     // 2. 也是翻页模式且排版参数变更
     bool needRepaginate = false;
 
-    final contentTransformChanged = oldSettings.cleanChapterTitle !=
-            newSettings.cleanChapterTitle ||
-        oldSettings.chineseConverterType != newSettings.chineseConverterType ||
-        oldSettings.paragraphIndent != newSettings.paragraphIndent;
+    final contentTransformChanged =
+        oldSettings.cleanChapterTitle != newSettings.cleanChapterTitle ||
+            chineseConverterChanged ||
+            oldSettings.paragraphIndent != newSettings.paragraphIndent;
+    final deferFarChaptersOnTransform = chineseConverterChanged &&
+        !modeChanged &&
+        newSettings.pageTurnMode != PageTurnMode.scroll;
 
     if (oldSettings.pageTurnMode == PageTurnMode.scroll &&
         newSettings.pageTurnMode != PageTurnMode.scroll) {
@@ -2102,7 +2263,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       if (contentTransformChanged) {
         _syncPageFactoryChapters(
           keepPosition: newSettings.pageTurnMode != PageTurnMode.scroll,
+          preferCachedForFarChapters: deferFarChaptersOnTransform,
+          centerIndex: _currentChapterIndex,
         );
+        if (deferFarChaptersOnTransform) {
+          _hasDeferredChapterTransformRefresh = true;
+        }
       }
       if (needRepaginate) {
         _paginateContentLogicOnly();
@@ -4032,8 +4198,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                           },
                           onShowMainMenu: _openReaderMenuFromAutoReadPanel,
                           onOpenChapterList: _openChapterListFromAutoReadPanel,
-                          onOpenInterfaceSettings:
-                              _openInterfaceSettingsFromAutoReadPanel,
+                          onOpenPageAnimSettings:
+                              _openPageAnimConfigFromAutoReadPanel,
                           onStop: _stopAutoReadFromPanel,
                           onClose: () {
                             setState(() {
@@ -4799,13 +4965,48 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _screenOffTimerStart(force: true);
   }
 
-  void _openInterfaceSettingsFromAutoReadPanel() {
-    if (_showAutoReadPanel) {
-      setState(() {
-        _showAutoReadPanel = false;
-      });
+  Future<void> _openPageAnimConfigFromAutoReadPanel() async {
+    _screenOffTimerStart(force: true);
+    final selectedMode = await showCupertinoModalPopup<PageTurnMode>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('翻页动画'),
+        actions: PageTurnModeUi.values(current: _settings.pageTurnMode)
+            .map(
+              (mode) => CupertinoActionSheetAction(
+                onPressed: () {
+                  if (PageTurnModeUi.isHidden(mode)) {
+                    Navigator.pop(sheetContext);
+                    _showToast('仿真2模式已隐藏');
+                    return;
+                  }
+                  Navigator.pop(sheetContext, mode);
+                },
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      PageTurnModeUi.isHidden(mode)
+                          ? '${mode.name}（隐藏）'
+                          : mode.name,
+                    ),
+                    if (_settings.pageTurnMode == mode)
+                      Icon(CupertinoIcons.check_mark, color: _uiAccent),
+                  ],
+                ),
+              ),
+            )
+            .toList(growable: false),
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (!mounted || selectedMode == null) return;
+    if (selectedMode != _settings.pageTurnMode) {
+      _updateSettings(_settings.copyWith(pageTurnMode: selectedMode));
     }
-    _showReadStyleDialog();
     _screenOffTimerStart(force: true);
   }
 
@@ -11879,6 +12080,38 @@ class _ReplaceStageCache {
     required this.rawContent,
     required this.title,
     required this.content,
+  });
+}
+
+class _ResolvedChapterSnapshot {
+  final String chapterId;
+  final int postProcessSignature;
+  final int baseTitleHash;
+  final int baseContentHash;
+  final String title;
+  final String content;
+
+  const _ResolvedChapterSnapshot({
+    required this.chapterId,
+    required this.postProcessSignature,
+    required this.baseTitleHash,
+    required this.baseContentHash,
+    required this.title,
+    required this.content,
+  });
+}
+
+class _ChapterImageMetaSnapshot {
+  final String chapterId;
+  final int postProcessSignature;
+  final int contentHash;
+  final List<ReaderImageMarkerMeta> metas;
+
+  const _ChapterImageMetaSnapshot({
+    required this.chapterId,
+    required this.postProcessSignature,
+    required this.contentHash,
+    required this.metas,
   });
 }
 

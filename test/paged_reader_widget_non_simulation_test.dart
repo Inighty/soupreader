@@ -143,6 +143,30 @@ void main() {
     expect(factory.currentPageIndex, 0);
   });
 
+  testWidgets('slide 模式快速连续点击应持续推进页码', (tester) async {
+    final factory = _buildFactory();
+    await tester.pumpWidget(
+      _buildReader(
+        factory: factory,
+        mode: PageTurnMode.slide,
+        animDuration: 600,
+      ),
+    );
+    await tester.pump();
+
+    expect(factory.currentPageIndex, 0);
+
+    await tester.tapAt(const Offset(370, 420));
+    await tester.pump(const Duration(milliseconds: 40));
+    await tester.tapAt(const Offset(370, 420));
+    await tester.pump(const Duration(milliseconds: 40));
+    await tester.tapAt(const Offset(370, 420));
+    await tester.pump(const Duration(milliseconds: 40));
+    await _finishTurnAnimation(tester);
+
+    expect(factory.currentPageIndex, greaterThanOrEqualTo(2));
+  });
+
   testWidgets('cover 模式拖拽取消应保持当前页', (tester) async {
     final factory = _buildFactory();
     await tester.pumpWidget(
@@ -244,5 +268,65 @@ void main() {
     await tester.pump();
     await _finishTurnAnimation(tester);
     expect(factory.currentPageIndex, 0);
+  });
+
+  testWidgets('正文标题居中模式在分页渲染中应生效', (tester) async {
+    final marker = ReaderImageMarkerCodec.encode(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/w8AAusB9Y8Zs2gAAAAASUVORK5CYII=',
+    );
+    final factory = PageFactory();
+    factory.setChapters(
+      <ChapterData>[
+        ChapterData(title: '测试章节标题', content: '$marker\n这是正文内容'),
+      ],
+      0,
+    );
+    factory.setLayoutParams(
+      contentHeight: 420,
+      contentWidth: 220,
+      fontSize: 20,
+      lineHeight: 1.4,
+      titleAlign: TextAlign.center,
+      titleFontSize: 24,
+      titleTopSpacing: 20,
+      titleBottomSpacing: 8,
+    );
+    factory.paginateAll();
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: MediaQuery(
+          data: const MediaQueryData(size: Size(390, 844)),
+          child: SizedBox(
+            width: 390,
+            height: 844,
+            child: PagedReaderWidget(
+              pageFactory: factory,
+              pageTurnMode: PageTurnMode.cover,
+              textStyle: const TextStyle(
+                fontSize: 20,
+                color: Color(0xFF222222),
+              ),
+              backgroundColor: const Color(0xFFFAF7F0),
+              settings: const ReadingSettings(
+                pageTurnMode: PageTurnMode.cover,
+                showStatusBar: false,
+                titleMode: 1,
+              ),
+              bookTitle: '测试书',
+              showStatusBar: false,
+              showTipBars: false,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final titleFinder = find.text('测试章节标题');
+    expect(titleFinder, findsOneWidget);
+    final titleWidget = tester.widget<Text>(titleFinder.first);
+    expect(titleWidget.textAlign, TextAlign.center);
   });
 }

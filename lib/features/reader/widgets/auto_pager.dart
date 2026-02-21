@@ -203,7 +203,7 @@ class AutoReadPanel extends StatefulWidget {
   final ValueChanged<int>? onSpeedChanged;
   final VoidCallback? onShowMainMenu;
   final VoidCallback? onOpenChapterList;
-  final VoidCallback? onOpenInterfaceSettings;
+  final VoidCallback? onOpenPageAnimSettings;
   final VoidCallback? onStop;
 
   const AutoReadPanel({
@@ -213,7 +213,7 @@ class AutoReadPanel extends StatefulWidget {
     this.onSpeedChanged,
     this.onShowMainMenu,
     this.onOpenChapterList,
-    this.onOpenInterfaceSettings,
+    this.onOpenPageAnimSettings,
     this.onStop,
   });
 
@@ -222,6 +222,10 @@ class AutoReadPanel extends StatefulWidget {
 }
 
 class _AutoReadPanelState extends State<AutoReadPanel> {
+  int? _previewSpeed;
+
+  int get _displaySpeed => _previewSpeed ?? widget.autoPager.speed;
+
   bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
 
   Color get _accent =>
@@ -259,6 +263,30 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
     if (mounted) {
       setState(() {});
     }
+  }
+
+  int _normalizeSpeed(double value) {
+    return value
+        .round()
+        .clamp(AutoPager.minSpeedSeconds, AutoPager.maxSpeedSeconds)
+        .toInt();
+  }
+
+  void _handleSpeedChanged(double value) {
+    final next = _normalizeSpeed(value);
+    if (_previewSpeed == next) return;
+    setState(() {
+      _previewSpeed = next;
+    });
+  }
+
+  void _handleSpeedChangeEnd(double value) {
+    final speed = _normalizeSpeed(value);
+    setState(() {
+      _previewSpeed = null;
+    });
+    widget.autoPager.setSpeed(speed);
+    widget.onSpeedChanged?.call(speed);
   }
 
   void _handleStop() {
@@ -355,7 +383,7 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
                   ),
                 ),
                 Text(
-                  '${widget.autoPager.speed}s',
+                  '${_displaySpeed}s',
                   style: TextStyle(
                     color: _textNormal,
                     fontSize: 13,
@@ -365,16 +393,13 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
             ),
             const SizedBox(height: 8),
             CupertinoSlider(
-              value: widget.autoPager.speed.toDouble(),
+              value: _displaySpeed.toDouble(),
               min: AutoPager.minSpeedSeconds.toDouble(),
               max: AutoPager.maxSpeedSeconds.toDouble(),
               divisions: AutoPager.maxSpeedSeconds - AutoPager.minSpeedSeconds,
               activeColor: _accent,
-              onChanged: (value) {
-                final speed = value.round();
-                widget.autoPager.setSpeed(speed);
-                widget.onSpeedChanged?.call(speed);
-              },
+              onChanged: _handleSpeedChanged,
+              onChangeEnd: _handleSpeedChangeEnd,
             ),
             const SizedBox(height: 6),
             Row(
@@ -402,7 +427,7 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
                 _buildActionItem(
                   icon: CupertinoIcons.circle_grid_3x3,
                   label: '设置',
-                  onTap: widget.onOpenInterfaceSettings,
+                  onTap: widget.onOpenPageAnimSettings,
                 ),
                 const Spacer(),
               ],

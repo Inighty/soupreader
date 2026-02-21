@@ -185,6 +185,114 @@
 ### 10) Progress（动态）
 
 - `2026-02-21`（本轮补丁）
+  - T11 第二十九批收敛：修复“快速翻页时内容视觉不更新”。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/widgets/paged_reader_widget.dart`、`test/paged_reader_widget_non_simulation_test.dart`、`PLANS.md`。
+    - 关键实现：
+      - 为翻页渲染新增“挂起图片失效的空闲帧刷新调度”，交互中收到 `PageFactory` 内容变更时不再仅打标，空闲后会自动触发快照失效与重绘。
+      - 收敛 `abortAnim` 中断路径：当中断动画并提交换页时，同步执行快照晋升（命中邻页缓存）或挂起失效刷新，避免快速连续翻页长期复用旧 `Picture`。
+      - 新增“slide 模式快速连续点击”回归用例，覆盖动画中断后的页码持续推进路径。
+  - 本轮实施记录：
+    - 做了什么：修复快速翻页下“页码推进但画面停留旧内容”的渲染不同步问题。
+    - 为什么：用户反馈“慢慢翻页正常，快速翻页内容不变”；定位到交互期 `Picture` 复用门闩与中断路径缓存未及时收敛。
+    - 如何验证：
+      - `flutter test test/paged_reader_widget_non_simulation_test.dart --concurrency=1`（通过）
+      - `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+    - 兼容影响：低。仅调整翻页渲染缓存的失效与刷新时机，不改章节数据、菜单语义与设置模型。
+  - T11 当前状态：保持 `active`。快速翻页视觉同步主偏差已收敛，后续按 C5 真机路径补“跨章连续快翻”体感证据。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第二十八批收敛：自动阅读弹窗“设置/速度提交时机”对齐 legado。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/views/simple_reader_view.dart`、`lib/features/reader/widgets/auto_pager.dart`、`test/auto_pager_test.dart`、`PLANS.md`。
+    - 关键实现：
+      - 自动阅读面板“设置”按钮回调改为“翻页动画选择弹窗”，不再跳到界面设置弹窗；保持面板层级与 legado `AutoReadDialog -> showPageAnimConfig` 同义。
+      - 自动阅读速度滑杆改为“拖动中只预览速度值、拖动结束再提交”，对齐 legado `onStopTrackingTouch` 提交语义。
+      - 新增自动阅读面板回归测试，覆盖“设置按钮触发回调”和“onChangeEnd 才提交速度”。
+  - 本轮实施记录：
+    - 做了什么：修复自动阅读弹窗设置入口与速度提交时机偏差。
+    - 为什么：用户要求核对 legado 一致性；对照 `AutoReadDialog.kt/dialog_auto_read.xml` 后确认当前实现存在行为差异。
+    - 如何验证：
+      - `flutter test test/auto_pager_test.dart --concurrency=1`（通过）
+      - `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+      - `flutter test test/reader_top_menu_test.dart --concurrency=1`（通过）
+      - `flutter test test/reader_bottom_menu_new_test.dart --concurrency=1`（通过）
+    - 兼容影响：低。仅调整自动阅读面板设置入口与速度提交时机，不改阅读数据模型、菜单文案与书源协议。
+  - T11 当前状态：保持 `active`。自动阅读弹窗关键行为已对齐，后续按 C5 真机路径补“自动阅读中切换翻页动画”手工证据。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第二十七批收敛：简繁切换链路对齐 legado“近章节重载”语义，避免全书即时重算导致大书卡顿。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/views/simple_reader_view.dart`、`PLANS.md`。
+    - 关键实现：
+      - `_syncPageFactoryChapters` 新增“中心章节 + 近邻章节”优先刷新策略，支持远章节复用旧快照，避免简繁切换时全量章节后处理。
+      - `chineseConverterType` 变更时启用“延迟全量刷新”标记，仅即时刷新当前章节与相邻章节，贴齐 legado `loadContent(当前/前后章)` 语义。
+      - 翻页进入新章节时，若命中旧快照则按需刷新“当前 + 邻章”PageFactory 数据并重排，保证可见章节语义一致且不卡主路径。
+  - 本轮实施记录：
+    - 做了什么：把简繁切换从“全书同步重建”改成“近章节即时 + 按需补齐”。
+    - 为什么：用户反馈本地大书点击简繁会卡；legacy 同场景只重载最近章节，不做全书瞬时转换。
+    - 如何验证：
+      - `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+      - `flutter test test/reader_top_menu_test.dart --concurrency=1`（通过）
+      - `flutter test test/reader_bottom_menu_new_test.dart --concurrency=1`（通过）
+    - 兼容影响：低。仅调整简繁切换时章节刷新范围与时机，不改书源协议、章节索引、进度存储与菜单文案。
+  - T11 当前状态：保持 `active`。简繁切换卡顿主因已收敛，后续按 C5 真机路径补“超大 TXT 连续切章”流畅性证据。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第二十六批收敛：优化“快速翻页跨章节”热路径，缓解切到下一章时卡顿。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/views/simple_reader_view.dart`、`PLANS.md`。
+    - 关键实现：
+      - 新增章节后处理快照缓存（`_ResolvedChapterSnapshot`），统一复用标题/正文后处理结果，避免跨章与预取路径重复执行 `_postProcessContent`。
+      - `_handlePageFactoryContentChanged` 改为“章节数据变化才更新正文/图片元信息”，同章翻页仅刷新页码状态，移除高频重复后处理。
+      - 新增图片 marker 元信息快照（`_ChapterImageMetaSnapshot`），跨章切换直接命中，减少主线程重复扫描正文。
+      - `_loadChapter`、`_prefetchChapterIfNeeded`、`_loadScrollSegment`、`_syncPageFactoryChapters` 统一接入快照解析，保持 legado 语义不变，仅优化执行时机与重复计算。
+  - 本轮实施记录：
+    - 做了什么：将章节后处理与图片 marker 解析从翻页回调热路径中剥离，改为缓存复用。
+    - 为什么：用户反馈“快速翻页切到下一章会卡顿”；对照 legado 切章语义后确认当前实现在 `PageFactory` 回调中存在重复后处理与重复扫描。
+    - 如何验证：
+      - `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+      - `flutter test test/reader_top_menu_test.dart --concurrency=1`（通过）
+      - `flutter test test/reader_bottom_menu_new_test.dart --concurrency=1`（通过）
+    - 兼容影响：低。仅优化阅读器章节解析与缓存复用策略，不改菜单入口、分页语义、进度存储与书源协议。
+  - T11 当前状态：保持 `active`。本批次完成跨章卡顿热路径收敛，后续继续按 C5 路径补真机滑动流畅性回归证据。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第二十五批收敛：阅读器自定义颜色选择器对齐 legado `TYPE_CUSTOM` 取色盘语义。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/widgets/reader_color_picker_dialog.dart`、`test/reader_color_picker_dialog_test.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。
+    - 关键实现：
+      - 新增可拖拽饱和度/明度取色盘与色相条，替代“样例色为主”的交互路径。
+      - HEX 输入与取色盘双向同步，保留 `AARRGGBB` 返回语义（alpha 固定 255）。
+      - 新增“当前/选择”双预览与“最近使用”回写，兼顾精确取色与高频复用。
+  - 本轮实施记录：
+    - 做了什么：将阅读器颜色弹窗改为 legado 同义的自由取色盘，并补齐相关测试。
+    - 为什么：用户反馈“自定义颜色组件不好用”，现有实现仅样例色块不满足精准取色。
+    - 如何验证：
+      - `flutter test test/reader_color_picker_dialog_test.dart`（通过）
+      - `flutter test test/simple_reader_view_compile_test.dart`（通过）
+      - `flutter test test/reading_tip_settings_view_test.dart`（通过）
+    - 兼容影响：低。对外调用签名和持久化颜色格式不变，不影响既有设置数据读取。
+  - T11 当前状态：保持 `active`。自定义取色盘已收敛，继续推进 C5 其余未闭环项。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第二十四批收敛：修复“正文标题设置为居中后分页模式无可见变化”问题。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/widgets/paged_reader_widget.dart`、`test/paged_reader_widget_non_simulation_test.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。
+    - 关键实现：
+      - 分页渲染新增标题独立绘制链路（Widget + Picture 预渲染双路径一致）。
+      - 标题仅在章节第一页按 `titleMode` 应用对齐：`0=居左`、`1=居中`、`2=隐藏`。
+      - 新增回归测试锁定“标题居中生效”行为。
+  - 本轮实施记录：
+    - 做了什么：补齐分页渲染标题的对齐语义，恢复“正文标题居中”可见效果。
+    - 为什么：用户反馈设置“居中”后无反应；排查确认为分页渲染未独立绘制标题导致。
+    - 如何验证：
+      - `flutter test test/paged_reader_widget_non_simulation_test.dart`（通过）
+      - `flutter test test/simple_reader_view_compile_test.dart`（通过）
+    - 兼容影响：低。仅调整标题绘制链路，不改翻页进度与章节数据结构。
+  - T11 当前状态：保持 `active`。标题居中问题已收口，继续跟进剩余阻塞项。
+
+- `2026-02-21`（本轮补丁）
   - T11 第二十三批收敛：完成“界面/设置”选项逐项排查，修复 `底部对齐` 假生效问题，并将未落地能力转为明确阻塞态。
   - T11 代码收敛：
     - 代码变更：`lib/features/reader/widgets/legacy_justified_text.dart`、`lib/features/reader/widgets/paged_reader_widget.dart`、`lib/features/reader/views/simple_reader_view.dart`、`test/legacy_justified_text_highlight_test.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。

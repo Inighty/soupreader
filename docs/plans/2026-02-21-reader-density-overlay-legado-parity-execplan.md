@@ -127,6 +127,7 @@
 - [done] 翻页模式菜单态隐藏页眉页脚提示，消除底部进度与菜单层叠。
 - [done] 底部进度拖动条与四入口间距优化，缓解视觉拥挤。
 - [done] 自动阅读速度语义、控制面板入口和状态反馈对齐 legado。
+- [done] 阅读器自定义取色器对齐 legado 自由取色盘语义（拖拽色盘 + 色相条 + HEX + 最近使用）。
 - [done] 定向测试与计划记录回填。
 
 ## Surprises & Discoveries
@@ -138,6 +139,7 @@
 - 翻页模式提示条绘制与正文占位应分离；仅隐藏提示条而不调整占位，才能避免菜单开合时正文跳动。
 - 底部工具栏拥挤感主要由“滑杆区与入口区贴得过紧”引发，增加小幅垂直留白即可缓解，不需改控件尺寸。
 - 自动阅读若仅“定时翻页”而无面板反馈，用户容易误判为点击无效；需保留 legado 的底部控制面板语义来提供可观测状态。
+- `CupertinoAlertDialog` 内容区在 intrinsic 布局阶段不支持 `LayoutBuilder`；取色盘需改为固定面板尺寸以避免渲染断言。
 
 ## Decision Log
 - 决策 1：保留用户自定义值，只迁移“旧默认值”字段，避免强制覆盖。
@@ -149,6 +151,7 @@
 - 决策 7：翻页模式菜单态隐藏提示条但保留页眉页脚占位，优先消除重叠并保持阅读区域稳定。
 - 决策 8：底部进度拖动条间距采用“小幅放松”策略（+3/+4dp 过渡），不调整功能热区。
 - 决策 9：自动阅读速度改回 legado 的“秒/页”模型，并以 `1-120` 范围对齐 `dialog_auto_read.xml` 的滑杆边界。
+- 决策 10：阅读器取色能力按 legado `TYPE_CUSTOM` 收敛为“自由取色盘为主 + 常用预设补充”，不再依赖少量样例色。
 
 ## Outcomes & Retrospective
 - 做了什么：完成正文密度参数与菜单分层联动收敛，补齐旧设置兼容迁移。
@@ -160,6 +163,7 @@
 - 增量收敛：修复翻页模式底部进度提示与菜单层叠问题，菜单态层级与 legado 语义一致。
 - 增量收敛：优化底部进度拖动区与四入口区间距，底栏观感更松弛。
 - 增量收敛：自动阅读入口反馈、速度模型与控制面板结构完成 legado 同义回补。
+- 增量收敛：自定义颜色选择改为 legado 同义取色盘交互，并补齐 HEX 校验/最近使用回写测试。
 
 ## 2026-02-21 增量：界面/设置选项排查（第 23 批）
 
@@ -218,3 +222,285 @@
 - [done] `textBottomJustify` 对齐 legado 语义，已进入渲染链路。
 - [blocked] `shareLayout`（E1）待样式布局模型扩展。
 - [blocked] `翻页按键`（E2）待平台按键映射能力补齐。
+
+## 2026-02-21 增量：正文标题居中在分页模式不生效（第 24 批）
+
+### 差异点清单（实现前）
+| ID | 位置 | legado 对照 | 差异 | 影响 |
+|---|---|---|---|---|
+| D12 | `PagedReaderWidget` 分页渲染 | `TextChapterLayout` + `TextPage` 标题布局语义 | 标题在分页渲染里未独立绘制，`titleMode=居中` 在正文页无可见变化 | 用户切到“居中”后感知为无效 |
+
+### 实施结果
+1. 分页渲染标题改为独立绘制  
+   - 文件：`lib/features/reader/widgets/paged_reader_widget.dart`。  
+   - 关键实现：
+     - 新增 `_resolvePageTitleRenderData`，仅在章节第一页提取标题前缀并分离正文。
+     - Widget 渲染路径新增 `_wrapPageBodyWithTitle`，按 `titleMode` 应用 `left/center` 对齐。
+     - Picture 预渲染路径新增 `_paintPageTitleOnCanvas`，保持动画/静态一致。
+
+2. 回归测试补齐  
+   - 文件：`test/paged_reader_widget_non_simulation_test.dart`。  
+   - 新增用例：`正文标题居中模式在分页渲染中应生效`，断言标题 `TextAlign.center`。
+
+### 验证与证据
+- `flutter test test/paged_reader_widget_non_simulation_test.dart`（通过）
+- `flutter test test/simple_reader_view_compile_test.dart`（通过）
+
+### 兼容影响
+- 低：仅修复分页阅读器标题渲染方式，不改章节索引、翻页边界和进度持久化结构。
+
+## 2026-02-21 增量：阅读器自定义取色盘对齐 legado（第 25 批）
+
+### legado 对照文件（本批新增，已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/BgTextConfigDialog.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/TipConfigDialog.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/lib/prefs/ColorPreference.kt`
+
+### 差异点清单（实现前）
+| ID | 位置 | legado 对照 | 差异 | 影响 |
+|---|---|---|---|---|
+| D13 | `reader_color_picker_dialog.dart` | `ColorPickerDialog.TYPE_CUSTOM` + `ReadBookActivity.onColorSelected` | soupreader 取色入口以样例色块为主，缺少可拖拽取色盘交互 | 用户自定义颜色效率低，难以精准选色 |
+
+### 逐项检查清单（本轮）
+- 入口：`界面 -> 文字颜色/背景颜色` 与 `信息 -> 页眉页脚颜色` 均沿用原入口，无新增分叉。
+- 状态：取色盘拖拽、色相条拖拽、HEX 输入三条路径可互相同步。
+- 异常：HEX 非法输入时显示错误提示，阻止确认提交。
+- 文案：保留“取消/确定”与颜色输入提示文案语义。
+- 排版：弹窗保留既有 iOS 对话框骨架，内容改为 legado 同义“自由取色盘优先”。
+- 交互触发：确认后仍返回 `AARRGGBB`（alpha 固定 255），并记录“最近使用”。
+
+### 实施结果
+1. 取色组件改为自由取色盘  
+   - 文件：`lib/features/reader/widgets/reader_color_picker_dialog.dart`。  
+   - 关键实现：
+     - 新增可拖拽饱和度/明度面板（SV board）。
+     - 新增可拖拽色相条（Hue strip）。
+     - 新增“当前/选择”双预览块，实时显示结果颜色。
+     - 保留 HEX 输入并实现与取色盘双向同步。
+     - 保留“常用预设”与“最近使用”作为辅助，不再依赖样例色。
+
+2. 回归测试更新  
+   - 文件：`test/reader_color_picker_dialog_test.dart`。  
+   - 关键实现：
+     - 用例 1：验证取色盘选择后可回写，并在二次打开时出现“最近使用”。
+     - 用例 2：验证 HEX 非法输入提示与合法输入提交。
+
+### 验证与证据
+- `flutter test test/reader_color_picker_dialog_test.dart`（通过）
+- `flutter test test/simple_reader_view_compile_test.dart`（通过）
+- `flutter test test/reading_tip_settings_view_test.dart`（通过）
+
+### 兼容影响
+- 低：`showReaderColorPickerDialog` 的函数签名与返回值不变，调用链无需改造。
+- 低：颜色仍以 `0xFFRRGGBB` 持久化，不涉及数据结构迁移。
+
+## 2026-02-21 增量：快速翻页跨章节卡顿优化（第 26 批）
+
+### legado 对照文件（本批新增，已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/api/PageFactory.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/provider/TextPageFactory.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/provider/ChapterProvider.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/provider/TextChapterLayout.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/model/ReadBook.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/ReadBookViewModel.kt`
+
+### 差异点清单（实现前）
+| ID | 位置 | legado 对照 | 差异 | 影响 |
+|---|---|---|---|---|
+| D14 | `simple_reader_view.dart` `_handlePageFactoryContentChanged` | `TextPageFactory.moveToNextChapter` + `ChapterProvider` | soupreader 在翻页回调内重复执行章节后处理与图片 marker 扫描 | 快速翻页跨章节时主线程抖动，体感卡顿 |
+| D15 | `simple_reader_view.dart` `_loadChapter/_prefetchChapterIfNeeded/_syncPageFactoryChapters` | `TextChapterLayout` 后台排版复用语义 | 同一章节在加载/预取/同步阶段重复 `_postProcessContent` | CPU 重复消耗，切章链路波动加剧 |
+
+### 逐项检查清单（本轮）
+- 入口：阅读器翻页链路入口不变（左右翻页、自动翻页、目录跳章）。
+- 状态：章节索引、章节标题、正文内容和页码提示保持原有状态流转。
+- 异常：章节为空/越界/在途下载等分支处理不变。
+- 文案：不新增、不修改任何用户可见文案。
+- 排版：不改正文布局参数与菜单结构，仅调整内部数据复用。
+- 交互触发：跨章节翻页仍按原语义触发保存进度、邻章预取、朗读上下文同步。
+
+### 实施结果
+1. 新增章节后处理快照缓存  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - 新增 `_ResolvedChapterSnapshot` 与 `_resolveChapterSnapshotFromBase`。
+     - 以“后处理签名 + 基础 title/content 哈希”为命中条件复用结果。
+     - `_loadChapter`、`_loadScrollSegment`、`_prefetchChapterIfNeeded` 统一改为走快照，避免重复 `_postProcessContent`。
+
+2. 翻页回调热路径降载  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - `_handlePageFactoryContentChanged` 改为先取快照，只有章节载荷变化时才更新 `_currentTitle/_currentContent`。
+     - 同章翻页不再重复解析正文与图片 marker，仅保留必要的 UI 刷新与进度保存。
+
+3. 图片 marker 元信息缓存  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - 新增 `_ChapterImageMetaSnapshot` 和 `_resolveChapterImageMetaSnapshot`。
+     - 跨章时复用已解析的 marker 列表，减少 `_collectUniqueImageMarkerMetas` 高频扫描。
+     - 增加上限（64）与章节清理策略，控制缓存规模。
+
+4. PageFactory 章节同步路径复用  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - `_syncPageFactoryChapters` 改为生成章节快照列表，复用已处理的标题与正文。
+     - 增加 `_pruneResolvedChapterCachesIfNeeded`，在章节集变化后清理失活缓存。
+
+### 验证与证据
+- `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+- `flutter test test/reader_top_menu_test.dart --concurrency=1`（通过）
+- `flutter test test/reader_bottom_menu_new_test.dart --concurrency=1`（通过）
+
+### 兼容影响
+- 低：仅优化章节后处理与图片 marker 解析的执行时机，不改阅读菜单语义、章节跳转行为和进度持久化结构。
+- 低：未新增配置项与数据模型字段，不涉及迁移脚本与存量数据格式变更。
+
+## 2026-02-21 增量：简繁切换链路对齐 legado 近章节重载（第 27 批）
+
+### legado 对照文件（本批新增，已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/ReadStyleDialog.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/model/ReadBook.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/help/book/ContentProcessor.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/help/config/AppConfig.kt`
+
+### 差异点清单（实现前）
+| ID | 位置 | legado 对照 | 差异 | 影响 |
+|---|---|---|---|---|
+| D16 | `simple_reader_view.dart` `_updateSettings -> _syncPageFactoryChapters` | `ReadStyleDialog` 发 `UP_CONFIG(5)`，`ReadBook.loadContent` 仅重载当前/前后章 | soupreader 简繁切换会全量遍历 `_chapters` 并后处理每章 | 本地大 TXT/大章节场景切换简繁卡顿明显 |
+| D17 | `simple_reader_view.dart` `PageFactory` 章节刷新 | `ReadBook` 按翻页位置渐进加载 | soupreader 缺少“延迟全量刷新”机制，无法在翻到新章节时按需补齐 | 要么全量卡顿，要么远章节语义不一致 |
+
+### 逐项检查清单（本轮）
+- 入口：阅读器“简/繁转换”入口与原路径一致，无新增入口层级。
+- 状态：切换后当前章即时生效；连续翻页时新章节按需更新。
+- 异常：章节空内容、越界章节、在途下载分支行为不变。
+- 文案：不新增、不修改用户可见文案。
+- 排版：正文排版参数、菜单结构与交互热区不变。
+- 交互触发：翻页、目录跳章、自动翻页仍走原状态流转。
+
+### 实施结果
+1. PageFactory 章节同步新增“近章节优先”策略  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - `_syncPageFactoryChapters` 新增 `preferCachedForFarChapters/centerIndex` 参数。
+     - 简繁切换场景仅强制刷新中心章节及前后一章，远章节复用旧快照。
+
+2. 新增快照新鲜度判定与按需补齐  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - 新增 `_isChapterSnapshotFresh`。
+     - 在 `_handlePageFactoryContentChanged` 中检测“进入新章节但快照陈旧”场景，触发一次“当前+邻章”补刷新并重排。
+
+3. 简繁切换触发路径改为“延迟全量刷新”  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - `_updateSettings` 中识别 `chineseConverterType` 变更后，启用 `_hasDeferredChapterTransformRefresh`。
+     - 立即刷新范围缩小为当前章邻域，后续随阅读位置推进逐步补齐，贴齐 legado 行为节奏。
+
+### 验证与证据
+- `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+- `flutter test test/reader_top_menu_test.dart --concurrency=1`（通过）
+- `flutter test test/reader_bottom_menu_new_test.dart --concurrency=1`（通过）
+
+### 兼容影响
+- 低：仅调整简繁切换时章节刷新范围与执行时机，不改章节索引、分页模式、进度持久化与菜单结构。
+- 低：不涉及数据库结构与设置模型迁移；旧配置读取与存储路径不变。
+
+## 2026-02-21 增量：自动阅读弹窗设置行为对齐 legado（第 28 批）
+
+### legado 对照文件（本批新增，已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/config/AutoReadDialog.kt`
+- `/home/server/legado/app/src/main/res/layout/dialog_auto_read.xml`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/BaseReadBookActivity.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/ReadBookActivity.kt`
+
+### 差异点清单（实现前）
+| ID | 位置 | legado 对照 | 差异 | 影响 |
+|---|---|---|---|---|
+| D18 | `simple_reader_view.dart` `_openInterfaceSettingsFromAutoReadPanel` | `AutoReadDialog.llSetting -> showPageAnimConfig` | soupreader 自动阅读面板“设置”跳到界面设置弹窗 | 交互路径层级偏离 legado |
+| D19 | `auto_pager.dart` `CupertinoSlider.onChanged` | `AutoReadDialog` 仅在 `onStopTrackingTouch` 提交速度 | soupreader 拖动过程中实时落盘并重启自动阅读定时器 | 大幅滑动时状态抖动，行为与 legado 不同 |
+
+### 逐项检查清单（本轮）
+- 入口：自动阅读面板保持 `目录/主菜单/停止/设置` 四入口，无新增层级。
+- 状态：设置按钮弹出翻页动画选择；自动阅读面板不被强制关闭。
+- 异常：隐藏翻页模式（仿真2）点击后保留不可选提示，不写入非法模式。
+- 文案：速度标题、按钮文案与既有语义保持不变。
+- 排版：自动阅读面板布局与热区尺寸不改，仅调整回调语义。
+- 交互触发：速度拖动中仅更新显示，拖动结束才提交并持久化。
+
+### 实施结果
+1. 自动阅读面板“设置”回调改为翻页动画选择  
+   - 文件：`lib/features/reader/views/simple_reader_view.dart`。  
+   - 关键实现：
+     - 新增 `_openPageAnimConfigFromAutoReadPanel`，弹出 `CupertinoActionSheet` 选择翻页动画。
+     - 选择后仅更新 `pageTurnMode`，不再关闭自动阅读面板并跳转界面设置弹窗。
+
+2. 自动阅读速度提交时机改为 `onChangeEnd`  
+   - 文件：`lib/features/reader/widgets/auto_pager.dart`。  
+   - 关键实现：
+     - 新增面板内 `_previewSpeed`，拖动过程中仅更新显示值。
+     - 在 `onChangeEnd` 才调用 `AutoPager.setSpeed` 与外部设置持久化回调。
+
+3. 回归测试补齐  
+   - 文件：`test/auto_pager_test.dart`。  
+   - 关键实现：
+     - 新增 `AutoReadPanel` 测试，覆盖“设置按钮触发回调”与“onChangeEnd 才提交速度”。
+
+### 验证与证据
+- `flutter test test/auto_pager_test.dart --concurrency=1`（通过）
+- `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+- `flutter test test/reader_top_menu_test.dart --concurrency=1`（通过）
+- `flutter test test/reader_bottom_menu_new_test.dart --concurrency=1`（通过）
+
+### 兼容影响
+- 低：仅调整自动阅读面板的设置入口与速度提交时机，不改设置模型字段和默认值。
+- 低：不涉及数据库结构、书源协议与正文链路逻辑。
+
+## 2026-02-21 增量：快速翻页视觉同步修复（第 29 批）
+
+### legado 对照文件（本批复用，已完整读取）
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/ReadView.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/delegate/CoverPageDelegate.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/delegate/NoAnimPageDelegate.kt`
+- `/home/server/legado/app/src/main/java/io/legado/app/ui/book/read/page/delegate/SimulationPageDelegate.kt`
+
+### 差异点清单（实现前）
+| ID | 位置 | legado 对照 | 差异 | 影响 |
+|---|---|---|---|---|
+| D20 | `paged_reader_widget.dart` `_onPageFactoryContentChangedForRender` | `ReadView` 交互收尾后会刷新当前页绘制缓存 | soupreader 交互中仅标记 `_pendingPictureInvalidation`，缺少空闲帧自动刷新调度 | 快速连续翻页时视觉停留旧页，用户感知“内容不变” |
+| D21 | `paged_reader_widget.dart` `_abortAnim` | legado 中断动画后会按新页状态继续绘制 | soupreader 中断动画提交换页后未同步收敛图片缓存晋升/失效 | 快速中断场景更易复用旧 `Picture` |
+
+### 逐项检查清单（本轮）
+- 入口：翻页手势/点击入口保持不变，无新增交互路径。
+- 状态：快速连续翻页时画面应随页码推进同步变化。
+- 异常：无上一页/下一页边界行为保持原语义。
+- 文案：不新增、不修改用户可见文案。
+- 排版：正文排版与提示条布局不改，仅调整渲染缓存时机。
+- 交互触发：慢速翻页与快速翻页均保持可翻可停，不卡死。
+
+### 实施结果
+1. 挂起失效新增空闲帧刷新调度  
+   - 文件：`lib/features/reader/widgets/paged_reader_widget.dart`。  
+   - 关键实现：
+     - 新增 `_markPictureInvalidationPending/_schedulePendingPictureInvalidationFlush`。
+     - 交互中收到内容变更时，除打标外自动调度空闲帧 flush，避免挂起状态长期滞留。
+
+2. 动画中断路径补齐图片缓存收敛  
+   - 文件：`lib/features/reader/widgets/paged_reader_widget.dart`。  
+   - 关键实现：
+     - `_abortAnim` 在提交换页后同步执行 `_promoteCachedPicturesOnPageFilled`（命中邻页缓存）。
+     - 未命中晋升时改为挂起失效并调度刷新，避免快速中断后持续显示旧图。
+
+3. 回归测试补齐  
+   - 文件：`test/paged_reader_widget_non_simulation_test.dart`。  
+   - 关键实现：
+     - 新增“slide 模式快速连续点击应持续推进页码”用例，覆盖快速中断路径下页码推进与交互连续性。
+
+### 验证与证据
+- `flutter test test/paged_reader_widget_non_simulation_test.dart --concurrency=1`（通过）
+- `flutter test test/simple_reader_view_compile_test.dart --concurrency=1`（通过）
+
+### 兼容影响
+- 低：仅调整翻页渲染缓存的失效与刷新时机，不改章节索引、分页规则与菜单结构。
+- 低：不涉及持久化字段、数据库结构与书源请求链路。
