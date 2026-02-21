@@ -36,4 +36,37 @@ void main() {
     final picture = recorder.endRecording();
     picture.dispose();
   });
+
+  test('LegacyJustifyComposer bottom justify only stretches near-full pages',
+      () {
+    final style = const TextStyle(
+      fontSize: 20,
+      height: 1.2,
+      color: Color(0xFF111111),
+    );
+    final lines = LegacyJustifyComposer.composeContentLines(
+      content: '第一行\n第二行\n第三行',
+      style: style,
+      maxWidth: 300,
+      justify: true,
+      paragraphIndent: '　　',
+      applyParagraphIndent: false,
+      preserveEmptyLines: true,
+    );
+
+    final nearFullGap = LegacyJustifyComposer.computeBottomJustifyGap(
+      bottomJustify: true,
+      lines: lines,
+      maxHeight: 90,
+    );
+    final tooSparseGap = LegacyJustifyComposer.computeBottomJustifyGap(
+      bottomJustify: true,
+      lines: lines,
+      maxHeight: 120,
+    );
+
+    expect(lines.length, greaterThan(1));
+    expect(nearFullGap, greaterThan(0));
+    expect(tooSparseGap, equals(0));
+  });
 }

@@ -34,6 +34,7 @@ class PagedReaderWidget extends StatefulWidget {
   final String legacyImageStyle;
   final VoidCallback? onImageSizeCacheUpdated;
   final void Function(String src, Size resolvedSize)? onImageSizeResolved;
+  final bool showTipBars;
 
   // === 翻页动画增强 ===
   final int animDuration; // 动画时长 (100-600ms)
@@ -63,6 +64,7 @@ class PagedReaderWidget extends StatefulWidget {
     this.legacyImageStyle = 'DEFAULT',
     this.onImageSizeCacheUpdated,
     this.onImageSizeResolved,
+    this.showTipBars = true,
     // 翻页动画增强默认值
     this.animDuration = 300,
     this.pageDirection = PageDirection.horizontal,
@@ -330,9 +332,11 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       _effectivePageTurnMode == PageTurnMode.cover ||
       _effectivePageTurnMode == PageTurnMode.none;
 
-  bool get _showHeader =>
+  bool get _hasHeaderSlot =>
       widget.settings.shouldShowHeader(showStatusBar: widget.showStatusBar);
-  bool get _showFooter => widget.settings.shouldShowFooter();
+  bool get _hasFooterSlot => widget.settings.shouldShowFooter();
+  bool get _showHeader => widget.showTipBars && _hasHeaderSlot;
+  bool get _showFooter => widget.showTipBars && _hasFooterSlot;
   bool get _showAnyTipBar => _showHeader || _showFooter;
 
   Color get _tipTextColor {
@@ -349,9 +353,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     );
   }
 
-  double get _topOffset => _showHeader ? PagedReaderWidget.topOffset : 0.0;
+  // 页眉/页脚占位保持稳定，避免仅隐藏提示条时正文发生上下跳动。
+  double get _topOffset => _hasHeaderSlot ? PagedReaderWidget.topOffset : 0.0;
   double get _bottomOffset =>
-      _showFooter ? PagedReaderWidget.bottomOffset : 0.0;
+      _hasFooterSlot ? PagedReaderWidget.bottomOffset : 0.0;
 
   void _applyStableSystemPadding({
     required EdgeInsets padding,
@@ -359,8 +364,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }) {
     _stableSystemPadding = padding;
     _stablePaddingOrientation = orientation;
-    _stableShowHeader = _showHeader;
-    _stableShowFooter = _showFooter;
+    _stableShowHeader = _hasHeaderSlot;
+    _stableShowFooter = _hasFooterSlot;
     _pendingSystemPaddingRefresh = false;
     _debugTrace(
       'apply_stable_padding top=${padding.top.toStringAsFixed(1)} bottom=${padding.bottom.toStringAsFixed(1)} orientation=$orientation',
@@ -404,8 +409,8 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final orientation = mediaQuery.orientation;
     final shouldRefresh = _stableSystemPadding == null ||
         _stablePaddingOrientation != orientation ||
-        _stableShowHeader != _showHeader ||
-        _stableShowFooter != _showFooter;
+        _stableShowHeader != _hasHeaderSlot ||
+        _stableShowFooter != _hasFooterSlot;
     if (shouldRefresh) {
       if (_isInteractionRunning && _stableSystemPadding != null) {
         _pendingSystemPaddingRefresh = true;
@@ -461,6 +466,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         applyParagraphIndent: false,
         preserveEmptyLines: true,
         maxHeight: contentHeight,
+        bottomJustify: widget.settings.textBottomJustify,
         highlightQuery: widget.searchHighlightQuery,
         highlightBackgroundColor: widget.searchHighlightColor,
         highlightTextColor: widget.searchHighlightTextColor,
@@ -2133,6 +2139,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         content: content,
         style: widget.textStyle,
         justify: widget.settings.textFullJustify,
+        bottomJustify: widget.settings.textBottomJustify,
         paragraphIndent: widget.settings.paragraphIndent,
         applyParagraphIndent: false,
         preserveEmptyLines: true,

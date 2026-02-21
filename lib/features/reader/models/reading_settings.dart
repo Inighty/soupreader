@@ -80,7 +80,7 @@ class ReadingSettings {
   final Map<String, int> clickActions;
 
   // 自动阅读
-  final int autoReadSpeed; // 自动阅读速度 (1-100)
+  final int autoReadSpeed; // 自动阅读速度（秒/页，1-120）
 
   // === 翻页动画 ===
   final int pageAnimDuration; // 对标 legado：固定 300ms
@@ -951,7 +951,7 @@ class ReadingSettings {
       clickActions: ClickAction.normalizeConfig(
         Map<String, int>.from(clickActions),
       ),
-      autoReadSpeed: _safeInt(autoReadSpeed, min: 1, max: 100, fallback: 10),
+      autoReadSpeed: _safeInt(autoReadSpeed, min: 1, max: 120, fallback: 10),
       pageAnimDuration: legacyPageAnimDuration,
       pageDirection: safePageDirection,
       pageTouchSlop: _safeInt(pageTouchSlop, min: 0, max: 9999, fallback: 0),

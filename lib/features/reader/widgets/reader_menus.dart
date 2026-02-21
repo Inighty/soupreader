@@ -2,6 +2,9 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
+import 'reader_menu_surface_style.dart';
+
+const Key _readerTopMenuPanelKey = Key('reader_top_menu_panel');
 
 class ReaderTopMenu extends StatelessWidget {
   final String bookTitle;
@@ -47,24 +50,9 @@ class ReaderTopMenu extends StatelessWidget {
     final chapterLabel = chapterTitle.trim().isEmpty ? '暂无章节' : chapterTitle;
     final chapterUrlLabel = chapterUrl?.trim() ?? '';
     final sourceActionLabel = source.isEmpty ? '书源' : source;
-    final isDarkTheme = currentTheme.isDark;
-    final menuBgBase = readBarStyleFollowPage
-        ? currentTheme.background
-        : (isDarkTheme
-            ? ReaderOverlayTokens.panelDark
-            : const Color(0xFF1F2937));
-    final menuSurfaceColor = menuBgBase.withValues(
-      alpha: readBarStyleFollowPage ? (isDarkTheme ? 0.98 : 0.97) : 0.96,
-    );
-    final menuPrimaryText =
-        readBarStyleFollowPage ? currentTheme.text : CupertinoColors.white;
-    final menuSecondaryText = menuPrimaryText.withValues(alpha: 0.78);
-    final menuTertiaryText = menuPrimaryText.withValues(alpha: 0.62);
-    final controlBg = menuBgBase.withValues(
-      alpha: readBarStyleFollowPage ? (isDarkTheme ? 0.22 : 0.14) : 0.26,
-    );
-    final controlBorder = menuPrimaryText.withValues(
-      alpha: readBarStyleFollowPage ? (isDarkTheme ? 0.32 : 0.26) : 0.24,
+    final style = resolveReaderMenuSurfaceStyle(
+      currentTheme: currentTheme,
+      readBarStyleFollowPage: readBarStyleFollowPage,
     );
 
     return Positioned(
@@ -72,6 +60,7 @@ class ReaderTopMenu extends StatelessWidget {
       left: 0,
       right: 0,
       child: Container(
+        key: _readerTopMenuPanelKey,
         padding: EdgeInsets.only(
           top: mediaQuery.padding.top + 7,
           left: horizontalPadding,
@@ -79,18 +68,17 @@ class ReaderTopMenu extends StatelessWidget {
           bottom: 9,
         ),
         decoration: BoxDecoration(
-          color: menuSurfaceColor,
+          color: style.panelBackground,
           border: Border(
             bottom: BorderSide(
-              color: menuPrimaryText.withValues(alpha: 0.18),
+              color: style.borderColor,
               width: 0.9,
             ),
           ),
           boxShadow: [
             BoxShadow(
-              color: CupertinoColors.black
-                  .withValues(alpha: isDarkTheme ? 0.22 : 0.08),
-              blurRadius: 10,
+              color: style.shadowColor,
+              blurRadius: 14,
               offset: const Offset(0, 4),
             ),
           ],
@@ -104,9 +92,9 @@ class ReaderTopMenu extends StatelessWidget {
                 _buildRoundIcon(
                   icon: CupertinoIcons.back,
                   onTap: () => Navigator.pop(context),
-                  iconColor: menuPrimaryText,
-                  backgroundColor: controlBg,
-                  borderColor: controlBorder,
+                  iconColor: style.primaryText,
+                  backgroundColor: style.controlBackground,
+                  borderColor: style.controlBorder,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -118,7 +106,7 @@ class ReaderTopMenu extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: menuPrimaryText,
+                        color: style.primaryText,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -129,9 +117,9 @@ class ReaderTopMenu extends StatelessWidget {
                 _buildRoundIcon(
                   icon: CupertinoIcons.ellipsis,
                   onTap: onShowMoreMenu,
-                  iconColor: menuPrimaryText,
-                  backgroundColor: controlBg,
-                  borderColor: controlBorder,
+                  iconColor: style.primaryText,
+                  backgroundColor: style.controlBackground,
+                  borderColor: style.controlBorder,
                 ),
               ],
             ),
@@ -169,7 +157,7 @@ class ReaderTopMenu extends StatelessWidget {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
-                                        color: menuSecondaryText,
+                                        color: style.secondaryText,
                                         fontSize: chapterFontSize,
                                       ),
                                     ),
@@ -185,7 +173,7 @@ class ReaderTopMenu extends StatelessWidget {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                          color: menuTertiaryText,
+                                          color: style.tertiaryText,
                                           fontSize: urlFontSize,
                                         ),
                                       ),
@@ -199,9 +187,9 @@ class ReaderTopMenu extends StatelessWidget {
                               _buildSourceActionChip(
                                 label: sourceActionLabel,
                                 onTap: onShowSourceActions,
-                                textColor: menuPrimaryText,
-                                backgroundColor: controlBg,
-                                borderColor: controlBorder,
+                                textColor: style.primaryText,
+                                backgroundColor: style.controlBackground,
+                                borderColor: style.controlBorder,
                                 maxWidth: sourceMaxWidth,
                               ),
                             ],

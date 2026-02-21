@@ -5,6 +5,7 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
   final String content;
   final TextStyle style;
   final bool justify;
+  final bool bottomJustify;
   final String paragraphIndent;
   final bool applyParagraphIndent;
   final bool preserveEmptyLines;
@@ -14,6 +15,7 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
     required this.content,
     required this.style,
     required this.justify,
+    this.bottomJustify = false,
     this.paragraphIndent = '　　',
     this.applyParagraphIndent = true,
     this.preserveEmptyLines = true,
@@ -27,27 +29,33 @@ class LegacyJustifiedTextBlock extends StatelessWidget {
           return const SizedBox.shrink();
         }
         final maxWidth = constraints.maxWidth;
-        final paragraphs = content.split('\n');
-        final lineHeight =
-            (style.fontSize ?? 16.0) * (style.height ?? 1.2).clamp(1.0, 2.5);
-
+        final lines = LegacyJustifyComposer.composeContentLines(
+          content: content,
+          style: style,
+          maxWidth: maxWidth,
+          justify: justify,
+          paragraphIndent: paragraphIndent,
+          applyParagraphIndent: applyParagraphIndent,
+          preserveEmptyLines: preserveEmptyLines,
+        );
+        if (lines.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final maxHeight =
+            constraints.maxHeight.isFinite && constraints.maxHeight > 0
+                ? constraints.maxHeight
+                : null;
+        final extraGap = LegacyJustifyComposer.computeBottomJustifyGap(
+          bottomJustify: bottomJustify,
+          lines: lines,
+          maxHeight: maxHeight,
+        );
         final children = <Widget>[];
-        for (final paragraph in paragraphs) {
-          if (paragraph.trim().isEmpty) {
-            if (preserveEmptyLines) {
-              children.add(SizedBox(height: lineHeight));
-            }
-            continue;
+        for (var i = 0; i < lines.length; i++) {
+          if (i > 0 && extraGap > 0.01) {
+            children.add(SizedBox(height: extraGap));
           }
-          final composed = LegacyJustifyComposer.composeParagraph(
-            paragraph: paragraph,
-            style: style,
-            maxWidth: maxWidth,
-            justify: justify,
-            paragraphIndent: paragraphIndent,
-            applyParagraphIndent: applyParagraphIndent,
-          );
-          children.addAll(composed.toWidgets(style: style, maxWidth: maxWidth));
+          children.add(lines[i].toWidget(style: style, maxWidth: maxWidth));
         }
 
         return Column(
@@ -88,10 +96,30 @@ class LegacyComposedLine {
     required this.height,
   });
 
+  factory LegacyComposedLine.empty({required double height}) {
+    return LegacyComposedLine(
+      plainText: '',
+      segments: const <LegacyComposedSegment>[],
+      justified: false,
+      height: height,
+    );
+  }
+
+  bool get isVisualEmpty {
+    if (plainText.trim().isNotEmpty) return false;
+    return segments.every((segment) => segment.text.trim().isEmpty);
+  }
+
   Widget toWidget({
     required TextStyle style,
     required double maxWidth,
   }) {
+    if (isVisualEmpty) {
+      return SizedBox(
+        width: maxWidth,
+        height: height,
+      );
+    }
     if (!justified || segments.length <= 1) {
       return SizedBox(
         width: maxWidth,
@@ -145,6 +173,59 @@ class LegacyComposedSegment {
 }
 
 class LegacyJustifyComposer {
+  static List<LegacyComposedLine> composeContentLines({
+    required String content,
+    required TextStyle style,
+    required double maxWidth,
+    required bool justify,
+    required String paragraphIndent,
+    required bool applyParagraphIndent,
+    required bool preserveEmptyLines,
+  }) {
+    final paragraphs = content.split('\n');
+    final lineHeight =
+        (style.fontSize ?? 16.0) * (style.height ?? 1.2).clamp(1.0, 2.5);
+    final lines = <LegacyComposedLine>[];
+    for (final paragraph in paragraphs) {
+      if (paragraph.trim().isEmpty) {
+        if (preserveEmptyLines) {
+          lines.add(LegacyComposedLine.empty(height: lineHeight));
+        }
+        continue;
+      }
+      final composed = composeParagraph(
+        paragraph: paragraph,
+        style: style,
+        maxWidth: maxWidth,
+        justify: justify,
+        paragraphIndent: paragraphIndent,
+        applyParagraphIndent: applyParagraphIndent,
+      );
+      lines.addAll(composed.lines);
+    }
+    return lines;
+  }
+
+  static double computeBottomJustifyGap({
+    required bool bottomJustify,
+    required List<LegacyComposedLine> lines,
+    required double? maxHeight,
+  }) {
+    if (!bottomJustify) return 0;
+    if (maxHeight == null || !maxHeight.isFinite || maxHeight <= 0) return 0;
+    if (lines.length <= 1) return 0;
+    final lastLine = lines.last;
+    if (lastLine.isVisualEmpty) return 0;
+    final contentHeight =
+        lines.fold<double>(0, (sum, line) => sum + line.height);
+    final surplus = maxHeight - contentHeight;
+    if (surplus <= 0.01) return 0;
+    if (surplus >= lastLine.height) return 0;
+    final gapCount = lines.length - 1;
+    if (gapCount <= 0) return 0;
+    return surplus / gapCount;
+  }
+
   static LegacyComposedParagraph composeParagraph({
     required String paragraph,
     required TextStyle style,
@@ -307,114 +388,118 @@ class LegacyJustifyComposer {
     required bool applyParagraphIndent,
     required bool preserveEmptyLines,
     required double maxHeight,
+    bool bottomJustify = false,
     String? highlightQuery,
     Color? highlightBackgroundColor,
     Color? highlightTextColor,
   }) {
-    final paragraphs = content.split('\n');
-    final lineHeight =
-        (style.fontSize ?? 16.0) * (style.height ?? 1.2).clamp(1.0, 2.5);
+    final renderLines = composeContentLines(
+      content: content,
+      style: style,
+      maxWidth: maxWidth,
+      justify: justify,
+      paragraphIndent: paragraphIndent,
+      applyParagraphIndent: applyParagraphIndent,
+      preserveEmptyLines: preserveEmptyLines,
+    );
+    if (renderLines.isEmpty) {
+      return 0;
+    }
+    final extraGap = computeBottomJustifyGap(
+      bottomJustify: bottomJustify,
+      lines: renderLines,
+      maxHeight: maxHeight,
+    );
     var y = origin.dy;
     final normalizedQuery = highlightQuery?.trim() ?? '';
     final hasHighlight = normalizedQuery.isNotEmpty;
 
-    for (final paragraph in paragraphs) {
+    for (var lineIndex = 0; lineIndex < renderLines.length; lineIndex++) {
+      if (lineIndex > 0 && extraGap > 0.01) {
+        y += extraGap;
+      }
       if (y - origin.dy > maxHeight) break;
-      if (paragraph.trim().isEmpty) {
-        if (preserveEmptyLines) {
-          y += lineHeight;
-        }
+      final line = renderLines[lineIndex];
+      if (line.segments.isEmpty || line.isVisualEmpty) {
+        y += line.height;
         continue;
       }
 
-      final composed = composeParagraph(
-        paragraph: paragraph,
-        style: style,
-        maxWidth: maxWidth,
-        justify: justify,
-        paragraphIndent: paragraphIndent,
-        applyParagraphIndent: applyParagraphIndent,
-      );
-
-      for (final line in composed.lines) {
-        if (y - origin.dy > maxHeight) break;
-        final lineRanges = hasHighlight
-            ? _resolveMatchRanges(line.plainText, normalizedQuery)
-            : const <TextRange>[];
-        var x = origin.dx;
-        var cursor = 0;
-        for (final segment in line.segments) {
-          if (segment.text.isNotEmpty) {
-            final segmentStart = cursor;
-            final segmentEnd = segmentStart + segment.text.length;
-            final overlaps = hasHighlight
-                ? _resolveSegmentRanges(
-                    lineRanges,
-                    segmentStart: segmentStart,
-                    segmentEnd: segmentEnd,
-                  )
-                : const <TextRange>[];
-            if (overlaps.isEmpty) {
-              x += _paintTextPiece(
-                canvas: canvas,
-                text: segment.text,
-                style: style,
-                x: x,
-                y: y,
-                lineHeight: line.height,
-              );
-            } else {
-              var localCursor = 0;
-              for (final range in overlaps) {
-                final localStart = range.start - segmentStart;
-                final localEnd = range.end - segmentStart;
-                if (localStart > localCursor) {
-                  final before =
-                      segment.text.substring(localCursor, localStart);
-                  x += _paintTextPiece(
-                    canvas: canvas,
-                    text: before,
-                    style: style,
-                    x: x,
-                    y: y,
-                    lineHeight: line.height,
-                  );
-                }
-                final hitText = segment.text.substring(localStart, localEnd);
+      final lineRanges = hasHighlight
+          ? _resolveMatchRanges(line.plainText, normalizedQuery)
+          : const <TextRange>[];
+      var x = origin.dx;
+      var cursor = 0;
+      for (final segment in line.segments) {
+        if (segment.text.isNotEmpty) {
+          final segmentStart = cursor;
+          final segmentEnd = segmentStart + segment.text.length;
+          final overlaps = hasHighlight
+              ? _resolveSegmentRanges(
+                  lineRanges,
+                  segmentStart: segmentStart,
+                  segmentEnd: segmentEnd,
+                )
+              : const <TextRange>[];
+          if (overlaps.isEmpty) {
+            x += _paintTextPiece(
+              canvas: canvas,
+              text: segment.text,
+              style: style,
+              x: x,
+              y: y,
+              lineHeight: line.height,
+            );
+          } else {
+            var localCursor = 0;
+            for (final range in overlaps) {
+              final localStart = range.start - segmentStart;
+              final localEnd = range.end - segmentStart;
+              if (localStart > localCursor) {
+                final before = segment.text.substring(localCursor, localStart);
                 x += _paintTextPiece(
                   canvas: canvas,
-                  text: hitText,
-                  style: style.copyWith(
-                    color: highlightTextColor ?? style.color,
-                  ),
-                  x: x,
-                  y: y,
-                  lineHeight: line.height,
-                  highlighted: true,
-                  highlightBackgroundColor: highlightBackgroundColor,
-                );
-                localCursor = localEnd;
-              }
-              if (localCursor < segment.text.length) {
-                final tail = segment.text.substring(localCursor);
-                x += _paintTextPiece(
-                  canvas: canvas,
-                  text: tail,
+                  text: before,
                   style: style,
                   x: x,
                   y: y,
                   lineHeight: line.height,
                 );
               }
+              final hitText = segment.text.substring(localStart, localEnd);
+              x += _paintTextPiece(
+                canvas: canvas,
+                text: hitText,
+                style: style.copyWith(
+                  color: highlightTextColor ?? style.color,
+                ),
+                x: x,
+                y: y,
+                lineHeight: line.height,
+                highlighted: true,
+                highlightBackgroundColor: highlightBackgroundColor,
+              );
+              localCursor = localEnd;
             }
-            cursor = segmentEnd;
+            if (localCursor < segment.text.length) {
+              final tail = segment.text.substring(localCursor);
+              x += _paintTextPiece(
+                canvas: canvas,
+                text: tail,
+                style: style,
+                x: x,
+                y: y,
+                lineHeight: line.height,
+              );
+            }
           }
-          if (segment.extraAfter > 0) {
-            x += segment.extraAfter;
-          }
+          cursor = segmentEnd;
         }
-        y += line.height;
+        if (segment.extraAfter > 0) {
+          x += segment.extraAfter;
+        }
       }
+      y += line.height;
     }
 
     return y - origin.dy;

@@ -4030,10 +4030,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                               _settings.copyWith(autoReadSpeed: speed),
                             );
                           },
+                          onShowMainMenu: _openReaderMenuFromAutoReadPanel,
+                          onOpenChapterList: _openChapterListFromAutoReadPanel,
+                          onOpenInterfaceSettings:
+                              _openInterfaceSettingsFromAutoReadPanel,
+                          onStop: _stopAutoReadFromPanel,
                           onClose: () {
                             setState(() {
                               _showAutoReadPanel = false;
                             });
+                            _screenOffTimerStart(force: true);
                           },
                         ),
                       ),
@@ -4214,6 +4220,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       animDuration: ReadingSettings.legacyPageAnimDuration,
       pageDirection: _settings.pageDirection,
       pageTouchSlop: _settings.pageTouchSlop,
+      // 菜单/搜索/自动阅读面板打开时隐藏页眉页脚提示，避免与底部菜单层叠。
+      showTipBars: !_showMenu && !_showSearchMenu && !_showAutoReadPanel,
       searchHighlightQuery: _activeSearchHighlightQuery,
       searchHighlightColor: _searchHighlightColor,
       searchHighlightTextColor: _searchHighlightTextColor,
@@ -4334,15 +4342,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     ? _settings.titleTopSpacing
                     : 20,
               ),
-              Text(
-                segment.title,
-                textAlign: _titleTextAlign,
-                style: TextStyle(
-                  fontSize: _settings.fontSize + _settings.titleSize,
-                  fontWeight: FontWeight.w600,
-                  color: _currentTheme.text,
-                  fontFamily: _currentFontFamily,
-                  fontFamilyFallback: _currentFontFamilyFallback,
+              SizedBox(
+                width: double.infinity,
+                child: Text(
+                  segment.title,
+                  textAlign: _titleTextAlign,
+                  style: TextStyle(
+                    fontSize: _settings.fontSize + _settings.titleSize,
+                    fontWeight: FontWeight.w600,
+                    color: _currentTheme.text,
+                    fontFamily: _currentFontFamily,
+                    fontFamilyFallback: _currentFontFamilyFallback,
+                  ),
                 ),
               ),
               SizedBox(
@@ -4768,6 +4779,43 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _syncSystemUiForOverlay();
   }
 
+  void _openReaderMenuFromAutoReadPanel() {
+    if (_showMenu && !_showAutoReadPanel) return;
+    setState(() {
+      _showAutoReadPanel = false;
+      _showMenu = true;
+      _showSearchMenu = false;
+    });
+    _syncSystemUiForOverlay();
+  }
+
+  void _openChapterListFromAutoReadPanel() {
+    if (_showAutoReadPanel) {
+      setState(() {
+        _showAutoReadPanel = false;
+      });
+    }
+    _showChapterList();
+    _screenOffTimerStart(force: true);
+  }
+
+  void _openInterfaceSettingsFromAutoReadPanel() {
+    if (_showAutoReadPanel) {
+      setState(() {
+        _showAutoReadPanel = false;
+      });
+    }
+    _showReadStyleDialog();
+    _screenOffTimerStart(force: true);
+  }
+
+  void _stopAutoReadFromPanel() {
+    _screenOffTimerStart(force: true);
+    if (mounted) {
+      _showToast('自动阅读已停止');
+    }
+  }
+
   void _stopAutoPagerAtBoundary() {
     if (!_autoPager.isRunning) return;
     _autoPager.stop();
@@ -4813,6 +4861,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       }
       _autoPager.start();
       _openAutoReadPanel();
+      _showToast('自动阅读已开启');
       _screenOffTimerStart(force: true);
       return;
     }
@@ -4829,6 +4878,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         _showAutoReadPanel = false;
       });
     }
+    _showToast('自动阅读已停止');
     _screenOffTimerStart(force: true);
   }
 
@@ -6475,6 +6525,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     setState(() {
       _showAutoReadPanel = true;
     });
+    _showToast('自动阅读已开启');
     _screenOffTimerStart(force: true);
   }
 
@@ -7933,39 +7984,35 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                           Text(
                             '共享布局',
                             style: TextStyle(
-                              color: _uiTextNormal,
+                              color: _uiTextSubtle,
                               fontSize: 13,
                             ),
                           ),
                           const SizedBox(width: 6),
                           GestureDetector(
-                            onTap: () => _updateSettingsFromSheet(
-                              setPopupState,
-                              _settings.copyWith(
-                                shareLayout: !_settings.shareLayout,
-                              ),
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => _showReaderActionUnavailable(
+                              '共享布局',
+                              reason: '样式切换联动排版参数尚未迁移完成',
                             ),
                             child: Container(
-                              width: 20,
-                              height: 20,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: _settings.shareLayout
-                                    ? _uiAccent
-                                    : _uiCardBg,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: _settings.shareLayout
-                                      ? _uiAccent
-                                      : _uiBorder,
+                                color: _uiCardBg,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: _uiBorder),
+                              ),
+                              child: Text(
+                                '待迁移',
+                                style: TextStyle(
+                                  color: _uiTextSubtle,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              child: _settings.shareLayout
-                                  ? const Icon(
-                                      CupertinoIcons.check_mark,
-                                      size: 14,
-                                      color: CupertinoColors.white,
-                                    )
-                                  : null,
                             ),
                           ),
                         ],
@@ -9252,6 +9299,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   Widget _buildLegacyTitleModeSegment(StateSetter setPopupState) {
     final safeGroupValue = _settings.titleMode.clamp(0, 2).toInt();
+    final selectedTitleTextColor = _uiAccent.computeLuminance() > 0.55
+        ? AppDesignTokens.textStrong
+        : CupertinoColors.white;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6),
       decoration: BoxDecoration(
@@ -9270,7 +9320,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               child: Text(
                 option.label,
                 style: TextStyle(
-                  color: _uiTextNormal,
+                  color: safeGroupValue == option.value
+                      ? selectedTitleTextColor
+                      : _uiTextNormal,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -10640,14 +10692,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   '速度',
                   _settings.autoReadSpeed.toDouble(),
                   1,
-                  100,
+                  120,
                   (val) {
                     _updateSettingsFromSheet(
                       setPopupState,
                       _settings.copyWith(autoReadSpeed: val.toInt()),
                     );
                   },
-                  displayFormat: (v) => v.toInt().toString(),
+                  displayFormat: (v) => '${v.toInt()}s',
                 ),
               ],
             ),

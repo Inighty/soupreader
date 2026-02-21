@@ -29,6 +29,7 @@ Widget _buildReader({
   required PageFactory factory,
   required PageTurnMode mode,
   int animDuration = 300,
+  bool showTipBars = true,
 }) {
   return Directionality(
     textDirection: TextDirection.ltr,
@@ -49,6 +50,7 @@ Widget _buildReader({
           bookTitle: '测试书',
           showStatusBar: false,
           animDuration: animDuration,
+          showTipBars: showTipBars,
         ),
       ),
     ),
@@ -219,5 +221,28 @@ void main() {
     await tester.pump();
     await _finishTurnAnimation(tester);
     expect(factory.currentPageIndex, 1);
+  });
+
+  testWidgets('隐藏提示条时翻页能力保持可用', (tester) async {
+    final factory = _buildFactory();
+    await tester.pumpWidget(
+      _buildReader(
+        factory: factory,
+        mode: PageTurnMode.slide,
+        showTipBars: false,
+      ),
+    );
+    await tester.pump();
+
+    expect(factory.currentPageIndex, 0);
+    await tester.tapAt(const Offset(370, 420));
+    await tester.pump();
+    await _finishTurnAnimation(tester);
+    expect(factory.currentPageIndex, 1);
+
+    await tester.tapAt(const Offset(20, 420));
+    await tester.pump();
+    await _finishTurnAnimation(tester);
+    expect(factory.currentPageIndex, 0);
   });
 }

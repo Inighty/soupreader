@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
+import 'reader_menu_surface_style.dart';
 
 /// 阅读器底部菜单：操作路径对齐 legado（目录/朗读/界面/设置）。
 class ReaderBottomMenuNew extends StatefulWidget {
@@ -55,6 +56,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   static const Key _brightnessPanelKey = Key('reader_brightness_panel');
   static const Key _brightnessAutoToggleKey = Key('reader_brightness_auto');
   static const Key _brightnessPositionToggleKey = Key('reader_brightness_pos');
+  static const Key _bottomMenuPanelKey = Key('reader_bottom_menu_panel');
   static const double _brightnessPanelTopOffset = 78.0;
   static const double _brightnessPanelTopOffsetWithTitleAddition = 94.0;
   static const double _brightnessPanelBottomOffset = 98.0;
@@ -75,33 +77,10 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
 
   @override
   Widget build(BuildContext context) {
-    final followPage = widget.readBarStyleFollowPage;
-    final panelBase = followPage
-        ? widget.currentTheme.background
-        : (_isDarkMode
-            ? ReaderOverlayTokens.panelDark
-            : ReaderOverlayTokens.panelLight);
-    final panelBg = panelBase.withValues(
-      alpha: followPage ? (_isDarkMode ? 0.98 : 0.97) : 1.0,
+    final style = resolveReaderMenuSurfaceStyle(
+      currentTheme: widget.currentTheme,
+      readBarStyleFollowPage: widget.readBarStyleFollowPage,
     );
-    final panelForeground = followPage
-        ? widget.currentTheme.text
-        : (_isDarkMode
-            ? ReaderOverlayTokens.textStrongDark
-            : ReaderOverlayTokens.textStrongLight);
-    final panelMutedForeground = followPage
-        ? widget.currentTheme.text.withValues(alpha: _isDarkMode ? 0.66 : 0.62)
-        : (_isDarkMode
-            ? ReaderOverlayTokens.textNormalDark
-            : ReaderOverlayTokens.textNormalLight);
-    final panelBorder = followPage
-        ? widget.currentTheme.text.withValues(alpha: _isDarkMode ? 0.30 : 0.24)
-        : (_isDarkMode
-            ? ReaderOverlayTokens.borderDark
-            : ReaderOverlayTokens.borderLight);
-    final panelShadow = followPage
-        ? widget.currentTheme.text.withValues(alpha: _isDarkMode ? 0.12 : 0.1)
-        : CupertinoColors.black.withValues(alpha: _isDarkMode ? 0.3 : 0.11);
     final mediaQuery = MediaQuery.of(context);
     final bottomPadding = mediaQuery.padding.bottom;
     final brightnessTopOffset = widget.settings.showReadTitleAddition
@@ -118,49 +97,51 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
               left: widget.settings.brightnessViewOnRight ? null : 16,
               right: widget.settings.brightnessViewOnRight ? 16 : null,
               child: _buildBrightnessPanel(
-                panelBg,
-                foreground: panelForeground,
-                mutedForeground: panelMutedForeground,
-                borderColor: panelBorder,
+                style.panelBackground,
+                foreground: style.primaryText,
+                mutedForeground: style.secondaryText,
+                borderColor: style.borderColor,
               ),
             ),
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: panelBg,
-                  border: Border(
-                    top: BorderSide(color: panelBorder),
+            child: Container(
+              key: _bottomMenuPanelKey,
+              decoration: BoxDecoration(
+                color: style.panelBackground,
+                border: Border(
+                  top: BorderSide(color: style.borderColor),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: style.shadowColor,
+                    blurRadius: 14,
+                    offset: const Offset(0, -4),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: panelShadow,
-                      blurRadius: 14,
-                      offset: const Offset(0, -4),
-                    ),
-                  ],
-                ),
-                padding: EdgeInsets.only(bottom: bottomPadding > 0 ? 4 : 8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildChapterSlider(
-                      foreground: panelForeground,
-                      mutedForeground: panelMutedForeground,
-                    ),
-                    Container(
-                      height: 0.9,
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      color: panelBorder.withValues(
-                          alpha: _isDarkMode ? 0.78 : 0.62),
-                    ),
-                    _buildBottomTabs(foreground: panelForeground),
-                  ],
-                ),
+                ],
+              ),
+              // 让菜单面板本体直接覆盖到底部安全区，避免系统手势区露出正文底色。
+              padding: EdgeInsets.only(
+                bottom: bottomPadding + (bottomPadding > 0 ? 4 : 8),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildChapterSlider(
+                    foreground: style.primaryText,
+                    mutedForeground: style.secondaryText,
+                  ),
+                  const SizedBox(height: 3),
+                  Container(
+                    height: 0.9,
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    color: style.dividerColor,
+                  ),
+                  const SizedBox(height: 4),
+                  _buildBottomTabs(foreground: style.primaryText),
+                ],
               ),
             ),
           ),
@@ -195,7 +176,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     final canNext = widget.currentChapterIndex < widget.totalChapters - 1;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 6),
+      padding: const EdgeInsets.fromLTRB(18, 5, 18, 6),
       child: Row(
         children: [
           _buildChapterTextButton(

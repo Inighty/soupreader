@@ -6,6 +6,7 @@ import 'package:soupreader/app/theme/colors.dart';
 import 'package:soupreader/app/theme/shadcn_theme.dart';
 import 'package:soupreader/features/reader/models/reading_settings.dart';
 import 'package:soupreader/features/reader/widgets/reader_bottom_menu.dart';
+import 'package:soupreader/features/reader/widgets/reader_menu_surface_style.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -13,6 +14,8 @@ void main() {
   Future<void> pumpMenu(
     WidgetTester tester, {
     required ReaderBottomMenuNew menu,
+    EdgeInsets? mediaPadding,
+    EdgeInsets? mediaViewPadding,
   }) async {
     final shadTheme = AppShadcnTheme.light();
     await tester.pumpWidget(
@@ -21,8 +24,19 @@ void main() {
         darkTheme: shadTheme,
         appBuilder: (context) => CupertinoApp(
           home: CupertinoPageScaffold(
-            child: SizedBox.expand(
-              child: Stack(children: [menu]),
+            child: Builder(
+              builder: (context) {
+                final base = MediaQuery.of(context);
+                return MediaQuery(
+                  data: base.copyWith(
+                    padding: mediaPadding ?? base.padding,
+                    viewPadding: mediaViewPadding ?? base.viewPadding,
+                  ),
+                  child: SizedBox.expand(
+                    child: Stack(children: [menu]),
+                  ),
+                );
+              },
             ),
           ),
           builder: (context, child) => ShadAppBuilder(child: child!),
@@ -112,6 +126,44 @@ void main() {
     await tester.tap(find.text('下一章'));
     await tester.pump();
     expect(chapterChanges, [1]);
+  });
+
+  testWidgets('ReaderBottomMenuNew 使用统一菜单色板', (tester) async {
+    const theme = ReadingThemeColors(
+      background: Color(0xFFF7F4EE),
+      text: Color(0xFF1F2328),
+      name: '日间',
+    );
+    final expected = resolveReaderMenuSurfaceStyle(
+      currentTheme: theme,
+      readBarStyleFollowPage: false,
+    );
+
+    await pumpMenu(
+      tester,
+      menu: ReaderBottomMenuNew(
+        currentChapterIndex: 1,
+        totalChapters: 5,
+        currentPageIndex: 0,
+        totalPages: 10,
+        settings: const ReadingSettings(),
+        currentTheme: theme,
+        onChapterChanged: (_) {},
+        onPageChanged: (_) {},
+        onSeekChapterProgress: (_) {},
+        onSettingsChanged: (_) {},
+        onShowChapterList: () {},
+        onShowReadAloud: () {},
+        onShowInterfaceSettings: () {},
+        onShowBehaviorSettings: () {},
+      ),
+    );
+
+    final panel = tester.widget<Container>(
+      find.byKey(const Key('reader_bottom_menu_panel')),
+    );
+    final decoration = panel.decoration as BoxDecoration;
+    expect(decoration.color, expected.panelBackground);
   });
 
   testWidgets('ReaderBottomMenuNew 四入口热区宽度对齐 legacy 60dp', (tester) async {
@@ -329,6 +381,36 @@ void main() {
     final panelHeight = tester.getSize(panel).height;
     expect(panelHeight, lessThanOrEqualTo(400));
     expect(panelHeight, greaterThanOrEqualTo(180));
+  });
+
+  testWidgets('ReaderBottomMenuNew 底栏背景覆盖到底部安全区', (tester) async {
+    await pumpMenu(
+      tester,
+      mediaPadding: const EdgeInsets.only(bottom: 24),
+      mediaViewPadding: const EdgeInsets.only(bottom: 24),
+      menu: ReaderBottomMenuNew(
+        currentChapterIndex: 1,
+        totalChapters: 5,
+        currentPageIndex: 0,
+        totalPages: 10,
+        settings: const ReadingSettings(),
+        currentTheme: AppColors.readingThemes.first,
+        onChapterChanged: (_) {},
+        onPageChanged: (_) {},
+        onSeekChapterProgress: (_) {},
+        onSettingsChanged: (_) {},
+        onShowChapterList: () {},
+        onShowReadAloud: () {},
+        onShowInterfaceSettings: () {},
+        onShowBehaviorSettings: () {},
+      ),
+    );
+
+    final panel = find.byKey(const Key('reader_bottom_menu_panel'));
+    expect(panel, findsOneWidget);
+    final panelRect = tester.getRect(panel);
+    final pageRect = tester.getRect(find.byType(CupertinoPageScaffold));
+    expect((pageRect.bottom - panelRect.bottom).abs(), lessThan(0.1));
   });
 
   testWidgets('ReaderBottomMenuNew 朗读入口支持长按与暂停态图标', (tester) async {

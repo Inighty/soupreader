@@ -1,16 +1,24 @@
 import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
+
 import '../../../app/theme/design_tokens.dart';
 
 /// 自动翻页器
-/// 支持滚动模式和翻页模式
+/// 支持滚动模式和翻页模式。
+/// 对齐 legado：速度语义为“每页秒数”，数值越大越慢。
 class AutoPager {
+  static const int minSpeedSeconds = 1;
+  static const int maxSpeedSeconds = 120;
+  static const int defaultSpeedSeconds = 10;
+  static const Duration _scrollTick = Duration(milliseconds: 16);
+
   /// 是否正在运行
   bool _isRunning = false;
   bool get isRunning => _isRunning;
 
-  /// 自动阅读速度 (1-100)
-  int _speed = 50;
+  /// 自动阅读速度（秒/页）
+  int _speed = defaultSpeedSeconds;
   int get speed => _speed;
 
   /// 模式：scroll / page
@@ -57,7 +65,7 @@ class AutoPager {
 
   /// 设置速度
   void setSpeed(int speed) {
-    _speed = speed.clamp(1, 100);
+    _speed = speed.clamp(minSpeedSeconds, maxSpeedSeconds);
     if (_isRunning) {
       // 重新启动以应用新速度
       stop();
@@ -92,33 +100,51 @@ class AutoPager {
 
   /// 滚动模式
   void _startScrollMode() {
-    // 速度转换为每帧滚动的像素数
-    // speed 1 = 0.5px/frame, speed 100 = 5px/frame
-    final pixelsPerFrame = 0.5 + (_speed - 1) * (5.0 - 0.5) / 99;
+    _timer = Timer.periodic(_scrollTick, (_) {
+      final controller = _scrollController;
+      if (controller == null || !controller.hasClients) {
+        return;
+      }
 
-    // 60fps 定时器
-    _timer = Timer.periodic(const Duration(milliseconds: 16), (_) {
-      if (_scrollController != null && _scrollController!.hasClients) {
-        final currentOffset = _scrollController!.offset;
-        final maxOffset = _scrollController!.position.maxScrollExtent;
+      final position = controller.position;
+      final currentOffset = controller.offset;
+      final maxOffset = position.maxScrollExtent;
+      if (currentOffset >= maxOffset - 0.5) {
+        _onNextPage?.call();
+        return;
+      }
 
-        if (currentOffset < maxOffset) {
-          _scrollController!.jumpTo(currentOffset + pixelsPerFrame);
-        } else {
-          // 到达底部，触发下一章
-          _onNextPage?.call();
-        }
+      final viewport = position.viewportDimension;
+      if (!viewport.isFinite || viewport <= 0) {
+        return;
+      }
+
+      final pixelsPerMs = viewport / (_speed * 1000.0);
+      final delta = pixelsPerMs * _scrollTick.inMilliseconds;
+      if (delta <= 0) {
+        return;
+      }
+      final nextOffset = (currentOffset + delta)
+          .clamp(position.minScrollExtent, maxOffset)
+          .toDouble();
+      if (nextOffset <= currentOffset) {
+        return;
+      }
+      try {
+        controller.jumpTo(nextOffset);
+      } catch (_) {
+        return;
+      }
+
+      if (nextOffset >= maxOffset - 0.5) {
+        _onNextPage?.call();
       }
     });
   }
 
   /// 翻页模式
   void _startPageMode() {
-    // 速度转换为翻页间隔
-    // speed 1 = 10秒, speed 100 = 1秒
-    final intervalMs = 10000 - (_speed - 1) * (10000 - 1000) ~/ 99;
-
-    _timer = Timer.periodic(Duration(milliseconds: intervalMs), (_) {
+    _timer = Timer.periodic(Duration(seconds: _speed), (_) {
       _onNextPage?.call();
     });
   }
@@ -175,12 +201,20 @@ class AutoReadPanel extends StatefulWidget {
   final AutoPager autoPager;
   final VoidCallback? onClose;
   final ValueChanged<int>? onSpeedChanged;
+  final VoidCallback? onShowMainMenu;
+  final VoidCallback? onOpenChapterList;
+  final VoidCallback? onOpenInterfaceSettings;
+  final VoidCallback? onStop;
 
   const AutoReadPanel({
     super.key,
     required this.autoPager,
     this.onClose,
     this.onSpeedChanged,
+    this.onShowMainMenu,
+    this.onOpenChapterList,
+    this.onOpenInterfaceSettings,
+    this.onStop,
   });
 
   @override
@@ -203,6 +237,12 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
   Color get _textNormal =>
       _isDark ? CupertinoColors.systemGrey : AppDesignTokens.textNormal;
 
+  Color get _divider =>
+      _isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+
+  Color get _shadow =>
+      CupertinoColors.black.withValues(alpha: _isDark ? 0.2 : 0.08);
+
   @override
   void initState() {
     super.initState();
@@ -221,91 +261,151 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
     }
   }
 
+  void _handleStop() {
+    widget.autoPager.stop();
+    widget.onStop?.call();
+    widget.onClose?.call();
+  }
+
+  Widget _buildActionItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+    bool highlighted = false,
+  }) {
+    final color = highlighted ? _accent : _textStrong;
+    return SizedBox(
+      width: 58,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 20,
+                child: Center(
+                  child: Icon(
+                    icon,
+                    size: 20,
+                    color: color,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: color,
+                  fontWeight: highlighted ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
       decoration: BoxDecoration(
         color: _panelBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        border: Border(
+          top: BorderSide(color: _divider),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: _shadow,
+            blurRadius: 14,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 标题栏
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _textNormal.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '自动阅读',
+                  '自动阅读速度',
                   style: TextStyle(
                     color: _textStrong,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: () {
-                    widget.autoPager.stop();
-                    widget.onClose?.call();
-                  },
-                  child: Icon(
-                    CupertinoIcons.xmark_circle_fill,
+                Text(
+                  '${widget.autoPager.speed}s',
+                  style: TextStyle(
                     color: _textNormal,
+                    fontSize: 13,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-
-            // 播放/暂停按钮
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: widget.autoPager.toggle,
-                  child: Icon(
-                    widget.autoPager.isRunning
-                        ? CupertinoIcons.pause_circle_fill
-                        : CupertinoIcons.play_circle_fill,
-                    color: _accent,
-                    size: 54,
-                  ),
-                ),
-              ],
+            const SizedBox(height: 8),
+            CupertinoSlider(
+              value: widget.autoPager.speed.toDouble(),
+              min: AutoPager.minSpeedSeconds.toDouble(),
+              max: AutoPager.maxSpeedSeconds.toDouble(),
+              divisions: AutoPager.maxSpeedSeconds - AutoPager.minSpeedSeconds,
+              activeColor: _accent,
+              onChanged: (value) {
+                final speed = value.round();
+                widget.autoPager.setSpeed(speed);
+                widget.onSpeedChanged?.call(speed);
+              },
             ),
-            const SizedBox(height: 16),
-
-            // 速度调节
+            const SizedBox(height: 6),
             Row(
               children: [
-                Icon(CupertinoIcons.tortoise, color: _textNormal, size: 20),
-                Expanded(
-                  child: CupertinoSlider(
-                    value: widget.autoPager.speed.toDouble(),
-                    min: 1,
-                    max: 100,
-                    divisions: 99,
-                    activeColor: _accent,
-                    onChanged: (value) {
-                      final speed = value.round();
-                      widget.autoPager.setSpeed(speed);
-                      widget.onSpeedChanged?.call(speed);
-                    },
-                  ),
+                const Spacer(),
+                _buildActionItem(
+                  icon: CupertinoIcons.list_bullet,
+                  label: '目录',
+                  onTap: widget.onOpenChapterList,
                 ),
-                Icon(CupertinoIcons.hare, color: _textNormal, size: 20),
+                const Spacer(flex: 2),
+                _buildActionItem(
+                  icon: CupertinoIcons.square_grid_2x2,
+                  label: '主菜单',
+                  onTap: widget.onShowMainMenu,
+                ),
+                const Spacer(flex: 2),
+                _buildActionItem(
+                  icon: CupertinoIcons.stop_circle_fill,
+                  label: '停止',
+                  onTap: _handleStop,
+                  highlighted: true,
+                ),
+                const Spacer(flex: 2),
+                _buildActionItem(
+                  icon: CupertinoIcons.circle_grid_3x3,
+                  label: '设置',
+                  onTap: widget.onOpenInterfaceSettings,
+                ),
+                const Spacer(),
               ],
-            ),
-
-            // 显示当前速度
-            Text(
-              '速度: ${widget.autoPager.speed}',
-              style: TextStyle(color: _textNormal, fontSize: 12),
             ),
           ],
         ),

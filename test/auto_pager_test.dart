@@ -10,7 +10,7 @@ void main() {
       final pager = AutoPager();
       var triggerCount = 0;
       pager.setMode(AutoPagerMode.page);
-      pager.setSpeed(100); // 约 1s/次
+      pager.setSpeed(1); // 1s/次
       pager.setOnNextPage(() {
         triggerCount += 1;
       });
@@ -36,7 +36,7 @@ void main() {
       final pager = AutoPager();
       var triggerCount = 0;
       pager.setMode(AutoPagerMode.page);
-      pager.setSpeed(100);
+      pager.setSpeed(1);
       pager.setOnNextPage(() {
         triggerCount += 1;
       });

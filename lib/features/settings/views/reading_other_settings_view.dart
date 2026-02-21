@@ -64,7 +64,7 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
               ),
               CupertinoListTile.notched(
                 title: const Text('自动阅读速度'),
-                additionalInfo: Text(_settings.autoReadSpeed.toString()),
+                additionalInfo: Text('${_settings.autoReadSpeed}s'),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _pickAutoReadSpeed,
               ),
@@ -108,7 +108,7 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
           child: CupertinoTextField(
             controller: controller,
             keyboardType: TextInputType.number,
-            placeholder: '1 - 100',
+            placeholder: '1 - 120（秒/页）',
           ),
         ),
         actions: [
@@ -128,7 +128,7 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
       ),
     );
     if (result == null) return;
-    _update(_settings.copyWith(autoReadSpeed: result.clamp(1, 100)));
+    _update(_settings.copyWith(autoReadSpeed: result.clamp(1, 120)));
   }
 
   Future<void> _pickChineseConverterType() async {

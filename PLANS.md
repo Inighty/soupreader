@@ -184,6 +184,121 @@
 
 ### 10) Progress（动态）
 
+- `2026-02-21`（本轮补丁）
+  - T11 第二十三批收敛：完成“界面/设置”选项逐项排查，修复 `底部对齐` 假生效问题，并将未落地能力转为明确阻塞态。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/widgets/legacy_justified_text.dart`、`lib/features/reader/widgets/paged_reader_widget.dart`、`lib/features/reader/views/simple_reader_view.dart`、`test/legacy_justified_text_highlight_test.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。
+    - 关键实现：
+      - `textBottomJustify` 对齐 legado `TextPage.upLinesPosition()`：仅在页面接近装满时分摊行间余量，不在大留白页面强行拉伸。
+      - `PagedReaderWidget` 普通渲染与 Picture 预渲染两条链路同步接入底部对齐，避免“不同翻页模式表现不一致”。
+      - “共享布局”入口改为“待迁移”提示，避免继续以可切换开关误导为已生效能力。
+  - 本轮实施记录：
+    - 做了什么：完成界面/设置核心选项排查并修复底部对齐；补充阻塞项记录。
+    - 为什么：用户反馈“界面和设置中的选项存在点了没效果”，与 legado 迁移级别口径不一致。
+    - 如何验证：
+      - `flutter test test/legacy_justified_text_highlight_test.dart test/paged_reader_widget_non_simulation_test.dart test/simple_reader_view_compile_test.dart`（通过）
+    - 兼容影响：中。底部对齐从“仅存储状态”升级为“真实影响页内排版”；`shareLayout` 改为待迁移提示，不影响书源与进度数据。
+  - T11 当前状态：保持 `active`。`textBottomJustify` 已收敛；`shareLayout` 与 `翻页按键` 维持 `blocked`，待后续能力回补。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第二十二批收敛：排查并修复自动阅读“点击反馈弱、速度语义偏差、面板入口不齐”问题，对齐 legado 自动阅读对话框语义。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/widgets/auto_pager.dart`、`lib/features/reader/views/simple_reader_view.dart`、`lib/features/reader/models/reading_settings.dart`、`lib/features/settings/views/reading_other_settings_view.dart`、`test/auto_pager_test.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。
+    - 关键实现：
+      - `AutoPager` 速度语义改为“秒/页”，范围由 `1-100` 收敛到 legado 同义的 `1-120`，翻页模式按秒触发，滚动模式按“视口高度/秒”推进。
+      - 自动阅读面板改为 legado 同义结构：速度滑杆 + `目录/主菜单/停止/设置` 四入口；保留底部弹层交互语义。
+      - `SimpleReaderView` 新增自动阅读面板回调链路（主菜单/目录/设置/停止），补齐开启/停止的可观测反馈（toast）与状态收敛。
+      - 阅读设置页“自动阅读速度”同步改为 `1-120（秒/页）`，显示文案统一加 `s`。
+  - 本轮实施记录：
+    - 做了什么：完成自动阅读速度模型、控制面板和入口状态流转的联动修复。
+    - 为什么：用户反馈自动阅读点击无明显反馈、速度设置感知弱；对照 legado 后确认速度语义和面板操作入口存在偏差。
+    - 如何验证：
+      - `flutter test test/auto_pager_test.dart test/simple_reader_view_compile_test.dart`（通过）
+      - `flutter test test/reading_settings_test.dart`（通过）
+    - 兼容影响：低到中。自动阅读速度上限由 `100` 调整为 `120`，并改为“秒/页”语义；旧配置会按新边界安全收敛，不影响书源解析与正文数据。
+  - T11 当前状态：保持 `active`。自动阅读链路已补齐，后续继续按 C5 真机路径回归触发反馈与层叠展示。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第二十一批收敛：优化底部菜单“进度拖动条与四入口”间距，缓解拥挤感。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/widgets/reader_bottom_menu.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。
+    - 关键实现：
+      - 在进度拖动区与四入口区之间新增 `SizedBox` 留白（分隔线上下加间距）。
+      - 章节滑杆区上边距从 `4` 调整为 `5`，向 legado 章节区 `5dp` 节奏收敛。
+      - 保持入口热区宽度、图标/文字尺寸与回调逻辑不变。
+  - 本轮实施记录：
+    - 做了什么：对底部进度拖动条区域进行轻量间距放松，避免视觉贴近。
+    - 为什么：用户明确指出“进度拖动条”与底部菜单看起来拥挤。
+    - 如何验证：
+      - `flutter test test/reader_bottom_menu_new_test.dart`（通过）
+    - 兼容影响：低。仅调整布局间距，不改交互语义与阅读逻辑。
+  - T11 当前状态：保持 `active`。底栏拥挤感问题已收口，继续按 C5 视觉回归补证。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第二十批收敛：排查并修复“翻页模式底部进度提示与底部菜单层叠”问题。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/widgets/paged_reader_widget.dart`、`lib/features/reader/views/simple_reader_view.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。
+    - 关键实现：
+      - `PagedReaderWidget` 新增 `showTipBars` 参数，控制页眉页脚提示是否绘制。
+      - 头脚占位与提示绘制解耦：菜单态仅隐藏提示条，不改变页眉页脚占位，避免正文区域在菜单开合时跳动。
+      - `SimpleReaderView._buildPagedContent` 在 `_showMenu/_showSearchMenu/_showAutoReadPanel` 任一为 true 时传入 `showTipBars=false`，避免底部进度提示与菜单栏重叠。
+  - 本轮实施记录：
+    - 做了什么：完成翻页模式提示条与底部菜单层级冲突排查与修复。
+    - 为什么：用户反馈底部进度条与底部菜单栏可能互相覆盖；排查确认该问题只在翻页模式菜单态存在。
+    - 如何验证：
+      - `flutter test test/simple_reader_view_compile_test.dart test/paged_reader_widget_non_simulation_test.dart test/paged_reader_widget_simulation_image_test.dart`（通过）
+    - 兼容影响：低。仅调整菜单态提示条可见性，不改翻页行为、章节进度计算与设置存储。
+  - T11 当前状态：保持 `active`。层叠问题已收口，继续按 C5 路径补真机回归证据。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第十九批收敛：修复“信息 -> 正文标题”选择可读性与滚动模式标题居中无效问题。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/views/simple_reader_view.dart`、`docs/plans/2026-02-21-reader-density-overlay-legado-parity-execplan.md`、`PLANS.md`。
+    - 关键实现：
+      - `_buildLegacyTitleModeSegment` 增加选中项文本对比色策略（按 accent 亮度自动切换深/浅文字），避免“居左/居中/隐藏”被选中态遮挡后难以辨认。
+      - `_buildScrollSegment` 的章节标题改为 `SizedBox(width: double.infinity)` 包裹，保证 `titleMode=1` 时 `TextAlign.center` 在滚动模式可见且生效。
+      - 保持 `titleMode` 三档语义与 legacy 一致：`0=居左`、`1=居中`、`2=隐藏`。
+  - 本轮实施记录：
+    - 做了什么：修正信息弹层标题模式选中态可读性，并修复滚动模式标题居中展示。
+    - 为什么：用户反馈“正文标题设置选中后文字看不清，居中没用”；与 legado 的 `RadioGroup + titleMode` 语义不一致。
+    - 如何验证：
+      - `flutter test test/simple_reader_view_compile_test.dart test/reader_top_menu_test.dart test/reader_bottom_menu_new_test.dart`（通过）
+    - 兼容影响：低。仅影响阅读器信息弹层标题模式可读性和滚动模式标题布局，不改配置结构与存储字段。
+  - T11 当前状态：保持 `active`。标题模式问题已收口，继续按 C5 视觉回归补证。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第十八批收敛：统一阅读器顶部栏与底部工具栏样式来源，移除顶部写死色值，确保与 legado 同一 `bg/text` 语义。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/widgets/reader_menu_surface_style.dart`、`lib/features/reader/widgets/reader_menus.dart`、`lib/features/reader/widgets/reader_bottom_menu.dart`、`test/reader_top_menu_test.dart`、`test/reader_bottom_menu_new_test.dart`。
+    - 关键实现：
+      - 新增 `resolveReaderMenuSurfaceStyle`，统一计算 `panel/text/border/divider/shadow/control` 样式参数。
+      - `ReaderTopMenu` 改为复用统一样式解析器，移除 `0xFF1F2937` 写死深色分支。
+      - `ReaderBottomMenuNew` 改为复用统一样式解析器，保持与顶部同源；底部安全区贴底覆盖逻辑保持有效。
+      - 新增测试断言顶部/底部均使用统一菜单色板，防止后续再次分叉。
+  - 本轮实施记录：
+    - 做了什么：完成顶/底菜单样式同源化改造并补齐回归测试。
+    - 为什么：用户明确要求“底部菜单栏和顶部样式统一”；此前顶部/底部由不同配色逻辑驱动，产生观感割裂。
+    - 如何验证：
+      - `flutter test test/reader_top_menu_test.dart test/reader_bottom_menu_new_test.dart test/simple_reader_view_compile_test.dart`（通过）
+    - 兼容影响：低。仅调整阅读器菜单样式计算入口，不改菜单功能、入口文案与交互回调。
+  - T11 当前状态：保持 `active`。顶/底菜单样式已同源，后续继续按 C5 路径做真机视觉回归补证。
+
+- `2026-02-21`（本轮补丁）
+  - T11 第十七批收敛：修复阅读器底部菜单安全区“漏底”问题，底栏背景铺满到系统手势区，避免底部露出正文背景。
+  - T11 代码收敛：
+    - 代码变更：`lib/features/reader/widgets/reader_bottom_menu.dart`、`test/reader_bottom_menu_new_test.dart`。
+    - 关键实现：
+      - `ReaderBottomMenuNew` 移除底栏外层 `SafeArea`（其外侧安全区会透明透出正文）。
+      - 底栏容器改为直接贴底，并将 `bottom inset` 合并进容器 `padding`，让背景色连续覆盖到底部安全区。
+      - 新增回归测试：在 `padding/viewPadding.bottom=24` 场景下断言 `reader_bottom_menu_panel` 底边与页面底边重合。
+  - 本轮实施记录：
+    - 做了什么：修复底栏背景未覆盖底部安全区的问题并补齐自动化回归。
+    - 为什么：用户反馈“底部工具栏颜色未拉到底，最下方露出正文背景”，与 legado 的底栏实体铺底语义不一致。
+    - 如何验证：
+      - `flutter test test/reader_bottom_menu_new_test.dart`（通过）
+    - 兼容影响：低。仅调整阅读器菜单容器布局，不涉及书源、正文解析与设置存储结构。
+  - T11 当前状态：保持 `active`。本补丁已收口底栏漏底问题，后续继续按 C5 视觉细节回归。
+
 - `2026-02-21`（本轮）
   - T11 第十六批收敛：阅读器正文密度与菜单分层对齐 legado，修复“内容不满 + 配置态遮挡偏重 + 顶底与正文混淆”。
   - T11 代码收敛：
@@ -636,6 +751,10 @@
 
 ### 11) Surprises & Discoveries（动态）
 
+- `2026-02-21`：`textBottomJustify` 在 soupreader 里此前仅有配置开关，未接入分页渲染；根因是文本合成器缺少“页内剩余高度分摊”阶段。修复后确认只在“接近满页”条件触发分摊，避免短页被过度拉伸。
+- `2026-02-21`：`shareLayout` 在当前数据模型中没有布局参数承载（`ReadStyleConfig` 仅含背景/文字字段），导致开关可切但无语义落点；本轮按迁移例外流程标记 `blocked` 并改为“待迁移”提示。
+- `2026-02-21`：`翻页按键` 仍依赖平台级按键映射能力，当前保留可观测占位提示，继续维持 `blocked`。
+
 - 边距/信息弹窗收口时发现 `ReadingSettings.fromJson` 对 `showHeaderLine` 的缺省回退为 `true`，与 legado `showHeaderLine=false` 语义不一致；旧配置缺字段会出现“无操作却显示分割线”的偏差，已改为 `false`。
 - legado `TipConfigDialog` 的“标题显示”是内联单选组而非二级弹层；若沿用 ActionSheet 会改变交互路径，已改为内联分段控件。
 - 发现 legacy 菜单规模远高于直觉（`410` 项），必须使用台账驱动，不能靠页面肉眼扫。
@@ -674,6 +793,10 @@
 - 仅用“章节耗时 + 长图误差”做预算自适应时，无法区分 `timeout/auth/decode` 失败性质，容易出现“某书源持续失败但预算变化迟缓”的尾部偏差；补齐失败分层后预算调整更稳定。
 
 ### 12) Decision Log（动态）
+
+- `2026-02-21`：T11 第二十三批对 `textBottomJustify` 采用“共享计算核心 + 双渲染链路复用”策略：`LegacyJustifyComposer` 同时服务 Widget 渲染与 Canvas 预渲染，避免不同翻页模式出现语义漂移。
+- `2026-02-21`：`shareLayout` 在未扩展样式布局快照模型前不再伪装可用，先收敛为 `blocked` 提示；后续回补方向为扩展 `ReadStyleConfig` 并在样式切换时按开关应用共享/独立布局。
+- `2026-02-21`：`翻页按键` 维持占位而不做虚假开关，待平台按键映射链路补齐后再解锁。
 
 - `2026-02-21`：T11 弹窗迁移采用“结构同义优先”策略：边距弹窗改为平铺分段列表；信息弹窗标题模式改为内联单选，不再使用二级 ActionSheet。
 - `2026-02-21`：`showHeaderLine` 兼容回退值改为 `false`，优先与 legado 默认语义保持一致，避免旧配置行为漂移。
@@ -714,6 +837,12 @@
 - `2026-02-21`：T11 对图片探测新增“失败类型分层采样 + source-level 遥测调参”策略：按 `timeout/auth/decode/other` 统计 EMA 与连续失败次数，动态增配探测预算并在高成功率时回收预算，避免慢源长期固定预算。
 
 ### 13) Outcomes & Retrospective（动态）
+
+- `2026-02-21`（第二十三批）：
+  - 做了什么：完成“界面/设置”选项排查并修复 `底部对齐` 假生效；将 `shareLayout` 与 `翻页按键` 记录为阻塞项并统一可观测提示。
+  - 为什么：用户反馈选项存在“可点击但无效果”的迁移偏差，需按 legado 语义收口并避免误导入口。
+  - 如何验证：`flutter test test/legacy_justified_text_highlight_test.dart test/paged_reader_widget_non_simulation_test.dart test/simple_reader_view_compile_test.dart`（通过）。
+  - 后续改进：扩展样式布局快照数据结构，回补 `shareLayout` 共享/独立布局切换能力。
 
 - 阶段性结果（截至 T11 第十五批收敛）：
   - 已完成任务：`T00,T01,T02,T03,T04,T05,T05A,T06,T07,T08,T09,T10`。

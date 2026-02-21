@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:soupreader/app/theme/colors.dart';
+import 'package:soupreader/app/theme/design_tokens.dart';
+import 'package:soupreader/features/reader/widgets/reader_menu_surface_style.dart';
 import 'package:soupreader/features/reader/widgets/reader_menus.dart';
 
 void main() {
@@ -34,13 +36,16 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  ReaderTopMenu buildMenu() {
+  ReaderTopMenu buildMenu({
+    ReadingThemeColors? theme,
+    bool readBarStyleFollowPage = false,
+  }) {
     return ReaderTopMenu(
       bookTitle: '明克街13号',
       chapterTitle: '第五百九十九章 前不久，我刚杀了一个',
       chapterUrl: 'https://www.example.com/chapter/599',
       sourceName: '笔趣阁',
-      currentTheme: AppColors.readingThemes.first,
+      currentTheme: theme ?? AppColors.readingThemes.first,
       onOpenBookInfo: () {},
       onOpenChapterLink: () {},
       onToggleChapterLinkOpenMode: () {},
@@ -49,6 +54,7 @@ void main() {
       showSourceAction: true,
       showChapterLink: true,
       showTitleAddition: true,
+      readBarStyleFollowPage: readBarStyleFollowPage,
     );
   }
 
@@ -74,5 +80,41 @@ void main() {
     expect(find.text('第五百九十九章 前不久，我刚杀了一个'), findsOneWidget);
     expect(find.text('笔趣阁'), findsOneWidget);
     expect(find.text('https://www.example.com/chapter/599'), findsOneWidget);
+  });
+
+  testWidgets('ReaderTopMenu 默认配色使用统一菜单色板（非写死深色）', (tester) async {
+    await pumpTopMenu(
+      tester,
+      logicalWidth: 430,
+      menu: buildMenu(),
+    );
+
+    final panel = tester.widget<Container>(
+      find.byKey(const Key('reader_top_menu_panel')),
+    );
+    final decoration = panel.decoration as BoxDecoration;
+    expect(decoration.color, ReaderOverlayTokens.panelLight);
+  });
+
+  testWidgets('ReaderTopMenu 跟随页面时使用阅读主题面板色板', (tester) async {
+    final theme = AppColors.legadoClassicTheme;
+    final expectedStyle = resolveReaderMenuSurfaceStyle(
+      currentTheme: theme,
+      readBarStyleFollowPage: true,
+    );
+    await pumpTopMenu(
+      tester,
+      logicalWidth: 430,
+      menu: buildMenu(
+        theme: theme,
+        readBarStyleFollowPage: true,
+      ),
+    );
+
+    final panel = tester.widget<Container>(
+      find.byKey(const Key('reader_top_menu_panel')),
+    );
+    final decoration = panel.decoration as BoxDecoration;
+    expect(decoration.color, expectedStyle.panelBackground);
   });
 }
