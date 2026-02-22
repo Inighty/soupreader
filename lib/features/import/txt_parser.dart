@@ -5,38 +5,92 @@ import 'package:fast_gbk/fast_gbk.dart';
 import 'package:uuid/uuid.dart';
 import '../bookshelf/models/book.dart';
 
+/// TXT 目录规则（对齐 legado `TxtTocRule.rule` 语义）。
+class TxtTocRuleOption {
+  final String name;
+  final String rule;
+  final String example;
+
+  const TxtTocRuleOption({
+    required this.name,
+    required this.rule,
+    required this.example,
+  });
+}
+
 /// TXT 文件解析器
 class TxtParser {
   static const _uuid = Uuid();
 
-  /// 常见章节标题正则 - 按优先级排序
-  static final List<RegExp> _chapterPatterns = [
-    // 第1章xxx 格式（阿拉伯数字，章后直接跟标题）
-    RegExp(r'^\s*第\d+章\S.*$', multiLine: true),
-    // 第X章、第X节、第X回、第X卷 (中文数字或阿拉伯数字)
-    RegExp(r'^\s*第[零一二三四五六七八九十百千万\d]+[章节回卷].*$', multiLine: true),
-    // 【第X章】格式
-    RegExp(r'^\s*【第[零一二三四五六七八九十百千万\d]+[章节回卷]】.*$', multiLine: true),
-    // 第 X 章 (带空格)
-    RegExp(r'^\s*第\s*\d+\s*章.*$', multiLine: true),
-    // Chapter X / CHAPTER X
-    RegExp(r'^\s*[Cc][Hh][Aa][Pp][Tt][Ee][Rr]\s+\d+.*$', multiLine: true),
-    // 卷X 章X
-    RegExp(r'^\s*[卷第]\s*[零一二三四五六七八九十百千万\d]+\s*[章节卷].*$', multiLine: true),
-    // 纯数字章节：001、0001、1、01 等开头
-    RegExp(r'^\s*\d{1,4}[\.\、\s].*$', multiLine: true),
-    // 正文 第X章
-    RegExp(r'^\s*正文\s+第[零一二三四五六七八九十百千万\d]+[章节回卷].*$', multiLine: true),
-    // 序章、楔子、引子、终章、番外
-    RegExp(r'^\s*[序终]章.*$', multiLine: true),
-    RegExp(r'^\s*[楔引]子.*$', multiLine: true),
-    RegExp(r'^\s*番外.*$', multiLine: true),
+  /// 内置目录规则（顺序影响默认自动识别优先级）。
+  static const List<TxtTocRuleOption> defaultTocRuleOptions =
+      <TxtTocRuleOption>[
+    TxtTocRuleOption(
+      name: '第N章（数字）',
+      rule: r'^\s*第\d+章\S.*$',
+      example: '第1章 开始',
+    ),
+    TxtTocRuleOption(
+      name: '第N章/节/回/卷',
+      rule: r'^\s*第[零一二三四五六七八九十百千万\d]+[章节回卷].*$',
+      example: '第十二章 夜雨',
+    ),
+    TxtTocRuleOption(
+      name: '【第N章】',
+      rule: r'^\s*【第[零一二三四五六七八九十百千万\d]+[章节回卷]】.*$',
+      example: '【第3章】再会',
+    ),
+    TxtTocRuleOption(
+      name: '第 N 章（带空格）',
+      rule: r'^\s*第\s*\d+\s*章.*$',
+      example: '第 10 章 转折',
+    ),
+    TxtTocRuleOption(
+      name: 'Chapter N',
+      rule: r'^\s*[Cc][Hh][Aa][Pp][Tt][Ee][Rr]\s+\d+.*$',
+      example: 'Chapter 8',
+    ),
+    TxtTocRuleOption(
+      name: '卷N/第N章',
+      rule: r'^\s*[卷第]\s*[零一二三四五六七八九十百千万\d]+\s*[章节卷].*$',
+      example: '卷一 第三章',
+    ),
+    TxtTocRuleOption(
+      name: '数字开头',
+      rule: r'^\s*\d{1,4}[\.\、\s].*$',
+      example: '001 初见',
+    ),
+    TxtTocRuleOption(
+      name: '正文 第N章',
+      rule: r'^\s*正文\s+第[零一二三四五六七八九十百千万\d]+[章节回卷].*$',
+      example: '正文 第5章',
+    ),
+    TxtTocRuleOption(
+      name: '序章/终章',
+      rule: r'^\s*[序终]章.*$',
+      example: '序章',
+    ),
+    TxtTocRuleOption(
+      name: '楔子/引子',
+      rule: r'^\s*[楔引]子.*$',
+      example: '楔子',
+    ),
+    TxtTocRuleOption(
+      name: '番外',
+      rule: r'^\s*番外.*$',
+      example: '番外·后日谈',
+    ),
   ];
+
+  static final List<RegExp> _chapterPatterns = defaultTocRuleOptions
+      .map((option) => RegExp(option.rule, multiLine: true))
+      .toList(growable: false);
 
   /// 从文件路径导入 TXT
   static Future<TxtImportResult> importFromFile(
     String filePath, {
     String? forcedCharset,
+    String? tocRuleRegex,
   }) async {
     final file = File(filePath);
     if (!await file.exists()) {
@@ -54,6 +108,7 @@ class TxtParser {
       bookName,
       filePath,
       charset: decoded.charset,
+      tocRuleRegex: tocRuleRegex,
     );
   }
 
@@ -62,6 +117,7 @@ class TxtParser {
     Uint8List bytes,
     String fileName, {
     String? forcedCharset,
+    String? tocRuleRegex,
   }) {
     final decoded = _decodeContent(bytes, forcedCharset: forcedCharset);
     final bookName =
@@ -71,6 +127,7 @@ class TxtParser {
       bookName,
       null,
       charset: decoded.charset,
+      tocRuleRegex: tocRuleRegex,
     );
   }
 
@@ -81,6 +138,7 @@ class TxtParser {
     required String bookName,
     String? forcedCharset,
     bool splitLongChapter = true,
+    String? tocRuleRegex,
   }) async {
     final file = File(filePath);
     if (!await file.exists()) {
@@ -95,6 +153,7 @@ class TxtParser {
       charset: decoded.charset,
       forcedBookId: bookId,
       splitLongChapter: splitLongChapter,
+      tocRuleRegex: tocRuleRegex,
     );
   }
 
@@ -295,6 +354,7 @@ class TxtParser {
     required String charset,
     String? forcedBookId,
     bool splitLongChapter = true,
+    String? tocRuleRegex,
   }) {
     // 清理内容 - 统一换行符
     content = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
@@ -303,6 +363,7 @@ class TxtParser {
     final chapters = _splitChapters(
       content,
       splitLongChapter: splitLongChapter,
+      tocRuleRegex: tocRuleRegex,
     );
 
     // 创建书籍
@@ -605,55 +666,96 @@ class TxtParser {
   static List<_ChapterInfo> _splitChapters(
     String content, {
     bool splitLongChapter = true,
+    String? tocRuleRegex,
   }) {
-    // 尝试所有模式，找出匹配最多的
-    RegExp? bestPattern;
-    int maxMatches = 0;
-    List<RegExpMatch> bestMatches = [];
-
-    for (final pattern in _chapterPatterns) {
-      final matches = pattern.allMatches(content).toList();
-      // 过滤掉太短的匹配（可能是误匹配）
-      final validMatches = matches.where((m) {
-        final text = m.group(0) ?? '';
-        // 章节标题通常不会太长，也不会太短
-        return text.trim().length >= 2 && text.trim().length <= 50;
-      }).toList();
-
-      if (validMatches.length > maxMatches) {
-        maxMatches = validMatches.length;
-        bestPattern = pattern;
-        bestMatches = validMatches;
+    final normalizedRule = (tocRuleRegex ?? '').trim();
+    if (normalizedRule.isNotEmpty) {
+      final forcedPattern = _compileTocPattern(normalizedRule);
+      if (forcedPattern == null) {
+        return <_ChapterInfo>[];
       }
+      return _splitByMatches(
+        content,
+        _filterValidMatches(forcedPattern.allMatches(content)),
+        splitLongChapter: splitLongChapter,
+        allowFallback: false,
+      );
     }
 
-    // 如果没有找到足够的章节（至少2章），按固定字数分章
-    if (bestPattern == null || maxMatches < 2) {
+    var maxMatches = 0;
+    List<RegExpMatch> bestMatches = <RegExpMatch>[];
+    for (final pattern in _chapterPatterns) {
+      final validMatches = _filterValidMatches(pattern.allMatches(content));
+      if (validMatches.length <= maxMatches) continue;
+      maxMatches = validMatches.length;
+      bestMatches = validMatches;
+    }
+
+    // 如果没有找到足够的章节（至少2章），按固定字数分章。
+    if (maxMatches < 2) {
       if (!splitLongChapter) {
         return _singleChapterFallback(content);
       }
       return _splitByLength(content);
     }
 
-    // 按章节分割
+    return _splitByMatches(
+      content,
+      bestMatches,
+      splitLongChapter: splitLongChapter,
+      allowFallback: true,
+    );
+  }
+
+  static RegExp? _compileTocPattern(String rawPattern) {
+    try {
+      return RegExp(rawPattern, multiLine: true);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static List<RegExpMatch> _filterValidMatches(
+    Iterable<RegExpMatch> matches,
+  ) {
+    return matches.where((match) {
+      final text = (match.group(0) ?? '').trim();
+      // legacy 规则通常为“章节标题整行匹配”，这里保留长度边界以减少误匹配噪音。
+      return text.length >= 2 && text.length <= 120;
+    }).toList(growable: false);
+  }
+
+  static List<_ChapterInfo> _splitByMatches(
+    String content,
+    List<RegExpMatch> matches, {
+    required bool splitLongChapter,
+    required bool allowFallback,
+  }) {
+    if (matches.isEmpty) {
+      if (!allowFallback) return <_ChapterInfo>[];
+      if (!splitLongChapter) {
+        return _singleChapterFallback(content);
+      }
+      return _splitByLength(content);
+    }
+
     final chapters = <_ChapterInfo>[];
 
     // 处理第一章前的内容（序言/简介）
-    if (bestMatches.isNotEmpty && bestMatches.first.start > 200) {
-      final preface = content.substring(0, bestMatches.first.start).trim();
+    if (matches.first.start > 200) {
+      final preface = content.substring(0, matches.first.start).trim();
       if (preface.isNotEmpty && preface.length > 50) {
         chapters.add(_ChapterInfo(title: '序言', content: preface));
       }
     }
 
-    for (int i = 0; i < bestMatches.length; i++) {
-      final match = bestMatches[i];
+    for (int i = 0; i < matches.length; i++) {
+      final match = matches[i];
       final title = match.group(0)?.trim() ?? '第${i + 1}章';
 
       final startIndex = match.end;
-      final endIndex = (i + 1 < bestMatches.length)
-          ? bestMatches[i + 1].start
-          : content.length;
+      final endIndex =
+          (i + 1 < matches.length) ? matches[i + 1].start : content.length;
 
       final chapterContent = content.substring(startIndex, endIndex).trim();
 
@@ -664,6 +766,7 @@ class TxtParser {
     }
 
     if (chapters.isEmpty) {
+      if (!allowFallback) return <_ChapterInfo>[];
       if (!splitLongChapter) {
         return _singleChapterFallback(content);
       }

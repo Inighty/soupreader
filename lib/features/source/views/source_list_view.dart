@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -16,9 +17,12 @@ import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/keep_screen_on_service.dart';
 import '../../../core/services/qr_scan_service.dart';
+import '../../../core/services/settings_service.dart';
+import '../../../core/services/source_variable_store.dart';
 import '../../../core/utils/legado_json.dart';
+import '../../settings/views/app_help_dialog.dart';
+import '../../search/models/search_scope.dart';
 import '../../search/views/search_view.dart';
-import '../constants/source_help_texts.dart';
 import '../models/book_source.dart';
 import '../services/source_availability_check_task_service.dart';
 import '../services/source_check_source_state_helper.dart';
@@ -43,6 +47,11 @@ enum _SourceSortMode {
   respond,
   enabled,
 }
+
+typedef SourceMoveSourcesHandler = Future<void> Function(
+  List<BookSource> sources, {
+  required bool toTop,
+});
 
 class _ImportSelectionDecision {
   const _ImportSelectionDecision({
@@ -90,7 +99,12 @@ class _CheckSettings {
 
 /// 书源管理页面
 class SourceListView extends StatefulWidget {
-  const SourceListView({super.key});
+  const SourceListView({
+    super.key,
+    this.moveSourcesHandler,
+  });
+
+  final SourceMoveSourcesHandler? moveSourcesHandler;
 
   @override
   State<SourceListView> createState() => _SourceListViewState();
@@ -105,6 +119,7 @@ class _SourceListViewState extends State<SourceListView> {
   late final SourceRepository _sourceRepo;
   late final DatabaseService _db;
   late final SourceImportCommitService _importCommitService;
+  final SettingsService _settingsService = SettingsService();
   final KeepScreenOnService _keepScreenOnService = KeepScreenOnService.instance;
   final SourceAvailabilityCheckTaskService _checkTaskService =
       SourceAvailabilityCheckTaskService.instance;
@@ -190,7 +205,7 @@ class _SourceListViewState extends State<SourceListView> {
               padding: EdgeInsets.zero,
               minimumSize: const Size(30, 30),
               onPressed: _showGroupFilterOptions,
-              child: const Icon(CupertinoIcons.folder),
+              child: const Icon(CupertinoIcons.square_grid_2x2),
             ),
             CupertinoButton(
               padding: EdgeInsets.zero,
@@ -422,27 +437,27 @@ class _SourceListViewState extends State<SourceListView> {
 
   List<BookSource> _applyQueryFilter(List<BookSource> input, String query) {
     final q = query.toLowerCase();
-    if (q == '启用') {
+    if (q == '已启用' || q == '启用') {
       return input.where((s) => s.enabled).toList(growable: false);
     }
-    if (q == '禁用') {
+    if (q == '已禁用' || q == '禁用') {
       return input.where((s) => !s.enabled).toList(growable: false);
     }
-    if (q == '需登录') {
+    if (q == '需要登录' || q == '需登录') {
       return input
           .where((s) => (s.loginUrl ?? '').trim().isNotEmpty)
           .toList(growable: false);
     }
-    if (q == '无分组') {
+    if (q == '未分组' || q == '无分组') {
       return input.where((s) {
         final group = s.bookSourceGroup ?? '';
         return group.isEmpty || group.contains('未分组');
       }).toList(growable: false);
     }
-    if (q == '启用发现') {
+    if (q == '已启用发现' || q == '启用发现') {
       return input.where((s) => s.enabledExplore).toList(growable: false);
     }
-    if (q == '禁用发现') {
+    if (q == '已禁用发现' || q == '禁用发现') {
       return input.where((s) => !s.enabledExplore).toList(growable: false);
     }
     if (query.startsWith('group:')) {
@@ -511,6 +526,19 @@ class _SourceListViewState extends State<SourceListView> {
     }
 
     list.sort((a, b) {
+      if (_sortMode == _SourceSortMode.enabled) {
+        final enabledCmp = _sortAscending
+            ? (a.enabled == b.enabled ? 0 : (a.enabled ? -1 : 1))
+            : (a.enabled == b.enabled ? 0 : (a.enabled ? 1 : -1));
+        if (enabledCmp != 0) {
+          return enabledCmp;
+        }
+        // 对齐 legado：是否启用在反序时仅反转启用分组，同组内名称始终正序。
+        return SearchScopeGroupHelper.cnCompareLikeLegado(
+          a.bookSourceName,
+          b.bookSourceName,
+        );
+      }
       final c = compareByMode(a, b);
       return _sortAscending ? c : -c;
     });
@@ -698,6 +726,9 @@ class _SourceListViewState extends State<SourceListView> {
                         ),
                         const SizedBox(width: 2),
                         CupertinoButton(
+                          key: ValueKey<String>(
+                            'source-item-more-${source.bookSourceUrl}',
+                          ),
                           padding: EdgeInsets.zero,
                           minimumSize: const Size(28, 28),
                           onPressed: () => _showSourceActions(source),
@@ -1076,28 +1107,30 @@ class _SourceListViewState extends State<SourceListView> {
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('从文件导入'),
+            child: const Text('本地导入'),
             onPressed: () {
               Navigator.pop(context);
               _importFromFile();
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('从网络导入'),
+            child: const Text('网络导入'),
             onPressed: () {
               Navigator.pop(context);
               _importFromUrl();
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('扫码导入'),
+            child: const Text('二维码导入'),
             onPressed: () {
               Navigator.pop(context);
               _importFromQrCode();
             },
           ),
           CupertinoActionSheetAction(
-            child: Text(_groupSourcesByDomain ? '关闭按域名分组' : '按域名分组'),
+            child: Text(
+              '${_groupSourcesByDomain ? '✓ ' : ''}按域名分组显示',
+            ),
             onPressed: () {
               Navigator.pop(context);
               setState(() => _groupSourcesByDomain = !_groupSourcesByDomain);
@@ -1141,26 +1174,26 @@ class _SourceListViewState extends State<SourceListView> {
             onPressed: () => pickSort(_SourceSortMode.weight),
           ),
           CupertinoActionSheetAction(
-            child: Text('${_sortMode == _SourceSortMode.name ? '✓ ' : ''}名称'),
+            child: Text('${_sortMode == _SourceSortMode.name ? '✓ ' : ''}名称排序'),
             onPressed: () => pickSort(_SourceSortMode.name),
           ),
           CupertinoActionSheetAction(
-            child: Text('${_sortMode == _SourceSortMode.url ? '✓ ' : ''}地址'),
+            child: Text('${_sortMode == _SourceSortMode.url ? '✓ ' : ''}地址排序'),
             onPressed: () => pickSort(_SourceSortMode.url),
           ),
           CupertinoActionSheetAction(
-            child:
-                Text('${_sortMode == _SourceSortMode.update ? '✓ ' : ''}更新时间'),
+            child: Text(
+                '${_sortMode == _SourceSortMode.update ? '✓ ' : ''}更新时间排序'),
             onPressed: () => pickSort(_SourceSortMode.update),
           ),
           CupertinoActionSheetAction(
-            child:
-                Text('${_sortMode == _SourceSortMode.respond ? '✓ ' : ''}响应时间'),
+            child: Text(
+                '${_sortMode == _SourceSortMode.respond ? '✓ ' : ''}响应时间排序'),
             onPressed: () => pickSort(_SourceSortMode.respond),
           ),
           CupertinoActionSheetAction(
             child:
-                Text('${_sortMode == _SourceSortMode.enabled ? '✓ ' : ''}启用状态'),
+                Text('${_sortMode == _SourceSortMode.enabled ? '✓ ' : ''}是否启用'),
             onPressed: () => pickSort(_SourceSortMode.enabled),
           ),
           CupertinoActionSheetAction(
@@ -1194,28 +1227,28 @@ class _SourceListViewState extends State<SourceListView> {
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('启用'),
-            onPressed: () => _applySearchQuery('启用', context),
+            child: const Text('已启用'),
+            onPressed: () => _applySearchQuery('已启用', context),
           ),
           CupertinoActionSheetAction(
-            child: const Text('禁用'),
-            onPressed: () => _applySearchQuery('禁用', context),
+            child: const Text('已禁用'),
+            onPressed: () => _applySearchQuery('已禁用', context),
           ),
           CupertinoActionSheetAction(
-            child: const Text('需登录'),
-            onPressed: () => _applySearchQuery('需登录', context),
+            child: const Text('需要登录'),
+            onPressed: () => _applySearchQuery('需要登录', context),
           ),
           CupertinoActionSheetAction(
-            child: const Text('无分组'),
-            onPressed: () => _applySearchQuery('无分组', context),
+            child: const Text('未分组'),
+            onPressed: () => _applySearchQuery('未分组', context),
           ),
           CupertinoActionSheetAction(
-            child: const Text('启用发现'),
-            onPressed: () => _applySearchQuery('启用发现', context),
+            child: const Text('已启用发现'),
+            onPressed: () => _applySearchQuery('已启用发现', context),
           ),
           CupertinoActionSheetAction(
-            child: const Text('禁用发现'),
-            onPressed: () => _applySearchQuery('禁用发现', context),
+            child: const Text('已禁用发现'),
+            onPressed: () => _applySearchQuery('已禁用发现', context),
           ),
           ...groups.map(
             (group) => CupertinoActionSheetAction(
@@ -1267,17 +1300,11 @@ class _SourceListViewState extends State<SourceListView> {
                         padding: EdgeInsets.zero,
                         minimumSize: const Size(32, 32),
                         onPressed: () async {
-                          final name = await _askGroupName('新增分组');
+                          final name = await _askGroupName('添加分组');
                           if (name == null || name.trim().isEmpty) return;
                           await _assignGroupToNoGroupSources(name.trim());
                         },
                         child: const Icon(CupertinoIcons.add_circled),
-                      ),
-                      CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(32, 32),
-                        onPressed: () => Navigator.pop(sheetContext),
-                        child: const Icon(CupertinoIcons.clear_circled),
                       ),
                     ],
                   ),
@@ -1293,15 +1320,7 @@ class _SourceListViewState extends State<SourceListView> {
                       final all = snapshot.data ?? _sourceRepo.getAllSources();
                       final groups = _buildGroups(_normalizeSources(all));
                       if (groups.isEmpty) {
-                        return Center(
-                          child: Text(
-                            '暂无可管理分组',
-                            style: TextStyle(
-                              color: CupertinoColors.secondaryLabel
-                                  .resolveFrom(context),
-                            ),
-                          ),
-                        );
+                        return const SizedBox.shrink();
                       }
 
                       return ListView.separated(
@@ -1331,7 +1350,7 @@ class _SourceListViewState extends State<SourceListView> {
                                   minimumSize: const Size(36, 30),
                                   onPressed: () async {
                                     final renamed = await _askGroupName(
-                                      '重命名分组',
+                                      '编辑分组',
                                       initialValue: group,
                                     );
                                     if (renamed == null) return;
@@ -1397,39 +1416,32 @@ class _SourceListViewState extends State<SourceListView> {
               child: const Text('登录'),
               onPressed: () {
                 Navigator.pop(context);
-                _openSourceLogin(source);
+                _openSourceLogin(source.bookSourceUrl);
               },
             ),
           CupertinoActionSheetAction(
             child: const Text('搜索'),
             onPressed: () async {
               Navigator.pop(context);
-              if (!mounted) return;
-              await Navigator.of(this.context).push(
-                CupertinoPageRoute<void>(
-                  builder: (_) => SearchView.scoped(
-                    sourceUrls: [source.bookSourceUrl],
-                  ),
-                ),
-              );
+              await _openSourceScopedSearch(source);
             },
           ),
           CupertinoActionSheetAction(
             child: const Text('调试'),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              _openEditor(
-                source.bookSourceUrl,
-                initialTab: 3,
-              );
+              await _openSourceDebug(source);
             },
           ),
           CupertinoActionSheetAction(
             isDestructiveAction: true,
             child: const Text('删除'),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              _confirmDeleteSource(source);
+              setState(() {
+                _selectedUrls.remove(source.bookSourceUrl);
+              });
+              await _confirmDeleteSource(source);
             },
           ),
           if ((source.exploreUrl ?? '').trim().isNotEmpty)
@@ -1437,9 +1449,7 @@ class _SourceListViewState extends State<SourceListView> {
               child: Text(source.enabledExplore ? '禁用发现' : '启用发现'),
               onPressed: () async {
                 Navigator.pop(context);
-                await _sourceRepo.updateSource(
-                  source.copyWith(enabledExplore: !source.enabledExplore),
-                );
+                await _toggleSourceExploreFromItemAction(source);
               },
             ),
         ],
@@ -1452,27 +1462,32 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Future<void> _confirmDeleteSource(BookSource source) async {
-    final ok = await showCupertinoDialog<bool>(
-          context: context,
-          builder: (ctx) => CupertinoAlertDialog(
-            title: const Text('删除书源'),
-            content: Text('\n确定删除 ${source.bookSourceName} ？'),
-            actions: [
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('删除'),
-              ),
-              CupertinoDialogAction(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('取消'),
-              ),
-            ],
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('提醒'),
+        content: Text('是否确认删除？\n${source.bookSourceName}'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
           ),
-        ) ??
-        false;
-    if (!ok) return;
-    await _sourceRepo.deleteSource(source.bookSourceUrl);
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _deleteSourceByLegacyRule(source.bookSourceUrl);
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteSourceByLegacyRule(String sourceUrl) async {
+    await _sourceRepo.deleteSource(sourceUrl);
+    await SourceVariableStore.removeVariable(sourceUrl);
   }
 
   Future<void> _toTop(BookSource source) async {
@@ -1490,6 +1505,11 @@ class _SourceListViewState extends State<SourceListView> {
     required bool toTop,
   }) async {
     if (sources.isEmpty) return;
+    final moveSourcesHandler = widget.moveSourcesHandler;
+    if (moveSourcesHandler != null) {
+      await moveSourcesHandler(sources, toTop: toTop);
+      return;
+    }
     final all = _sourceRepo.getAllSources();
     if (all.isEmpty) return;
 
@@ -1497,7 +1517,7 @@ class _SourceListViewState extends State<SourceListView> {
       ..sort((a, b) => a.customOrder.compareTo(b.customOrder));
 
     if (toTop) {
-      final minOrder = all.map((e) => e.customOrder).fold<int>(0, math.min) - 1;
+      final minOrder = all.map((e) => e.customOrder).reduce(math.min) - 1;
       final updated = sorted
           .asMap()
           .entries
@@ -1509,7 +1529,7 @@ class _SourceListViewState extends State<SourceListView> {
       return;
     }
 
-    final maxOrder = all.map((e) => e.customOrder).fold<int>(0, math.max) + 1;
+    final maxOrder = all.map((e) => e.customOrder).reduce(math.max) + 1;
     final updated = sorted
         .asMap()
         .entries
@@ -1773,7 +1793,7 @@ class _SourceListViewState extends State<SourceListView> {
       final groups = _extractGroups(source.bookSourceGroup);
       groups.addAll(addGroups);
       await _sourceRepo.updateSource(
-        source.copyWith(bookSourceGroup: _joinGroups(groups)),
+        _copySourceWithGroup(source, _joinGroups(groups)),
       );
     }));
     _showMessage('已将 ${selected.length} 条书源加入分组');
@@ -1794,7 +1814,7 @@ class _SourceListViewState extends State<SourceListView> {
       final groups = _extractGroups(source.bookSourceGroup);
       groups.removeWhere(removeGroups.contains);
       await _sourceRepo.updateSource(
-        source.copyWith(bookSourceGroup: _joinGroups(groups)),
+        _copySourceWithGroup(source, _joinGroups(groups)),
       );
     }));
     _showMessage('已从 ${selected.length} 条书源移除分组');
@@ -1912,24 +1932,72 @@ class _SourceListViewState extends State<SourceListView> {
     _showMessage('系统分享不可用，已复制 ${sources.length} 条书源 JSON');
   }
 
+  Future<List<BookSource>> _loadAllSourcesForMutation() async {
+    final db = _db.driftDb;
+    final rows = await db.select(db.sourceRecords).get();
+    if (rows.isEmpty) {
+      return const <BookSource>[];
+    }
+    final sources = <BookSource>[];
+    for (final row in rows) {
+      final raw = (row.rawJson ?? '').trim();
+      if (raw.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is Map<String, dynamic>) {
+            sources.add(BookSource.fromJson(decoded));
+            continue;
+          }
+          if (decoded is Map) {
+            sources.add(
+              BookSource.fromJson(
+                decoded.map((key, value) => MapEntry('$key', value)),
+              ),
+            );
+            continue;
+          }
+        } catch (_) {
+          // ignore and fallback to table fields
+        }
+      }
+      sources.add(
+        BookSource.fromJson({
+          'bookSourceUrl': row.bookSourceUrl,
+          'bookSourceName': row.bookSourceName,
+          'bookSourceGroup': row.bookSourceGroup,
+          'bookSourceType': row.bookSourceType,
+          'enabled': row.enabled,
+          'enabledExplore': row.enabledExplore,
+          'enabledCookieJar': row.enabledCookieJar ?? true,
+          'weight': row.weight,
+          'customOrder': row.customOrder,
+          'respondTime': row.respondTime,
+          'header': row.header,
+          'loginUrl': row.loginUrl,
+          'bookSourceComment': row.bookSourceComment,
+          'lastUpdateTime': row.lastUpdateTime,
+        }),
+      );
+    }
+    return _normalizeSources(sources);
+  }
+
   Future<void> _assignGroupToNoGroupSources(String group) async {
-    final all = _sourceRepo.getAllSources();
+    final all = await _loadAllSourcesForMutation();
     final targets = all
         .where((s) => (s.bookSourceGroup ?? '').trim().isEmpty)
         .toList(growable: false);
-    if (targets.isEmpty) {
-      _showMessage('当前没有“无分组”书源');
-      return;
-    }
+    if (targets.isEmpty) return;
     await Future.wait(
       targets.map(
-          (s) => _sourceRepo.updateSource(s.copyWith(bookSourceGroup: group))),
+        (s) => _sourceRepo.updateSource(_copySourceWithGroup(s, group)),
+      ),
     );
   }
 
   Future<void> _renameGroup(String oldGroup, String newGroup) async {
     final normalized = newGroup.trim();
-    final all = _sourceRepo.getAllSources();
+    final all = await _loadAllSourcesForMutation();
     final targets = all.where((s) {
       return _extractGroups(s.bookSourceGroup).contains(oldGroup);
     }).toList(growable: false);
@@ -1942,13 +2010,13 @@ class _SourceListViewState extends State<SourceListView> {
         groups.add(normalized);
       }
       await _sourceRepo.updateSource(
-        source.copyWith(bookSourceGroup: _joinGroups(groups)),
+        _copySourceWithGroup(source, _joinGroups(groups)),
       );
     }));
   }
 
   Future<void> _removeGroupEverywhere(String group) async {
-    final all = _sourceRepo.getAllSources();
+    final all = await _loadAllSourcesForMutation();
     final targets = all.where((s) {
       return _extractGroups(s.bookSourceGroup).contains(group);
     }).toList(growable: false);
@@ -1957,9 +2025,14 @@ class _SourceListViewState extends State<SourceListView> {
       final groups = _extractGroups(source.bookSourceGroup);
       groups.remove(group);
       await _sourceRepo.updateSource(
-        source.copyWith(bookSourceGroup: _joinGroups(groups)),
+        _copySourceWithGroup(source, _joinGroups(groups)),
       );
     }));
+  }
+
+  BookSource _copySourceWithGroup(BookSource source, String? group) {
+    final normalized = (group ?? '').trim();
+    return source.copyWith(bookSourceGroup: normalized);
   }
 
   List<String> _extractGroups(String? raw) {
@@ -2012,7 +2085,7 @@ class _SourceListViewState extends State<SourceListView> {
                 children: [
                   CupertinoTextField(
                     controller: controller,
-                    placeholder: '输入分组名',
+                    placeholder: '分组名称',
                     onChanged: (_) => setDialogState(() {}),
                   ),
                   if (quickGroups.isNotEmpty)
@@ -2363,8 +2436,28 @@ class _SourceListViewState extends State<SourceListView> {
     return null;
   }
 
-  void _showSourceManageHelp() {
-    _showMessage(SourceHelpTexts.manage);
+  Future<void> _showSourceManageHelp() async {
+    try {
+      final markdownText =
+          await rootBundle.loadString('assets/web/help/md/SourceMBookHelp.md');
+      if (!mounted) return;
+      await showAppHelpDialog(context, markdownText: markdownText);
+    } catch (error) {
+      if (!mounted) return;
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('帮助'),
+          content: Text('帮助文档加载失败：$error'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Future<void> _maybeShowSourceManageHelpOnce() async {
@@ -2375,7 +2468,7 @@ class _SourceListViewState extends State<SourceListView> {
     if (shown) return;
     await _settingsPut(_prefSourceManageHelpShown, true);
     if (!mounted) return;
-    _showSourceManageHelp();
+    await _showSourceManageHelp();
   }
 
   Future<void> _createNewSource() async {
@@ -2437,7 +2530,13 @@ class _SourceListViewState extends State<SourceListView> {
     );
   }
 
-  Future<void> _openSourceLogin(BookSource source) async {
+  Future<void> _openSourceLogin(String bookSourceUrl) async {
+    final source = _sourceRepo.getSourceByUrl(bookSourceUrl);
+    if (source == null) {
+      _showMessage('未找到书源');
+      return;
+    }
+
     if (SourceLoginUiHelper.hasLoginUi(source.loginUi)) {
       await Navigator.of(context).push(
         CupertinoPageRoute<void>(
@@ -2469,6 +2568,49 @@ class _SourceListViewState extends State<SourceListView> {
     );
   }
 
+  Future<void> _toggleSourceExploreFromItemAction(BookSource source) async {
+    final currentSource = _sourceRepo.getSourceByUrl(source.bookSourceUrl);
+    if (currentSource == null) {
+      return;
+    }
+    final nextEnabledExplore = !source.enabledExplore;
+    if (currentSource.enabledExplore == nextEnabledExplore) {
+      return;
+    }
+    await _sourceRepo.updateSource(
+      currentSource.copyWith(enabledExplore: nextEnabledExplore),
+    );
+  }
+
+  Future<void> _openSourceDebug(BookSource source) async {
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceDebugLegacyView(
+          source: source,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSourceScopedSearch(BookSource source) async {
+    final nextScope = SearchScope.fromSource(source);
+    final currentSettings = _settingsService.appSettings;
+    if (currentSettings.searchScope != nextScope) {
+      unawaited(
+        _settingsService.saveAppSettings(
+          currentSettings.copyWith(searchScope: nextScope),
+        ),
+      );
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => const SearchView(),
+      ),
+    );
+  }
+
   Future<void> _importFromFile() async {
     final result = await _importExportService.importFromFile();
     await _commitImportResult(result);
@@ -2477,20 +2619,12 @@ class _SourceListViewState extends State<SourceListView> {
   Future<void> _importFromQrCode() async {
     final text = await QrScanService.scanText(
       context,
-      title: '扫码导入书源',
+      title: '二维码导入',
     );
     final value = text?.trim();
     if (value == null || value.isEmpty) {
       return;
     }
-
-    if (value.startsWith('http://') || value.startsWith('https://')) {
-      await _pushImportHistory(value);
-      final result = await _importExportService.importFromUrl(value);
-      await _commitImportResult(result);
-      return;
-    }
-
     final result = await _importExportService.importFromText(value);
     await _commitImportResult(result);
   }
@@ -2515,7 +2649,7 @@ class _SourceListViewState extends State<SourceListView> {
                         children: [
                           const Expanded(
                             child: Text(
-                              '在线导入',
+                              '网络导入',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w600,
@@ -2537,7 +2671,7 @@ class _SourceListViewState extends State<SourceListView> {
                           Expanded(
                             child: CupertinoTextField(
                               controller: _urlController,
-                              placeholder: '输入书源链接（http/https）',
+                              placeholder: '输入书源网址',
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -3301,7 +3435,7 @@ class _SourceListViewState extends State<SourceListView> {
       }
     }
     if (kIsWeb && (result.errorMessage ?? '').contains('跨域限制')) {
-      lines.add('建议：改用“剪贴板导入”或“文件导入”');
+      lines.add('建议：改用“剪贴板导入”或“本地导入”');
     }
     if (result.warnings.isNotEmpty) {
       lines.add('详情：');

@@ -207,6 +207,10 @@ class ReaderLegacyMenuHelper {
     ];
   }
 
+  static ReaderLegacyRefreshMenuAction defaultRefreshAction() {
+    return ReaderLegacyRefreshMenuAction.current;
+  }
+
   static String refreshMenuLabel(ReaderLegacyRefreshMenuAction action) {
     switch (action) {
       case ReaderLegacyRefreshMenuAction.current:

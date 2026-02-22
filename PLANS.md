@@ -182,7 +182,8 @@
   - 完成 `T02-seq96`（`book_read_refresh.xml / menu_refresh_all / 刷新全部章节`）：对齐 legado `menu_refresh_all` 语义，复核并固化“有可用书源时从首章开始清理全量章节缓存并重载当前章节；无可用书源时回落当前章节重载”的边界；补充 `ReaderRefreshScopeHelper` 全量刷新映射与全量清缓存回写用例，确保 `menu_refresh_all` 具备独立可复现证据。验证 `flutter test test/reader_refresh_scope_helper_test.dart test/reader_legacy_menu_helper_test.dart test/reader_top_menu_test.dart test/simple_reader_view_compile_test.dart` 通过。
   - 完成 `T02-seq97`（`book_read_source.xml / menu_login / 登录`）：对齐 legado `menu_login -> SourceLoginActivity(key=bookSourceUrl)` 的实时触发语义，阅读页书源动作菜单点击“登录”后改为按 `bookSourceUrl` 回查当前书源再触发登录；`loginUrl` 为空保持入口隐藏，回查缺失统一提示“未找到书源”，避免 action sheet 打开期间使用过期书源快照。验证手工路径 `阅读页(网络书) -> 顶部书源名 -> 登录`（校验 `loginUrl` 为空不展示登录、非空点击可进入登录流程）。
   - 完成 `T02-seq98`（`book_read_source.xml / @+id/menu_chapter_pay / 购买`）：对齐 legado `menu_chapter_pay` 语义，书源动作菜单“购买”入口收敛为“仅 `loginUrl` 非空且当前章节 `isVip=true && isPay!=true` 显示”；点击后保留确认弹窗，确认分支改为按 `bookSourceUrl` 回查当前书源后执行 `payAction`，结果按 legado 分流为“绝对 URL 打开网页 / `isTrue` 返回值触发清缓存并刷新目录”；异常改为仅写日志 `执行购买操作出错`，移除扩展成功/失败提示。验证手工路径 `阅读页(网络书,VIP未购买章节) -> 顶部书源名 -> 章节购买 -> 确定`（校验显隐条件、URL 分支、truthy 分支与异常日志分支）。
-  - 下一项：`seq99`（`book_read_source.xml / @+id/menu_edit_source / 编辑书源`）。
+  - 完成 `T02-seq99`（`book_read_source.xml / @+id/menu_edit_source / 编辑书源`）：对齐 legado `menu_edit_source -> openSourceEditActivity` 的实时触发语义，阅读页书源动作菜单点击“编辑书源”后改为按 `bookSourceUrl` 回查当前书源再打开编辑页；回查缺失统一提示“未找到书源”，避免 action sheet 打开期间使用过期书源快照；仅在编辑页保存返回时刷新阅读页书源显示，对齐 legado `RESULT_OK -> upBookSource/upMenuView` 回调边界。验证手工路径 `阅读页(网络书) -> 顶部书源名 -> 编辑书源`（校验可进入编辑页、弹层期间删除书源时提示“未找到书源”、取消返回不刷新、保存返回刷新书源显示）。
+  - 下一项：`seq100`（`book_read_source.xml / @+id/menu_disable_source / 禁用书源`）。
 
 ## 说明
 

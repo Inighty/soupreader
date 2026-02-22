@@ -19,6 +19,7 @@ class SettingsService {
   static const String _keyBookCanUpdateMap = 'book_can_update_map';
   static const String _keyBookSplitLongChapterMap =
       'book_split_long_chapter_map';
+  static const String _keyBookTxtTocRuleMap = 'book_txt_toc_rule_map';
   static const String _keyBookUseReplaceRuleMap = 'book_use_replace_rule_map';
   static const String _keyBookReSegmentMap = 'book_re_segment_map';
   static const String _keyBookImageStyleMap = 'book_image_style_map';
@@ -45,6 +46,7 @@ class SettingsService {
   bool _isInitialized = false;
   Map<String, bool> _bookCanUpdateMap = <String, bool>{};
   Map<String, bool> _bookSplitLongChapterMap = <String, bool>{};
+  Map<String, String> _bookTxtTocRuleMap = <String, String>{};
   Map<String, bool> _bookUseReplaceRuleMap = <String, bool>{};
   Map<String, bool> _bookReSegmentMap = <String, bool>{};
   Map<String, String> _bookImageStyleMap = <String, String>{};
@@ -115,6 +117,8 @@ class SettingsService {
     _bookCanUpdateMap = _decodeBoolMap(_prefs.getString(_keyBookCanUpdateMap));
     _bookSplitLongChapterMap =
         _decodeBoolMap(_prefs.getString(_keyBookSplitLongChapterMap));
+    _bookTxtTocRuleMap =
+        _decodeStringMap(_prefs.getString(_keyBookTxtTocRuleMap));
     _bookUseReplaceRuleMap =
         _decodeBoolMap(_prefs.getString(_keyBookUseReplaceRuleMap));
     _bookReSegmentMap = _decodeBoolMap(_prefs.getString(_keyBookReSegmentMap));
@@ -233,6 +237,32 @@ class SettingsService {
       _keyBookSplitLongChapterMap,
       _bookSplitLongChapterMap,
     );
+  }
+
+  String? getBookTxtTocRule(String bookId) {
+    if (!_isInitialized) return null;
+    final key = bookId.trim();
+    if (key.isEmpty) return null;
+    final value = _bookTxtTocRuleMap[key];
+    if (value == null) return null;
+    final normalized = value.trim();
+    if (normalized.isEmpty) return null;
+    return normalized;
+  }
+
+  Future<void> saveBookTxtTocRule(String bookId, String? tocRuleRegex) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    final normalized = (tocRuleRegex ?? '').trim();
+    final nextMap = Map<String, String>.from(_bookTxtTocRuleMap);
+    if (normalized.isEmpty) {
+      nextMap.remove(key);
+    } else {
+      nextMap[key] = normalized;
+    }
+    _bookTxtTocRuleMap = nextMap;
+    await _persistStringMap(_keyBookTxtTocRuleMap, _bookTxtTocRuleMap);
   }
 
   bool getBookUseReplaceRule(String bookId, {bool fallback = true}) {

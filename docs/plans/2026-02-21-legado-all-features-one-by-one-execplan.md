@@ -1549,10 +1549,24 @@
     - 交互触发：已同义（确认后按 `bookSourceUrl` 回查当前书源执行 `payAction`，结果分流对齐 legado：绝对 URL 打开网页、`isTrue` 返回清缓存并刷新目录）。
     - 验证：手工路径 `阅读页(网络书,VIP未购买章节) -> 顶部书源名 -> 章节购买 -> 确定`（校验入口显隐、URL 跳转分支、truthy 分支目录刷新、异常仅写日志）。
   - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_chapter_pay` 显隐与结果分流语义，不改动书源规则字段结构与 Cookie 持久化链路。
-  - 下一项：`seq99`（`book_read_source.xml / @+id/menu_edit_source / 编辑书源`）。
+  - 已完成 `P3-seq99`：`book_read_source.xml / @+id/menu_edit_source / 编辑书源`。
+  - `P3-seq99` 差异点清单（实施前）：
+    - legado `menu_edit_source` 在点击时调用 `openSourceEditActivity()`，内部按当前 `ReadBook.bookSource.bookSourceUrl` 实时启动编辑页；Flutter 端当前使用 action sheet 打开时捕获的 `source` 快照直接打开编辑页，弹层期间若书源状态变化会出现过期触发。
+    - legado 仅在 `BookSourceEditActivity` 返回 `RESULT_OK` 时执行 `upBookSource -> upMenuView` 刷新菜单；Flutter 端当前无论保存或取消都刷新书源显示，状态回调边界不一致。
+  - `P3-seq99` 逐项对照清单（实施后）：
+    - 入口：已同义（书源动作弹层保留“编辑书源”一级入口）。
+    - 状态：已同义（点击时按 `bookSourceUrl` 回查当前书源后再打开编辑页，缺失时给出“未找到书源”可观测反馈）。
+    - 异常：已同义（弹层期间书源被删除时不再使用过期快照，改为即时拦截并提示，避免静默失败）。
+    - 文案：已同义（入口文案维持“编辑书源”，缺失提示与阅读域既有口径一致为“未找到书源”）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet` 承载入口，平台样式差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（仅在编辑页保存返回时刷新阅读页书源显示，取消返回不刷新，对齐 legado `RESULT_OK` 回调边界）。
+    - 验证：手工路径 `阅读页(网络书) -> 顶部书源名 -> 编辑书源`（校验进入编辑页、删除后回查提示、取消不刷新、保存后刷新）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_edit_source` 触发与回调边界，不改动书源保存规则与正文链路。
+  - 下一项：`seq100`（`book_read_source.xml / @+id/menu_disable_source / 禁用书源`）。
 
 ## Surprises & Discoveries
 
+- `2026-02-22`：`P3-seq99` 对照 legado 时确认“编辑书源”与“登录/购买”属于同类时序边界：若弹层打开后书源被删除，继续使用弹层快照会偏离 legado 的实时回查语义；本序号已统一改为按 `bookSourceUrl` 回查后再触发编辑。
 - `2026-02-22`：`P3-seq98` 对照 legado `String?.isTrue()` 时确认购买动作的“成功判定”不是仅 `true/1/ok`，而是“非空且不属于 `false|no|not|0`”即视为真；Flutter 端已按该口径收敛，避免 `payAction` 返回自定义 truthy 字符串时被误判为失败。
 - `2026-02-22`：`P3-seq97` 对照 legado 时确认阅读页“登录”动作与书源管理条目登录存在同类边界风险：若弹层打开后书源状态变化，直接使用快照对象会偏离“按当前书源状态触发”的语义；本序号已统一为按 `bookSourceUrl` 回查后再触发登录链路。
 - `2026-02-22`：`P3-seq96` 对照 legado 时确认“刷新全部章节”的高风险点不是运行逻辑缺失，而是缺少 `startIndex=0 + clearFollowing=true` 的独立回归证据；本序号补齐 `ReaderRefreshScopeHelper` 的 `menu_refresh_all` 映射与全量清缓存测试后，已可稳定证明全量刷新边界。
@@ -1740,6 +1754,7 @@
 - `2026-02-22` 决策 98：`P3-seq96` 采用“行为保持 + 证据独立闭环”策略：运行时继续复用既有 `selectionFromLegacyAction(all) -> clearCachedRange(start=0, clearFollowing=true)` 链路，不新增分支实现；仅补齐 `menu_refresh_all` 的动作映射与全量清缓存单测，并回填台账证据，确保后续序号改动不破坏全量刷新边界。
 - `2026-02-22` 决策 99：`P3-seq97` 采用“URL 回查优先”策略：阅读页 `menu_login` 点击后不再直接使用 action sheet 打开时的书源快照，而是按 `bookSourceUrl` 回查当前书源后再触发登录；缺失时提示“未找到书源”，以对齐 legado `SourceLoginActivity(key=bookSourceUrl)` 的实时状态边界并避免过期快照误触发。
 - `2026-02-22` 决策 100：`P3-seq98` 采用“显隐边界收敛 + 日志优先可观测”策略：`menu_chapter_pay` 显隐严格收敛为 `loginUrl && isVip && !isPay`，确认后按 `bookSourceUrl` 回查当前书源执行 `payAction`；结果分流对齐 legado `isAbsUrl / isTrue` 语义，异常统一写日志 `执行购买操作出错`，不追加扩展 toast。
+- `2026-02-22` 决策 101：`P3-seq99` 采用“实时回查 + 保存后刷新”策略：`menu_edit_source` 点击后不再使用弹层快照直接打开编辑页，而是按 `bookSourceUrl` 回查当前书源后再触发；仅在编辑页保存返回时刷新阅读页书源显示，取消返回不刷新，以对齐 legado `RESULT_OK -> upBookSource/upMenuView` 回调边界。
 
 ## Outcomes & Retrospective
 
@@ -1748,3 +1763,4 @@
 - `2026-02-22`：完成 `P3-seq96`（`menu_refresh_all`）迁移闭环，已补齐“首章起全量清缓存 + 无书源回落当前章节重载”的独立验证证据；队列推进到下一项 `seq97(menu_login)`。
 - `2026-02-22`：完成 `P3-seq97`（`menu_login`）迁移闭环，已补齐“按 `bookSourceUrl` 回查当前书源后触发登录”的实时状态边界证据；队列推进到下一项 `seq98(menu_chapter_pay)`。
 - `2026-02-22`：完成 `P3-seq98`（`menu_chapter_pay`）迁移闭环，已补齐“显隐条件、`isTrue` 判定与异常日志可观测”的同义证据；队列推进到下一项 `seq99(menu_edit_source)`。
+- `2026-02-22`：完成 `P3-seq99`（`menu_edit_source`）迁移闭环，已补齐“按 `bookSourceUrl` 实时回查再编辑 + 仅保存返回刷新”的同义证据；队列推进到下一项 `seq100(menu_disable_source)`。

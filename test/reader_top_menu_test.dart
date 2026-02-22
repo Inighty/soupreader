@@ -39,6 +39,18 @@ void main() {
   ReaderTopMenu buildMenu({
     ReadingThemeColors? theme,
     bool readBarStyleFollowPage = false,
+    VoidCallback? onChangeSource,
+    VoidCallback? onChangeSourceLongPress,
+    VoidCallback? onRefresh,
+    VoidCallback? onRefreshLongPress,
+    VoidCallback? onOfflineCache,
+    VoidCallback? onTocRule,
+    VoidCallback? onSetCharset,
+    bool showChangeSourceAction = false,
+    bool showRefreshAction = false,
+    bool showDownloadAction = false,
+    bool showTocRuleAction = false,
+    bool showSetCharsetAction = false,
   }) {
     return ReaderTopMenu(
       bookTitle: '明克街13号',
@@ -49,8 +61,20 @@ void main() {
       onOpenBookInfo: () {},
       onOpenChapterLink: () {},
       onToggleChapterLinkOpenMode: () {},
+      onChangeSource: onChangeSource,
+      onChangeSourceLongPress: onChangeSourceLongPress,
+      onRefresh: onRefresh,
+      onRefreshLongPress: onRefreshLongPress,
+      onOfflineCache: onOfflineCache,
+      onTocRule: onTocRule,
+      onSetCharset: onSetCharset,
       onShowSourceActions: () {},
       onShowMoreMenu: () {},
+      showChangeSourceAction: showChangeSourceAction,
+      showRefreshAction: showRefreshAction,
+      showDownloadAction: showDownloadAction,
+      showTocRuleAction: showTocRuleAction,
+      showSetCharsetAction: showSetCharsetAction,
       showSourceAction: true,
       showChapterLink: true,
       showTitleAddition: true,
@@ -116,5 +140,170 @@ void main() {
     );
     final decoration = panel.decoration as BoxDecoration;
     expect(decoration.color, expectedStyle.panelBackground);
+  });
+
+  testWidgets('ReaderTopMenu 换源按钮支持点击与长按回调', (tester) async {
+    var tapCount = 0;
+    var longPressCount = 0;
+    await pumpTopMenu(
+      tester,
+      logicalWidth: 430,
+      menu: buildMenu(
+        showChangeSourceAction: true,
+        onChangeSource: () => tapCount += 1,
+        onChangeSourceLongPress: () => longPressCount += 1,
+      ),
+    );
+
+    final changeSourceButton =
+        find.byKey(const Key('reader_top_menu_change_source'));
+    expect(changeSourceButton, findsOneWidget);
+
+    await tester.tap(changeSourceButton);
+    await tester.pump();
+    expect(tapCount, 1);
+
+    await tester.longPress(changeSourceButton);
+    await tester.pump();
+    expect(longPressCount, 1);
+  });
+
+  testWidgets('ReaderTopMenu 可隐藏换源按钮', (tester) async {
+    await pumpTopMenu(
+      tester,
+      logicalWidth: 430,
+      menu: buildMenu(showChangeSourceAction: false),
+    );
+    expect(
+        find.byKey(const Key('reader_top_menu_change_source')), findsNothing);
+  });
+
+  testWidgets('ReaderTopMenu 刷新按钮支持点击与长按回调', (tester) async {
+    var tapCount = 0;
+    var longPressCount = 0;
+    await pumpTopMenu(
+      tester,
+      logicalWidth: 430,
+      menu: buildMenu(
+        showRefreshAction: true,
+        onRefresh: () => tapCount += 1,
+        onRefreshLongPress: () => longPressCount += 1,
+      ),
+    );
+
+    final refreshButton = find.byKey(const Key('reader_top_menu_refresh'));
+    expect(refreshButton, findsOneWidget);
+
+    await tester.tap(refreshButton);
+    await tester.pump();
+    expect(tapCount, 1);
+
+    await tester.longPress(refreshButton);
+    await tester.pump();
+    expect(longPressCount, 1);
+  });
+
+  testWidgets('ReaderTopMenu 可隐藏刷新按钮', (tester) async {
+    await pumpTopMenu(
+      tester,
+      logicalWidth: 430,
+      menu: buildMenu(showRefreshAction: false),
+    );
+    expect(find.byKey(const Key('reader_top_menu_refresh')), findsNothing);
+  });
+
+  testWidgets('ReaderTopMenu 离线缓存按钮支持点击回调', (tester) async {
+    var tapCount = 0;
+    await pumpTopMenu(
+      tester,
+      logicalWidth: 430,
+      menu: buildMenu(
+        showDownloadAction: true,
+        onOfflineCache: () => tapCount += 1,
+      ),
+    );
+
+    final downloadButton =
+        find.byKey(const Key('reader_top_menu_offline_cache'));
+    expect(downloadButton, findsOneWidget);
+
+    await tester.tap(downloadButton);
+    await tester.pump();
+    expect(tapCount, 1);
+  });
+
+  testWidgets('ReaderTopMenu 可隐藏离线缓存按钮', (tester) async {
+    await pumpTopMenu(
+      tester,
+      logicalWidth: 430,
+      menu: buildMenu(showDownloadAction: false),
+    );
+    expect(
+      find.byKey(const Key('reader_top_menu_offline_cache')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('ReaderTopMenu TXT 目录规则按钮支持点击回调', (tester) async {
+    var tapCount = 0;
+    await pumpTopMenu(
+      tester,
+      logicalWidth: 430,
+      menu: buildMenu(
+        showTocRuleAction: true,
+        onTocRule: () => tapCount += 1,
+      ),
+    );
+
+    final tocRuleButton = find.byKey(const Key('reader_top_menu_toc_rule'));
+    expect(tocRuleButton, findsOneWidget);
+
+    await tester.tap(tocRuleButton);
+    await tester.pump();
+    expect(tapCount, 1);
+  });
+
+  testWidgets('ReaderTopMenu 可隐藏 TXT 目录规则按钮', (tester) async {
+    await pumpTopMenu(
+      tester,
+      logicalWidth: 430,
+      menu: buildMenu(showTocRuleAction: false),
+    );
+    expect(
+      find.byKey(const Key('reader_top_menu_toc_rule')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('ReaderTopMenu 设置编码按钮支持点击回调', (tester) async {
+    var tapCount = 0;
+    await pumpTopMenu(
+      tester,
+      logicalWidth: 430,
+      menu: buildMenu(
+        showSetCharsetAction: true,
+        onSetCharset: () => tapCount += 1,
+      ),
+    );
+
+    final setCharsetButton =
+        find.byKey(const Key('reader_top_menu_set_charset'));
+    expect(setCharsetButton, findsOneWidget);
+
+    await tester.tap(setCharsetButton);
+    await tester.pump();
+    expect(tapCount, 1);
+  });
+
+  testWidgets('ReaderTopMenu 可隐藏设置编码按钮', (tester) async {
+    await pumpTopMenu(
+      tester,
+      logicalWidth: 430,
+      menu: buildMenu(showSetCharsetAction: false),
+    );
+    expect(
+      find.byKey(const Key('reader_top_menu_set_charset')),
+      findsNothing,
+    );
   });
 }

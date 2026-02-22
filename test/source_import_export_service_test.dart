@@ -148,7 +148,7 @@ void main() {
       expect(result.success, isFalse);
       expect(result.errorMessage, contains('跨域限制（CORS）'));
       expect(result.errorMessage, contains('从剪贴板导入'));
-      expect(result.errorMessage, contains('从文件导入'));
+      expect(result.errorMessage, contains('本地导入'));
     });
   });
 }

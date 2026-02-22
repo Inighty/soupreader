@@ -5,6 +5,11 @@ import '../models/reading_settings.dart';
 import 'reader_menu_surface_style.dart';
 
 const Key _readerTopMenuPanelKey = Key('reader_top_menu_panel');
+const Key _readerTopMenuChangeSourceKey = Key('reader_top_menu_change_source');
+const Key _readerTopMenuRefreshKey = Key('reader_top_menu_refresh');
+const Key _readerTopMenuOfflineCacheKey = Key('reader_top_menu_offline_cache');
+const Key _readerTopMenuTocRuleKey = Key('reader_top_menu_toc_rule');
+const Key _readerTopMenuSetCharsetKey = Key('reader_top_menu_set_charset');
 
 class ReaderTopMenu extends StatelessWidget {
   final String bookTitle;
@@ -15,8 +20,20 @@ class ReaderTopMenu extends StatelessWidget {
   final VoidCallback onOpenBookInfo;
   final VoidCallback onOpenChapterLink;
   final VoidCallback onToggleChapterLinkOpenMode;
+  final VoidCallback? onChangeSource;
+  final VoidCallback? onChangeSourceLongPress;
+  final VoidCallback? onRefresh;
+  final VoidCallback? onRefreshLongPress;
+  final VoidCallback? onOfflineCache;
+  final VoidCallback? onTocRule;
+  final VoidCallback? onSetCharset;
   final VoidCallback onShowSourceActions;
   final VoidCallback onShowMoreMenu;
+  final bool showChangeSourceAction;
+  final bool showRefreshAction;
+  final bool showDownloadAction;
+  final bool showTocRuleAction;
+  final bool showSetCharsetAction;
   final bool showSourceAction;
   final bool showChapterLink;
   final bool showTitleAddition;
@@ -32,8 +49,20 @@ class ReaderTopMenu extends StatelessWidget {
     required this.onOpenBookInfo,
     required this.onOpenChapterLink,
     required this.onToggleChapterLinkOpenMode,
+    this.onChangeSource,
+    this.onChangeSourceLongPress,
+    this.onRefresh,
+    this.onRefreshLongPress,
+    this.onOfflineCache,
+    this.onTocRule,
+    this.onSetCharset,
     required this.onShowSourceActions,
     required this.onShowMoreMenu,
+    this.showChangeSourceAction = false,
+    this.showRefreshAction = false,
+    this.showDownloadAction = false,
+    this.showTocRuleAction = false,
+    this.showSetCharsetAction = false,
     this.showSourceAction = true,
     this.showChapterLink = true,
     this.showTitleAddition = true,
@@ -114,6 +143,63 @@ class ReaderTopMenu extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
+                if (showChangeSourceAction && onChangeSource != null) ...[
+                  _buildRoundIcon(
+                    key: _readerTopMenuChangeSourceKey,
+                    icon: CupertinoIcons.arrow_right_arrow_left,
+                    onTap: onChangeSource,
+                    onLongPress: onChangeSourceLongPress,
+                    iconColor: style.primaryText,
+                    backgroundColor: style.controlBackground,
+                    borderColor: style.controlBorder,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (showRefreshAction && onRefresh != null) ...[
+                  _buildRoundIcon(
+                    key: _readerTopMenuRefreshKey,
+                    icon: CupertinoIcons.refresh,
+                    onTap: onRefresh,
+                    onLongPress: onRefreshLongPress,
+                    iconColor: style.primaryText,
+                    backgroundColor: style.controlBackground,
+                    borderColor: style.controlBorder,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (showDownloadAction && onOfflineCache != null) ...[
+                  _buildRoundIcon(
+                    key: _readerTopMenuOfflineCacheKey,
+                    icon: CupertinoIcons.cloud_download,
+                    onTap: onOfflineCache,
+                    iconColor: style.primaryText,
+                    backgroundColor: style.controlBackground,
+                    borderColor: style.controlBorder,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (showTocRuleAction && onTocRule != null) ...[
+                  _buildRoundIcon(
+                    key: _readerTopMenuTocRuleKey,
+                    icon: CupertinoIcons.list_bullet,
+                    onTap: onTocRule,
+                    iconColor: style.primaryText,
+                    backgroundColor: style.controlBackground,
+                    borderColor: style.controlBorder,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (showSetCharsetAction && onSetCharset != null) ...[
+                  _buildRoundIcon(
+                    key: _readerTopMenuSetCharsetKey,
+                    icon: CupertinoIcons.textformat,
+                    onTap: onSetCharset,
+                    iconColor: style.primaryText,
+                    backgroundColor: style.controlBackground,
+                    borderColor: style.controlBorder,
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 _buildRoundIcon(
                   icon: CupertinoIcons.ellipsis,
                   onTap: onShowMoreMenu,
@@ -208,15 +294,19 @@ class ReaderTopMenu extends StatelessWidget {
   }
 
   Widget _buildRoundIcon({
+    Key? key,
     required IconData icon,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
+    VoidCallback? onLongPress,
     required Color iconColor,
     required Color backgroundColor,
     required Color borderColor,
   }) {
     return GestureDetector(
+      key: key,
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Container(
         width: 32,
         height: 32,

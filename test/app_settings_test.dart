@@ -395,6 +395,7 @@ void main() {
 
     expect(service.getBookCanUpdate('book-1'), isTrue);
     expect(service.getBookSplitLongChapter('book-1'), isTrue);
+    expect(service.getBookTxtTocRule('book-1'), isNull);
     expect(service.getBookUseReplaceRule('book-1'), isTrue);
     expect(service.getBookReSegment('book-1'), isFalse);
     expect(service.getBookImageStyle('book-1'), 'DEFAULT');
@@ -407,6 +408,7 @@ void main() {
 
     await service.saveBookCanUpdate('book-1', false);
     await service.saveBookSplitLongChapter('book-1', false);
+    await service.saveBookTxtTocRule('book-1', r'^\s*第\d+章.*$');
     await service.saveBookUseReplaceRule('book-1', false);
     await service.saveBookReSegment('book-1', true);
     await service.saveBookImageStyle('book-1', 'single');
@@ -416,6 +418,7 @@ void main() {
 
     expect(service.getBookCanUpdate('book-1'), isFalse);
     expect(service.getBookSplitLongChapter('book-1'), isFalse);
+    expect(service.getBookTxtTocRule('book-1'), r'^\s*第\d+章.*$');
     expect(service.getBookUseReplaceRule('book-1'), isFalse);
     expect(service.getBookReSegment('book-1'), isTrue);
     expect(service.getBookImageStyle('book-1'), 'SINGLE');
@@ -429,6 +432,7 @@ void main() {
     await service.init();
     expect(service.getBookCanUpdate('book-1'), isFalse);
     expect(service.getBookSplitLongChapter('book-1'), isFalse);
+    expect(service.getBookTxtTocRule('book-1'), r'^\s*第\d+章.*$');
     expect(service.getBookUseReplaceRule('book-1'), isFalse);
     expect(service.getBookReSegment('book-1'), isTrue);
     expect(service.getBookImageStyle('book-1'), 'SINGLE');
@@ -440,12 +444,16 @@ void main() {
     );
     expect(service.getBookCanUpdate(''), isTrue);
     expect(service.getBookSplitLongChapter(''), isTrue);
+    expect(service.getBookTxtTocRule(''), isNull);
     expect(service.getBookUseReplaceRule(''), isTrue);
     expect(service.getBookReSegment(''), isFalse);
     expect(service.getBookImageStyle(''), 'DEFAULT');
     expect(service.getBookDelRubyTag(''), isFalse);
     expect(service.getBookDelHTag(''), isFalse);
     expect(service.getChapterSameTitleRemoved('', 'chapter-1'), isFalse);
+
+    await service.saveBookTxtTocRule('book-1', null);
+    expect(service.getBookTxtTocRule('book-1'), isNull);
   });
 
   test('SettingsService 兼容旧格式书籍级开关映射', () async {

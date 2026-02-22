@@ -560,7 +560,7 @@ class SourceImportExportService {
       if (_isWeb && _isLikelyCorsError(err)) {
         return SourceImportResult(
           success: false,
-          errorMessage: '网络导入失败：浏览器跨域限制（CORS），请改用“从剪贴板导入”或“从文件导入”',
+          errorMessage: '网络导入失败：浏览器跨域限制（CORS），请改用“从剪贴板导入”或“本地导入”',
         );
       }
       return SourceImportResult(

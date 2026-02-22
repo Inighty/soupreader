@@ -1,23 +1,42 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/qr_scan_service.dart';
-import '../constants/source_help_texts.dart';
+import '../../settings/views/app_help_dialog.dart';
 import '../models/book_source.dart';
 import '../services/rule_parser_engine.dart';
 import '../services/source_debug_quick_action_helper.dart';
 import '../services/source_explore_kinds_service.dart';
 import 'source_debug_text_view.dart';
 
+typedef SourceDebugScanLauncher = Future<String?> Function(
+  BuildContext context, {
+  String title,
+});
+typedef SourceDebugExploreKindsLoader = Future<List<SourceExploreKind>>
+    Function(
+  BookSource source, {
+  bool forceRefresh,
+});
+typedef SourceDebugExploreKindsCacheClearer = Future<void> Function(
+    BookSource source);
+
 class SourceDebugLegacyView extends StatefulWidget {
   final BookSource source;
   final String? initialDebugKey;
+  final SourceDebugScanLauncher? scanLauncher;
+  final SourceDebugExploreKindsLoader? exploreKindsLoader;
+  final SourceDebugExploreKindsCacheClearer? clearExploreKindsCache;
 
   const SourceDebugLegacyView({
     super.key,
     required this.source,
     this.initialDebugKey,
+    this.scanLauncher,
+    this.exploreKindsLoader,
+    this.clearExploreKindsCache,
   });
 
   @override
@@ -191,11 +210,17 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
     if (_loadingExploreKinds) return;
     setState(() => _loadingExploreKinds = true);
     List<SourceExploreKind> kinds;
+    final exploreKindsLoader = widget.exploreKindsLoader;
     try {
-      kinds = await _exploreKindsService.exploreKinds(
-        widget.source,
-        forceRefresh: forceRefresh,
-      );
+      kinds = await (exploreKindsLoader != null
+          ? exploreKindsLoader(
+              widget.source,
+              forceRefresh: forceRefresh,
+            )
+          : _exploreKindsService.exploreKinds(
+              widget.source,
+              forceRefresh: forceRefresh,
+            ));
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingExploreKinds = false);
@@ -235,7 +260,12 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
   }
 
   Future<void> _refreshExploreKinds() async {
-    await _exploreKindsService.clearExploreKindsCache(widget.source);
+    final clearExploreKindsCache = widget.clearExploreKindsCache;
+    if (clearExploreKindsCache != null) {
+      await clearExploreKindsCache(widget.source);
+    } else {
+      await _exploreKindsService.clearExploreKindsCache(widget.source);
+    }
     if (!mounted) return;
     setState(() {
       _events.clear();
@@ -307,26 +337,52 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
   }
 
   Future<void> _scanAndDebug() async {
-    final value = await QrScanService.scanText(context, title: '扫码调试');
+    final launcher = widget.scanLauncher ?? QrScanService.scanText;
+    final value = await launcher(context, title: '扫描二维码');
     final text = value?.trim();
     if (text == null || text.isEmpty) return;
     await _runDebug(text);
   }
 
-  Future<void> _openRawSource({
-    required String title,
-    required String? raw,
-  }) async {
-    final text = (raw ?? '').trim();
-    if (text.isEmpty) {
-      _showMessage('暂无$title');
-      return;
-    }
+  Future<void> _openSearchRawSource() async {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
         builder: (_) => SourceDebugTextView(
-          title: title,
-          text: text,
+          title: 'html',
+          text: _searchSrcRaw ?? '',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openBookRawSource() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceDebugTextView(
+          title: 'html',
+          text: _bookSrcRaw ?? '',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openTocRawSource() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceDebugTextView(
+          title: 'html',
+          text: _tocSrcRaw ?? '',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openContentRawSource() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceDebugTextView(
+          title: 'html',
+          text: _contentSrcRaw ?? '',
         ),
       ),
     );
@@ -341,28 +397,28 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(popupContext);
-              _openRawSource(title: '搜索源码', raw: _searchSrcRaw);
+              _openSearchRawSource();
             },
             child: const Text('搜索源码'),
           ),
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(popupContext);
-              _openRawSource(title: '详情源码', raw: _bookSrcRaw);
+              _openBookRawSource();
             },
-            child: const Text('详情源码'),
+            child: const Text('书籍源码'),
           ),
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(popupContext);
-              _openRawSource(title: '目录源码', raw: _tocSrcRaw);
+              _openTocRawSource();
             },
             child: const Text('目录源码'),
           ),
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(popupContext);
-              _openRawSource(title: '正文源码', raw: _contentSrcRaw);
+              _openContentRawSource();
             },
             child: const Text('正文源码'),
           ),
@@ -374,9 +430,9 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
             child: const Text('刷新发现'),
           ),
           CupertinoActionSheetAction(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(popupContext);
-              _showMessage(SourceHelpTexts.debug);
+              await _showDebugHelp();
             },
             child: const Text('帮助'),
           ),
@@ -389,20 +445,28 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
     );
   }
 
-  void _showMessage(String message) {
-    showCupertinoDialog<void>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('提示'),
-        content: Text('\n$message'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('好'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _showDebugHelp() async {
+    try {
+      final markdownText =
+          await rootBundle.loadString('assets/web/help/md/debugHelp.md');
+      if (!mounted) return;
+      await showAppHelpDialog(context, markdownText: markdownText);
+    } catch (error) {
+      if (!mounted) return;
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('帮助'),
+          content: Text('帮助文档加载失败：$error'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildKeyField() {

@@ -15,15 +15,19 @@ import 'package:uuid/uuid.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
+import '../../../core/database/repositories/bookmark_repository.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/book_variable_store.dart';
+import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/services/source_variable_store.dart';
 import '../../../core/services/webdav_service.dart';
 import '../../bookshelf/models/book.dart';
 import '../../bookshelf/services/book_add_service.dart';
+import '../../import/txt_parser.dart';
 import '../../reader/models/reading_settings.dart';
+import '../../reader/services/reader_bookmark_export_service.dart';
 import '../../reader/services/reader_charset_service.dart';
 import '../../reader/services/chapter_title_display_helper.dart';
 import '../../reader/services/reader_source_switch_helper.dart';
@@ -50,26 +54,31 @@ import 'search_book_info_edit_view.dart';
 class SearchBookInfoView extends StatefulWidget {
   final SearchResult result;
   final Book? bookshelfBook;
+  final ReaderBookmarkExportService? bookmarkExportService;
 
   const SearchBookInfoView({
     super.key,
     required this.result,
+    this.bookmarkExportService,
   }) : bookshelfBook = null;
 
   const SearchBookInfoView._({
     super.key,
     required this.result,
     required this.bookshelfBook,
+    required this.bookmarkExportService,
   });
 
   factory SearchBookInfoView.fromBookshelf({
     Key? key,
     required Book book,
+    ReaderBookmarkExportService? bookmarkExportService,
   }) {
     final sourceUrl = (book.sourceUrl ?? book.sourceId ?? '').trim();
     return SearchBookInfoView._(
       key: key,
       bookshelfBook: book,
+      bookmarkExportService: bookmarkExportService,
       result: SearchResult(
         name: book.title,
         author: book.author,
@@ -96,11 +105,13 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   late final RuleParserEngine _engine;
   late final SourceRepository _sourceRepo;
   late final BookRepository _bookRepo;
+  late final BookmarkRepository _bookmarkRepo;
   late final ChapterRepository _chapterRepo;
   late final BookAddService _addService;
   late final SettingsService _settingsService;
   late final WebDavService _webDavService;
   late final ReaderCharsetService _readerCharsetService;
+  late final ReaderBookmarkExportService _bookmarkExportService;
   late final ChapterTitleDisplayHelper _chapterTitleDisplayHelper;
 
   late SearchResult _activeResult;
@@ -135,11 +146,14 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     _engine = RuleParserEngine();
     _sourceRepo = SourceRepository(db);
     _bookRepo = BookRepository(db);
+    _bookmarkRepo = BookmarkRepository();
     _chapterRepo = ChapterRepository(db);
     _addService = BookAddService(database: db, engine: _engine);
     _settingsService = SettingsService();
     _webDavService = WebDavService();
     _readerCharsetService = ReaderCharsetService();
+    _bookmarkExportService =
+        widget.bookmarkExportService ?? ReaderBookmarkExportService();
     _deleteAlertEnabled = _resolveBookInfoDeleteAlertSetting();
     _chapterTitleDisplayHelper = ChapterTitleDisplayHelper(
       replaceRuleService: ReplaceRuleService(db),
@@ -503,6 +517,90 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     if (book == null || !book.isLocal) return false;
     final lower = ((book.localPath ?? book.bookUrl ?? '')).toLowerCase();
     return lower.endsWith('.txt');
+  }
+
+  String? _resolveBookTxtTocRuleRegex(String bookId) {
+    final regex = _settingsService.getBookTxtTocRule(bookId);
+    if (regex == null) return null;
+    final normalized = regex.trim();
+    if (normalized.isEmpty) return null;
+    return normalized;
+  }
+
+  Future<String?> _pickTxtTocRuleRegex({
+    required String currentRegex,
+  }) {
+    return showCupertinoModalPopup<String?>(
+      context: context,
+      builder: (sheetContext) {
+        final normalizedCurrent = currentRegex.trim();
+        return CupertinoActionSheet(
+          title: const Text('TXT 目录规则'),
+          message: const Text('选择后会立即重建本地 TXT 目录。'),
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.pop(sheetContext, ''),
+              child: Text(
+                normalizedCurrent.isEmpty ? '✓ 自动识别（默认）' : '自动识别（默认）',
+              ),
+            ),
+            for (final option in TxtParser.defaultTocRuleOptions)
+              CupertinoActionSheetAction(
+                onPressed: () => Navigator.pop(sheetContext, option.rule),
+                child: Text(
+                  normalizedCurrent == option.rule
+                      ? '✓ ${option.name}'
+                      : option.name,
+                ),
+              ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(sheetContext),
+            child: const Text('取消'),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<_SearchBookTocRuleUpdateResult?> _handleEditTxtTocRuleFromToc() async {
+    final id = _bookId?.trim() ?? '';
+    if (!_inBookshelf || id.isEmpty || !_isLocalTxtBook()) {
+      _showMessage('当前书籍未接入 TXT 目录规则配置');
+      return null;
+    }
+    final storedBook = _bookRepo.getBookById(id);
+    if (storedBook == null || !storedBook.isLocal) {
+      _showMessage('书籍信息不存在，无法配置 TXT 目录规则');
+      return null;
+    }
+
+    final selectedRegex = await _pickTxtTocRuleRegex(
+      currentRegex: _resolveBookTxtTocRuleRegex(id) ?? '',
+    );
+    if (selectedRegex == null) return null;
+    final normalizedRegex = selectedRegex.trim();
+    await _settingsService.saveBookTxtTocRule(
+      id,
+      normalizedRegex.isEmpty ? null : normalizedRegex,
+    );
+
+    final refreshed = await _refreshLocalBookshelfBook(
+      force: true,
+      showSuccessToast: false,
+      txtTocRuleRegex: normalizedRegex.isEmpty ? null : normalizedRegex,
+    );
+    if (!refreshed) return null;
+
+    final updatedToc = _loadStoredToc(id);
+    final updatedDisplayTitles = await _buildTocDisplayTitles(updatedToc);
+    if (mounted) {
+      _showMessage('TXT 目录规则已应用');
+    }
+    return _SearchBookTocRuleUpdateResult(
+      toc: updatedToc,
+      displayTitles: updatedDisplayTitles,
+    );
   }
 
   bool _resolveBookInfoDeleteAlertSetting() {
@@ -1157,6 +1255,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     bool force = false,
     bool? splitLongChapter,
     bool showSuccessToast = true,
+    String? txtTocRuleRegex,
   }) async {
     if (_loadingToc && !force) return false;
     final id = _bookId?.trim() ?? '';
@@ -1189,6 +1288,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
         preferredTxtCharset: preferredTxtCharset,
         splitLongChapter:
             splitLongChapter ?? _settingsService.getBookSplitLongChapter(id),
+        txtTocRuleRegex: txtTocRuleRegex ?? _resolveBookTxtTocRuleRegex(id),
       );
       await _chapterRepo.clearChaptersForBook(id);
       await _chapterRepo.addChapters(refreshResult.chapters);
@@ -1403,6 +1503,9 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           tocToOpen.map((item) => item.name).toList(growable: false);
     }
     if (!mounted) return;
+    final showTxtTocRuleAction = _inBookshelf && _isLocalTxtBook();
+    final showExportBookmarkAction =
+        _inBookshelf && (_bookId?.trim().isNotEmpty ?? false);
 
     final selected = await Navigator.of(context, rootNavigator: true).push<int>(
       CupertinoPageRoute(
@@ -1411,11 +1514,93 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           toc: tocToOpen,
           displayTitles: displayTitles,
           sourceName: _displaySourceName,
+          showTxtTocRuleAction: showTxtTocRuleAction,
+          showExportBookmarkAction: showExportBookmarkAction,
+          onEditTocRule:
+              showTxtTocRuleAction ? _handleEditTxtTocRuleFromToc : null,
+          onExportBookmark:
+              showExportBookmarkAction ? _handleExportBookmarkFromToc : null,
+          onExportBookmarkMarkdown: showExportBookmarkAction
+              ? _handleExportBookmarkMarkdownFromToc
+              : null,
         ),
       ),
     );
     if (selected == null) return;
     await _openReader(initialChapter: selected);
+  }
+
+  Future<void> _handleExportBookmarkFromToc() async {
+    final feedback = await _exportBookmarksFromToc(markdown: false);
+    if (!mounted || feedback == null) return;
+    final message = feedback.trim();
+    if (message.isEmpty) return;
+    _showMessage(message);
+  }
+
+  Future<void> _handleExportBookmarkMarkdownFromToc() async {
+    final feedback = await _exportBookmarksFromToc(markdown: true);
+    if (!mounted || feedback == null) return;
+    final message = feedback.trim();
+    if (message.isEmpty) return;
+    _showMessage(message);
+  }
+
+  Future<String?> _exportBookmarksFromToc({required bool markdown}) async {
+    final id = _bookId?.trim() ?? '';
+    if (!_inBookshelf || id.isEmpty) {
+      return '当前书籍不支持导出书签';
+    }
+
+    try {
+      await _bookmarkRepo.init();
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'search_book_info.toc.export_bookmark.init',
+        message: '导出失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'bookId': id,
+          'bookTitle': _displayName,
+          'format': markdown ? 'md' : 'json',
+        },
+      );
+      return '导出失败：${_compactReason(error.toString())}';
+    }
+
+    final bookmarks = _bookmarkRepo.getBookmarksForBook(id);
+    final result = markdown
+        ? await _bookmarkExportService.exportMarkdown(
+            bookTitle: _displayName,
+            bookAuthor: _displayAuthor,
+            bookmarks: bookmarks,
+          )
+        : await _bookmarkExportService.exportJson(
+            bookTitle: _displayName,
+            bookAuthor: _displayAuthor,
+            bookmarks: bookmarks,
+          );
+    if (result.cancelled) return null;
+    if (result.success) {
+      if (kIsWeb) {
+        final webMessage = result.message?.trim() ?? '';
+        if (webMessage.isNotEmpty) return webMessage;
+      }
+      return '导出成功';
+    }
+    final message = (result.message ?? '导出失败').trim();
+    ExceptionLogService().record(
+      node: 'search_book_info.toc.export_bookmark',
+      message: '导出失败',
+      error: message,
+      context: <String, dynamic>{
+        'bookId': id,
+        'bookTitle': _displayName,
+        'format': markdown ? 'md' : 'json',
+      },
+    );
+    return message;
   }
 
   Future<void> _refreshBookshelfToc() async {
@@ -2337,17 +2522,44 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
+class _SearchBookTocRuleUpdateResult {
+  final List<TocItem> toc;
+  final List<String> displayTitles;
+
+  const _SearchBookTocRuleUpdateResult({
+    required this.toc,
+    required this.displayTitles,
+  }) : assert(displayTitles.length == toc.length);
+}
+
+enum _SearchBookTocMenuAction {
+  reverseToc,
+  tocRule,
+  exportBookmark,
+  exportBookmarkMarkdown,
+}
+
 class _SearchBookTocView extends StatefulWidget {
   final String bookTitle;
   final String sourceName;
   final List<TocItem> toc;
   final List<String> displayTitles;
+  final bool showTxtTocRuleAction;
+  final bool showExportBookmarkAction;
+  final Future<_SearchBookTocRuleUpdateResult?> Function()? onEditTocRule;
+  final Future<void> Function()? onExportBookmark;
+  final Future<void> Function()? onExportBookmarkMarkdown;
 
   const _SearchBookTocView({
     required this.bookTitle,
     required this.sourceName,
     required this.toc,
     required this.displayTitles,
+    this.showTxtTocRuleAction = false,
+    this.showExportBookmarkAction = false,
+    this.onEditTocRule,
+    this.onExportBookmark,
+    this.onExportBookmarkMarkdown,
   }) : assert(displayTitles.length == toc.length);
 
   @override
@@ -2355,22 +2567,213 @@ class _SearchBookTocView extends StatefulWidget {
 }
 
 class _SearchBookTocViewState extends State<_SearchBookTocView> {
+  static const Key _menuSearchActionKey =
+      Key('search_book_toc_menu_search_action');
+  static const Key _menuSearchFieldKey =
+      Key('search_book_toc_menu_search_field');
+  static const Key _menuSearchCloseKey =
+      Key('search_book_toc_menu_search_close');
+  static const Key _menuMoreActionKey = Key('search_book_toc_menu_more_action');
+  static const Key _menuReverseTocActionKey =
+      Key('search_book_toc_menu_reverse_toc_action');
+  static const Key _menuTocRuleActionKey =
+      Key('search_book_toc_menu_toc_rule_action');
+  static const Key _menuExportBookmarkActionKey =
+      Key('search_book_toc_menu_export_bookmark_action');
+  static const Key _menuExportBookmarkMarkdownActionKey =
+      Key('search_book_toc_menu_export_markdown_action');
+
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
+  bool _searchExpanded = false;
   bool _reversed = false;
+  bool _runningTocRuleAction = false;
+  bool _runningExportBookmarkAction = false;
+  bool _runningExportBookmarkMarkdownAction = false;
+  late List<TocItem> _toc;
+  late List<String> _displayTitles;
+
+  @override
+  void initState() {
+    super.initState();
+    _toc = widget.toc;
+    _displayTitles = widget.displayTitles;
+    _searchFocusNode.addListener(_handleSearchFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(covariant _SearchBookTocView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!listEquals(oldWidget.toc, widget.toc)) {
+      _toc = widget.toc;
+    }
+    if (!listEquals(oldWidget.displayTitles, widget.displayTitles)) {
+      _displayTitles = widget.displayTitles;
+    }
+  }
+
+  void _handleSearchFocusChange() {
+    if (_searchFocusNode.hasFocus || !_searchExpanded || !mounted) return;
+    setState(() {
+      _searchExpanded = false;
+    });
+  }
+
+  void _openSearch() {
+    if (_searchExpanded) return;
+    setState(() {
+      _searchExpanded = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _searchFocusNode.requestFocus();
+    });
+  }
+
+  void _closeSearch({required bool clearQuery}) {
+    if (!_searchExpanded && !(clearQuery && _searchQuery.isNotEmpty)) return;
+    setState(() {
+      _searchExpanded = false;
+      if (clearQuery) {
+        _searchController.clear();
+        _searchQuery = '';
+      }
+    });
+    _searchFocusNode.unfocus();
+  }
 
   @override
   void dispose() {
+    _searchFocusNode.removeListener(_handleSearchFocusChange);
+    _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
   List<MapEntry<int, TocItem>> get _filtered {
     return SearchBookTocFilterHelper.filterEntries(
-      toc: widget.toc,
+      toc: _toc,
       rawQuery: _searchQuery,
       reversed: _reversed,
     );
+  }
+
+  Future<void> _showTocMenu() async {
+    if (_runningTocRuleAction ||
+        _runningExportBookmarkAction ||
+        _runningExportBookmarkMarkdownAction) {
+      return;
+    }
+    final selected = await showCupertinoModalPopup<_SearchBookTocMenuAction>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('目录操作'),
+        actions: [
+          if (widget.showTxtTocRuleAction)
+            CupertinoActionSheetAction(
+              key: _menuTocRuleActionKey,
+              onPressed: () =>
+                  Navigator.pop(sheetContext, _SearchBookTocMenuAction.tocRule),
+              child: const Text('TXT 目录规则'),
+            ),
+          CupertinoActionSheetAction(
+            key: _menuReverseTocActionKey,
+            onPressed: () => Navigator.pop(
+              sheetContext,
+              _SearchBookTocMenuAction.reverseToc,
+            ),
+            child: const Text('反转目录'),
+          ),
+          if (widget.showExportBookmarkAction)
+            CupertinoActionSheetAction(
+              key: _menuExportBookmarkActionKey,
+              onPressed: () => Navigator.pop(
+                sheetContext,
+                _SearchBookTocMenuAction.exportBookmark,
+              ),
+              child: const Text('导出'),
+            ),
+          if (widget.showExportBookmarkAction)
+            CupertinoActionSheetAction(
+              key: _menuExportBookmarkMarkdownActionKey,
+              onPressed: () => Navigator.pop(
+                sheetContext,
+                _SearchBookTocMenuAction.exportBookmarkMarkdown,
+              ),
+              child: const Text('导出(MD)'),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (selected == null) return;
+    switch (selected) {
+      case _SearchBookTocMenuAction.reverseToc:
+        _toggleReverseToc();
+        return;
+      case _SearchBookTocMenuAction.tocRule:
+        await _runTocRuleAction();
+        return;
+      case _SearchBookTocMenuAction.exportBookmark:
+        await _runExportBookmarkAction();
+        return;
+      case _SearchBookTocMenuAction.exportBookmarkMarkdown:
+        await _runExportBookmarkMarkdownAction();
+        return;
+    }
+  }
+
+  void _toggleReverseToc() {
+    setState(() => _reversed = !_reversed);
+  }
+
+  Future<void> _runTocRuleAction() async {
+    final handler = widget.onEditTocRule;
+    if (handler == null || _runningTocRuleAction) return;
+    setState(() => _runningTocRuleAction = true);
+    try {
+      final updated = await handler();
+      if (!mounted || updated == null) return;
+      if (updated.displayTitles.length != updated.toc.length) return;
+      setState(() {
+        _toc = updated.toc;
+        _displayTitles = updated.displayTitles;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _runningTocRuleAction = false);
+      }
+    }
+  }
+
+  Future<void> _runExportBookmarkAction() async {
+    final handler = widget.onExportBookmark;
+    if (handler == null || _runningExportBookmarkAction) return;
+    setState(() => _runningExportBookmarkAction = true);
+    try {
+      await handler();
+    } finally {
+      if (mounted) {
+        setState(() => _runningExportBookmarkAction = false);
+      }
+    }
+  }
+
+  Future<void> _runExportBookmarkMarkdownAction() async {
+    final handler = widget.onExportBookmarkMarkdown;
+    if (handler == null || _runningExportBookmarkMarkdownAction) return;
+    setState(() => _runningExportBookmarkMarkdownAction = true);
+    try {
+      await handler();
+    } finally {
+      if (mounted) {
+        setState(() => _runningExportBookmarkMarkdownAction = false);
+      }
+    }
   }
 
   @override
@@ -2378,9 +2781,62 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
     final filtered = _filtered;
+    final searchAction = _searchExpanded
+        ? CupertinoButton(
+            key: _menuSearchCloseKey,
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
+            onPressed: () => _closeSearch(clearQuery: true),
+            child: const Icon(CupertinoIcons.xmark, size: 18),
+          )
+        : CupertinoButton(
+            key: _menuSearchActionKey,
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
+            onPressed: _openSearch,
+            child: const Icon(CupertinoIcons.search, size: 18),
+          );
+    final trailing = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        searchAction,
+        if (_runningTocRuleAction ||
+            _runningExportBookmarkAction ||
+            _runningExportBookmarkMarkdownAction)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: CupertinoActivityIndicator(radius: 8),
+          ),
+        CupertinoButton(
+          key: _menuMoreActionKey,
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(30, 30),
+          onPressed: (_runningTocRuleAction ||
+                  _runningExportBookmarkAction ||
+                  _runningExportBookmarkMarkdownAction)
+              ? null
+              : _showTocMenu,
+          child: const Icon(CupertinoIcons.ellipsis_circle, size: 18),
+        ),
+      ],
+    );
 
     return AppCupertinoPageScaffold(
       title: '目录',
+      middle: _searchExpanded
+          ? SizedBox(
+              height: 34,
+              child: CupertinoSearchTextField(
+                key: _menuSearchFieldKey,
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                placeholder: '搜索',
+                onChanged: (value) => setState(() => _searchQuery = value),
+                onSubmitted: (value) => setState(() => _searchQuery = value),
+              ),
+            )
+          : null,
+      trailing: trailing,
       child: Column(
         children: [
           Padding(
@@ -2398,40 +2854,12 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ShadInput(
-                    controller: _searchController,
-                    placeholder: const Text('搜索章节'),
-                    leading: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(LucideIcons.search, size: 14),
-                    ),
-                    onChanged: (value) => setState(() => _searchQuery = value),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ShadButton.ghost(
-                  onPressed: () => setState(() => _reversed = !_reversed),
-                  child: Icon(
-                    _reversed
-                        ? LucideIcons.arrowDownWideNarrow
-                        : LucideIcons.arrowUpWideNarrow,
-                    size: 16,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 _searchQuery.trim().isEmpty
-                    ? '共 ${widget.toc.length} 章'
+                    ? '共 ${_toc.length} 章'
                     : '匹配 ${filtered.length} 章',
                 style: theme.textTheme.small.copyWith(
                   color: scheme.mutedForeground,
@@ -2445,7 +2873,7 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
               itemCount: filtered.length,
               itemBuilder: (context, index) {
                 final entry = filtered[index];
-                final displayTitle = widget.displayTitles[entry.key];
+                final displayTitle = _displayTitles[entry.key];
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: GestureDetector(

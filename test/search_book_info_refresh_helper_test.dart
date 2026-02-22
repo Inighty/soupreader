@@ -83,6 +83,40 @@ void main() {
       expect(splitEnabled.chapters.length, greaterThan(1));
     });
 
+    test('TXT 重解析可按指定 tocRuleRegex 解析目录', () async {
+      final txtFile = File('${tempDir.path}/refresh_toc_rule_case.txt');
+      await txtFile.writeAsString(
+        '@@ 序章\n这里是序章正文，长度足够用于分章验证。\n\n'
+        '@@ 第一节\n这里是第一节正文，长度足够用于分章验证。\n\n'
+        '@@ 第二节\n这里是第二节正文，长度足够用于分章验证。',
+        flush: true,
+      );
+
+      final book = Book(
+        id: 'book-refresh-toc-rule',
+        title: '刷新目录规则测试',
+        author: '原作者',
+        bookUrl: 'local://book-refresh-toc-rule',
+        isLocal: true,
+        localPath: txtFile.path,
+      );
+
+      final defaultResult = await SearchBookInfoRefreshHelper.refreshLocalBook(
+        book: book,
+        splitLongChapter: false,
+      );
+      final customResult = await SearchBookInfoRefreshHelper.refreshLocalBook(
+        book: book,
+        splitLongChapter: false,
+        txtTocRuleRegex: r'^\s*@@\s*.+$',
+      );
+
+      expect(defaultResult.chapters.length, 1);
+      expect(customResult.chapters.length, 3);
+      expect(customResult.chapters.first.title, '@@ 序章');
+      expect(customResult.chapters.last.title, '@@ 第二节');
+    });
+
     test('非本地书籍触发刷新会报错', () async {
       const book = Book(
         id: 'book-remote',

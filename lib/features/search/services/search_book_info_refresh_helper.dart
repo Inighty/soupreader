@@ -14,6 +14,7 @@ class SearchBookInfoRefreshHelper {
     required Book book,
     String? preferredTxtCharset,
     bool splitLongChapter = true,
+    String? txtTocRuleRegex,
   }) async {
     if (!book.isLocal) {
       throw StateError('当前书籍不是本地书籍');
@@ -37,6 +38,7 @@ class SearchBookInfoRefreshHelper {
           localPath: localPath,
           preferredTxtCharset: preferredTxtCharset,
           splitLongChapter: splitLongChapter,
+          txtTocRuleRegex: txtTocRuleRegex,
         );
       case '.epub':
         return _refreshEpubBook(
@@ -53,6 +55,7 @@ class SearchBookInfoRefreshHelper {
     required String localPath,
     String? preferredTxtCharset,
     bool splitLongChapter = true,
+    String? txtTocRuleRegex,
   }) async {
     final parsed = await TxtParser.reparseFromFile(
       filePath: localPath,
@@ -60,6 +63,7 @@ class SearchBookInfoRefreshHelper {
       bookName: book.title,
       forcedCharset: preferredTxtCharset,
       splitLongChapter: splitLongChapter,
+      tocRuleRegex: txtTocRuleRegex,
     );
 
     final chapters = parsed.chapters;

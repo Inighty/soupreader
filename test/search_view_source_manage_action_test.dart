@@ -84,6 +84,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(SourceListView), findsOneWidget);
-    expect(find.byIcon(CupertinoIcons.folder), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.square_grid_2x2), findsOneWidget);
   });
 }

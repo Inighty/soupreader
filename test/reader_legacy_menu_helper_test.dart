@@ -135,4 +135,11 @@ void main() {
       <String>['刷新当前章节', '刷新之后章节', '刷新全部章节'],
     );
   });
+
+  test('ReaderLegacyMenuHelper 默认刷新动作对齐 legado menu_refresh=menu_refresh_dur', () {
+    expect(
+      ReaderLegacyMenuHelper.defaultRefreshAction(),
+      ReaderLegacyRefreshMenuAction.current,
+    );
+  });
 }
