@@ -6,8 +6,10 @@ Future<ReaderSourceSwitchCandidate?> showSourceSwitchCandidateSheet({
   required BuildContext context,
   required String keyword,
   required List<ReaderSourceSwitchCandidate> candidates,
-  required bool loadTocEnabled,
+  bool loadTocEnabled = false,
+  int changeSourceDelaySeconds = 0,
   Future<void> Function(bool enabled)? onLoadTocChanged,
+  Future<void> Function(int seconds)? onChangeSourceDelayChanged,
   Future<void> Function()? onOpenSourceManage,
   Future<List<ReaderSourceSwitchCandidate>> Function(
     List<ReaderSourceSwitchCandidate> currentCandidates,
@@ -19,7 +21,9 @@ Future<ReaderSourceSwitchCandidate?> showSourceSwitchCandidateSheet({
       keyword: keyword,
       candidates: candidates,
       loadTocEnabled: loadTocEnabled,
+      changeSourceDelaySeconds: changeSourceDelaySeconds,
       onLoadTocChanged: onLoadTocChanged,
+      onChangeSourceDelayChanged: onChangeSourceDelayChanged,
       onOpenSourceManage: onOpenSourceManage,
       onRefreshCandidates: onRefreshCandidates,
     ),
@@ -30,7 +34,9 @@ class SourceSwitchCandidateSheet extends StatefulWidget {
   final String keyword;
   final List<ReaderSourceSwitchCandidate> candidates;
   final bool loadTocEnabled;
+  final int changeSourceDelaySeconds;
   final Future<void> Function(bool enabled)? onLoadTocChanged;
+  final Future<void> Function(int seconds)? onChangeSourceDelayChanged;
   final Future<void> Function()? onOpenSourceManage;
   final Future<List<ReaderSourceSwitchCandidate>> Function(
     List<ReaderSourceSwitchCandidate> currentCandidates,
@@ -41,7 +47,9 @@ class SourceSwitchCandidateSheet extends StatefulWidget {
     required this.keyword,
     required this.candidates,
     required this.loadTocEnabled,
+    this.changeSourceDelaySeconds = 0,
     this.onLoadTocChanged,
+    this.onChangeSourceDelayChanged,
     this.onOpenSourceManage,
     this.onRefreshCandidates,
   });
@@ -58,7 +66,9 @@ class _SourceSwitchCandidateSheetState
   bool _openingSourceManage = false;
   bool _refreshingCandidates = false;
   bool _updatingLoadToc = false;
+  bool _updatingSourceDelay = false;
   late bool _loadTocEnabled;
+  late int _changeSourceDelaySeconds;
   late List<ReaderSourceSwitchCandidate> _candidates;
 
   List<ReaderSourceSwitchCandidate> get _filteredCandidates {
@@ -72,6 +82,8 @@ class _SourceSwitchCandidateSheetState
   void initState() {
     super.initState();
     _loadTocEnabled = widget.loadTocEnabled;
+    _changeSourceDelaySeconds =
+        _normalizeDelaySeconds(widget.changeSourceDelaySeconds);
     _candidates = List<ReaderSourceSwitchCandidate>.from(
       widget.candidates,
       growable: false,
@@ -84,6 +96,10 @@ class _SourceSwitchCandidateSheetState
     super.didUpdateWidget(oldWidget);
     if (oldWidget.loadTocEnabled != widget.loadTocEnabled) {
       _loadTocEnabled = widget.loadTocEnabled;
+    }
+    if (oldWidget.changeSourceDelaySeconds != widget.changeSourceDelaySeconds) {
+      _changeSourceDelaySeconds =
+          _normalizeDelaySeconds(widget.changeSourceDelaySeconds);
     }
   }
 
@@ -168,19 +184,32 @@ class _SourceSwitchCandidateSheetState
   }
 
   Future<void> _showMoreActions() async {
-    if (_openingSourceManage || _refreshingCandidates || _updatingLoadToc) {
+    if (_openingSourceManage ||
+        _refreshingCandidates ||
+        _updatingLoadToc ||
+        _updatingSourceDelay) {
       return;
     }
     final action = await showCupertinoModalPopup<_SourceSwitchMenuAction>(
       context: context,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(sheetContext).pop(_SourceSwitchMenuAction.loadToc);
-            },
-            child: Text(_loadTocEnabled ? '✓ 加载目录' : '加载目录'),
-          ),
+          if (widget.onLoadTocChanged != null)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(sheetContext).pop(_SourceSwitchMenuAction.loadToc);
+              },
+              child: Text(_loadTocEnabled ? '✓ 加载目录' : '加载目录'),
+            ),
+          if (widget.onChangeSourceDelayChanged != null)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.of(sheetContext).pop(
+                  _SourceSwitchMenuAction.changeSourceDelay,
+                );
+              },
+              child: Text('换源间隔（${_changeSourceDelaySeconds}秒）'),
+            ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.of(sheetContext).pop(),
@@ -190,7 +219,110 @@ class _SourceSwitchCandidateSheetState
     );
     if (action == _SourceSwitchMenuAction.loadToc) {
       await _handleToggleLoadToc();
+      return;
     }
+    if (action == _SourceSwitchMenuAction.changeSourceDelay) {
+      await _handleChangeSourceDelay();
+    }
+  }
+
+  int _normalizeDelaySeconds(int value) {
+    return value.clamp(0, 9999).toInt();
+  }
+
+  Future<void> _handleChangeSourceDelay() async {
+    final onChangeSourceDelayChanged = widget.onChangeSourceDelayChanged;
+    if (onChangeSourceDelayChanged == null || _updatingSourceDelay) {
+      return;
+    }
+    final picked = await _showChangeSourceDelayPicker();
+    if (!mounted || picked == null) return;
+    final next = _normalizeDelaySeconds(picked);
+    if (next == _changeSourceDelaySeconds) return;
+    setState(() {
+      _changeSourceDelaySeconds = next;
+      _updatingSourceDelay = true;
+    });
+    try {
+      await onChangeSourceDelayChanged(next);
+    } finally {
+      if (mounted) {
+        setState(() => _updatingSourceDelay = false);
+      }
+    }
+  }
+
+  Future<int?> _showChangeSourceDelayPicker() async {
+    final initialValue = _normalizeDelaySeconds(_changeSourceDelaySeconds);
+    final pickerController = FixedExtentScrollController(
+      initialItem: initialValue,
+    );
+    var selectedValue = initialValue;
+    final result = await showCupertinoModalPopup<int>(
+      context: context,
+      builder: (sheetContext) {
+        final theme = CupertinoTheme.of(sheetContext);
+        final backgroundColor = theme.scaffoldBackgroundColor;
+        return Container(
+          height: 320,
+          color: backgroundColor,
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 44,
+                  child: Row(
+                    children: [
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        child: const Text('取消'),
+                      ),
+                      const Expanded(
+                        child: Center(
+                          child: Text(
+                            '换源间隔',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        onPressed: () =>
+                            Navigator.of(sheetContext).pop(selectedValue),
+                        child: const Text('确定'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Expanded(
+                  child: CupertinoPicker.builder(
+                    itemExtent: 36,
+                    scrollController: pickerController,
+                    onSelectedItemChanged: (index) {
+                      selectedValue = index;
+                    },
+                    childCount: 10000,
+                    itemBuilder: (context, index) {
+                      return Center(
+                        child: Text('$index 秒'),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    pickerController.dispose();
+    return result;
   }
 
   @override
@@ -198,6 +330,8 @@ class _SourceSwitchCandidateSheetState
     final colors = CupertinoTheme.of(context);
     final size = MediaQuery.of(context).size;
     final filtered = _filteredCandidates;
+    final showMoreButton = widget.onLoadTocChanged != null ||
+        widget.onChangeSourceDelayChanged != null;
 
     return SafeArea(
       top: false,
@@ -275,19 +409,19 @@ class _SourceSwitchCandidateSheetState
                           child: const Text('书源管理'),
                         ),
                       const SizedBox(width: 12),
-                      if (widget.onLoadTocChanged != null)
+                      if (showMoreButton)
                         CupertinoButton(
                           padding: EdgeInsets.zero,
                           minimumSize: const Size(32, 32),
                           onPressed: (_openingSourceManage ||
                                   _refreshingCandidates ||
-                                  _updatingLoadToc)
+                                  _updatingLoadToc ||
+                                  _updatingSourceDelay)
                               ? null
                               : _showMoreActions,
                           child: const Text('更多'),
                         ),
-                      if (widget.onLoadTocChanged != null)
-                        const SizedBox(width: 12),
+                      if (showMoreButton) const SizedBox(width: 12),
                       CupertinoButton(
                         padding: EdgeInsets.zero,
                         minimumSize: const Size(32, 32),
@@ -397,4 +531,5 @@ class _SourceSwitchCandidateSheetState
 
 enum _SourceSwitchMenuAction {
   loadToc,
+  changeSourceDelay,
 }

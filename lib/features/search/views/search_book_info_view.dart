@@ -131,6 +131,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   bool _tocUiLoadWordCount = true;
   bool _deleteAlertEnabled = true;
   bool _introExpanded = false;
+  int _changeSourceDelaySeconds = 0;
   String? _error;
   String? _tocError;
 
@@ -152,6 +153,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     _chapterRepo = ChapterRepository(db);
     _addService = BookAddService(database: db, engine: _engine);
     _settingsService = SettingsService();
+    _changeSourceDelaySeconds = _settingsService.getBatchChangeSourceDelay();
     _webDavService = WebDavService();
     _readerCharsetService = ReaderCharsetService();
     _bookmarkExportService =
@@ -2027,6 +2029,16 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     );
   }
 
+  int _normalizeChangeSourceDelaySeconds(int seconds) {
+    return seconds.clamp(0, 9999).toInt();
+  }
+
+  Future<void> _handleChangeSourceDelayChanged(int seconds) async {
+    final normalized = _normalizeChangeSourceDelaySeconds(seconds);
+    _changeSourceDelaySeconds = normalized;
+    await _settingsService.saveBatchChangeSourceDelay(normalized);
+  }
+
   Future<void> _switchSource() async {
     if (_switchingSource) return;
 
@@ -2063,8 +2075,15 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
         orderedSources.map((entry) => entry.value).toList(growable: false);
 
     setState(() => _switchingSource = true);
+    final searchDelaySeconds = _normalizeChangeSourceDelaySeconds(
+      _changeSourceDelaySeconds,
+    );
     final searchResults = <SearchResult>[];
-    for (final source in sortedEnabledSources) {
+    for (var index = 0; index < sortedEnabledSources.length; index++) {
+      final source = sortedEnabledSources[index];
+      if (index > 0 && searchDelaySeconds > 0) {
+        await Future<void>.delayed(Duration(seconds: searchDelaySeconds));
+      }
       try {
         final list = await _engine.search(
           source,
@@ -2119,6 +2138,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       keyword: keyword,
       candidates: candidates,
       loadTocEnabled: false,
+      changeSourceDelaySeconds: _changeSourceDelaySeconds,
+      onChangeSourceDelayChanged: _handleChangeSourceDelayChanged,
     );
     if (selected == null) return;
     await _applySourceCandidate(selected);

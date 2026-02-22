@@ -979,18 +979,18 @@ class _SourceListViewState extends State<SourceListView> {
             child: const Text('启用所选'),
             onPressed: () {
               Navigator.pop(sheetContext);
-              _batchSetEnabled(visibleSources, true);
+              _batchEnableSelection(visibleSources);
             },
           ),
           CupertinoActionSheetAction(
             child: const Text('禁用所选'),
             onPressed: () {
               Navigator.pop(sheetContext);
-              _batchSetEnabled(visibleSources, false);
+              _batchDisableSelection(visibleSources);
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('加入分组'),
+            child: const Text('添加分组'),
             onPressed: () {
               Navigator.pop(sheetContext);
               _batchAddGroup(visibleSources);
@@ -1007,7 +1007,7 @@ class _SourceListViewState extends State<SourceListView> {
             child: const Text('启用发现'),
             onPressed: () {
               Navigator.pop(sheetContext);
-              _batchSetExplore(visibleSources, true);
+              _batchEnableExplore(visibleSources);
             },
           ),
           CupertinoActionSheetAction(
@@ -1745,20 +1745,34 @@ class _SourceListViewState extends State<SourceListView> {
         .toList(growable: false);
   }
 
-  Future<void> _batchSetEnabled(
-      List<BookSource> allSources, bool enabled) async {
-    final targets = _selectedSources(allSources)
-        .where((s) => s.enabled != enabled)
-        .toList(growable: false);
-    if (targets.isEmpty) {
-      _showMessage(enabled ? '所选书源已全部启用' : '所选书源已全部禁用');
-      return;
-    }
+  Future<void> _batchEnableSelection(List<BookSource> allSources) async {
+    final selected = _selectedSources(allSources);
+    if (selected.isEmpty) return;
     await Future.wait(
-      targets
-          .map((s) => _sourceRepo.updateSource(s.copyWith(enabled: enabled))),
+      selected.map((source) {
+        return _sourceRepo.updateSource(source.copyWith(enabled: true));
+      }),
     );
-    _showMessage('${enabled ? '已启用' : '已禁用'} ${targets.length} 条书源');
+  }
+
+  Future<void> _batchDisableSelection(List<BookSource> allSources) async {
+    final selected = _selectedSources(allSources);
+    if (selected.isEmpty) return;
+    await Future.wait(
+      selected.map((source) {
+        return _sourceRepo.updateSource(source.copyWith(enabled: false));
+      }),
+    );
+  }
+
+  Future<void> _batchEnableExplore(List<BookSource> allSources) async {
+    final selected = _selectedSources(allSources);
+    if (selected.isEmpty) return;
+    await Future.wait(
+      selected.map((source) {
+        return _sourceRepo.updateSource(source.copyWith(enabledExplore: true));
+      }),
+    );
   }
 
   Future<void> _batchSetExplore(
@@ -1780,15 +1794,12 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Future<void> _batchAddGroup(List<BookSource> allSources) async {
-    final groupInput = await _askGroupName('加入分组');
+    final groupInput = await _askGroupName('添加分组');
     if (groupInput == null || groupInput.trim().isEmpty) return;
     final addGroups = _extractGroups(groupInput);
     if (addGroups.isEmpty) return;
     final selected = _selectedSources(allSources);
-    if (selected.isEmpty) {
-      _showMessage('当前未选择书源');
-      return;
-    }
+    if (selected.isEmpty) return;
     await Future.wait(selected.map((source) async {
       final groups = _extractGroups(source.bookSourceGroup);
       groups.addAll(addGroups);
@@ -1796,7 +1807,6 @@ class _SourceListViewState extends State<SourceListView> {
         _copySourceWithGroup(source, _joinGroups(groups)),
       );
     }));
-    _showMessage('已将 ${selected.length} 条书源加入分组');
   }
 
   Future<void> _batchRemoveGroup(List<BookSource> allSources) async {
@@ -1805,10 +1815,7 @@ class _SourceListViewState extends State<SourceListView> {
     final removeGroups = _extractGroups(groupInput).toSet();
     if (removeGroups.isEmpty) return;
     final selected = _selectedSources(allSources);
-    if (selected.isEmpty) {
-      _showMessage('当前未选择书源');
-      return;
-    }
+    if (selected.isEmpty) return;
 
     await Future.wait(selected.map((source) async {
       final groups = _extractGroups(source.bookSourceGroup);
@@ -1817,7 +1824,6 @@ class _SourceListViewState extends State<SourceListView> {
         _copySourceWithGroup(source, _joinGroups(groups)),
       );
     }));
-    _showMessage('已从 ${selected.length} 条书源移除分组');
   }
 
   Future<void> _batchDeleteSelected(List<BookSource> allSources) async {

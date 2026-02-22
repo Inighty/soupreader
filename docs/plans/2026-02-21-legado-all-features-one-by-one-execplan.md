@@ -150,6 +150,98 @@
 ## Progress（动态）
 
 - `2026-02-22`
+  - 状态变更：完成 `P4-seq154`（`book_source_sel.xml / @+id/menu_enable_explore / 启用发现`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq154`（`book_source_sel.xml / @+id/menu_enable_explore / 启用发现`）：书源管理多选“更多”菜单“启用发现”动作收敛 legado 同义语义；点击后按当前选中集合批量写入 `enabledExplore=true`，不筛选已启用项，不追加“已启用 N 条书源的发现/已全部启用”等扩展提示。
+  - `P4-seq154` 差异点清单（实施前）：
+    - legado `BookSourceActivity.onMenuItemClick(menu_enable_explore)` 直接执行 `viewModel.enableSelectExplore(adapter.selection)`，动作链路无成功提示或兜底提示分支。
+    - legado `BookSourceViewModel.enableSelectExplore` 直连 `bookSourceDao.enableExplore(true, sources)`；`BookSourceDao.enableExplore(enable, bookSources)` 对选中集合逐项写库，不过滤已启用项。
+    - Flutter 侧此前“启用发现”复用 `_batchSetExplore(..., true)`，会先过滤已启用项并追加“所选书源发现已全部启用/已启用 N 条书源的发现”提示，用户可见状态流偏离 legado。
+  - `P4-seq154` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理多选模式底栏“省略号 -> 启用发现”）。
+    - 状态：已同义（点击后按当前选中集合批量写入 `enabledExplore=true`；已启用项保持启用且不改动其它字段）。
+    - 异常：已同义（无选中时“更多”按钮禁用；执行过程无扩展提示）。
+    - 文案：已同义（动作文案固定“启用发现”）。
+    - 排版：已同义（入口承载在多选底栏 `CupertinoActionSheet` 的“批量操作”层级，平台差异可接受）。
+    - 交互触发：已同义（`书源管理 -> 多选模式 -> 省略号 -> 启用发现`）。
+    - 验证：手工路径 `书源管理 -> 多选模式选择至少 1 个未启用发现书源 -> 省略号 -> 启用发现 -> 重新打开条目菜单`（校验目标书源切换为启用发现且执行过程无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_enable_explore` 的静默批量启用语义，不改动 `menu_disable_explore`（`seq155`）、分组、导出与校验链路。
+  - 下一项：按优先级继续推进 `P4-seq155`（`book_source_sel.xml / @+id/menu_disable_explore / 禁用发现`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq153`（`book_source_sel.xml / @+id/menu_remove_group / 移除分组`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq153`（`book_source_sel.xml / @+id/menu_remove_group / 移除分组`）：书源管理多选“更多”菜单“移除分组”动作收敛 legado 同义语义；点击后弹出“移除分组”输入框，确认非空输入后按当前选中集合批量移除对应分组，不追加“当前未选择书源/已从 N 条书源移除分组”等扩展提示。
+  - `P4-seq153` 差异点清单（实施前）：
+    - legado `BookSourceActivity.menu_remove_group` 触发 `selectionRemoveFromGroups()`：弹窗标题固定 `remove_group`（“移除分组”），输入框支持已存在分组候选；确认时仅在输入 `isNotEmpty` 时调用 `viewModel.selectionRemoveFromGroups(adapter.selection, group)`，动作本身无成功或兜底提示。
+    - legado `BookSourceViewModel.selectionRemoveFromGroups` 仅执行“按选中集合复制并 `removeGroup(groups)` 后批量 `upGroup`”的静默状态写入，不附加“无选中/成功”提示分支。
+    - Flutter 侧此前 `_batchRemoveGroup` 在“无选中”场景弹“当前未选择书源”，成功后弹“已从 N 条书源移除分组”，用户可见状态流偏离 legado。
+  - `P4-seq153` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理多选模式底栏“省略号 -> 移除分组”）。
+    - 状态：已同义（确认非空分组输入后，对当前选中集合批量移除对应分组；未命中的分组保持原值）。
+    - 异常：已同义（无选中、取消输入、空输入场景均静默 no-op，不追加扩展提示）。
+    - 文案：已同义（动作文案与弹窗标题统一为“移除分组”）。
+    - 排版：已同义（入口承载在多选底栏 `CupertinoActionSheet` 的“批量操作”层级，输入弹窗保留分组候选 chips）。
+    - 交互触发：已同义（`书源管理 -> 多选模式 -> 省略号 -> 移除分组 -> 输入分组并确定`）。
+    - 验证：手工路径 `书源管理 -> 多选模式选择至少 1 个带分组书源 -> 省略号 -> 移除分组 -> 输入已存在分组并确定 -> 重新打开条目菜单`（校验目标书源对应分组已移除且执行过程无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_remove_group` 的静默状态流，不改动添加分组、发现开关、导出与校验链路。
+  - 下一项：按优先级继续推进 `P4-seq154`（`book_source_sel.xml / @+id/menu_enable_explore / 启用发现`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq152`（`book_source_sel.xml / @+id/menu_add_group / 添加分组`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq152`（`book_source_sel.xml / @+id/menu_add_group / 添加分组`）：书源管理多选“更多”菜单“添加分组”动作收敛 legado 同义语义；入口文案由“加入分组”收敛为“添加分组”，点击后弹出分组输入框并按当前选中集合批量追加分组，不追加“当前未选择书源/已加入分组”等扩展提示。
+  - `P4-seq152` 差异点清单（实施前）：
+    - legado `BookSourceActivity.menu_add_group` 触发 `selectionAddToGroups()`：弹窗标题固定 `add_group`（“添加分组”），输入框支持已存在分组候选；确认时仅在输入 `isNotEmpty` 时调用 `viewModel.selectionAddToGroups(adapter.selection, group)`，动作本身无成功或兜底提示。
+    - Flutter 侧此前批量菜单文案与输入弹窗标题均为“加入分组”，且 `_batchAddGroup` 在“无选中”与“成功写入”后会追加提示，用户可见状态流偏离 legado。
+  - `P4-seq152` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理多选模式底栏“省略号 -> 添加分组”）。
+    - 状态：已同义（确认非空分组输入后，对当前选中集合批量追加分组并写库；重复分组保持去重）。
+    - 异常：已同义（无选中时保持静默 no-op；取消输入或空输入不落库且无额外提示）。
+    - 文案：已同义（动作与弹窗标题统一为“添加分组”）。
+    - 排版：已同义（入口承载在多选底栏 `CupertinoActionSheet` 的“批量操作”层级，输入弹窗保留分组候选 chips）。
+    - 交互触发：已同义（`书源管理 -> 多选模式 -> 省略号 -> 添加分组 -> 输入分组并确定`）。
+    - 验证：手工路径 `书源管理 -> 多选模式选择至少 1 个书源 -> 省略号 -> 添加分组 -> 输入分组名并确定 -> 重新打开条目菜单`（校验目标书源分组已追加且执行过程无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_add_group` 的入口文案与静默状态流，不改动移除分组、发现开关、导出与校验链路。
+  - 下一项：按优先级继续推进 `P4-seq153`（`book_source_sel.xml / @+id/menu_remove_group / 移除分组`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq151`（`book_source_sel.xml / @+id/menu_disable_selection / 禁用所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq151`（`book_source_sel.xml / @+id/menu_disable_selection / 禁用所选`）：书源管理多选“更多”菜单“禁用所选”动作收敛 legado 同义静默批量禁用语义；点击后按当前选中集合批量写入 `enabled=false`，不追加“已禁用 N 条书源/所选书源已全部禁用”等扩展提示。
+  - `P4-seq151` 差异点清单（实施前）：
+    - legado `BookSourceActivity.menu_disable_selection` 仅执行 `viewModel.disableSelection(adapter.selection)`；`BookSourceViewModel.disableSelection` 直连 `bookSourceDao.enable(false, sources)`，动作本身无成功提示。
+    - Flutter 侧此前“禁用所选”复用 `_batchSetEnabled(..., false)`，会先过滤已禁用项并追加结果提示，用户可见状态流偏离 legado 静默语义。
+  - `P4-seq151` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理多选模式底栏“省略号 -> 禁用所选”）。
+    - 状态：已同义（点击后按当前选中集合批量写入 `enabled=false`；已禁用项保持禁用且不改动其它字段）。
+    - 异常：已同义（无选中时“更多”按钮禁用；执行过程不追加扩展异常提示）。
+    - 文案：已同义（动作文案固定“禁用所选”；执行结果不追加扩展文案）。
+    - 排版：已同义（入口继续承载在多选底栏 `CupertinoActionSheet` 的“批量操作”层级，平台差异可接受）。
+    - 交互触发：已同义（`书源管理 -> 多选模式 -> 省略号 -> 禁用所选`）。
+    - 验证：手工路径 `书源管理 -> 多选模式选择至少 1 个已启用书源 -> 省略号 -> 禁用所选 -> 重新打开条目菜单`（校验目标书源切换为禁用态且执行过程无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_disable_selection` 的提示边界与批量禁用状态流，不改动启用所选、分组、导出与校验链路。
+  - 下一项：按优先级继续推进 `P4-seq152`（`book_source_sel.xml / @+id/menu_add_group / 添加分组`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq150`（`book_source_sel.xml / @+id/menu_enable_selection / 启用所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq150`（`book_source_sel.xml / @+id/menu_enable_selection / 启用所选`）：书源管理多选“更多”菜单“启用所选”动作收敛 legado 同义静默批量启用语义；点击后按当前选中集合批量写入 `enabled=true`，不追加“已启用 N 条书源/所选书源已全部启用”等扩展提示。
+  - `P4-seq150` 差异点清单（实施前）：
+    - legado `BookSourceActivity.menu_enable_selection` 仅执行 `viewModel.enableSelection(adapter.selection)`；`BookSourceViewModel.enableSelection` 直连 `bookSourceDao.enable(true, sources)`，动作本身无成功提示。
+    - Flutter 侧此前“启用所选”复用 `_batchSetEnabled(..., true)`，会先过滤已启用项并追加结果提示，用户可见状态流偏离 legado 静默语义。
+  - `P4-seq150` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理多选模式底栏“省略号 -> 启用所选”）。
+    - 状态：已同义（点击后按当前选中集合批量写入 `enabled=true`；已启用项保持启用且不改动其它字段）。
+    - 异常：已同义（无选中时“更多”按钮禁用；执行过程不追加扩展异常提示）。
+    - 文案：已同义（动作文案固定“启用所选”；执行结果不追加扩展文案）。
+    - 排版：已同义（入口继续承载在多选底栏 `CupertinoActionSheet` 的“批量操作”层级，平台差异可接受）。
+    - 交互触发：已同义（`书源管理 -> 多选模式 -> 省略号 -> 启用所选`）。
+    - 验证：手工路径 `书源管理 -> 多选模式选择至少 1 个未启用书源 -> 省略号 -> 启用所选 -> 重新打开条目菜单`（校验目标书源切换为启用态且执行过程无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_enable_selection` 的提示边界与批量启用状态流，不改动禁用所选、分组、导出与校验链路。
+  - 下一项：按优先级继续推进 `P4-seq151`（`book_source_sel.xml / @+id/menu_disable_selection / 禁用所选`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq368`（`source_picker.xml / @+id/menu_change_source_delay / 换源间隔`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq368`（`source_picker.xml / @+id/menu_change_source_delay / 换源间隔`）：换源候选弹层“更多”菜单补齐 legado 同义“换源间隔”入口；点击后弹出 `0~9999` 秒数值选择并持久化到全局键 `batchChangeSourceDelay`，菜单动作本身不触发候选刷新；后续整书换源/单章换源与详情页换源的逐源搜索按该秒数串行间隔执行。
+  - `P4-seq368` 差异点清单（实施前）：
+    - legado `SourcePickerDialog.menu_change_source_delay` 点击后通过 `NumberPickerDialog`（`min=0/max=9999`）回写 `AppConfig.batchChangeSourceDelay`；`BookshelfManageViewModel.changeSource` 在批量换源循环中按该值（秒）执行延迟。
+    - Flutter 侧此前缺少 `batchChangeSourceDelay` 全局键与对应菜单入口，换源候选搜索在多书源循环中连续触发，无法配置换源间隔。
+  - `P4-seq368` 逐项对照清单（实施后）：
+    - 入口：已同义（换源候选弹层“更多”新增“换源间隔（N秒）”；详情页换源候选弹层同步可见）。
+    - 状态：已同义（可在 `0~9999` 秒范围内选择并持久化到 `batchChangeSourceDelay`；重进弹层可回显）。
+    - 异常：已同义（取消选择不改配置；越界输入在持久化前按 `0~9999` 夹取，不追加扩展提示）。
+    - 文案：已同义（动作文案固定“换源间隔”，单位“秒”）。
+    - 排版：已同义（入口承载在候选弹层“更多”层级，采用 `Cupertino` 数值滚轮承载，平台差异可接受）。
+    - 交互触发：已同义（`阅读页 -> 换源候选弹层 -> 更多 -> 换源间隔`；`书籍详情页 -> 换源候选弹层 -> 更多 -> 换源间隔`）。
+    - 验证：手工路径 `阅读页(网络书) -> 顶部换源按钮点击或长按 -> 整书换源/单章换源 -> 候选弹层 -> 更多 -> 换源间隔`（校验可选择秒数并持久化）；手工路径 `书籍详情页 -> 换源 -> 候选弹层 -> 更多 -> 换源间隔`（校验同一全局值回显）；重复触发换源（校验逐源搜索按配置秒数间隔串行执行）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_change_source_delay` 配置与换源搜索间隔语义，不改动换源匹配规则、目录抓取与结果提交流程。
+  - 下一项：按优先级继续推进 `P4-seq150`（`book_source_sel.xml / @+id/menu_enable_selection / 启用所选`；`P4-seq367` 属于 `detail_later` 后置项）。
   - 状态变更：完成 `P4-seq366`（`source_login.xml / @+id/menu_del_login_header / 删除登录头`）后，ExecPlan 保持 `active`。
   - 完成 `P4-seq366`（`source_login.xml / @+id/menu_del_login_header / 删除登录头`）：登录表单承载页“更多”菜单补齐 legado 同义“删除登录头”入口；点击后静默清理当前书源 `loginHeader_<sourceKey>` 缓存，并按书源 URL 作用域清理 Cookie，不触发保存、不跳转、不追加成功或失败提示。
   - `P4-seq366` 差异点清单（实施前）：
@@ -2409,6 +2501,10 @@
 
 ## Surprises & Discoveries
 
+- `2026-02-22`：对照 legado `BookSourceActivity.menu_remove_group -> selectionRemoveFromGroups -> BookSourceViewModel.selectionRemoveFromGroups` 时确认该项是“固定文案 + 静默批量移除”语义：菜单文案与弹窗标题均为“移除分组”，确认后仅按选中集合执行 `removeGroup(groups)` 并批量写库，不追加“未选择/移除成功”提示。Flutter 端此前两条提示分支已在 `P4-seq153` 收敛。
+- `2026-02-22`：对照 legado `BookSourceActivity.menu_add_group -> selectionAddToGroups` 时确认该项是“固定文案 + 静默批量写入”语义：菜单文案与弹窗标题均为“添加分组”，确认后仅调用 `selectionAddToGroups(adapter.selection, group)` 批量写库，不追加“未选择/成功”提示。Flutter 端此前多出的提示分支已在 `P4-seq152` 收敛。
+- `2026-02-22`：对照 legado `BookSourceActivity.menu_enable_selection -> BookSourceViewModel.enableSelection` 时确认该项是“静默批量状态写入”语义：动作仅批量写 `enabled=true`，不追加“已启用 N 条/已全部启用”提示。Flutter 端此前复用通用批量开关方法会追加结果提示，本序号已收敛为静默链路。
+- `2026-02-22`：对照 legado `SourcePickerDialog.menu_change_source_delay` 与 `BookshelfManageViewModel.changeSource` 时确认该项并非“仅展示配置入口”，而是“全局秒级整数配置 + 后续换源循环按该值串行延迟”的组合语义。SoupReader 当前尚未迁移书架批量换源流程，本序号将该全局键先接入现有换源候选搜索循环（阅读页与详情页）以保持“配置即生效”的核心边界，同时不提前扩展到未迁移的批量管理流程。
 - `2026-02-22`：对照 legado `SourceLoginDialog.menu_show_login_header` 与 `HttpTtsEditDialog.menu_show_login_header` 时确认两者边界不同：前者在有登录头缓存时提供“复制文本”按钮，后者仅只读展示无复制动作。`P4-seq365` 已按前者补齐复制语义，避免错误复用 `P3-seq379` 的只读边界。
 - `2026-02-22`：对照 legado `ChangeBookSourceDialog/ChangeChapterSourceDialog.menu_load_toc` 时确认该项是“只切换全局开关 + 勾选态”的纯状态动作，不触发刷新；但该开关会影响后续候选刷新链路是否预加载目录。Flutter 端此前无此入口且候选刷新固定不预加载目录，本序号已补齐入口并将刷新链路改为按开关分支。
 - `2026-02-22`：对照 legado `ChangeBookSourceDialog.menu_refresh_list -> ChangeBookSourceViewModel.startRefreshList` 时确认“刷新列表”并非“重新对全部启用书源发起新搜索”，而是“基于当前候选集合逐项刷新并回写列表”；同时 `ChangeChapterSourceDialog` 未处理 `menu_refresh_list`。本序号据此将刷新动作仅接入整书换源候选弹层，避免在单章链路提前引入无效扩展动作。
@@ -2543,6 +2639,11 @@
 
 ## Decision Log
 
+- `2026-02-22` 决策 164：`P4-seq154` 采用“单项入口独立收敛 + 静默批量启用发现”策略：仅将 `book_source_sel/menu_enable_explore` 从通用 `_batchSetExplore` 分离为独立 `_batchEnableExplore` 动作；点击后按当前选中集合直接写入 `enabledExplore=true`，不筛选已启用项，不追加成功或兜底提示。`menu_disable_explore`（`seq155`）保持原实现待下一序号单独处理，避免跨序号并项。
+- `2026-02-22` 决策 163：`P4-seq153` 采用“单项入口收敛 + 静默批量移除分组”策略：仅收敛 `book_source_sel/menu_remove_group` 的动作边界，菜单文案与弹窗标题统一为“移除分组”；确认非空输入后仅按当前选中集合批量移除对应分组并写库，移除“无选中/成功移除”扩展提示。`menu_enable_explore`（`seq154`）保持待下一序号单独处理，避免跨序号并项。
+- `2026-02-22` 决策 162：`P4-seq152` 采用“单项入口收敛 + 静默批量追加分组”策略：仅收敛 `book_source_sel/menu_add_group` 的入口文案与动作边界，菜单文案/弹窗标题统一为“添加分组”；确认非空输入后仅按当前选中集合批量追加分组并写库，移除“无选中/成功写入”扩展提示。`menu_remove_group`（`seq153`）保持待下一序号单独处理，避免跨序号并项。
+- `2026-02-22` 决策 161：`P4-seq150` 采用“单项入口独立收敛 + 静默批量启用”策略：仅将 `book_source_sel/menu_enable_selection` 从通用 `_batchSetEnabled` 分离为独立 `_batchEnableSelection` 动作，点击后按当前选中集合直接写入 `enabled=true`，不追加成功或兜底提示；`menu_disable_selection`（`seq151`）保持原实现待下一序号单独处理，避免跨序号并项。
+- `2026-02-22` 决策 160：`P4-seq368` 采用“共享候选弹层补齐单项入口 + 全局键持久化 + 搜索链路延迟生效”策略：在 `SourceSwitchCandidateSheet` 的“更多”菜单新增 `menu_change_source_delay` 同义入口，使用 `0~9999` 秒滚轮选择并落盘到 `batchChangeSourceDelay`；菜单动作仅更新配置不触发候选刷新。阅读页与详情页换源搜索循环统一读取该键并按秒级串行延迟，保持 legado 的“配置影响后续换源节奏”语义，不提前并入 `seq150~157` 批量多选菜单能力。
 - `2026-02-22` 决策 159：`P4-seq366` 采用“登录页单项补齐 + 静默清理”策略：在 `SourceLoginFormView` 的“更多”菜单仅新增 `menu_del_login_header`，点击后执行“删除 `loginHeader_<sourceKey>` + 按书源 URL 作用域清理 Cookie”；清理失败不提示，保持 legado `removeLoginHeader()` 的静默边界。该序号不提前并入 `menu_log`（`seq367`）后续能力，保持一项一处理。
 - `2026-02-22` 决策 158：`P4-seq365` 采用“登录承载页单项补齐 + 复制语义按源类型分流”策略：在 `SourceLoginFormView` 顶栏新增“更多”入口，仅补齐 `menu_show_login_header`；点击后按当前书源键读取 `loginHeader_<sourceKey>` 缓存并弹出“登录头”对话框，有缓存时展示原始文本并提供“复制文本”动作，无缓存仅标题。该序号不提前并入 `menu_del_login_header/menu_log` 后续能力，保持一项一处理。
 - `2026-02-22` 决策 157：`P4-seq360` 采用“入口文案收敛 + 导入仅回填表单”策略：`SourceEditLegacyView.menu_qr_code_camera` 文案收敛为“二维码导入”，扫码承载标题收敛为“扫描二维码”；扫码成功后仅执行 `upSourceView` 等价回填，不更新 `_savedSource/_savedSnapshot`，不追加成功提示，保持“导入后仍需用户手动保存”的 legado 边界，不提前并入 `menu_show_login_header/menu_del_login_header` 后续序号能力。
@@ -2707,6 +2808,11 @@
 
 ## Outcomes & Retrospective
 
+- `2026-02-22`：完成 `P4-seq154`（`menu_enable_explore`）迁移闭环，已补齐“书源多选菜单启用发现入口 + 批量写入 `enabledExplore=true` + 不筛选已启用项 + 全流程静默无提示”的同义证据；队列推进到下一项 `seq155(menu_disable_explore)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq153`（`menu_remove_group`）迁移闭环，已补齐“书源多选菜单移除分组入口 + 输入弹窗标题收敛 + 按选中集合批量移除分组 + 全流程静默无提示”的同义证据；队列推进到下一项 `seq154(menu_enable_explore)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq152`（`menu_add_group`）迁移闭环，已补齐“书源多选菜单添加分组入口 + 输入弹窗标题收敛 + 按选中集合批量追加分组 + 全流程静默无提示”的同义证据；队列推进到下一项 `seq153(menu_remove_group)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq150`（`menu_enable_selection`）迁移闭环，已补齐“书源多选菜单启用所选入口 + 批量启用状态写入 + 全流程静默无提示”同义证据；队列推进到下一项 `seq151(menu_disable_selection)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq368`（`menu_change_source_delay`）迁移闭环，已补齐“换源候选弹层更多菜单换源间隔入口 + `0~9999` 秒滚轮选择 + 全局键 `batchChangeSourceDelay` 持久化 + 后续逐源搜索按秒级间隔串行执行”同义证据；队列推进到下一项 `seq150(book_source_sel/menu_enable_selection)`（`seq367` 后置）。
 - `2026-02-22`：完成 `P4-seq366`（`menu_del_login_header`）迁移闭环，已补齐“登录表单页更多菜单删除登录头入口 + 删除 `loginHeader_<sourceKey>` + 清理书源 URL 作用域 Cookie + 全流程静默无提示”的同义证据；队列推进到下一项 `seq368(source_picker/menu_change_source_delay)`（`seq367` 后置）。
 - `2026-02-22`：完成 `P4-seq365`（`menu_show_login_header`）迁移闭环，已补齐“登录表单页更多菜单查看登录头入口 + 读取 `loginHeader_<sourceKey>` 缓存 + 弹窗标题‘登录头’ + 有缓存时可复制文本”的同义证据；队列推进到下一项 `seq366(source_login/menu_del_login_header)`。
 - `2026-02-22`：完成 `P4-seq360`（`menu_qr_code_camera`）迁移闭环，已补齐“书源编辑页更多菜单‘二维码导入’文案 + 扫码页标题‘扫描二维码’ + 扫码成功仅回填表单且不重置已保存快照 + 无扩展成功提示”的同义证据；队列推进到下一项 `seq365(source_login/menu_show_login_header)`。

@@ -86,7 +86,7 @@ priority_order,seq,phase,menu_file,item_id,title_zh,current_status,priority_tier
 85,360,P4,source_edit.xml,@+id/menu_qr_code_camera,二维码导入,done,CORE-SUPPORT,5020,P4+source_chain+critical_action
 86,365,P4,source_login.xml,@+id/menu_show_login_header,查看登录头,done,CORE-SUPPORT,5020,P4+source_chain+critical_action
 87,366,P4,source_login.xml,@+id/menu_del_login_header,删除登录头,done,CORE-SUPPORT,5020,P4+source_chain+critical_action
-88,368,P4,source_picker.xml,@+id/menu_change_source_delay,换源间隔,pending,CORE-SUPPORT,5020,P4+source_chain+critical_action
+88,368,P4,source_picker.xml,@+id/menu_change_source_delay,换源间隔,done,CORE-SUPPORT,5020,P4+source_chain+critical_action
 89,123,P4,book_source.xml,@+id/menu_group_manage,分组管理,done,DONE,2700,P4+source_chain+done
 90,124,P4,book_source.xml,@+id/menu_enabled_group,已启用,done,DONE,2700,P4+source_chain+done
 91,125,P4,book_source.xml,@+id/menu_disabled_group,已禁用,done,DONE,2700,P4+source_chain+done
@@ -101,11 +101,11 @@ priority_order,seq,phase,menu_file,item_id,title_zh,current_status,priority_tier
 100,147,P4,book_source_item.xml,@+id/menu_debug_source,调试,done,CORE-SUPPORT,4900,P4+source_chain
 101,148,P4,book_source_item.xml,@+id/menu_del,删除,done,CORE-SUPPORT,4900,P4+source_chain+done
 102,149,P4,book_source_item.xml,@+id/menu_enable_explore,启用发现,done,CORE-SUPPORT,4900,P4+source_chain+done
-103,150,P4,book_source_sel.xml,@+id/menu_enable_selection,启用所选,pending,CORE-SUPPORT,4900,P4+source_chain
-104,151,P4,book_source_sel.xml,@+id/menu_disable_selection,禁用所选,pending,CORE-SUPPORT,4900,P4+source_chain
-105,152,P4,book_source_sel.xml,@+id/menu_add_group,添加分组,pending,CORE-SUPPORT,4900,P4+source_chain
-106,153,P4,book_source_sel.xml,@+id/menu_remove_group,移除分组,pending,CORE-SUPPORT,4900,P4+source_chain
-107,154,P4,book_source_sel.xml,@+id/menu_enable_explore,启用发现,pending,CORE-SUPPORT,4900,P4+source_chain
+103,150,P4,book_source_sel.xml,@+id/menu_enable_selection,启用所选,done,CORE-SUPPORT,4900,P4+source_chain+done
+104,151,P4,book_source_sel.xml,@+id/menu_disable_selection,禁用所选,done,CORE-SUPPORT,4900,P4+source_chain+done
+105,152,P4,book_source_sel.xml,@+id/menu_add_group,添加分组,done,CORE-SUPPORT,4900,P4+source_chain+done
+106,153,P4,book_source_sel.xml,@+id/menu_remove_group,移除分组,done,CORE-SUPPORT,4900,P4+source_chain+done
+107,154,P4,book_source_sel.xml,@+id/menu_enable_explore,启用发现,done,CORE-SUPPORT,4900,P4+source_chain+done
 108,155,P4,book_source_sel.xml,@+id/menu_disable_explore,禁用发现,pending,CORE-SUPPORT,4900,P4+source_chain
 109,156,P4,book_source_sel.xml,@+id/menu_top_sel,置顶所选,pending,CORE-SUPPORT,4900,P4+source_chain
 110,157,P4,book_source_sel.xml,@+id/menu_bottom_sel,置底所选,pending,CORE-SUPPORT,4900,P4+source_chain

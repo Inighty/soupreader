@@ -200,6 +200,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   bool _tocUiUseReplace = false;
   bool _tocUiLoadWordCount = true;
   bool _changeSourceLoadToc = false;
+  int _changeSourceDelaySeconds = 0;
   bool _tocUiSplitLongChapter = false;
   bool _useReplaceRule = true;
   bool _reSegment = false;
@@ -489,6 +490,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _tocUiUseReplace = _settingsService.getTocUiUseReplace();
     _tocUiLoadWordCount = _settingsService.getTocUiLoadWordCount();
     _changeSourceLoadToc = _settingsService.getChangeSourceLoadToc();
+    _changeSourceDelaySeconds = _settingsService.getBatchChangeSourceDelay();
     _audioPlayUseWakeLock = _settingsService.getAudioPlayUseWakeLock();
     _contentSelectSpeakMode = _settingsService.getContentSelectSpeakMode();
     _readerFontFolderPath = _settingsService.getReaderFontFolderPath();
@@ -4968,7 +4970,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (bookName.isNotEmpty) {
       scopes.add(bookName);
     }
-    final sourceUrl = _currentSourceUrl.trim();
+    final sourceUrl = (_currentSourceUrl ?? '').trim();
     if (sourceUrl.isNotEmpty && !scopes.contains(sourceUrl)) {
       scopes.add(sourceUrl);
     }
@@ -9807,9 +9809,20 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     await _settingsService.saveChangeSourceLoadToc(enabled);
   }
 
+  int _normalizeChangeSourceDelaySeconds(int seconds) {
+    return seconds.clamp(0, 9999).toInt();
+  }
+
+  Future<void> _handleChangeSourceDelayChanged(int seconds) async {
+    final normalized = _normalizeChangeSourceDelaySeconds(seconds);
+    _changeSourceDelaySeconds = normalized;
+    await _settingsService.saveBatchChangeSourceDelay(normalized);
+  }
+
   Future<List<ReaderSourceSwitchCandidate>> _loadSourceSwitchCandidates({
     required Book currentBook,
     bool? loadTocEnabled,
+    int? sourceDelaySeconds,
   }) async {
     final enabledSources = _sourceRepo
         .getAllSources()
@@ -9834,6 +9847,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       currentBook: currentBook,
       sourcesToSearch: sortedEnabledSources,
       loadTocEnabled: loadTocEnabled ?? _changeSourceLoadToc,
+      sourceDelaySeconds: sourceDelaySeconds ?? _changeSourceDelaySeconds,
     );
   }
 
@@ -9842,6 +9856,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     required Book currentBook,
     required List<ReaderSourceSwitchCandidate> currentCandidates,
     bool? loadTocEnabled,
+    int? sourceDelaySeconds,
   }) async {
     if (currentCandidates.isEmpty) {
       return const <ReaderSourceSwitchCandidate>[];
@@ -9874,6 +9889,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       currentBook: currentBook,
       sourcesToSearch: scopedSources,
       loadTocEnabled: loadTocEnabled ?? _changeSourceLoadToc,
+      sourceDelaySeconds: sourceDelaySeconds ?? _changeSourceDelaySeconds,
     );
   }
 
@@ -9882,6 +9898,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     required Book currentBook,
     required List<BookSource> sourcesToSearch,
     required bool loadTocEnabled,
+    required int sourceDelaySeconds,
   }) async {
     final keyword = currentBook.title.trim();
     final authorKeyword = currentBook.author.trim();
@@ -9889,8 +9906,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       return const <ReaderSourceSwitchCandidate>[];
     }
 
+    final searchDelaySeconds = _normalizeChangeSourceDelaySeconds(
+      sourceDelaySeconds,
+    );
     final searchResults = <SearchResult>[];
-    for (final source in sourcesToSearch) {
+    for (var index = 0; index < sourcesToSearch.length; index++) {
+      final source = sourcesToSearch[index];
+      if (index > 0 && searchDelaySeconds > 0) {
+        await Future<void>.delayed(Duration(seconds: searchDelaySeconds));
+      }
       try {
         final list = await _ruleEngine.search(
           source,
@@ -9945,8 +9969,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       return;
     }
 
-    final candidates =
-        await _loadSourceSwitchCandidates(currentBook: currentBook);
+    final candidates = await _loadSourceSwitchCandidates(
+      currentBook: currentBook,
+      sourceDelaySeconds: _changeSourceDelaySeconds,
+    );
     if (!mounted) return;
     if (candidates.isEmpty) {
       _showToast('未找到可切换的匹配书源');
@@ -9958,13 +9984,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       keyword: keyword,
       candidates: candidates,
       loadTocEnabled: _changeSourceLoadToc,
+      changeSourceDelaySeconds: _changeSourceDelaySeconds,
       onLoadTocChanged: _handleChangeSourceLoadTocChanged,
+      onChangeSourceDelayChanged: _handleChangeSourceDelayChanged,
       onOpenSourceManage: _openSourceManageFromReader,
       onRefreshCandidates: (currentCandidates) {
         return _refreshSourceSwitchCandidatesByCurrentList(
           currentBook: currentBook,
           currentCandidates: currentCandidates,
           loadTocEnabled: _changeSourceLoadToc,
+          sourceDelaySeconds: _changeSourceDelaySeconds,
         );
       },
     );
@@ -9994,8 +10023,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       return;
     }
 
-    final candidates =
-        await _loadSourceSwitchCandidates(currentBook: currentBook);
+    final candidates = await _loadSourceSwitchCandidates(
+      currentBook: currentBook,
+      sourceDelaySeconds: _changeSourceDelaySeconds,
+    );
     if (!mounted) return;
     if (candidates.isEmpty) {
       _showToast('未找到可切换的匹配书源');
@@ -10007,7 +10038,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       keyword: keyword,
       candidates: candidates,
       loadTocEnabled: _changeSourceLoadToc,
+      changeSourceDelaySeconds: _changeSourceDelaySeconds,
       onLoadTocChanged: _handleChangeSourceLoadTocChanged,
+      onChangeSourceDelayChanged: _handleChangeSourceDelayChanged,
       onOpenSourceManage: _openSourceManageFromReader,
     );
     if (selected == null) return;

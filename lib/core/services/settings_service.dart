@@ -26,6 +26,7 @@ class SettingsService {
   static const String _keyTocUiUseReplace = 'toc_ui_use_replace';
   static const String _keyTocUiLoadWordCount = 'toc_ui_load_word_count';
   static const String _keyChangeSourceLoadToc = 'changeSourceLoadToc';
+  static const String _keyBatchChangeSourceDelay = 'batchChangeSourceDelay';
   static const String _keyBookPageAnimMap = 'book_page_anim_map';
   static const String _keyBookReSegmentMap = 'book_re_segment_map';
   static const String _keyBookImageStyleMap = 'book_image_style_map';
@@ -443,6 +444,18 @@ class SettingsService {
   Future<void> saveChangeSourceLoadToc(bool enabled) async {
     if (!_isInitialized) return;
     await _prefs.setBool(_keyChangeSourceLoadToc, enabled);
+  }
+
+  int getBatchChangeSourceDelay({int fallback = 0}) {
+    if (!_isInitialized) return fallback.clamp(0, 9999).toInt();
+    final value = _prefs.getInt(_keyBatchChangeSourceDelay) ?? fallback;
+    return value.clamp(0, 9999).toInt();
+  }
+
+  Future<void> saveBatchChangeSourceDelay(int seconds) async {
+    if (!_isInitialized) return;
+    final normalized = seconds.clamp(0, 9999).toInt();
+    await _prefs.setInt(_keyBatchChangeSourceDelay, normalized);
   }
 
   bool getAudioPlayUseWakeLock({bool fallback = false}) {

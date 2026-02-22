@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show SelectableText;
 import 'package:html/parser.dart' as html_parser;
 
 import '../models/dict_rule.dart';
