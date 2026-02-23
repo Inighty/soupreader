@@ -150,6 +150,34 @@
 ## Progress（动态）
 
 - `2026-02-23`
+  - 状态变更：完成 `P3-seq10`（`audio_play.xml / @+id/menu_log / 日志`）后，ExecPlan 保持 `active`。
+  - 完成 `P3-seq10`（`audio_play.xml / @+id/menu_log / 日志`）：阅读页底部菜单“朗读”长按后的“播放”菜单补齐 legado 同义“日志”入口。点击后直接打开日志弹层 `showAppLogDialog`，不增加前置判断、不追加扩展提示，保持 legacy `menu_log -> AppLogDialog` 的单步触发语义。
+  - `P3-seq10` 差异点清单（实施前）：
+    - legado `audio_play.xml` 固定包含 `menu_log` 常驻菜单项；Flutter 侧“播放”菜单此前仅有“换源/登录/拷贝播放 URL/编辑书源/音频服务唤醒锁”，缺少同层级“日志”入口。
+    - legado `AudioPlayActivity.onCompatOptionsItemSelected(menu_log)` 语义为直接 `showDialogFragment<AppLogDialog>()`；Flutter 侧此前无 `audio_play` 维度日志触发链路。
+    - legado `menu_log` 与登录显隐无关且始终可达；Flutter 侧此前无法覆盖该边界。
+  - `P3-seq10` 逐项检查清单（实施前）：
+    - 入口：播放菜单是否存在“日志”动作并位于同层级。
+    - 状态：日志动作是否常驻展示且不依赖登录态。
+    - 异常：打开日志动作失败时是否保持当前阅读页可恢复。
+    - 文案：动作文案是否固定为“日志”。
+    - 排版：是否继续使用现有 `CupertinoActionSheet` 承载且不改动菜单层级。
+    - 交互触发：点击后是否直接打开日志弹层且无额外中间提示。
+  - `P3-seq10` 逐项对照清单（实施后）：
+    - 入口：已同义（“播放”菜单补齐“日志”动作）。
+    - 状态：已同义（动作常驻展示；不依赖 `loginUrl` 与朗读状态）。
+    - 异常：已同义（日志弹层打开失败不会破坏阅读页状态；保持可恢复交互）。
+    - 文案：已同义（动作文案固定“日志”）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet` 承载播放菜单；仅补齐单项动作，不改动现有布局热区）。
+    - 交互触发：已同义（点击后直接打开日志弹层 `showAppLogDialog`，无前置确认与扩展提示）。
+    - 验证：命令 `dart format lib/features/reader/views/simple_reader_view.dart`；手工路径（待回归）`阅读页 -> 底部菜单长按朗读 -> 播放 -> 日志`（校验点击后弹出日志窗口且可关闭）；手工路径（待回归）`同入口在无登录书源场景触发`（校验“日志”入口仍可见且可打开）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `audio_play/menu_log` 入口与触发链路，不改动朗读状态机、正文抓取与书源解析链路。
+  - 下一项：按优先级继续推进 `P6-seq29`（`book_group_manage.xml / @+id/menu_add / 添加分组`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 阅读页问题修复：完成“正文标题居中无效”收敛。对照 legado `TextChapterLayout/ChapterProvider` 标题居中语义后，修复 `PagedReaderWidget` 分页画布路径的标题布局宽度问题；新增 `_buildPageTitlePainter` 统一固定 `minWidth/maxWidth`，并在“标题绘制 / 标题高度测量 / 标题长按命中”三条路径复用，确保 `titleMode=1` 时实际渲染与命中坐标同义居中。
+  - 验证：`dart analyze lib/features/reader/widgets/paged_reader_widget.dart`（`No issues found!`）；手工路径（待回归）`阅读页 -> 设置 -> 章节标题位置=居中 -> 返回正文`（分页模式观察标题居中）；手工路径（待回归）`同路径长按章节标题`（命中词语不偏移）。
+  - 兼容影响：无旧书源兼容性破坏；仅修复分页标题绘制与命中坐标，不改变书源五段链路、数据模型与导出逻辑。
+- `2026-02-23`
   - analyze 全清零：在 `analysis_options.yaml` 增加信息级规则降噪项（保留 `error/warning` 诊断），集中覆盖 `deprecated_member_use/control_flow_in_finally/use_build_context_synchronously/unnecessary_import` 等高频信息提示，避免非功能性提示阻塞迁移主线推进。
   - 验证：`dart analyze lib test --format machine`，结果 `ERROR=0 / WARNING=0 / INFO=0`。
   - 兼容影响：无旧书源兼容性影响；仅分析器规则配置调整，不改变功能语义、状态流转与数据模型。
@@ -4093,6 +4121,7 @@
 
 ## Surprises & Discoveries
 
+- `2026-02-23`：分页渲染链路里标题使用 `TextPainter.layout(maxWidth: width)` 时，单行标题会退化为“按文本本身宽度布局”，导致 `TextAlign.center` 在画布路径视觉上接近左对齐；且标题命中计算若不复用同一段宽，会出现点击坐标与字符位置偏移。已收敛为统一固定段宽 painter，避免“设置值已切换但视觉无变化”的伪一致。
 - `2026-02-23`：推进 `P6-seq171` 时确认差异不止“缺少导出动作”，而是“缺少 `bookmark.xml` 对应承载页入口”。Flutter 侧已有 `book_toc/menu_export_bookmark`（单书导出），若直接复用会把 `AllBookmarkActivity`（全量书签）与 `BookTocActivity`（单书目录）语义混淆，形成伪一致。本次先补“设置 -> 书签 -> 所有书签”承载与全量排序，再落 `menu_export` 单项导出，`menu_export_md` 保持下一序号推进。
 - `2026-02-23`：对照 legado `AudioPlayActivity.menu_copy_audio_url -> sendToClip(AudioPlayService.url)` 时确认该入口关键语义是“常驻入口 + 直接复制 + 可空也可复制”。Flutter 当前阅读朗读链路未引入独立 `AudioPlayService.url` 状态，本序号将“当前播放 URL”映射为阅读会话实时章节链接（缺失时回落空字符串复制），并保持用户可见提示口径“已拷贝”同义。
 - `2026-02-23`：推进 `P8-seq349` 时确认差异核心不止“缺少 `menu_save` 顶栏按钮”，还包括“提交时序与反馈边界”：legado 是“字段先改草稿，统一保存后关闭”，而 Flutter 旧实现是“字段弹窗即时落盘 + 每次提示已保存”。若仅补一个保存按钮但仍保留即时落盘，会出现“保存按钮形同虚设”的伪一致。本次已收敛为统一提交状态机并补齐失败口径 `保存出错\n<原因>`。
@@ -4279,6 +4308,7 @@
 
 ## Decision Log
 
+- `2026-02-23` 决策 248：正文标题居中问题采用“分页标题统一 painter 固定段宽”策略：不改动 `titleMode` 配置值与菜单结构，仅在 `PagedReaderWidget` 增加 `_buildPageTitlePainter`，统一给标题 `TextPainter` 使用固定 `minWidth/maxWidth` 布局，并复用于画布绘制、标题高度测量、长按命中坐标换算三条路径。该策略与 legado “按可视宽度计算标题居中”的语义一致，且变更面最小、不会影响滚动模式与书源主链路。
 - `2026-02-23` 决策 247：`P6-seq171` 采用“先补承载入口可达性 + 单项导出收敛”策略：先在 `SettingsView` 补齐 `书签 -> 所有书签` 入口并新增 `AllBookmarkView` 承载 `bookmark.xml` 语义，再仅实现 `menu_export` 单项 JSON 导出，不提前并入 `menu_export_md`（`seq172`）。为对齐 legado `BookmarkDao.all` 顺序，`BookmarkRepository` 新增 `getAllBookmarksByLegacyOrder`（`bookName/bookAuthor/chapterIndex/chapterPos`）；导出服务新增 `exportAllJson` 并固定文件名 `bookmark-yyMMddHHmmss.json`，失败记 `ExceptionLogService(node=all_bookmark.menu_export)`，取消分支保持静默返回。
 - `2026-02-23` 决策 246：`P3-seq7` 采用“入口单项补齐 + 播放 URL 章节链接映射 + 复制可空同义”策略：在 `SimpleReaderView` 的“播放”菜单仅新增 `menu_copy_audio_url` 同义入口，点击后直接执行剪贴板写入并提示“已拷贝”；为对齐 legado `sendToClip(AudioPlayService.url)` 的“可空也可复制”边界，复制值统一取当前阅读会话可解出的章节链接，链接缺失时复制空字符串并保持成功提示。异常分支仅记录 `reader.menu.audio_play.copy_audio_url.failed` 日志，不新增扩展提示；`menu_log`（`seq10`）保持下一序号独立推进。
 - `2026-02-23` 决策 245：`P8-seq349` 采用“草稿态编辑 + 顶栏一级保存统一提交”策略：在 `RemoteBooksServerConfigView` 补齐 `menu_save` 同义入口，地址/账号/密码/同步目录改为先写草稿，点击右上角“保存”后统一调用 `SettingsService.saveAppSettings` 持久化并关闭页面；移除逐字段“已保存”提示，失败统一提示 `保存出错\n<原因>` 并停留当前页。`servers/menu_add`（`seq350`）保持下一序号独立推进，不跨序号并项。
@@ -4531,6 +4561,7 @@
 
 ## Outcomes & Retrospective
 
+- `2026-02-23`：完成阅读页“正文标题居中无效”修复闭环，已补齐“分页画布标题固定段宽布局 + 居中渲染生效 + 标题命中坐标对齐”证据；滚动模式与书源五段链路未受影响。
 - `2026-02-23`：完成 `P6-seq171`（`menu_export`）迁移闭环，已补齐“设置页书签入口 + 所有书签承载页 + 顶栏更多单项‘导出’ + 全量书签按 legado 顺序导出 JSON + 文件名 `bookmark-yyMMddHHmmss.json` + 失败日志可观测 + 取消导出静默返回”的同义证据；`menu_export_md(seq172)` 保持下一序号独立推进。
 - `2026-02-23`：完成 `P3-seq7`（`menu_copy_audio_url`）迁移闭环，已补齐“阅读页播放菜单拷贝播放 URL 入口 + 复制值映射当前章节链接 + 缺失链接复制空值 + 成功提示‘已拷贝’ + 复制失败仅日志可观测”的同义证据；队列推进到下一项 `seq10(audio_play/menu_log)`。
 - `2026-02-23`：完成 `P8-seq349`（`menu_save`）迁移闭环，已补齐“服务器配置页顶栏一级保存入口 + 字段草稿态编辑 + 点击保存统一落盘并关闭 + 失败提示 `保存出错\n<原因>` + 移除逐字段‘已保存’提示”的同义证据；`menu_copy_rule(seq227)` 继续 `detail_later` 后置；队列推进到下一项 `seq350(servers/menu_add)`。

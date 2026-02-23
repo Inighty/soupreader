@@ -52,6 +52,7 @@ import '../../search/services/search_book_info_refresh_helper.dart';
 import '../../search/models/search_scope.dart';
 import '../../search/models/search_scope_group_helper.dart';
 import '../../search/views/search_book_info_view.dart';
+import '../../settings/views/app_log_dialog.dart';
 import '../../settings/views/exception_logs_view.dart';
 import '../models/reading_settings.dart';
 import '../services/chapter_title_display_helper.dart';
@@ -5889,6 +5890,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               _audioPlayUseWakeLock ? '✓ 音频服务唤醒锁' : '音频服务唤醒锁',
             ),
           ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(
+              sheetContext,
+              _ReaderAudioPlayMenuAction.log,
+            ),
+            child: const Text('日志'),
+          ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(sheetContext),
@@ -5925,7 +5933,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         }
         await _settingsService.saveAudioPlayUseWakeLock(next);
         return;
+      case _ReaderAudioPlayMenuAction.log:
+        await _openAppLogsFromAudioPlayMenu();
+        return;
     }
+  }
+
+  Future<void> _openAppLogsFromAudioPlayMenu() async {
+    await showAppLogDialog(context);
   }
 
   Future<void> _copyAudioPlayUrlFromMenu() async {
@@ -16158,6 +16173,7 @@ enum _ReaderAudioPlayMenuAction {
   copyAudioUrl,
   editSource,
   wakeLock,
+  log,
 }
 
 class _DuplicateTitleRemovalResult {

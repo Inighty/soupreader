@@ -306,7 +306,7 @@ priority_order,seq,phase,menu_file,item_id,title_zh,current_status,priority_tier
 305,203,P3,content_edit.xml,@+id/menu_copy_all,拷贝所有,pending,SUPPORT,4300,P3+detail_later
 306,206,P3,content_select_action.xml,@+id/menu_copy,copy,pending,SUPPORT,4300,P3+detail_later
 307,381,P3,speak_engine_edit.xml,@+id/menu_copy_source,拷贝源,pending,SUPPORT,4300,P3+detail_later
-308,10,P3,audio_play.xml,@+id/menu_log,日志,pending,SUPPORT,4200,P3+detail_later+non_core
+308,10,P3,audio_play.xml,@+id/menu_log,日志,done,SUPPORT,4200,P3+detail_later+non_core
 309,383,P3,speak_engine_edit.xml,@+id/menu_log,日志,pending,SUPPORT,4200,P3+detail_later+non_core
 310,384,P3,speak_engine_edit.xml,@+id/menu_help,帮助,pending,SUPPORT,4200,P3+detail_later+non_core
 311,357,P4,source_edit.xml,@+id/menu_copy_source,拷贝源,pending,SUPPORT,4100,P4+source_chain+detail_later

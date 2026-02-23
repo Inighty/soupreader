@@ -1400,20 +1400,18 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     if (titleData.shouldRenderTitle) {
       final title = titleData.title!.trim();
       if (title.isNotEmpty) {
-        final titlePainter = TextPainter(
-          text: TextSpan(text: title, style: _pageTitleStyle),
-          textDirection: ui.TextDirection.ltr,
-          textAlign: _pageTitleAlign,
-          maxLines: null,
-        )..layout(maxWidth: contentWidth);
+        final titlePainter = _buildPageTitlePainter(title, contentWidth);
 
         final titleStart = contentTop + _pageTitleTopSpacing;
         final titleEnd = titleStart + titlePainter.height;
         if (globalPosition.dy >= titleStart && globalPosition.dy <= titleEnd) {
           final localDx =
               (globalPosition.dx - contentLeft).clamp(0.0, contentWidth);
+          final localDy = (globalPosition.dy - titleStart)
+              .clamp(0.0, titlePainter.height)
+              .toDouble();
           final offset = titlePainter
-              .getPositionForOffset(Offset(localDx, 0))
+              .getPositionForOffset(Offset(localDx, localDy))
               .offset
               .clamp(0, title.length - 1)
               .toInt();
@@ -1470,12 +1468,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   double _titlePainterHeight(String title, double maxWidth) {
-    final painter = TextPainter(
-      text: TextSpan(text: title, style: _pageTitleStyle),
-      textDirection: ui.TextDirection.ltr,
-      textAlign: _pageTitleAlign,
-      maxLines: null,
-    )..layout(maxWidth: maxWidth);
+    final painter = _buildPageTitlePainter(title, maxWidth);
     return painter.height;
   }
 
@@ -2715,6 +2708,25 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   TextAlign get _pageTitleAlign =>
       widget.settings.titleMode == 1 ? TextAlign.center : TextAlign.left;
 
+  TextPainter _buildPageTitlePainter(String title, double maxWidth) {
+    final painter = TextPainter(
+      text: TextSpan(text: title, style: _pageTitleStyle),
+      textDirection: ui.TextDirection.ltr,
+      textAlign: _pageTitleAlign,
+      maxLines: null,
+    );
+    final layoutWidth = (maxWidth.isFinite ? maxWidth : 0.0)
+        .clamp(0.0, double.infinity)
+        .toDouble();
+    if (layoutWidth <= 0) {
+      painter.layout(minWidth: 0, maxWidth: 0);
+      return painter;
+    }
+    // 固定段宽以确保标题居中模式在画布渲染与命中计算中语义一致。
+    painter.layout(minWidth: layoutWidth, maxWidth: layoutWidth);
+    return painter;
+  }
+
   double get _pageTitleTopSpacing => (widget.settings.titleTopSpacing > 0
           ? widget.settings.titleTopSpacing
           : 20.0)
@@ -2761,12 +2773,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       return 0;
     }
     final topSpacing = _pageTitleTopSpacing.clamp(0.0, maxHeight);
-    final titlePainter = TextPainter(
-      text: TextSpan(text: title, style: _pageTitleStyle),
-      textDirection: ui.TextDirection.ltr,
-      textAlign: _pageTitleAlign,
-      maxLines: null,
-    )..layout(maxWidth: maxWidth);
+    final titlePainter = _buildPageTitlePainter(title, maxWidth);
     final restHeight = (maxHeight - topSpacing).clamp(0.0, maxHeight);
     final paintableTitleHeight = titlePainter.height.clamp(0.0, restHeight);
     titlePainter.paint(canvas, Offset(origin.dx, origin.dy + topSpacing));
