@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/cookie_store.dart';
+import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/source_login_store.dart';
 import '../models/book_source.dart';
 import '../services/source_cookie_scope_resolver.dart';
@@ -190,18 +191,7 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
 
   Future<void> _submit() async {
     final key = widget.source.bookSourceUrl.trim();
-    if (key.isEmpty) {
-      await _showMessage('请先填写书源地址');
-      return;
-    }
-
-    final loginData = <String, String>{};
-    for (final row in _rows) {
-      if (!row.isTextLike) continue;
-      final text = (_controllers[row.name]?.text ?? '').trim();
-      if (text.isEmpty) continue;
-      loginData[row.name] = text;
-    }
+    final loginData = _collectLoginData();
 
     if (loginData.isEmpty) {
       await SourceLoginStore.removeLoginInfo(key);
@@ -210,21 +200,48 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
       return;
     }
 
-    await SourceLoginStore.putLoginInfo(key, jsonEncode(loginData));
-    final result = await _scriptService.runLoginScript(
-      source: widget.source,
-      loginData: loginData,
-    );
-    if (!mounted) return;
-    if (!result.success) {
-      await _showMessage(result.message);
-      return;
-    }
-    if (result.message.trim().isNotEmpty) {
-      await _showMessage(result.message);
+    try {
+      await SourceLoginStore.putLoginInfo(key, jsonEncode(loginData));
+      final result = await _scriptService.runLoginScript(
+        source: widget.source,
+        loginData: loginData,
+      );
       if (!mounted) return;
+
+      if (!result.success) {
+        final detail = result.message.trim();
+        final errorMessage = detail.isEmpty ? '登录出错' : '登录出错\n$detail';
+        ExceptionLogService().record(
+          node: 'source.login.menu_ok',
+          message: '登录脚本执行失败',
+          error: detail.isEmpty ? null : detail,
+          context: <String, dynamic>{
+            'sourceKey': key,
+            'sourceName': widget.source.bookSourceName,
+          },
+        );
+        await _showMessage(errorMessage);
+        return;
+      }
+
+      // 对齐 legado SourceLoginDialog.menu_ok：成功后仅提示“成功”并关闭页面。
+      await _showMessage('成功');
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'source.login.menu_ok',
+        message: '登录出错',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'sourceKey': key,
+          'sourceName': widget.source.bookSourceName,
+        },
+      );
+      if (!mounted) return;
+      await _showMessage('登录出错\n$error');
     }
-    Navigator.pop(context);
   }
 
   Future<void> _handleActionRow(SourceLoginUiRow row) async {
@@ -241,13 +258,7 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
       return;
     }
 
-    final loginData = <String, String>{};
-    for (final item in _rows) {
-      if (!item.isTextLike) continue;
-      final text = (_controllers[item.name]?.text ?? '').trim();
-      if (text.isEmpty) continue;
-      loginData[item.name] = text;
-    }
+    final loginData = _collectLoginData();
     final result = await _scriptService.runButtonScript(
       source: widget.source,
       loginData: loginData,
@@ -257,6 +268,15 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
     if (result.message.trim().isNotEmpty) {
       await _showMessage(result.message);
     }
+  }
+
+  Map<String, String> _collectLoginData() {
+    final loginData = <String, String>{};
+    for (final row in _rows) {
+      if (!row.isTextLike) continue;
+      loginData[row.name] = _controllers[row.name]?.text ?? '';
+    }
+    return loginData;
   }
 
   Widget _buildRow(SourceLoginUiRow row) {

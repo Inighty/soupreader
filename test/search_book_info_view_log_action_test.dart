@@ -61,7 +61,7 @@ Future<void> _invokeLogAction(WidgetTester tester) async {
   expect(logAction, findsOneWidget);
   final action = tester.widget<CupertinoActionSheetAction>(logAction);
   await tester.runAsync(() async {
-    action.onPressed?.call();
+    action.onPressed();
     await Future<void>.delayed(const Duration(milliseconds: 120));
   });
   await tester.pumpAndSettle();

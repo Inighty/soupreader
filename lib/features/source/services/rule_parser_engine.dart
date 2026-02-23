@@ -3866,6 +3866,7 @@ class RuleParserEngine {
     int page = 1,
     bool Function(String name, String author)? filter,
     bool Function(int size)? shouldBreak,
+    CancelToken? cancelToken,
   }) async {
     _clearRuntimeVariables();
     final resolved = _resolveBookListRuleForStage(source, isSearch: true);
@@ -3895,6 +3896,7 @@ class RuleParserEngine {
         enabledCookieJar: source.enabledCookieJar,
         sourceKey: source.bookSourceUrl,
         concurrentRate: source.concurrentRate,
+        cancelToken: cancelToken,
         onFinalUrl: (finalUrl) {
           if (finalUrl.trim().isNotEmpty) {
             responseUrl = finalUrl.trim();
@@ -5227,6 +5229,7 @@ class RuleParserEngine {
     BookSource source,
     String bookUrl, {
     bool clearRuntimeVariables = true,
+    CancelToken? cancelToken,
   }) async {
     if (clearRuntimeVariables) {
       _clearRuntimeVariables();
@@ -5246,6 +5249,7 @@ class RuleParserEngine {
         enabledCookieJar: source.enabledCookieJar,
         sourceKey: source.bookSourceUrl,
         concurrentRate: source.concurrentRate,
+        cancelToken: cancelToken,
         onFinalUrl: (finalUrl) {
           if (finalUrl.trim().isNotEmpty) {
             parseBaseUrl = finalUrl.trim();
@@ -5620,6 +5624,7 @@ class RuleParserEngine {
     BookSource source,
     String tocUrl, {
     bool clearRuntimeVariables = true,
+    CancelToken? cancelToken,
   }) async {
     if (clearRuntimeVariables) {
       _clearRuntimeVariables();
@@ -5658,6 +5663,7 @@ class RuleParserEngine {
           enabledCookieJar: source.enabledCookieJar,
           sourceKey: source.bookSourceUrl,
           concurrentRate: source.concurrentRate,
+          cancelToken: cancelToken,
         );
         if (response == null) break;
 
@@ -6144,6 +6150,7 @@ class RuleParserEngine {
     String chapterUrl, {
     String? nextChapterUrl,
     bool clearRuntimeVariables = true,
+    CancelToken? cancelToken,
   }) async {
     if (clearRuntimeVariables) {
       _clearRuntimeVariables();
@@ -6181,6 +6188,7 @@ class RuleParserEngine {
           enabledCookieJar: source.enabledCookieJar,
           sourceKey: source.bookSourceUrl,
           concurrentRate: source.concurrentRate,
+          cancelToken: cancelToken,
         );
         if (response == null) break;
 
@@ -6798,6 +6806,7 @@ class RuleParserEngine {
     bool? enabledCookieJar,
     String? sourceKey,
     String? concurrentRate,
+    CancelToken? cancelToken,
     void Function(String finalUrl)? onFinalUrl,
     void Function(bool isRedirect)? onIsRedirect,
   }) async {
@@ -6877,6 +6886,7 @@ class RuleParserEngine {
           method: method,
           body: body,
           retry: retry,
+          cancelToken: cancelToken,
         );
       } finally {
         _releaseConcurrentRatePermit(permit.record);
@@ -7968,11 +7978,15 @@ class RuleParserEngine {
     return _queryAllElements(ctx, css);
   }
 
-  @visibleForTesting
-  String debugParseRule(dynamic ctx, String rule, String baseUrl) {
+  String parseRuleForContext(dynamic ctx, String rule, String baseUrl) {
     final root = ctx is Document ? ctx.documentElement : ctx;
     if (root is! Element) return '';
     return _parseRule(root, rule, baseUrl);
+  }
+
+  @visibleForTesting
+  String debugParseRule(dynamic ctx, String rule, String baseUrl) {
+    return parseRuleForContext(ctx, rule, baseUrl);
   }
 
   @visibleForTesting

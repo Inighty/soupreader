@@ -131,7 +131,7 @@ Future<void> _tapSheetAction(
   );
   expect(action, findsOneWidget);
   final actionWidget = tester.widget<CupertinoActionSheetAction>(action);
-  actionWidget.onPressed?.call();
+  actionWidget.onPressed();
   await tester.pumpAndSettle();
 }
 

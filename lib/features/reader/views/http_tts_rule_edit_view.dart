@@ -8,7 +8,7 @@ import '../../source/services/source_login_script_service.dart';
 import '../../source/services/source_login_ui_helper.dart';
 import '../../source/services/source_login_url_resolver.dart';
 import '../../source/views/source_login_form_view.dart';
-import '../../source/views/source_web_verify_view.dart';
+import '../../source/views/source_login_webview_view.dart';
 import '../models/http_tts_rule.dart';
 import '../services/http_tts_rule_store.dart';
 
@@ -366,7 +366,10 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
 
       await Navigator.of(context).push(
         CupertinoPageRoute<void>(
-          builder: (_) => SourceWebVerifyView(initialUrl: resolvedUrl),
+          builder: (_) => SourceLoginWebViewView(
+            source: loginSource,
+            initialUrl: resolvedUrl,
+          ),
         ),
       );
     } catch (error) {

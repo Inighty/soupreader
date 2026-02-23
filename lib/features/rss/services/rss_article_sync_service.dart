@@ -384,7 +384,7 @@ class RssArticleFetchService {
       source: parserSource,
       bookUrl: sortUrl,
     );
-    final next = info.detail?.tocUrl?.trim() ?? '';
+    final next = info.detail?.tocUrl.trim() ?? '';
     if (next.isEmpty) return null;
     return _absoluteUrl(sortUrl, next);
   }

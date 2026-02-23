@@ -85,8 +85,61 @@ import WebKit
 
       cookiesChannel.setMethodCallHandler { call, result in
         let store = WKWebsiteDataStore.default().httpCookieStore
+        func filterCookies(
+          _ cookies: [HTTPCookie],
+          domain: String,
+          includeSubdomains: Bool
+        ) -> [HTTPCookie] {
+          let trimmed = domain.trimmingCharacters(in: .whitespacesAndNewlines)
+          guard !trimmed.isEmpty else { return cookies }
+          return cookies.filter { cookie in
+            let d = cookie.domain.trimmingCharacters(in: .whitespacesAndNewlines)
+            if d == trimmed { return true }
+            if includeSubdomains {
+              if d.hasSuffix("." + trimmed) { return true }
+              if trimmed.hasSuffix("." + d) { return true }
+            }
+            return false
+          }
+        }
+
+        func serializeCookies(_ cookies: [HTTPCookie]) -> [[String: Any]] {
+          cookies.map { c in
+            var m: [String: Any] = [
+              "name": c.name,
+              "value": c.value,
+              "domain": c.domain,
+              "path": c.path,
+              "secure": c.isSecure,
+              "httpOnly": c.isHTTPOnly
+            ]
+            if let exp = c.expiresDate {
+              m["expiresMs"] = Int(exp.timeIntervalSince1970 * 1000.0)
+            }
+            return m
+          }
+        }
 
         switch call.method {
+        case "getCookiesForUrl":
+          guard let args = call.arguments as? [String: Any],
+                let urlText = args["url"] as? String,
+                let url = URL(string: urlText),
+                let host = url.host
+          else {
+            result(FlutterError(code: "ARGUMENT_ERROR", message: "Missing url", details: nil))
+            return
+          }
+          let includeSubdomains = args["includeSubdomains"] as? Bool ?? true
+          store.getAllCookies { cookies in
+            let filtered = filterCookies(
+              cookies,
+              domain: host,
+              includeSubdomains: includeSubdomains
+            )
+            result(serializeCookies(filtered))
+          }
+
         case "getCookies":
           guard let args = call.arguments as? [String: Any],
                 let domain = args["domain"] as? String
@@ -96,33 +149,12 @@ import WebKit
           }
           let includeSubdomains = args["includeSubdomains"] as? Bool ?? true
           store.getAllCookies { cookies in
-            let trimmed = domain.trimmingCharacters(in: .whitespacesAndNewlines)
-            let filtered = cookies.filter { cookie in
-              let d = cookie.domain.trimmingCharacters(in: .whitespacesAndNewlines)
-              if trimmed.isEmpty { return true }
-              if d == trimmed { return true }
-              if includeSubdomains {
-                if d.hasSuffix("." + trimmed) { return true }
-                if trimmed.hasSuffix("." + d) { return true }
-              }
-              return false
-            }
-
-            let out: [[String: Any]] = filtered.map { c in
-              var m: [String: Any] = [
-                "name": c.name,
-                "value": c.value,
-                "domain": c.domain,
-                "path": c.path,
-                "secure": c.isSecure,
-                "httpOnly": c.isHTTPOnly
-              ]
-              if let exp = c.expiresDate {
-                m["expiresMs"] = Int(exp.timeIntervalSince1970 * 1000.0)
-              }
-              return m
-            }
-            result(out)
+            let filtered = filterCookies(
+              cookies,
+              domain: domain,
+              includeSubdomains: includeSubdomains
+            )
+            result(serializeCookies(filtered))
           }
 
         case "clearAllCookies":

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../reader/views/speak_engine_manage_view.dart';
+import '../../reader/views/txt_toc_rule_manage_view.dart';
 import '../../rss/views/rss_source_manage_view.dart';
 import '../../source/views/source_list_view.dart';
 import 'settings_placeholders.dart';
@@ -81,7 +82,7 @@ class SourceManagementView extends StatelessWidget {
                 onTap: () {
                   Navigator.of(context).push(
                     CupertinoPageRoute<void>(
-                      builder: (context) => const SourceListView(),
+                      builder: (context) => const TxtTocRuleManageView(),
                     ),
                   );
                 },

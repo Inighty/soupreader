@@ -10,6 +10,7 @@ import '../models/rss_source.dart';
 import '../services/rss_source_manage_helper.dart';
 import '../services/rss_subscription_helper.dart';
 import 'rss_articles_placeholder_view.dart';
+import 'rule_subscription_view.dart';
 import 'rss_source_edit_view.dart';
 import 'rss_source_manage_view.dart';
 
@@ -116,6 +117,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
                   ],
                 ),
               ),
+              _buildRuleSubscriptionEntry(),
               Expanded(
                 child: visible.isEmpty
                     ? _buildEmptyState(enabledCount)
@@ -148,6 +150,30 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
             child: Text(action),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRuleSubscriptionEntry() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      decoration: BoxDecoration(
+        color: CupertinoColors.secondarySystemGroupedBackground
+            .resolveFrom(context),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: CupertinoListTile.notched(
+        leading: const Icon(CupertinoIcons.square_list),
+        title: const Text('规则订阅'),
+        additionalInfo: const Text(
+          '导入地址',
+          style: TextStyle(
+            fontSize: 12,
+            color: CupertinoColors.secondaryLabel,
+          ),
+        ),
+        trailing: const CupertinoListTileChevron(),
+        onTap: _openRuleSubscription,
       ),
     );
   }
@@ -264,6 +290,15 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
     await Navigator.of(context).push<void>(
       CupertinoPageRoute<void>(
         builder: (_) => const RssFavoritesPlaceholderView(),
+      ),
+    );
+  }
+
+  Future<void> _openRuleSubscription() async {
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      CupertinoPageRoute<void>(
+        builder: (_) => const RuleSubscriptionView(),
       ),
     );
   }

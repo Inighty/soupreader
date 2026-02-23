@@ -36,7 +36,7 @@ import '../../search/models/search_scope_group_helper.dart';
 import 'source_debug_legacy_view.dart';
 import 'source_edit_legacy_view.dart';
 import 'source_login_form_view.dart';
-import 'source_web_verify_view.dart';
+import 'source_login_webview_view.dart';
 
 enum _SourceSortMode {
   manual,
@@ -61,22 +61,6 @@ class _ImportSelectionDecision {
 
   final List<SourceImportCandidate> candidates;
   final SourceImportSelectionPolicy policy;
-}
-
-enum _CheckKeywordDialogAction {
-  cancel,
-  openSettings,
-  start,
-}
-
-class _CheckKeywordDialogResult {
-  const _CheckKeywordDialogResult({
-    required this.action,
-    required this.keyword,
-  });
-
-  final _CheckKeywordDialogAction action;
-  final String keyword;
 }
 
 class _CheckSettings {
@@ -291,7 +275,7 @@ class _SourceListViewState extends State<SourceListView> {
     });
     if (_searchController.text.trim().isEmpty && hasInvalidGroup) {
       setState(() => _searchController.text = '失效');
-      _showToastMessage('发现有失效书源，已自动筛选');
+      _showToastMessage('发现有失效书源，已为您自动筛选！');
     }
   }
 
@@ -1014,21 +998,21 @@ class _SourceListViewState extends State<SourceListView> {
             child: const Text('禁用发现'),
             onPressed: () {
               Navigator.pop(sheetContext);
-              _batchSetExplore(visibleSources, false);
+              _batchDisableExplore(visibleSources);
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('置顶'),
+            child: const Text('置顶所选'),
             onPressed: () {
               Navigator.pop(sheetContext);
-              _batchMoveToTopBottom(visibleSources, true);
+              _batchMoveSelectionToTop(visibleSources);
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('置底'),
+            child: const Text('置底所选'),
             onPressed: () {
               Navigator.pop(sheetContext);
-              _batchMoveToTopBottom(visibleSources, false);
+              _batchMoveSelectionToBottom(visibleSources);
             },
           ),
           CupertinoActionSheetAction(
@@ -1039,7 +1023,7 @@ class _SourceListViewState extends State<SourceListView> {
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('分享所选'),
+            child: const Text('分享选中源'),
             onPressed: () {
               Navigator.pop(sheetContext);
               _batchShareSelected(visibleSources);
@@ -1540,32 +1524,24 @@ class _SourceListViewState extends State<SourceListView> {
     await _sourceRepo.addSources(updated);
   }
 
-  Future<void> _batchMoveToTopBottom(
-    List<BookSource> allSources,
-    bool toTop,
-  ) async {
+  Future<void> _batchMoveSelectionToTop(List<BookSource> allSources) async {
     final selected = _selectedSources(allSources);
-    if (selected.isEmpty) {
-      _showMessage('当前未选择书源');
-      return;
-    }
-    await _moveSourcesToTopBottom(selected, toTop: toTop);
-    _showMessage('已${toTop ? '置顶' : '置底'} ${selected.length} 条书源');
+    if (selected.isEmpty) return;
+    await _moveSourcesToTopBottom(selected, toTop: true);
+  }
+
+  Future<void> _batchMoveSelectionToBottom(List<BookSource> allSources) async {
+    final selected = _selectedSources(allSources);
+    if (selected.isEmpty) return;
+    await _moveSourcesToTopBottom(selected, toTop: false);
   }
 
   Future<void> _batchCheckSelected(List<BookSource> allSources) async {
     final selected = _selectedSources(allSources);
-    if (selected.isEmpty) {
-      _showMessage('当前未选择书源');
-      return;
-    }
+    if (selected.isEmpty) return;
     final keyword = await _askCheckKeyword();
     if (keyword == null) return;
     final checkSettings = _loadCheckSettings();
-    if (!checkSettings.checkSearch && !checkSettings.checkDiscovery) {
-      _showMessage('至少启用一种校验方式');
-      return;
-    }
     final startResult = await _checkTaskService.start(
       SourceCheckTaskConfig(
         includeDisabled: true,
@@ -1581,19 +1557,10 @@ class _SourceListViewState extends State<SourceListView> {
       ),
       forceRestart: true,
     );
-    if (startResult.type == SourceCheckStartType.runningOtherTask) {
-      _showMessage(startResult.message);
-      return;
+    if (startResult.type == SourceCheckStartType.runningOtherTask ||
+        startResult.type == SourceCheckStartType.attachedExisting) {
+      _showToastMessage('已有书源在校验,等完成后再试');
     }
-    if (startResult.type == SourceCheckStartType.emptySource) {
-      _showMessage(startResult.message);
-      return;
-    }
-    if (startResult.type == SourceCheckStartType.attachedExisting) {
-      _showMessage(startResult.message);
-      return;
-    }
-    _showMessage('已开始校验（${selected.length} 条）');
   }
 
   GlobalKey _itemKeyForUrl(String url) {
@@ -1775,22 +1742,14 @@ class _SourceListViewState extends State<SourceListView> {
     );
   }
 
-  Future<void> _batchSetExplore(
-      List<BookSource> allSources, bool enabled) async {
-    final targets = _selectedSources(allSources)
-        .where((s) => s.enabledExplore != enabled)
-        .toList(growable: false);
-    if (targets.isEmpty) {
-      _showMessage(enabled ? '所选书源发现已全部启用' : '所选书源发现已全部禁用');
-      return;
-    }
-
+  Future<void> _batchDisableExplore(List<BookSource> allSources) async {
+    final targets = _selectedSources(allSources);
+    if (targets.isEmpty) return;
     await Future.wait(
       targets.map(
-        (s) => _sourceRepo.updateSource(s.copyWith(enabledExplore: enabled)),
+        (s) => _sourceRepo.updateSource(s.copyWith(enabledExplore: false)),
       ),
     );
-    _showMessage('${enabled ? '已启用' : '已禁用'} ${targets.length} 条书源的发现');
   }
 
   Future<void> _batchAddGroup(List<BookSource> allSources) async {
@@ -1914,30 +1873,18 @@ class _SourceListViewState extends State<SourceListView> {
 
   Future<void> _batchShareSelected(List<BookSource> allSources) async {
     final sources = _resolveExportShareSources(allSources);
-    if (sources.isEmpty) {
-      _showMessage('当前未选择书源');
-      return;
-    }
+    if (sources.isEmpty) return;
     try {
       final file = await _importExportService.exportToShareFile(sources);
-      if (file != null) {
-        await SharePlus.instance.share(
-          ShareParams(
-            files: [XFile(file.path, mimeType: 'application/json')],
-            text: 'SoupReader 书源（${sources.length} 条）',
-            subject: 'bookSource.json',
-          ),
-        );
-        _showMessage('已打开系统分享（${sources.length} 条书源）');
-        return;
-      }
+      if (file == null) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'text/*')],
+        ),
+      );
     } catch (_) {
-      // ignore and fallback
+      // 对齐 legado Context.share(file)：分享异常不追加提示。
     }
-
-    final text = LegadoJson.encode(sources.map((s) => s.toJson()).toList());
-    await Clipboard.setData(ClipboardData(text: text));
-    _showMessage('系统分享不可用，已复制 ${sources.length} 条书源 JSON');
   }
 
   Future<List<BookSource>> _loadAllSourcesForMutation() async {
@@ -2355,57 +2302,35 @@ class _SourceListViewState extends State<SourceListView> {
     }
   }
 
-  Future<_CheckKeywordDialogResult?> _showCheckKeywordDialog(
+  Future<String?> _showCheckKeywordDialog(
     String initialKeyword,
   ) async {
     final controller = TextEditingController(text: initialKeyword);
     try {
-      return await showCupertinoDialog<_CheckKeywordDialogResult>(
+      return await showCupertinoDialog<String>(
         context: context,
         builder: (ctx) => CupertinoAlertDialog(
-          title: const Text('校验关键词'),
+          title: const Text('搜索关键词'),
           content: Padding(
             padding: const EdgeInsets.only(top: 12),
             child: CupertinoTextField(
               controller: controller,
-              placeholder: '输入搜索关键词',
+              placeholder: 'search word',
             ),
           ),
           actions: [
             CupertinoDialogAction(
-              onPressed: () {
-                Navigator.pop(
-                  ctx,
-                  _CheckKeywordDialogResult(
-                    action: _CheckKeywordDialogAction.cancel,
-                    keyword: controller.text,
-                  ),
-                );
-              },
+              onPressed: () => Navigator.pop(ctx),
               child: const Text('取消'),
             ),
             CupertinoDialogAction(
-              onPressed: () {
-                Navigator.pop(
-                  ctx,
-                  _CheckKeywordDialogResult(
-                    action: _CheckKeywordDialogAction.openSettings,
-                    keyword: controller.text,
-                  ),
-                );
+              onPressed: () async {
+                await _showCheckSettingsDialog();
               },
               child: const Text('校验设置'),
             ),
             CupertinoDialogAction(
-              onPressed: () {
-                Navigator.pop(
-                  ctx,
-                  _CheckKeywordDialogResult(
-                    action: _CheckKeywordDialogAction.start,
-                    keyword: controller.text,
-                  ),
-                );
-              },
+              onPressed: () => Navigator.pop(ctx, controller.text),
               child: const Text('开始校验'),
             ),
           ],
@@ -2422,26 +2347,14 @@ class _SourceListViewState extends State<SourceListView> {
     }
     final cached = (_settingsGet(_prefCheckKeyword, defaultValue: '我的') ?? '我的')
         .toString();
-    var draft = cached;
-    while (mounted) {
-      final dialogResult = await _showCheckKeywordDialog(draft);
-      if (dialogResult == null ||
-          dialogResult.action == _CheckKeywordDialogAction.cancel) {
-        return null;
-      }
-      draft = dialogResult.keyword;
-      if (dialogResult.action == _CheckKeywordDialogAction.openSettings) {
-        await _showCheckSettingsDialog();
-        continue;
-      }
-      final normalized = dialogResult.keyword.trim();
-      final keyword = normalized.isNotEmpty
-          ? normalized
-          : (cached.trim().isNotEmpty ? cached.trim() : '我的');
-      await _settingsPut(_prefCheckKeyword, keyword);
-      return keyword;
-    }
-    return null;
+    final keywordInput = await _showCheckKeywordDialog(cached);
+    if (keywordInput == null) return null;
+    final normalized = keywordInput.trim();
+    final keyword = normalized.isNotEmpty
+        ? normalized
+        : (cached.trim().isNotEmpty ? cached.trim() : '我的');
+    await _settingsPut(_prefCheckKeyword, keyword);
+    return keyword;
   }
 
   Future<void> _showSourceManageHelp() async {
@@ -2571,7 +2484,10 @@ class _SourceListViewState extends State<SourceListView> {
 
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceWebVerifyView(initialUrl: resolvedUrl),
+        builder: (_) => SourceLoginWebViewView(
+          source: source,
+          initialUrl: resolvedUrl,
+        ),
       ),
     );
   }

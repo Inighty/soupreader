@@ -6,6 +6,7 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
+import '../../reader/views/dict_rule_manage_view.dart';
 import '../../replace/views/replace_rule_list_view.dart';
 
 class TextRulesSettingsView extends StatefulWidget {
@@ -65,6 +66,11 @@ class _TextRulesSettingsViewState extends State<TextRulesSettingsView> {
                 trailing: const CupertinoListTileChevron(),
                 onTap: _openReplaceRules,
               ),
+              CupertinoListTile.notched(
+                title: const Text('字典规则'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _openDictRules,
+              ),
             ],
           ),
           CupertinoListSection.insetGrouped(
@@ -83,6 +89,14 @@ class _TextRulesSettingsViewState extends State<TextRulesSettingsView> {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
         builder: (context) => const ReplaceRuleListView(),
+      ),
+    );
+  }
+
+  Future<void> _openDictRules() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (context) => const DictRuleManageView(),
       ),
     );
   }

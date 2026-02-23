@@ -6,7 +6,18 @@ class WebViewCookieBridge {
   static const MethodChannel _channel =
       MethodChannel('soupreader/webview_cookies');
 
-  static bool get isSupported => Platform.isIOS;
+  static bool get isSupported => Platform.isIOS || Platform.isAndroid;
+
+  static Future<List<Cookie>> getCookiesForUrl(String url) async {
+    if (!isSupported) return const <Cookie>[];
+    final raw = await _channel.invokeMethod<List<dynamic>>(
+      'getCookiesForUrl',
+      <String, dynamic>{
+        'url': url,
+      },
+    );
+    return _decodeCookies(raw);
+  }
 
   static Future<List<Cookie>> getCookiesForDomain(
     String domain, {
@@ -20,8 +31,11 @@ class WebViewCookieBridge {
         'includeSubdomains': includeSubdomains,
       },
     );
-    if (raw == null) return const <Cookie>[];
+    return _decodeCookies(raw);
+  }
 
+  static List<Cookie> _decodeCookies(List<dynamic>? raw) {
+    if (raw == null) return const <Cookie>[];
     final out = <Cookie>[];
     for (final item in raw) {
       if (item is! Map) continue;
@@ -44,8 +58,7 @@ class WebViewCookieBridge {
       if (expiresMs is int) {
         cookie.expires = DateTime.fromMillisecondsSinceEpoch(expiresMs);
       } else if (expiresMs is num) {
-        cookie.expires =
-            DateTime.fromMillisecondsSinceEpoch(expiresMs.toInt());
+        cookie.expires = DateTime.fromMillisecondsSinceEpoch(expiresMs.toInt());
       } else if (expiresMs is String) {
         final parsed = int.tryParse(expiresMs);
         if (parsed != null) {
@@ -69,4 +82,3 @@ class WebViewCookieBridge {
     return cookies.map((c) => '${c.name}=${c.value}').join('; ');
   }
 }
-

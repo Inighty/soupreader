@@ -78,6 +78,58 @@ class ReaderBookmarkExportService {
     );
   }
 
+  /// 对齐 legado `AllBookmarkViewModel.exportBookmark`：
+  /// 使用全量书签集合导出 JSON，文件名为 `bookmark-yyMMddHHmmss.json`。
+  Future<ReaderBookmarkExportResult> exportAllJson({
+    required List<BookmarkEntity> bookmarks,
+    DateTime? now,
+  }) {
+    if (bookmarks.isEmpty) {
+      return Future<ReaderBookmarkExportResult>.value(
+        const ReaderBookmarkExportResult(
+          message: '暂无书签可导出',
+        ),
+      );
+    }
+    final ordered = List<BookmarkEntity>.from(bookmarks);
+    final content = _buildJsonContent(ordered);
+    return _saveExportContent(
+      dialogTitle: '导出书签',
+      extension: 'json',
+      fileName: _buildTimestampFileName(
+        extension: 'json',
+        timestamp: now ?? DateTime.now(),
+      ),
+      content: content,
+    );
+  }
+
+  /// 对齐 legado `AllBookmarkViewModel.exportBookmarkMd`：
+  /// 使用全量书签集合导出 Markdown，文件名为 `bookmark-yyMMddHHmmss.md`。
+  Future<ReaderBookmarkExportResult> exportAllMarkdown({
+    required List<BookmarkEntity> bookmarks,
+    DateTime? now,
+  }) {
+    if (bookmarks.isEmpty) {
+      return Future<ReaderBookmarkExportResult>.value(
+        const ReaderBookmarkExportResult(
+          message: '暂无书签可导出',
+        ),
+      );
+    }
+    final ordered = List<BookmarkEntity>.from(bookmarks);
+    final content = _buildAllBookmarksMarkdownContent(ordered);
+    return _saveExportContent(
+      dialogTitle: '导出书签',
+      extension: 'md',
+      fileName: _buildTimestampFileName(
+        extension: 'md',
+        timestamp: now ?? DateTime.now(),
+      ),
+      content: content,
+    );
+  }
+
   Future<ReaderBookmarkExportResult> _export({
     required ReaderBookmarkExportFormat format,
     required String bookTitle,
@@ -119,33 +171,12 @@ class ReaderBookmarkExportService {
       extension: extension,
     );
 
-    try {
-      if (kIsWeb) {
-        await _copyText(content);
-        return const ReaderBookmarkExportResult(
-          success: true,
-          message: '已复制导出内容到剪贴板',
-        );
-      }
-      final outputPath = await _saveFile(
-        dialogTitle: dialogTitle,
-        fileName: outputFileName,
-        allowedExtensions: <String>[extension],
-      );
-      if (outputPath == null || outputPath.trim().isEmpty) {
-        return const ReaderBookmarkExportResult(cancelled: true);
-      }
-      final normalizedPath = outputPath.trim();
-      await _writeFile(path: normalizedPath, content: content);
-      return ReaderBookmarkExportResult(
-        success: true,
-        outputPath: normalizedPath,
-      );
-    } catch (e) {
-      return ReaderBookmarkExportResult(
-        message: '导出失败：$e',
-      );
-    }
+    return _saveExportContent(
+      dialogTitle: dialogTitle,
+      extension: extension,
+      fileName: outputFileName,
+      content: content,
+    );
   }
 
   String _buildJsonContent(List<BookmarkEntity> bookmarks) {
@@ -193,6 +224,35 @@ class ReaderBookmarkExportService {
     return buffer.toString();
   }
 
+  /// 对齐 legado `AllBookmarkViewModel.exportBookmarkMd`：
+  /// 按全量序列输出分组标题、章节、原文、摘要。
+  String _buildAllBookmarksMarkdownContent(List<BookmarkEntity> bookmarks) {
+    var currentName = '';
+    var currentAuthor = '';
+    final buffer = StringBuffer();
+    for (final bookmark in bookmarks) {
+      if (bookmark.bookName != currentName &&
+          bookmark.bookAuthor != currentAuthor) {
+        currentName = bookmark.bookName;
+        currentAuthor = bookmark.bookAuthor;
+        buffer
+          ..writeln('## ${bookmark.bookName} ${bookmark.bookAuthor}')
+          ..writeln();
+      }
+      final text = bookmark.content;
+      buffer
+        ..writeln('#### ${bookmark.chapterTitle}')
+        ..writeln()
+        ..writeln('###### 原文')
+        ..writeln(' $text')
+        ..writeln()
+        ..writeln('###### 摘要')
+        ..writeln(' $text')
+        ..writeln();
+    }
+    return buffer.toString();
+  }
+
   String _buildOutputFileName({
     required String bookTitle,
     required String bookAuthor,
@@ -201,6 +261,54 @@ class ReaderBookmarkExportService {
     final safeTitle = _sanitizeFileNameSegment(bookTitle, fallback: 'book');
     final safeAuthor = _sanitizeFileNameSegment(bookAuthor, fallback: 'author');
     return 'bookmark-$safeTitle $safeAuthor.$extension';
+  }
+
+  Future<ReaderBookmarkExportResult> _saveExportContent({
+    required String dialogTitle,
+    required String extension,
+    required String fileName,
+    required String content,
+  }) async {
+    try {
+      if (kIsWeb) {
+        await _copyText(content);
+        return const ReaderBookmarkExportResult(
+          success: true,
+          message: '已复制导出内容到剪贴板',
+        );
+      }
+      final outputPath = await _saveFile(
+        dialogTitle: dialogTitle,
+        fileName: fileName,
+        allowedExtensions: <String>[extension],
+      );
+      if (outputPath == null || outputPath.trim().isEmpty) {
+        return const ReaderBookmarkExportResult(cancelled: true);
+      }
+      final normalizedPath = outputPath.trim();
+      await _writeFile(path: normalizedPath, content: content);
+      return ReaderBookmarkExportResult(
+        success: true,
+        outputPath: normalizedPath,
+      );
+    } catch (e) {
+      return ReaderBookmarkExportResult(
+        message: '导出失败：$e',
+      );
+    }
+  }
+
+  String _buildTimestampFileName({
+    required String extension,
+    required DateTime timestamp,
+  }) {
+    final year = (timestamp.year % 100).toString().padLeft(2, '0');
+    final month = timestamp.month.toString().padLeft(2, '0');
+    final day = timestamp.day.toString().padLeft(2, '0');
+    final hour = timestamp.hour.toString().padLeft(2, '0');
+    final minute = timestamp.minute.toString().padLeft(2, '0');
+    final second = timestamp.second.toString().padLeft(2, '0');
+    return 'bookmark-$year$month$day$hour$minute$second.$extension';
   }
 
   String _sanitizeFileNameSegment(String value, {required String fallback}) {

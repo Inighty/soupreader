@@ -37,7 +37,7 @@ class SourceLegacySaveService {
     final name = source.bookSourceName.trim();
     final url = source.bookSourceUrl.trim();
     if (name.isEmpty || url.isEmpty) {
-      throw const FormatException('书源名称和书源地址不能为空');
+      throw const FormatException('名称和 URL 不能为空');
     }
 
     final normalizedSource = source.copyWith(

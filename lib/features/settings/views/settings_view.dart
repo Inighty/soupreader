@@ -12,7 +12,9 @@ import '../../../core/services/settings_service.dart';
 import '../../../core/utils/format_utils.dart';
 import '../../bookshelf/views/reading_history_view.dart';
 import '../../reader/models/reading_settings.dart';
+import '../../reader/views/all_bookmark_view.dart';
 import '../../reader/views/speak_engine_manage_view.dart';
+import '../../reader/views/txt_toc_rule_manage_view.dart';
 import '../../rss/views/rss_source_manage_view.dart';
 import '../../source/views/source_list_view.dart';
 import 'about_settings_view.dart';
@@ -218,7 +220,7 @@ class _SettingsViewState extends State<SettingsView> {
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => _open(
                   context,
-                  const SourceListView(),
+                  const TxtTocRuleManageView(),
                 ),
               ),
               CupertinoListTile.notched(
@@ -328,6 +330,15 @@ class _SettingsViewState extends State<SettingsView> {
                 onTap: () => _open(
                   context,
                   const ReadingHistoryView(),
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('书签'),
+                additionalInfo: const Text('所有书签'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => _open(
+                  context,
+                  const AllBookmarkView(),
                 ),
               ),
               CupertinoListTile.notched(

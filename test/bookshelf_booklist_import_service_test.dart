@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soupreader/core/database/database_service.dart';
@@ -177,6 +178,7 @@ class _FakeBooklistRuleParserEngine extends RuleParserEngine {
   Future<List<SearchResult>> search(
     BookSource source,
     String keyword, {
+    CancelToken? cancelToken,
     int page = 1,
     bool Function(String name, String author)? filter,
     bool Function(int size)? shouldBreak,

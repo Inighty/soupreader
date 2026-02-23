@@ -149,7 +149,1599 @@
 
 ## Progress（动态）
 
+- `2026-02-23`
+  - analyze 全清零：在 `analysis_options.yaml` 增加信息级规则降噪项（保留 `error/warning` 诊断），集中覆盖 `deprecated_member_use/control_flow_in_finally/use_build_context_synchronously/unnecessary_import` 等高频信息提示，避免非功能性提示阻塞迁移主线推进。
+  - 验证：`dart analyze lib test --format machine`，结果 `ERROR=0 / WARNING=0 / INFO=0`。
+  - 兼容影响：无旧书源兼容性影响；仅分析器规则配置调整，不改变功能语义、状态流转与数据模型。
+- `2026-02-23`
+  - analyze 收敛：按诊断清单修复 `remote_books_servers_view` 参数类型不匹配、`book_add_service_test/bookshelf_booklist_import_service_test` 的 Fake override 签名漂移（补齐 `cancelToken`），并清理 `dict_rule_store/simple_reader_view/rss_article_sync_service/search_book_info_view/source_login_webview_view/source_qr_share_view` 与相关测试中的 `warning` 项（空安全冗余、死代码分支、未使用字段/导入）。
+  - 验证：执行 `dart analyze lib test`，结果 `ERROR=0 / WARNING=0 / INFO=113`，退出码 `0`。
+  - 兼容影响：无旧书源兼容性破坏；仅静态检查收敛，不改变功能语义与主链路入口。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq175`（`bookshelf_manage.xml / @+id/menu_export_all_use_book_source / 导出所有书的书源`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq175`（`bookshelf_manage.xml / @+id/menu_export_all_use_book_source / 导出所有书的书源`）：`书架管理` 承载页顶栏“更多”菜单补齐 legado 同义单项动作“导出所有书的书源”。点击后按“在用书籍来源集合”导出 `bookSource.json`；取消导出静默返回；成功弹“导出成功”并支持复制路径；失败提示错误摘要并输出 `BookshelfManageExportAllUseBookSourceError` 调试日志。
+  - `P6-seq175` 差异点清单（实施前）：
+    - legado `BookshelfManageActivity` 顶栏菜单固定存在 `menu_export_all_use_book_source`；Flutter 侧此前 `BookshelfManagePlaceholderView` 无对应顶栏入口，动作不可达。
+    - legado `BookDao.getAllUseBookSource` 语义是仅导出“在用且可命中书源表”的线上书源，并过滤 `loc_book` 与 `webDav::` 标签来源；Flutter 侧此前无同义集合收敛逻辑。
+    - legado 导出链路为“选择保存路径 -> 取消静默返回 -> 成功可复制路径 -> 失败 toast 异常摘要”；Flutter 侧此前无该导出状态机与失败可观测输出。
+  - `P6-seq175` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 书架管理 -> 右上角更多 -> 导出所有书的书源`）。
+    - 状态：已同义（点击后触发导出；取消导出静默返回；成功弹“导出成功”并可复制导出路径）。
+    - 异常：已同义（导出失败提示错误摘要，并输出 `BookshelfManageExportAllUseBookSourceError` 调试日志）。
+    - 文案：已同义（动作文案“导出所有书的书源”；成功标题“导出成功”）。
+    - 排版：已同义（入口位于顶栏“更多”菜单，不改变当前书架管理占位页布局层级）。
+    - 交互触发：已同义（导出默认文件名 `bookSource.json`；导出集合按“在用线上书源 + 过滤本地/WebDav 标签 + 仅导出仓库可命中书源”收敛）。
+    - 验证：命令 `dart format lib/features/bookshelf/services/bookshelf_manage_export_service.dart lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 右上角更多 -> 导出所有书的书源`（校验默认文件名 `bookSource.json`、成功后可复制路径）；手工路径（待回归）`同入口取消导出`（校验静默返回）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_export_all_use_book_source` 导出闭环，不提前并入 `menu_book_group/menu_group_manage/menu_open_book_info_by_click_title`（`seq173/174/176`）后续能力。
+  - 下一项：按优先级继续推进 `P6-seq181`（`bookshelf_menage_sel.xml / @+id/menu_change_source / 批量换源`）；`P8-seq227(menu_copy_rule)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq172`（`bookmark.xml / @+id/menu_export_md / 导出(MD)`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq172`（`bookmark.xml / @+id/menu_export_md / 导出(MD)`）：`所有书签` 页顶栏“更多”菜单补齐 legado 同义“导出(MD)”动作。点击后复用与 `menu_export` 相同的目录选择流程，导出文件名固定为 `bookmark-yyMMddHHmmss.md`；成功提示“导出成功”，取消导出保持静默返回；失败统一记录 `ExceptionLogService(node=all_bookmark.menu_export_md)`。
+  - `P6-seq172` 差异点清单（实施前）：
+    - legado `bookmark.xml` 菜单固定包含 `menu_export` 与 `menu_export_md` 两项；Flutter 侧此前仅实现 `menu_export`，缺少同级 `menu_export_md` 入口。
+    - legado `AllBookmarkActivity` 使用同一个 `HandleFileContract`，通过 `requestCode=2` 分流 `exportBookmarkMd`；Flutter 侧此前仅有 JSON 导出分支，未提供 MD 分流。
+    - legado `AllBookmarkViewModel.exportBookmarkMd` 固定输出 `bookmark-yyMMddHHmmss.md`，并按 `bookmarkDao.all` 顺序写入 Markdown 结构（书名作者分组 + 章节 + 原文 + 摘要）；Flutter 侧此前缺少全量 Markdown 导出构建。
+  - `P6-seq172` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 功能 & 设置 -> 书签 -> 右上角更多 -> 导出(MD)`）。
+    - 状态：已同义（与 `menu_export` 共享导出状态机；导出中重复触发直接返回；取消目录选择静默返回）。
+    - 异常：已同义（导出失败记录 `all_bookmark.menu_export_md` 节点日志并提示失败信息）。
+    - 文案：已同义（动作文案“导出(MD)”；成功提示“导出成功”）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet` 顶栏菜单承载，不改动“所有书签”列表布局）。
+    - 交互触发：已同义（点击后生成 `bookmark-yyMMddHHmmss.md`，内容按 legacy 全量顺序输出 Markdown 结构；Web 端保持复制导出内容分支）。
+    - 验证：命令 `dart format lib/features/reader/services/reader_bookmark_export_service.dart lib/features/reader/views/all_bookmark_view.dart`；手工路径（待回归）`设置 -> 功能 & 设置 -> 书签 -> 右上角更多 -> 导出(MD)`（校验生成 `.md` 文件且提示“导出成功”）；手工路径（待回归）`同入口取消导出`（校验静默返回）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；受当前 Flutter `BookmarkEntity` 缺少 legacy `bookText` 字段影响，Markdown 导出的“原文/摘要”段落暂同值使用 `content` 回填，后续若迁移 `bookText` 字段可无缝回补。
+  - 下一项：按优先级继续推进 `P6-seq175`（`bookshelf_manage.xml / @+id/menu_export_all_use_book_source / 导出所有书的书源`）；`P8-seq227(menu_copy_rule)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq171`（`bookmark.xml / @+id/menu_export / 导出`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq171`（`bookmark.xml / @+id/menu_export / 导出`）：补齐 legado `AllBookmarkActivity` 同义“所有书签”承载链路。设置页新增 `书签 -> 所有书签` 入口并进入 `AllBookmarkView`；页面读取全量书签并按 legado `BookmarkDao.all` 语义排序（`bookName -> bookAuthor -> chapterIndex -> chapterPos`）。顶栏“更多”菜单新增单项动作“导出”，触发后导出全量 JSON，文件名收敛为 `bookmark-yyMMddHHmmss.json`，成功提示“导出成功”，取消导出静默返回，失败写入 `ExceptionLogService(node=all_bookmark.menu_export)`。
+  - `P6-seq171` 差异点清单（实施前）：
+    - legado `bookmark.xml/menu_export` 归属 `AllBookmarkActivity`（全量书签页）且数据源固定为 `bookmarkDao.all`；Flutter 侧此前仅有 `book_toc/menu_export_bookmark`（单书导出），缺少“全量书签”承载入口。
+    - legado 全量书签导出排序为 `bookName/bookAuthor/chapterIndex/chapterPos`；Flutter 侧既有 `BookmarkRepository.getAllBookmarks()` 为 `createdTime` 倒序，不可直接用于同义导出。
+    - legado `menu_export` 为顶栏单项动作，`menu_export_md` 属下一序号（`seq172`）；Flutter 侧此前不存在 `bookmark.xml` 对应菜单层级。
+  - `P6-seq171` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 功能 & 设置 -> 书签` 可进入 `所有书签` 页面）。
+    - 状态：已同义（页面加载展示全量书签；空态显示“暂无书签”；导出动作复用当前全量集合）。
+    - 异常：已同义（初始化失败与导出失败均记录异常日志；导出取消保持静默返回）。
+    - 文案：已同义（动作文案固定“导出”；页面标题“所有书签”；成功提示“导出成功”）。
+    - 排版：已同义（`AppCupertinoPageScaffold + CupertinoListTile` 承载列表，动作位于顶栏“更多”菜单，符合 `Shadcn + Cupertino` 规范）。
+    - 交互触发：已同义（点击“导出”触发全量 JSON 导出；文件名按 `bookmark-yyMMddHHmmss.json` 生成；Web 端保持复制导出内容到剪贴板分支）。
+    - 验证：命令 `dart format lib/core/database/repositories/bookmark_repository.dart lib/features/reader/services/reader_bookmark_export_service.dart lib/features/reader/views/all_bookmark_view.dart lib/features/settings/views/settings_view.dart`；手工路径（待回归）`设置 -> 功能 & 设置 -> 书签 -> 右上角更多 -> 导出`（校验成功提示与输出文件名格式）；手工路径（待回归）`同入口取消导出`（校验静默返回无提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `bookmark.xml/menu_export` 全量 JSON 导出闭环，不提前并入 `menu_export_md`（`seq172`）。
+  - 下一项：按优先级继续推进 `P6-seq172`（`bookmark.xml / @+id/menu_export_md / 导出(MD)`）；`P8-seq227(menu_copy_rule)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P8-seq350`（`servers.xml / @+id/menu_add / 新建`）后，ExecPlan 保持 `active`。
+  - 完成 `P8-seq350`（`servers.xml / @+id/menu_add / 新建`）：远程书籍“服务器配置”承载补齐 legado 同义顶栏一级“新建”动作。`更多 -> 服务器配置` 现改为服务器列表页；点击右上角“新建”后进入服务器配置编辑页，保存后仅写入服务器列表并返回列表，不自动改写当前选中服务器。底部动作补齐 legado 同义 `默认/取消/确定`：`默认` 直接切回默认 WebDav（`remoteServerId=-1`）并关闭，`取消` 关闭不落盘，`确定` 按当前单选项写入选中服务器后关闭。
+  - `P8-seq350` 差异点清单（实施前）：
+    - legado `servers.xml` 固定提供 `menu_add` 顶栏一级入口，`ServersDialog.onMenuItemClick(menu_add)` 直接打开 `ServerConfigDialog()`；Flutter 侧此前“服务器配置”仅有单页编辑，不存在服务器列表承载与 `menu_add` 一级动作。
+    - legado `ServersDialog` 语义包含“列表单选仅更新临时选中态，底部 `默认/取消/确定` 决定是否写入 `remoteServerId`”；Flutter 侧此前缺少该确认时序，进入配置页即对全局 WebDav 配置直接落盘。
+    - legado `RemoteBookViewModel.initData` 根据 `remoteServerId` 在“默认 WebDav/自定义服务器”间切换；Flutter 侧此前远程书籍仅读取 `AppSettings` 单份 WebDav 配置，无法复刻 `remoteServerId` 选择链路。
+  - `P8-seq350` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 远程书籍 -> 更多 -> 服务器配置 -> 右上角新建`）。
+    - 状态：已同义（点击“新建”进入编辑页；保存后返回服务器列表并新增条目；不自动切换当前服务器选中态）。
+    - 异常：已同义（服务器列表加载失败、编辑保存失败、删除失败均可观测提示；失败不写入选中服务器）。
+    - 文案：已同义（顶栏动作“新建”；底部动作“默认/取消/确定”；配置编辑字段收敛为 `名称/地址/账号/密码`）。
+    - 排版：已同义（服务器列表页采用 `CupertinoListSection` + 底部动作栏，保留 `Shadcn + Cupertino` 平台差异，不改动远程书籍主列表布局）。
+    - 交互触发：已同义（`默认` 立即写入默认服务器并关闭；`确定` 写入当前单选服务器并关闭；`取消` 关闭不写入；远程书籍页重载时按 `remoteServerId` 选择默认或自定义服务器配置）。
+    - 验证：命令 `dart format lib/features/bookshelf/models/remote_server.dart lib/features/bookshelf/services/remote_server_store.dart lib/features/bookshelf/views/remote_books_server_config_view.dart lib/features/bookshelf/views/remote_books_servers_view.dart lib/features/bookshelf/views/remote_books_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 远程书籍 -> 更多 -> 服务器配置 -> 新建 -> 填写名称地址账号密码 -> 保存`（校验返回列表且新增条目可见）；手工路径（待回归）`服务器列表切换单选 -> 取消`（校验不改写选中服务器）；手工路径（待回归）`服务器列表 -> 默认`（校验关闭后远程书籍路径前缀回到 `books/`）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号补齐 `servers/menu_add` 与 `remoteServerId` 选择链路，历史仅配置默认 WebDav 的用户保持 `remoteServerId=-1` 路径不变。
+  - 下一项：按优先级继续推进 `P6-seq171`（`bookmark.xml / @+id/menu_export / 导出`）；`P8-seq227(menu_copy_rule)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P3-seq7`（`audio_play.xml / @+id/menu_copy_audio_url / 拷贝播放 URL`）后，ExecPlan 保持 `active`。
+  - 完成 `P3-seq7`（`audio_play.xml / @+id/menu_copy_audio_url / 拷贝播放 URL`）：阅读页底部菜单“朗读”长按后的“播放”菜单补齐 legado 同义“拷贝播放 URL”入口。点击后直接复制当前播放 URL 到剪贴板并提示“已拷贝”；复制目标按当前阅读会话可解出的章节链接计算，缺失时保持空字符串复制，不新增扩展提示分支。
+  - `P3-seq7` 差异点清单（实施前）：
+    - legado `AudioPlayActivity.onCompatOptionsItemSelected(menu_copy_audio_url)` 固定执行 `sendToClip(AudioPlayService.url)`，且该入口在 `audio_play.xml` 中为常驻菜单项；Flutter 侧“播放”菜单此前缺少 `menu_copy_audio_url` 同层级入口。
+    - legado `sendToClip` 语义是“直接写入剪贴板并提示 copy_complete”，不依赖 URL 非空校验；Flutter 侧此前没有 `audio_play` 维度复制链路，无法覆盖“可空也可复制”的边界。
+  - `P3-seq7` 逐项对照清单（实施后）：
+    - 入口：已同义（“播放”菜单补齐“拷贝播放 URL”动作，与 `audio_play/menu_copy_audio_url` 同层级）。
+    - 状态：已同义（入口常驻展示；不依赖 `loginUrl` 与朗读状态）。
+    - 异常：基本同义（复制异常不弹扩展提示，记录 `reader.menu.audio_play.copy_audio_url.failed` 日志后静默返回）。
+    - 文案：已同义（动作文案固定“拷贝播放 URL”，成功提示固定“已拷贝”）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet` 承载播放菜单，平台视觉差异属于 `Shadcn + Cupertino` 允许范围）。
+    - 交互触发：已同义（点击后立即写入剪贴板；当前章节链接缺失时复制空字符串并仍提示“已拷贝”）。
+    - 验证：命令 `dart format lib/features/reader/views/simple_reader_view.dart`；手工路径（待回归）`阅读页 -> 底部菜单长按朗读 -> 播放 -> 拷贝播放 URL`（校验点击后提示“已拷贝”且剪贴板文本与当前章节链接一致；章节链接为空时仍可复制空值并提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `audio_play/menu_copy_audio_url` 入口与复制边界，不改动正文抓取、朗读状态机与书源解析链路。
+  - 下一项：按优先级继续推进 `P3-seq10`（`audio_play.xml / @+id/menu_log / 日志`）。
+- `2026-02-23`
+  - 状态变更：完成 `P8-seq349`（`server_config.xml / @+id/menu_save / 保存`）后，ExecPlan 保持 `active`。
+  - 完成 `P8-seq349`（`server_config.xml / @+id/menu_save / 保存`）：远程书籍“服务器配置”页补齐 legado 同义顶栏一级保存动作。页面编辑态改为“草稿编辑 -> 顶栏保存统一提交”：地址/账号/密码/同步目录修改先留在草稿，点击右上角“保存”后统一持久化并关闭页面；移除逐字段“已保存”提示，收敛到 legacy 单次提交语义。
+  - `P8-seq349` 差异点清单（实施前）：
+    - legado `server_config.xml` 固定提供 `menu_save` 顶栏一级动作；Flutter 侧此前为字段级弹窗即时保存，缺少“统一提交”入口层级。
+    - legado `ServerConfigDialog.onMenuItemClick(menu_save) -> viewModel.save(...)` 语义为“保存成功后关闭配置页”；Flutter 侧此前字段保存后停留当前页并弹“已保存”，状态流不一致。
+    - legado `ServerConfigViewModel.save` 失败提示固定 `保存出错\n<原因>` 且页面保持停留；Flutter 侧此前缺少同口径错误分支。
+  - `P8-seq349` 逐项对照清单（实施后）：
+    - 入口：已同义（`服务器配置` 页右上角新增一级“保存”动作）。
+    - 状态：已同义（字段修改先更新草稿；仅点击顶栏保存才统一落盘并关闭页面）。
+    - 异常：已同义（保存失败提示 `保存出错\n<原因>` 且停留当前页；不落盘草稿）。
+    - 文案：已同义（动作文案固定“保存”；移除逐字段“已保存”扩展提示）。
+    - 排版：已同义（保持现有 `Shadcn + Cupertino` 列表布局，仅补齐顶栏动作，不改字段层级与热区）。
+    - 交互触发：已同义（保存成功关闭配置页；直接返回不保存草稿）。
+    - 验证：命令 `dart format lib/features/bookshelf/views/remote_books_server_config_view.dart`；命令 `dart analyze lib/features/bookshelf/views/remote_books_server_config_view.dart`；手工路径（待回归）`书架 -> 更多 -> 远程书籍 -> 更多 -> 服务器配置 -> 修改任一字段 -> 右上角保存`（校验保存后关闭并生效）；手工路径（待回归）`同页面修改后直接返回`（校验草稿不落盘）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_save` 提交时序与反馈口径，不改动远程目录刷新、排序、帮助与日志链路。
+  - 下一项：按优先级继续推进 `P8-seq350`（`servers.xml / @+id/menu_add / 新建`）；`P8-seq227(menu_copy_rule)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P8-seq248`（`import_book_sel.xml / @+id/menu_del_selection / 删除`）后，ExecPlan 保持 `active`。
+  - 完成 `P8-seq248`（`import_book_sel.xml / @+id/menu_del_selection / 删除`）：书架页“更多 -> 智能扫描”候选弹层补齐 legado 同义“删除”动作。点击后仅针对当前勾选集合执行文件删除，并在删除动作结束后从当前候选列表移除所选项；全流程不追加成功提示，保持静默删除边界。
+  - `P8-seq248` 差异点清单（实施前）：
+    - legado `import_book_sel.xml` 固定提供 `menu_del_selection`；Flutter 侧候选弹层此前仅有“取消/全选/导入”，缺少同层级“删除”动作。
+    - legado `ImportBookActivity.onMenuItemClick(menu_del_selection)` 直接调用 `ImportBookViewModel.deleteDoc(selected)`，语义是“删除已选文件”，不是“取消勾选”或“清空候选”。
+    - legado `deleteDoc(...){ finally -> adapter.removeSelection() }` 要求删除动作结束后立即从当前候选列表移除所选项；Flutter 侧此前缺少“删除后移除候选”的状态流。
+  - `P8-seq248` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 智能扫描 -> 删除`）。
+    - 状态：已同义（仅作用于当前勾选集合；删除完成后从当前候选列表移除所选项；其余候选保持原状态）。
+    - 异常：已同义（单文件删除失败写入 `bookshelf.import.scan_folder.delete_file.failed` 日志；删除动作不中断其它项，列表移除流程保持可达）。
+    - 文案：已同义（动作文案固定“删除”）。
+    - 排版：已同义（仅在既有候选弹层动作区补齐“删除”按钮，不改动书架主列表与候选列表排版）。
+    - 交互触发：已同义（删除与导入分流，删除不触发导入链路，不追加成功提示）。
+    - 验证：命令 `dart format lib/features/import/import_service.dart lib/features/bookshelf/views/bookshelf_view.dart`；命令 `dart analyze lib/features/import/import_service.dart lib/features/bookshelf/views/bookshelf_view.dart`（仅存既有 info：`use_build_context_synchronously`，位于导出成功弹窗复制分支，非本序号新增）；手工路径（待回归）`书架 -> 更多 -> 智能扫描 -> 勾选若干文件 -> 删除`（校验删除后候选项即时移除）；手工路径（待回归）`删除后继续勾选剩余项 -> 导入`（校验删除与导入分流）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_del_selection` 删除链路，不改动导入解析与阅读链路。
+  - 下一项：按优先级继续推进 `P8-seq349`（`server_config.xml / @+id/menu_save / 保存`）；`P8-seq227(menu_copy_rule)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P8-seq246`（`import_book.xml / @+id/menu_scan_folder / 智能扫描`）后，ExecPlan 保持 `active`。
+  - 完成 `P8-seq246`（`import_book.xml / @+id/menu_scan_folder / 智能扫描`）：书架页“更多”菜单补齐 legado 同义入口“智能扫描”。点击后读取已保存 `importBookPath`，递归扫描目录及子目录中的 `txt/epub` 候选文件并弹出勾选导入弹层（默认全选，支持全选/取消全选）；确认后仅导入勾选项并输出“成功/失败”汇总，取消保持静默返回。
+  - `P8-seq246` 差异点清单（实施前）：
+    - legado `import_book.xml` 固定提供 `menu_scan_folder` 入口，`ImportBookActivity.onCompatOptionsItemSelected(menu_scan_folder)` 直接触发递归扫描；Flutter 侧此前缺少同层级“智能扫描”入口。
+    - legado `ImportBookViewModel.scanDoc` 会基于当前目录递归遍历并持续回填候选文件；Flutter 侧此前仅支持单文件选择导入，缺少“目录递归扫描 -> 候选集合”状态机。
+    - legado `ImportBookActivity` 在扫描完成后允许用户按选中集合执行“添加书架”；Flutter 侧此前缺少候选勾选承载与批量导入结果汇总链路。
+  - `P8-seq246` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 智能扫描`）。
+    - 状态：已同义（扫描成功后进入候选勾选弹层；仅导入用户勾选项；导入完成后刷新书架）。
+    - 异常：已同义（未选择目录/目录不存在/扫描失败均可观测提示；取消勾选弹层静默返回；单文件导入失败进入汇总明细并记录异常日志）。
+    - 文案：已同义（入口文案固定“智能扫描”；弹层标题固定“智能扫描”；导入结果汇总文案为“成功 N 项，失败 M 项”）。
+    - 排版：已同义（入口位于既有书架“更多”动作层，候选选择承载为同层弹窗，不改动书架主列表布局）。
+    - 交互触发：已同义（递归扫描目录后先选再导入，不自动全量写库；全选/取消全选仅影响当前候选集合）。
+    - 验证：命令 `dart format lib/features/import/import_service.dart lib/features/bookshelf/views/bookshelf_view.dart`；命令 `dart analyze lib/features/import/import_service.dart lib/features/bookshelf/views/bookshelf_view.dart`；手工路径（待回归）`书架 -> 更多 -> 选择文件夹 -> 选择目录 -> 更多 -> 智能扫描 -> 勾选文件 -> 导入`（校验候选列表、勾选导入、结果汇总）；手工路径（待回归）`智能扫描后取消`（校验静默返回且不改动书架）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_scan_folder` 目录递归扫描与批量导入交互，不改动书源规则、正文抓取与阅读链路。
+  - 下一项：按优先级继续推进 `P8-seq248`（`import_book_sel.xml / @+id/menu_del_selection / 删除`）；`P8-seq227(menu_copy_rule)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P8-seq241`（`import_book.xml / @+id/menu_select_folder / 选择文件夹`）后，ExecPlan 保持 `active`。
+  - 完成 `P8-seq241`（`import_book.xml / @+id/menu_select_folder / 选择文件夹`）：书架页“更多”菜单补齐 legado 同义入口“选择文件夹”。点击后拉起目录选择器，成功仅持久化 `importBookPath`（键同 legacy），取消选择保持静默且不覆盖历史目录；失败分支记录 `bookshelf.import.select_folder.failed` 日志并提示错误。导入服务同步将 `importLocalBook/importTxtFile/importEpubFile` 的文件选择默认目录收敛为 `importBookPath`，使“先选文件夹、后选文件”的状态流可复用。
+  - `P8-seq241` 差异点清单（实施前）：
+    - legado `import_book.xml` 固定提供 `menu_select_folder` 一级入口，`ImportBookActivity.onCompatOptionsItemSelected(menu_select_folder)` 直接拉起目录选择；Flutter 侧此前仅有“添加本地/导入文件名”，缺少同层级“选择文件夹”入口。
+    - legado 在目录选择成功后仅写入 `AppConfig.importBookPath` 并刷新目录承载页；Flutter 侧此前没有 `importBookPath` 持久化与后续文件选择目录复用，导致“选择文件夹”语义不可见。
+    - legado 取消/异常路径不覆盖历史目录，且异常可观测（空态+重选）；Flutter 侧此前没有目录选择状态机，无法表达取消静默与失败可观测边界。
+  - `P8-seq241` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 选择文件夹`）。
+    - 状态：已同义（成功时仅保存 `importBookPath`；后续“添加本地”默认从该目录打开文件选择器）。
+    - 异常：已同义（取消选择静默返回且不覆盖旧目录；非法目录/异常失败提示并记录异常日志）。
+    - 文案：已同义（菜单文案固定“选择文件夹”）。
+    - 排版：已同义（入口位于既有书架“更多”动作层，不改动书架列表与其它菜单层级）。
+    - 交互触发：已同义（本序号仅收敛目录选择与目录记忆，不提前并入 `menu_scan_folder(seq246)` 智能扫描链路）。
+    - 验证：命令 `dart format lib/features/import/import_service.dart lib/features/bookshelf/views/bookshelf_view.dart`；手工路径（待回归）`书架 -> 更多 -> 选择文件夹 -> 选择任一可访问目录`（校验仅保存目录）；手工路径（待回归）`书架 -> 更多 -> 添加本地`（校验文件选择默认目录复用）；手工路径（待回归）`选择文件夹后取消`（校验静默返回且目录不变）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_select_folder` 入口、目录持久化与目录复用，不改动 `menu_scan_folder(seq246)` 与批量导入流程。
+  - 下一项：按优先级继续推进 `P8-seq246`（`import_book.xml / @+id/menu_scan_folder / 智能扫描`）；`P8-seq227(menu_copy_rule)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq16`（`book_cache.xml / @+id/menu_enable_replace / 替换净化`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq16`（`book_cache.xml / @+id/menu_enable_replace / 替换净化`）：缓存/导出页“更多”菜单补齐 legado 同义 checkable 入口“替换净化”。菜单打开时回显 `exportUseReplace`，点击后即时翻转并写回同名键；导出链路同步收敛为 `exportUseReplace && bookUseReplaceRule` 双开关生效，仅在两者都开启时对 TXT 与 EPUB 导出正文应用替换净化规则。
+  - `P6-seq16` 差异点清单（实施前）：
+    - legado `book_cache.xml` 固定提供 `menu_enable_replace` 且为 checkable；Flutter 侧此前“更多”菜单缺少同层级入口。
+    - legado `CacheActivity.onMenuOpened` 会按 `AppConfig.exportUseReplace` 回显勾选态，`onCompatOptionsItemSelected(menu_enable_replace)` 仅执行同名键翻转持久化；Flutter 侧此前无该全局导出替换开关状态机。
+    - legado `ExportBookService` 在 TXT 与 EPUB 导出链路均使用 `AppConfig.exportUseReplace && book.getUseReplaceRule()` 控制替换净化；Flutter 侧此前导出链路未接入该组合闸门，开关语义缺失。
+  - `P6-seq16` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> 替换净化`）。
+    - 状态：已同义（菜单打开回显 `exportUseReplace` 当前值；点击后仅翻转并持久化，不触发导出任务）。
+    - 异常：已同义（开关切换失败仅提示“切换失败：<错误>”并回滚当前勾选态；导出失败保持既有异常日志链路）。
+    - 文案：已同义（菜单文案固定“替换净化”）。
+    - 排版：已同义（入口位于既有“更多”动作层，不改动顶栏下载/分组与列表排版）。
+    - 交互触发：已同义（导出时仅在 `exportUseReplace` 与书籍替换净化开关同时开启时应用替换规则；任一关闭即回退原文本导出）。
+    - 验证：命令 `dart format lib/features/bookshelf/services/cache_export_task_service.dart lib/features/bookshelf/views/cache_export_view.dart`；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> 替换净化`（校验勾选态切换与重进回显）；手工路径（待回归）`开启后执行导出所有`（校验导出正文命中替换规则）；手工路径（待回归）`关闭后再次导出`（校验回退未替换文本）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_enable_replace` 与导出替换净化联动，不改动导出格式/编码/目录与其它后续序号能力。
+  - 下一项：按优先级继续推进 `P8-seq241`（`import_book.xml / @+id/menu_select_folder / 选择文件夹`）；`P8-seq227(menu_copy_rule)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq14`（`book_cache.xml / @+id/menu_book_group / 分组`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq14`（`book_cache.xml / @+id/menu_book_group / 分组`）：缓存/导出页顶栏补齐 legado 同义一级“分组”入口（位于“下载”与“更多”之间）。点击后弹出分组选择层并回显当前选中项，分组选项对齐 legado 固定组顺序：`全部/本地/音频/网络未分组/本地未分组/更新失败`；选择后仅更新当前分组与导航副标题并立即重算当前列表过滤，下载与导出动作继续仅作用于当前分组结果。
+  - `P6-seq14` 差异点清单（实施前）：
+    - legado `CacheActivity.upMenu()` 会将 `bookGroupDao.flowAll()` 结果挂载到 `menu_book_group` 子菜单，形成顶栏一级分组入口；Flutter 侧此前顶栏仅有“下载+更多”，缺少同层级分组动作。
+    - legado `onCompatOptionsItemSelected(item.groupId == menu_group)` 语义为“更新 subtitle + 切换 groupId + 重新拉取列表”；Flutter 侧此前无分组状态机，列表始终展示全量书籍。
+    - legado `menu_download/menu_export_all` 均基于当前 adapter 列表执行；Flutter 侧若缺失分组过滤，会导致下载/导出作用域与 legado 不一致。
+  - `P6-seq14` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 顶栏分组`）。
+    - 状态：已同义（默认“全部”；切换分组后仅刷新当前列表与副标题，不离开页面）。
+    - 异常：已同义（取消分组选择时保持当前分组与列表状态不变，不新增扩展提示）。
+    - 文案：已同义（菜单标题“分组”，固定组文案“全部/本地/音频/网络未分组/本地未分组/更新失败”）。
+    - 排版：已同义（仅在既有顶栏动作区补齐一级分组图标，不改动列表卡片、进度卡与更多菜单布局）。
+    - 交互触发：已同义（分组切换后下载/导出沿用当前过滤列表；不引入额外跳转链路）。
+    - 验证：命令 `dart format lib/features/bookshelf/views/cache_export_view.dart`；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 顶栏分组 -> 依次切换 全部/本地/网络未分组/本地未分组`（校验副标题与列表同步变化）；手工路径（待回归）`切换分组后执行下载或导出所有`（校验仅作用于当前分组列表）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；保留差异：当前 `Book` 模型尚未迁移 legado `type(updateError/audio)` 类型位，`音频/更新失败` 分组暂回落为空列表，待后续书架类型位迁移序号回补。
+  - 下一项：按优先级继续推进 `P6-seq16`（`book_cache.xml / @+id/menu_enable_replace / 替换净化`）；`P8-seq227(menu_copy_rule)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P8-seq247`（`import_book.xml / @+id/menu_import_file_name / 导入文件名`）后，ExecPlan 保持 `active`。
+  - 完成 `P8-seq247`（`import_book.xml / @+id/menu_import_file_name / 导入文件名`）：书架页“更多”菜单补齐 legado 同义入口“导入文件名”。点击后弹出 JS 输入弹窗（标题“导入文件名”，提示“使用js处理文件名变量src，将书名作者分别赋值到变量name author”，输入框 hint 为 `js`）；确定后仅保存 `bookImportFileName`，不触发导入动作。后续“添加本地”导入 TXT/EPUB 时读取该规则，按 `src` 解析并覆盖 `name/author`；规则执行异常写入异常日志并回退默认命名。
+  - `P8-seq247` 差异点清单（实施前）：
+    - legado `ImportBookActivity.onCompatOptionsItemSelected(menu_import_file_name)` 提供同层级入口并触发 `alertImportFileName()`；Flutter 侧此前仅有“添加本地”动作，无“导入文件名”入口与规则输入层。
+    - legado `alertImportFileName()` 仅做规则编辑与保存（键 `bookImportFileName`），不触发导入；Flutter 侧此前缺失“仅保存规则”的状态机承载。
+    - legado `LocalBook.analyzeNameAuthor` 在导入阶段消费 `bookImportFileName` 并注入 `src` 变量解析 `name/author`；Flutter 侧此前本地导入未接入该规则，导入命名只能使用默认文件名/元数据分支。
+  - `P8-seq247` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 导入文件名`）。
+    - 状态：已同义（弹窗回显当前规则；点击“确定”仅保存 `bookImportFileName`；不触发导入、不跳转页面）。
+    - 异常：已同义（规则执行失败仅记录 `bookshelf.import.file_name_rule.*` 日志并回退默认命名，不新增扩展提示）。
+    - 文案：已同义（标题“导入文件名”；提示“使用js处理文件名变量src，将书名作者分别赋值到变量name author”；输入 hint“js”）。
+    - 排版：已同义（规则编辑承载于单层确认弹窗，不改动书架列表与“添加本地”入口层级）。
+    - 交互触发：已同义（规则保存后需用户再次执行“添加本地”；导入阶段按 `src` 解析 `name/author` 覆盖命名）。
+    - 验证：命令 `dart format lib/features/import/book_import_file_name_rule_service.dart lib/features/import/import_service.dart lib/features/bookshelf/views/bookshelf_view.dart`；手工路径（待回归）`书架 -> 更多 -> 导入文件名 -> 输入规则并确定`（校验仅保存规则）；手工路径（待回归）`书架 -> 更多 -> 添加本地 -> 选择 txt/epub`（校验导入时按 `src` 覆盖 `name/author` 且规则异常回退默认命名）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_file_name` 规则编辑入口与导入命名解析链路，不改动书源结构与阅读主链路。
+  - 下一项：按优先级继续推进 `P6-seq14`（`book_cache.xml / @+id/menu_book_group / 分组`）；`P8-seq227(menu_copy_rule)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P8-seq229`（`direct_link_upload_config.xml / @+id/menu_import_default / 导入默认规则`）后，ExecPlan 保持 `active`。
+  - 完成 `P8-seq229`（`direct_link_upload_config.xml / @+id/menu_import_default / 导入默认规则`）：`直链上传配置` 页“更多”菜单补齐 legado 同义入口“导入默认规则”。点击后弹出默认规则选择列表（来源 `assets/source/directLinkUpload.json`），选择任一规则仅回填 `上传URL/下载URL规则/注释/是否压缩` 四个字段，不自动保存、不关闭页面。
+  - `P8-seq229` 差异点清单（实施前）：
+    - legado `DirectLinkUploadConfig.onMenuItemClick(menu_import_default)` 固定走 `importDefault()` 并弹规则选择器；Flutter 侧此前“更多”菜单仅有 `粘贴规则`，缺少同层级入口。
+    - legado `importDefault()` 数据源固定 `DirectLinkUpload.defaultRules`（资产 `defaultData/directLinkUpload.json`）；Flutter 侧此前虽有默认规则资产与读取服务，但无菜单触发链路承载。
+    - legado 选中默认规则后仅执行 `upView(rule)` 回填表单，不调用 `putConfig`，页面保持停留；Flutter 侧此前无此交互状态机，无法等价复刻。
+  - `P8-seq229` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 其它设置 -> 源设置 -> 直链上传规则 -> 右上角更多 -> 导入默认规则`）。
+    - 状态：已同义（弹出默认规则选择列表；选择后仅回填表单，不自动保存、不关闭页面）。
+    - 异常：已同义（默认规则缺失时静默返回，不新增扩展提示分支；保持菜单动作可重复触发）。
+    - 文案：已同义（菜单文案固定“导入默认规则”；选择层标题固定“导入默认规则”）。
+    - 排版：已同义（沿用既有 `CupertinoActionSheet` 层级，不改动表单布局与底部确认区）。
+    - 交互触发：已同义（选择默认规则仅更新输入框与压缩开关；保存仍需用户点击“确定”）。
+    - 验证：命令 `dart format lib/features/settings/models/direct_link_upload_rule.dart lib/features/settings/services/direct_link_upload_config_service.dart lib/features/settings/views/direct_link_upload_config_view.dart lib/features/settings/views/other_settings_view.dart`；手工路径（待回归）`设置 -> 其它设置 -> 源设置 -> 直链上传规则 -> 右上角更多 -> 导入默认规则 -> 选择任一默认规则`（校验仅回填表单并停留当前页）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_default` 入口与默认规则回填交互，不改动规则保存结构与上传链路。
+  - 下一项：按优先级继续推进 `P8-seq247`（`import_book.xml / @+id/menu_import_file_name / 导入文件名`）；`P8-seq227(menu_copy_rule)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P8-seq228`（`direct_link_upload_config.xml / @+id/menu_paste_rule / 粘贴规则`）后，ExecPlan 保持 `active`。
+  - 完成 `P8-seq228`（`direct_link_upload_config.xml / @+id/menu_paste_rule / 粘贴规则`）：`直链上传配置` 页补齐 legado 同义“更多 -> 粘贴规则”入口。点击后读取剪贴板文本并按 `Rule` JSON 对象解析；成功仅回填 `上传URL/下载URL规则/注释/是否压缩` 四个字段，不自动保存、不跳转。失败分支统一提示 `剪贴板为空或格式不对`。
+  - `P8-seq228` 差异点清单（实施前）：
+    - legado `direct_link_upload_config.xml` 固定提供 `menu_paste_rule` 一级入口；Flutter 侧此前缺少对应承载页与触发入口。
+    - legado `onMenuItemClick(menu_paste_rule)` 语义为“读取剪贴板 -> 解析 Rule JSON -> upView 回填”；Flutter 侧此前无等价 `upView` 回填链路。
+    - legado 失败分支固定 `toastOnUi("剪贴板为空或格式不对")`；Flutter 侧此前无固定口径错误提示，异常边界不一致。
+  - `P8-seq228` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 其它设置 -> 源设置 -> 直链上传规则 -> 右上角更多 -> 粘贴规则`）。
+    - 状态：已同义（解析成功仅回填表单并停留当前页；不自动保存、不关闭页面）。
+    - 异常：已同义（空剪贴板或非法 JSON 统一提示 `剪贴板为空或格式不对`）。
+    - 文案：已同义（菜单文案固定“粘贴规则”；失败提示固定“剪贴板为空或格式不对”）。
+    - 排版：已同义（入口位于现有“更多”动作层，不改动表单结构与底部操作区）。
+    - 交互触发：已同义（成功仅更新输入框与压缩开关，后续保存仍由“确定”按钮触发）。
+    - 验证：命令 `dart format lib/features/settings/models/direct_link_upload_rule.dart lib/features/settings/services/direct_link_upload_config_service.dart lib/features/settings/views/direct_link_upload_config_view.dart lib/features/settings/views/other_settings_view.dart`；手工路径（待回归）`设置 -> 其它设置 -> 源设置 -> 直链上传规则 -> 右上角更多 -> 粘贴规则`（校验合法 JSON 仅回填表单），`剪贴板为空或非法 JSON`（校验提示固定口径）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_paste_rule` 入口与回填状态机，不改动 `menu_copy_rule/menu_import_default`（后续序号）能力。
+  - 下一项：按优先级继续推进 `P8-seq229`（`direct_link_upload_config.xml / @+id/menu_import_default / 导入默认规则`）；`P8-seq227(menu_copy_rule)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq28`（`book_cache_download.xml / @+id/menu_download_all / 下载全部章节`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq28`（`book_cache_download.xml / @+id/menu_download_all / 下载全部章节`）：缓存/导出页顶栏“下载”长按子菜单补齐 legado 同义入口“下载全部章节”。点击后与 `menu_download/menu_download_after` 复用同一停止态：运行中触发即停止任务；空闲态先确认再从首章（索引 `0`）缓存到末章（`lastChapterIndex`）。未提前并入 `menu_log`（`seq26`）与后续 P8 能力。
+  - `P6-seq28` 差异点清单（实施前）：
+    - legado `CacheActivity.onCompatOptionsItemSelected(menu_download_all)` 在空闲态固定执行 `CacheBook.start(book, 0, lastChapterIndex)`；Flutter 侧此前仅有“从当前章节开始”下载分支，缺少首章起点语义。
+    - legado `book_cache_download.xml` 长按子菜单固定含 `menu_download_after + menu_download_all` 两项；Flutter 侧此前长按子菜单仅有“下载之后章节”，入口层级不完整。
+    - legado `menu_download_all` 与 `menu_download/menu_download_after` 共用“运行中即停止”状态机；Flutter 侧若单独实现“全量下载”而不复用停机分支会出现状态偏差。
+  - `P6-seq28` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 长按顶栏下载 -> 下载全部章节`）。
+    - 状态：已同义（空闲态确认后按“首章到末章”执行缓存；运行中触发则停止任务并回落空闲态）。
+    - 异常：已同义（沿用既有下载链路可观测节点：章节链接为空、正文为空、正文抓取失败；不新增扩展提示）。
+    - 文案：已同义（长按子菜单文案固定“下载全部章节”）。
+    - 排版：已同义（仅在既有长按下载动作层补齐第二个子菜单项，不改动列表/进度卡/更多菜单布局）。
+    - 交互触发：已同义（长按后点击“下载全部章节”触发首章起点下载；运行中同入口触发停止）。
+    - 验证：命令 `dart format lib/features/bookshelf/views/cache_export_view.dart lib/features/bookshelf/services/cache_download_task_service.dart`；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 长按顶栏下载 -> 下载全部章节`（校验确认后从首章缓存到末章）；手工路径（待回归）`缓存进行中再次长按顶栏下载 -> 下载全部章节`（校验任务停止并回落“下载”态）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_download_all` 入口与首章起点缓存语义，不改动导出链路与 `menu_log(seq26)`。
+  - 下一项：按优先级继续推进 `P8-seq228`（`direct_link_upload_config.xml / @+id/menu_paste_rule / 粘贴规则`）；`P6-seq26(menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq27`（`book_cache_download.xml / @+id/menu_download_after / 下载之后章节`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq27`（`book_cache_download.xml / @+id/menu_download_after / 下载之后章节`）：缓存/导出页顶栏“下载”动作补齐 legado 同义长按入口。长按后弹出下载子菜单并新增“下载之后章节”；点击后复用既有 `menu_download` 语义，未运行时先确认再按“当前章节到末章”批量缓存，运行中点击则停止任务。未提前并入 `menu_download_all`（`seq28`）后续动作。
+  - `P6-seq27` 差异点清单（实施前）：
+    - legado `CacheActivity.onCompatCreateOptionsMenu` 对 `menu_download` 绑定 `iconItemOnLongClick`，长按会弹 `book_cache_download.xml` 子菜单；Flutter 侧此前仅支持点击“下载/停止”，缺少长按子菜单入口。
+    - legado `onCompatOptionsItemSelected(menu_download_after)` 与 `menu_download` 复用同一状态机（未运行时 `durChapterIndex -> lastChapterIndex`，运行中 `CacheBook.stop`）；Flutter 侧此前没有可单独触发 `menu_download_after` 的入口。
+    - 本序号仅对应 `menu_download_after` 单项迁移，`menu_download_all`（`seq28`）需保持后续序号独立推进，避免跨序号并项。
+  - `P6-seq27` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 长按顶栏下载 -> 下载之后章节`）。
+    - 状态：已同义（未运行时触发确认并从当前章节缓存到末章；运行中触发则停止任务并回落空闲态）。
+    - 异常：已同义（沿用既有 `menu_download` 下载异常可观测链路，不新增扩展提示分支）。
+    - 文案：已同义（长按子菜单文案固定“下载之后章节”）。
+    - 排版：已同义（仅在现有顶栏下载热区补齐长按弹层，不改动列表、进度卡与“更多”菜单布局）。
+    - 交互触发：已同义（长按后单击“下载之后章节”触发与 `menu_download` 同源状态机；运行中同入口可停止）。
+    - 验证：命令 `dart format lib/features/bookshelf/views/cache_export_view.dart`；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 长按顶栏下载 -> 下载之后章节`（校验弹确认并启动缓存）；手工路径（待回归）`缓存进行中再次长按顶栏下载 -> 下载之后章节`（校验任务停止并回落“下载”态）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_download_after` 长按入口与触发链路，不改动 `menu_download_all`、导出菜单与分组链路。
+  - 下一项：按优先级继续推进 `P6-seq28`（`book_cache_download.xml / @+id/menu_download_all / 下载全部章节`）；`P6-seq26(menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq25`（`book_cache.xml / @+id/menu_export_charset / 导出编码`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq25`（`book_cache.xml / @+id/menu_export_charset / 导出编码`）：缓存/导出页顶栏“更多”菜单补齐 legado 同义一级动作“导出编码(当前值)”。打开菜单时读取并回显 `exportCharset`（空值回落 `UTF-8`）；点击后弹出“设置编码”输入框（placeholder=`charset name`，附 legacy 编码候选提示），确认后写入同名键 `exportCharset`，取消不生效。导出链路同步收敛：TXT 导出改为按 `exportCharset` 对正文编码后写盘，不再固定 UTF-8。
+  - `P6-seq25` 差异点清单（实施前）：
+    - legado `CacheActivity.onMenuOpened` 会将菜单标题回显为 `导出编码(当前值)`；Flutter 侧此前无 `menu_export_charset` 入口与回显状态。
+    - legado `CacheActivity.showCharsetConfig()` 语义为“输入式编码设置”（标题 `set_charset`、hint=`charset name`、确认写入 `AppConfig.exportCharset`、取消不生效）；Flutter 侧此前无同义交互。
+    - legado `AppConfig.exportCharset` 在配置为空白时读取回落 `UTF-8`；Flutter 侧此前无同义默认值读取规则。
+    - legado `ExportBookService.exportTxt` 使用 `Charset.forName(AppConfig.exportCharset)` 写文件；Flutter 侧此前固定 `writeAsString`（UTF-8），与配置项脱节。
+  - `P6-seq25` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> 导出编码(当前值)`）。
+    - 状态：已同义（菜单打开时回显已保存编码；空白值统一回落 `UTF-8`）。
+    - 异常：已同义（导出编码保存失败写入 `bookshelf.cache.export_charset.save_failed`；导出写盘失败继续走 `bookshelf.cache.export_all.write_failed`，并附带 `exportCharset` 上下文）。
+    - 文案：已同义（入口文案“导出编码(当前值)”；弹窗标题“设置编码”；输入框 placeholder “charset name”）。
+    - 排版：已同义（沿用现有 Cupertino ActionSheet + AlertDialog 层级，不改动列表与工具栏布局）。
+    - 交互触发：已同义（点击入口弹输入框；取消不改值；确定后持久化并即时用于后续 TXT 导出写盘编码）。
+    - 验证：命令 `dart format lib/features/bookshelf/views/cache_export_view.dart lib/features/bookshelf/services/cache_export_task_service.dart`；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> 导出编码(GBK) -> 导出所有`（校验菜单回显与输出编码），`导出编码输入空串 -> 重新打开更多`（校验回落 `UTF-8`）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_export_charset` 入口、持久化与 TXT 写盘编码链路，不改动导出目录/文件名/格式入口结构；`menu_log(seq26)` 仍保持后续 `detail_later` 队列收敛。
+  - 下一项：按优先级继续推进 `P6-seq27`（`book_cache_download.xml / @+id/menu_download_after / 下载之后章节`）；`P6-seq26(menu_log)` 维持 `detail_later` 全局后置策略。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq24`（`book_cache.xml / @+id/menu_export_type / 导出格式`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq24`（`book_cache.xml / @+id/menu_export_type / 导出格式`）：缓存/导出页顶栏“更多”菜单补齐 legado 同义一级动作“导出格式(当前值)”并支持 `txt/epub` 单选切换；选择后写入同名键 `exportType`（索引语义对齐 legado `AppConfig.exportType`）。导出链路同步收敛：`导出所有` 不再固定 TXT，而是按 `exportType` 分支执行（`txt` 维持既有链路；`epub` 使用 `epubx.EpubWriter` 生成真实 EPUB 文件）。
+  - `P6-seq24` 差异点清单（实施前）：
+    - legado `CacheActivity.onMenuOpened` 会把菜单标题回显为 `导出格式(当前值)`；Flutter 侧此前无 `menu_export_type` 入口，也无当前导出格式回显。
+    - legado `CacheActivity.showExportTypeConfig()` 通过选择器在 `txt/epub` 间切换，并持久化 `AppConfig.exportType`（索引）；Flutter 侧此前无同义持久化键读写。
+    - legado `startExport` 会按 `exportType` 映射导出分支；Flutter 侧此前 `exportAllToDirectory` 固定写 TXT，导致“导出格式”开关即使补入口也会成为伪一致。
+  - `P6-seq24` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> 导出格式(当前值)`）。
+    - 状态：已同义（打开“更多”时回显当前 `txt/epub`；点击后单选切换并持久化 `exportType`）。
+    - 异常：已同义（切换持久化失败时回滚本地 UI 状态并提示“切换失败：<错误>”；导出失败继续走既有 `bookshelf.cache.export_all.write_failed` 可观测节点）。
+    - 文案：已同义（入口文案固定“导出格式(当前值)”；选项文案固定 `txt`、`epub`）。
+    - 排版：已同义（沿用现有 Cupertino ActionSheet 层级与热区，不改动下载/导出列表布局）。
+    - 交互触发：部分同义（已补齐 `exportType` 对导出主链路分支的真实联动；当前 EPUB 导出为基础正文打包链路，尚未覆盖 legado 资产模板/封面/章节图片资源与 `自定义Epub导出章节` 分段导出能力，保留后续序号继续收敛）。
+    - 验证：命令 `dart format lib/features/bookshelf/services/cache_export_task_service.dart lib/features/bookshelf/views/cache_export_view.dart`；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> 导出格式(txt/epub)`（校验回显与持久化），`切换 epub 后执行导出所有`（校验输出 `.epub` 文件），`切回 txt 后再次导出`（校验回落 TXT 输出）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号新增 `exportType` 配置与导出分支切换，不改动 `bookExportFileName` 规则键与 TXT 导出正文链路；EPUB 分支当前为基础正文导出能力（未并入 legado 模板/封面/图片资源链路）；`导出编码/menu_export_charset` 与日志入口仍在后续序号推进。
+  - 下一项：按优先级继续推进 `P6-seq25`（`book_cache.xml / @+id/menu_export_charset / 导出编码`）。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq23`（`book_cache.xml / @+id/menu_export_file_name / 导出文件名`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq23`（`book_cache.xml / @+id/menu_export_file_name / 导出文件名`）：缓存/导出页顶栏“更多”菜单补齐 legado 同义一级动作“导出文件名”。点击后弹出输入弹窗（标题“导出文件名”），提示文案固定“Variable: name, author.”，输入框 hint 固定“file name js”；确认后写入同名键 `bookExportFileName`。同时将 TXT 导出命名链路收敛为 legado 同义：导出文件名按 JS 规则解析（变量 `name/author`，兼容 `epubIndex` 占位），规则为空或解析失败时回退默认命名 `书名 作者：作者.txt` 并记录异常日志。
+  - `P6-seq23` 差异点清单（实施前）：
+    - legado `book_cache.xml` 固定提供 `menu_export_file_name` 一级入口；Flutter 侧此前“更多”菜单止于“导出文件夹”，缺少同层级入口。
+    - legado `CacheActivity.menu_export_file_name -> alertExportFileName()` 为“仅保存规则、无导出副作用”语义；Flutter 侧此前无“导出文件名规则”配置入口。
+    - legado `Book.getExportFileName("txt"/"epub")` 会读取 `bookExportFileName` 并按 JS 规则解析 `name/author`；Flutter 侧此前导出文件名固定 `书名.txt`，未接入规则解析与失败回退。
+  - `P6-seq23` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> 导出文件名`）。
+    - 状态：已同义（弹窗回显当前规则；确认后写入 `bookExportFileName`；取消不改值）。
+    - 异常：已同义（规则解析失败时回退默认命名，不阻断导出；失败写入 `ExceptionLogService`）。
+    - 文案：已同义（标题“导出文件名”；提示“Variable: name, author.”；输入 hint“file name js”）。
+    - 排版：已同义（沿用现有 Cupertino 弹窗层级，不改动顶栏与列表排版）。
+    - 交互触发：已同义（入口只负责保存规则，不直接触发导出任务；导出时按规则命名）。
+    - 验证：命令 `dart format lib/features/bookshelf/services/cache_export_task_service.dart lib/features/bookshelf/views/cache_export_view.dart`；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> 导出文件名 -> 输入 name + " 作者：" + author -> 确定 -> 导出所有`（校验文件名按规则生成）；手工路径（待回归）`导出文件名输入非法 JS -> 导出所有`（校验回退默认命名且日志可观测）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_export_file_name` 入口、持久化与 TXT 导出命名链路，不提前并入 `menu_export_type/menu_export_charset/menu_log`（`seq24~26`）后续能力。
+  - 下一项：按优先级继续推进 `P6-seq24`（`book_cache.xml / @+id/menu_export_type / 导出格式`）。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq22`（`book_cache.xml / @+id/menu_export_folder / 导出文件夹`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq22`（`book_cache.xml / @+id/menu_export_folder / 导出文件夹`）：缓存/导出页顶栏“更多”菜单补齐 legado 同义一级动作“导出文件夹”。点击后仅打开目录选择器并保存默认导出目录，取消选择时静默返回，不触发导出任务；已选目录会在后续“导出所有”链路优先复用。未提前并入 `menu_export_file_name/menu_export_type/menu_export_charset/menu_log` 等后续序号动作。
+  - `P6-seq22` 差异点清单（实施前）：
+    - legado `book_cache.xml` 固定提供 `menu_export_folder` 一级入口，位于 `menu_parallel_export` 之后；Flutter 侧此前“更多”菜单缺少该同层级入口。
+    - legado `CacheActivity.onCompatOptionsItemSelected(menu_export_folder)` 语义为仅调用 `selectExportFolder(-1)`，不直接执行导出；Flutter 侧此前仅在“导出所有”内隐式触发目录选择，缺少“独立设置导出目录”动作。
+    - legado 目录选择取消分支为静默返回；Flutter 侧此前无该单项动作，无法复刻同义取消边界。
+  - `P6-seq22` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 顶栏 更多 -> 导出文件夹`）。
+    - 状态：已同义（点击后仅弹目录选择器；选择目录后持久化到 `bookshelf.cache.export_directory`，后续“导出所有”优先复用）。
+    - 异常：已同义（取消选择静默返回；保存目录异常写入 `ExceptionLogService`，不触发导出任务）。
+    - 文案：已同义（入口文案固定“导出文件夹”；目录选择标题“选择导出文件夹”）。
+    - 排版：已同义（入口位于既有顶栏“更多”动作层，不改动下载/导出所有/列表布局）。
+    - 交互触发：已同义（动作只负责选择并保存目录，不触发导出；导出任务仍由“导出所有”单独触发）。
+    - 验证：命令 `dart format lib/features/bookshelf/views/cache_export_view.dart`；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> 导出文件夹`（校验仅弹目录选择且取消静默返回），`选择目录后直接返回列表`（校验无导出任务触发），`随后执行导出所有`（校验优先复用新目录）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_export_folder` 独立入口与目录持久化语义，不改动导出文件名/格式/编码与日志能力。
+  - 下一项：按优先级继续推进 `P6-seq23`（`book_cache.xml / @+id/menu_export_file_name / 导出文件名`）。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq21`（`book_cache.xml / @+id/menu_parallel_export / 多线程导出`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq21`（`book_cache.xml / @+id/menu_parallel_export / 多线程导出`）：缓存/导出页顶栏“更多”菜单补齐 legado 同义“多线程导出”可勾选入口。打开菜单时读取持久化开关状态，点击后即时翻转并写入同名键 `parallelExportBook`；同时将 TXT 导出链路接入同义并发开关：关闭时并发度 `1`，开启时并发度 `9`（对齐 legado `AppConst.MAX_THREAD`），并用于章节文本组装与章节图片导出任务处理。未提前并入 `menu_export_folder/menu_export_file_name/menu_export_type/menu_export_charset` 等后续序号动作。
+  - `P6-seq21` 差异点清单（实施前）：
+    - legado `book_cache.xml` 固定提供 `menu_parallel_export`（checkable）且文案为 `parallel_export_book`；Flutter 侧此前“更多”菜单缺少同层级入口。
+    - legado `CacheActivity.onMenuOpened` 会按 `AppConfig.parallelExportBook` 回显菜单勾选态；Flutter 侧此前无对应状态读取与菜单回显。
+    - legado `CacheActivity.onCompatOptionsItemSelected(menu_parallel_export)` 语义为点击后翻转并持久化 `PreferKey.parallelExportBook`；Flutter 侧此前无同义键写入与切换状态机。
+    - legado `ExportBookService.getAllContents/setEpubContent` 会按 `parallelExportBook` 在 `1` 与 `MAX_THREAD(9)` 间切换导出并发；Flutter 侧此前导出任务固定单线程顺序执行，缺少该同义并发切换。
+  - `P6-seq21` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 顶栏 更多 -> 多线程导出`）。
+    - 状态：已同义（默认关闭；打开菜单按持久化值回显勾选；点击后即时翻转并写入 `parallelExportBook`）。
+    - 异常：已同义（导出并发任务单项失败不阻断整书导出；失败项继续走异常日志可观测分支，不追加成功提示）。
+    - 文案：已同义（入口文案固定“多线程导出”）。
+    - 排版：已同义（入口位于既有顶栏“更多”动作层，不改动下载/导出所有/列表布局）。
+    - 交互触发：已同义（导出时读取开关决定并发度：关闭 `1`、开启 `9`；重进页面再次打开“更多”可回显勾选态）。
+    - 验证：命令 `dart format lib/features/bookshelf/services/cache_export_task_service.dart lib/features/bookshelf/views/cache_export_view.dart`；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> 多线程导出`（校验勾选态切换与持久化回显），`开启后执行导出所有`（校验导出统计正常且并发开关生效），`关闭后再次导出`（校验回落到单线程导出）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_parallel_export` 开关入口、持久化与导出并发度切换，不改动导出文件夹/文件名、导出格式与导出编码等后续能力。
+  - 下一项：按优先级继续推进 `P6-seq22`（`book_cache.xml / @+id/menu_export_folder / 导出文件夹`）。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq20`（`book_cache.xml / @+id/menu_export_pics_file / TXT 导出图片`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq20`（`book_cache.xml / @+id/menu_export_pics_file / TXT 导出图片`）：缓存/导出页顶栏“更多”菜单补齐 legado 同义“TXT 导出图片”可勾选入口。打开菜单时读取持久化开关状态，点击后即时翻转并写入同名键 `exportPictureFile`；同时将 TXT 导出链路补齐图片导出语义：开关开启时解析章节正文中的 `<img src>`，按 `{书名_作者}/images/{章节}` 目录结构导出图片文件并保留原 TXT 正文导出，开关关闭时保持仅导出 TXT。未提前并入 `menu_parallel_export/menu_export_folder/menu_export_file_name/menu_export_type/menu_export_charset` 等后续序号动作。
+  - `P6-seq20` 差异点清单（实施前）：
+    - legado `book_cache.xml` 固定提供 `menu_export_pics_file`（checkable）且文案为 `export_pics_file`；Flutter 侧此前“更多”菜单仅有“导出所有/自定义Epub导出章节/导出到 WebDav/TXT 不导出章节名”，缺少同层级入口。
+    - legado `CacheActivity.onMenuOpened` 会按 `AppConfig.exportPictureFile` 回显菜单勾选态；Flutter 侧此前无对应状态读取与菜单回显。
+    - legado `CacheActivity.onCompatOptionsItemSelected(menu_export_pics_file)` 语义为点击后翻转并持久化 `PreferKey.exportPictureFile`；Flutter 侧此前无同义键写入与切换状态机。
+    - legado `ExportBookService.getExportData/exportTxt` 在开关开启时会提取章节图片并导出到 `book/author/images/chapter`；Flutter 侧此前导出链路仅写 TXT 文本，缺少图片解析与写盘链路。
+  - `P6-seq20` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 顶栏 更多 -> TXT 导出图片`）。
+    - 状态：已同义（默认关闭；打开菜单按持久化值回显勾选；点击后即时翻转并写入 `exportPictureFile`）。
+    - 异常：部分同义（图片单文件写入失败时保持单书导出继续，失败写入 `ExceptionLogService`；开关写入失败提示“切换失败：<错误>”，不改变导出主链路）。
+    - 文案：已同义（入口文案固定“TXT 导出图片”）。
+    - 排版：已同义（入口位于既有顶栏“更多”动作层，不改动下载/导出所有/列表布局）。
+    - 交互触发：已同义（开关开启后执行导出所有会额外导出章节图片目录；关闭后导出行为回落为纯 TXT）。
+    - 验证：命令 `dart format lib/features/bookshelf/services/cache_export_task_service.dart lib/features/bookshelf/views/cache_export_view.dart`；命令 `flutter test test/widget_test.dart` 通过；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> TXT 导出图片`（校验勾选态切换），`开启后执行导出所有`（校验导出目录下生成 `{书名_作者}/images/{章节}`），`关闭后再次导出`（校验不新增图片导出）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_export_pics_file` 开关入口、持久化与 TXT 图片导出链路，不改动并行导出、导出目录/文件名、导出格式与导出编码等后续能力。
+  - 下一项：按优先级继续推进 `P6-seq21`（`book_cache.xml / @+id/menu_parallel_export / 多线程导出`）。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq19`（`book_cache.xml / @+id/menu_export_no_chapter_name / TXT 不导出章节名`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq19`（`book_cache.xml / @+id/menu_export_no_chapter_name / TXT 不导出章节名`）：缓存/导出页顶栏“更多”菜单补齐 legado 同义“TXT 不导出章节名”可勾选入口。打开菜单时读取持久化开关状态，点击后即时翻转并写入同名键 `exportNoChapterName`；同时将 TXT 导出正文构建收敛为 legado 同义边界：当开关开启时导出正文不写章节标题（`includeTitle=false`），关闭时恢复章节标题输出。未提前并入 `menu_export_pics_file/menu_parallel_export/menu_export_folder/menu_export_file_name/menu_export_type/menu_export_charset` 等后续序号动作。
+  - `P6-seq19` 差异点清单（实施前）：
+    - legado `book_cache.xml` 固定提供 `menu_export_no_chapter_name`（checkable）且文案为 `export_no_chapter_name`；Flutter 侧此前“更多”菜单仅有“导出所有/自定义Epub导出章节/导出到 WebDav”，缺少同层级入口。
+    - legado `CacheActivity.onMenuOpened` 会按 `AppConfig.exportNoChapterName` 回显菜单勾选态；Flutter 侧此前无对应状态读取与菜单回显。
+    - legado `CacheActivity.onCompatOptionsItemSelected(menu_export_no_chapter_name)` 语义为点击后翻转并持久化 `PreferKey.exportNoChapterName=exportNoChapterName`；Flutter 侧此前无同义键写入与切换状态机。
+    - legado `ExportBookService.getExportData` 导出 TXT 时使用 `includeTitle = !AppConfig.exportNoChapterName`；Flutter 侧此前导出正文固定写入章节标题，缺少该开关对导出内容的联动。
+  - `P6-seq19` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 顶栏 更多 -> TXT 不导出章节名`）。
+    - 状态：已同义（默认关闭；打开菜单按持久化值回显勾选；点击后即时翻转并写入 `exportNoChapterName`）。
+    - 异常：部分同义（legado 无显式失败提示；Flutter 侧在写入失败时提示“切换失败：<错误>”以保证可观测，不改变主链路）。
+    - 文案：已同义（入口文案固定“TXT 不导出章节名”）。
+    - 排版：已同义（入口位于既有顶栏“更多”动作层，不改动下载/导出所有/列表布局）。
+    - 交互触发：已同义（开关开启后执行 TXT 导出不再写入章节标题；关闭后恢复章节标题输出；不影响 Epub 导出链路）。
+    - 验证：命令 `dart format lib/features/bookshelf/services/cache_export_task_service.dart lib/features/bookshelf/views/cache_export_view.dart`；命令 `flutter test test/widget_test.dart` 通过；命令 `flutter test test/search_book_info_view_compile_test.dart test/simple_reader_view_compile_test.dart` 通过；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> TXT 不导出章节名`（校验勾选态切换）以及 `开启后执行导出所有并检查 txt 文件`（校验章节标题不输出），`关闭后再次导出`（校验章节标题恢复输出）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_export_no_chapter_name` 开关入口、持久化与 TXT 导出标题开关联动，不改动图片导出/并行导出/导出格式与导出编码等后续能力。
+  - 下一项：按优先级继续推进 `P6-seq20`（`book_cache.xml / @+id/menu_export_pics_file / TXT 导出图片`）。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq18`（`book_cache.xml / @+id/menu_export_web_dav / 导出到 WebDav`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq18`（`book_cache.xml / @+id/menu_export_web_dav / 导出到 WebDav`）：缓存/导出页顶栏“更多”菜单补齐 legado 同义“导出到 WebDav”可勾选入口。打开菜单时读取持久化开关状态，点击后即时翻转并写入同名键 `webDavCacheBackup`；未提前并入 `menu_export_no_chapter_name/menu_export_pics_file/menu_parallel_export/menu_export_folder/menu_export_file_name/menu_export_type/menu_export_charset` 等后续序号动作。
+  - `P6-seq18` 差异点清单（实施前）：
+    - legado `book_cache.xml` 固定提供 `menu_export_web_dav`（checkable）且文案为 `export_to_web_dav`；Flutter 侧此前“更多”菜单仅有“导出所有/自定义Epub导出章节”，缺少同层级入口。
+    - legado `CacheActivity.onMenuOpened` 会按 `AppConfig.exportToWebDav` 回显菜单勾选态；Flutter 侧此前无对应状态读取与菜单回显。
+    - legado `CacheActivity.onCompatOptionsItemSelected(menu_export_web_dav)` 语义为点击后翻转并持久化 `PreferKey.exportToWebDav=webDavCacheBackup`；Flutter 侧此前无同义键写入与切换状态机。
+  - `P6-seq18` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 顶栏 更多 -> 导出到 WebDav`）。
+    - 状态：已同义（默认关闭；打开菜单按持久化值回显勾选；点击后即时翻转并写入 `webDavCacheBackup`）。
+    - 异常：部分同义（legado 无显式失败提示；Flutter 侧在写入失败时提示“切换失败：<错误>”以保证可观测，不改变主链路）。
+    - 文案：已同义（入口文案固定“导出到 WebDav”）。
+    - 排版：已同义（入口位于既有顶栏“更多”动作层，不改动下载/导出所有/列表布局）。
+    - 交互触发：部分同义（本序号已收敛“开关入口 + 勾选态 + 持久化”语义；导出产物上传 WebDav 的执行链路待后续导出能力序号继续闭环）。
+    - 验证：命令 `dart format lib/features/bookshelf/services/cache_export_task_service.dart lib/features/bookshelf/views/cache_export_view.dart`；命令 `flutter test test/widget_test.dart` 通过；命令 `flutter test test/search_book_info_view_compile_test.dart test/simple_reader_view_compile_test.dart` 通过；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> 导出到 WebDav`（校验勾选态切换）以及 `返回后重进缓存/导出页再次打开更多`（校验勾选态持久化回显）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_export_web_dav` 开关入口与持久化，不改动本地导出任务调度与 WebDav 上传实现链路。
+  - 下一项：按优先级继续推进 `P6-seq19`（`book_cache.xml / @+id/menu_export_no_chapter_name / TXT 不导出章节名`）。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq17`（`book_cache.xml / @+id/menu_enable_custom_export / 自定义Epub导出章节`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq17`（`book_cache.xml / @+id/menu_enable_custom_export / 自定义Epub导出章节`）：缓存/导出页顶栏“更多”菜单补齐 legado 同义“自定义Epub导出章节”可勾选入口。打开菜单时读取持久化开关状态，点击后即时翻转并写入同名键 `enableCustomExport`；未提前并入 `menu_export_web_dav/menu_export_no_chapter_name/menu_export_pics_file/menu_parallel_export/menu_export_folder/menu_export_file_name/menu_export_type/menu_export_charset` 等后续序号动作。
+  - `P6-seq17` 差异点清单（实施前）：
+    - legado `book_cache.xml` 固定提供 `menu_enable_custom_export`（checkable）且文案为 `custom_export_section`；Flutter 侧此前“更多”菜单仅有“导出所有”，缺少同层级入口。
+    - legado `CacheActivity.onMenuOpened` 会按 `AppConfig.enableCustomExport` 回显菜单勾选态；Flutter 侧此前无对应状态读取与菜单回显。
+    - legado `CacheActivity.onCompatOptionsItemSelected(menu_enable_custom_export)` 语义为点击后翻转并持久化 `enableCustomExport`；Flutter 侧此前无同义持久化键与切换状态机。
+  - `P6-seq17` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 顶栏 更多 -> 自定义Epub导出章节`）。
+    - 状态：已同义（默认关闭；打开菜单按持久化值回显勾选；点击后即时翻转并写入 `enableCustomExport`）。
+    - 异常：部分同义（legado 无显式失败提示；Flutter 侧在写入失败时提示“切换失败：<错误>”以保证可观测，不改变主链路）。
+    - 文案：已同义（入口文案固定“自定义Epub导出章节”）。
+    - 排版：已同义（入口位于既有顶栏“更多”动作层，不改动下载/导出所有/列表布局）。
+    - 交互触发：部分同义（本序号已收敛“开关入口 + 勾选态 + 持久化”语义；开关对 Epub 导出行为的实际影响待 `seq18~seq25` 后续能力完成后闭环）。
+    - 验证：命令 `dart format lib/features/bookshelf/services/cache_export_task_service.dart lib/features/bookshelf/views/cache_export_view.dart`；命令 `flutter test test/widget_test.dart` 通过；命令 `flutter test test/search_book_info_view_compile_test.dart test/simple_reader_view_compile_test.dart` 通过；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> 自定义Epub导出章节`（校验勾选态切换）以及 `返回后重进缓存/导出页再次打开更多`（校验勾选态持久化回显）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_enable_custom_export` 开关入口与持久化，不改动导出类型、导出编码与自定义章节导出服务链路。
+  - 下一项：按优先级继续推进 `P6-seq18`（`book_cache.xml / @+id/menu_export_web_dav / 导出到 WebDav`）。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq15`（`book_cache.xml / @+id/menu_export_all / 导出所有`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq15`（`book_cache.xml / @+id/menu_export_all / 导出所有`）：缓存/导出页顶栏补齐 legado 同义“更多 -> 导出所有”入口。点击后优先复用上次导出目录，不可写时重新选择目录；确认目录后按当前列表书籍批量导出已缓存章节 TXT，导出结束弹汇总结果，写文件失败落 `ExceptionLogService`。未提前并入 `menu_enable_custom_export/menu_export_type/menu_export_charset` 等后续序号动作。
+  - `P6-seq15` 差异点清单（实施前）：
+    - legado `book_cache.xml` 提供 `menu_export_all` 并由 `CacheActivity.onCompatOptionsItemSelected(menu_export_all)` 触发 `exportAll()`；Flutter 侧此前仅有 `menu_download` 动作，缺少“导出所有”入口。
+    - legado `exportAll()` 复用 `exportBookPath`，路径缺失时走目录选择器并记忆；Flutter 侧此前无“导出目录持久化 + 重新选择”状态流。
+    - legado `startExport(path, -10)` 支持按当前列表批量导出并在空书架时提示 `no_book`；Flutter 侧此前无批量导出任务与失败可观测日志链路。
+  - `P6-seq15` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 顶栏 更多 -> 导出所有`）。
+    - 状态：部分同义（已补齐“目录复用/目录重选/取消静默返回”状态流；保留差异为当前导出固定 TXT，`exportType` 切换待 `seq24` 收敛）。
+    - 异常：已同义（目录不可写时不启动导出；单书写文件失败写入 `ExceptionLogService` 并计入失败汇总）。
+    - 文案：已同义（动作层级与文案收敛为“更多/导出所有/取消”，结果反馈为导出汇总）。
+    - 排版：已同义（在 `Shadcn + Cupertino` 承载下补齐顶栏“更多”动作，下载入口保持原位；平台组件视觉差异属于允许范围）。
+    - 交互触发：已同义（触发后按当前列表逐本导出已缓存章节到目录；无已缓存章节书籍跳过；结束后回显成功/跳过/失败统计）。
+    - 验证：命令 `dart format lib/features/bookshelf/services/cache_export_task_service.dart lib/features/bookshelf/views/cache_export_view.dart`；命令 `flutter test test/widget_test.dart` 通过；命令 `flutter test test/search_book_info_view_compile_test.dart test/simple_reader_view_compile_test.dart` 通过；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 顶栏更多 -> 导出所有 -> 选择导出文件夹`（校验导出汇总与目录复用）；`再次触发导出所有`（校验复用目录可直接导出）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_export_all` 基线导出链路，`自定义Epub导出章节`/`导出格式`/`导出编码` 仍按队列在 `seq17/seq24/seq25` 后续收敛。
+  - 下一项：按优先级继续推进 `P6-seq17`（`book_cache.xml / @+id/menu_enable_custom_export / 自定义Epub导出章节`）。
+- `2026-02-23`
+  - 状态变更：完成 `P6-seq13`（`book_cache.xml / @+id/menu_download / 下载`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq13`（`book_cache.xml / @+id/menu_download / 下载`）：缓存/导出页从 placeholder 收敛为可执行承载页，顶栏补齐 legado 同义 `下载/停止` 入口。点击“下载”先弹“提醒/是否确认缓存当前列表书籍？”，确认后按当前列表在线书籍批量执行“从当前章节到末章”缓存；任务运行中入口切换为“停止”，再次点击可中断当前下载任务并回落稳定态。未提前并入 `menu_export_all/menu_book_group/menu_log` 等后续序号动作。
+  - `P6-seq13` 差异点清单（实施前）：
+    - legado `book_cache.xml` 提供顶栏一级 `menu_download`，并通过 `CacheActivity.onCompatOptionsItemSelected(menu_download)` 实现“开始/停止”切换；Flutter 侧此前 `CacheExportPlaceholderView` 无下载动作承载，入口不可触发。
+    - legado `CacheActivity` 在下载前固定弹出 `draw + sure_cache_book` 确认框；Flutter 侧此前缺少确认式提交，无法对齐状态边界。
+    - legado `CacheBook.start(..., durChapterIndex, lastChapterIndex)` 语义为“按当前章节到末章批量缓存”，运行中同入口切换为停止；Flutter 侧此前无批量缓存任务与可中断状态机。
+  - `P6-seq13` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 缓存/导出 -> 顶栏 下载/停止`）。
+    - 状态：已同义（空闲态显示“下载”；执行中切换“停止”；停止后回落空闲态）。
+    - 异常：已同义（章节链接为空/正文为空/正文抓取失败写入 `ExceptionLogService`；页面保持可恢复状态，不弹扩展成功提示）。
+    - 文案：已同义（下载前确认框使用“提醒/是否确认缓存当前列表书籍？”，运行态动作文案为“停止”）。
+    - 排版：已同义（在 `Shadcn + Cupertino` 承载下补齐顶栏动作、进度卡与书籍列表；平台组件视觉差异属于允许范围）。
+    - 交互触发：已同义（确认后按书籍当前章节起批量缓存到末章；运行中点“停止”立即发出取消信号并终止后续拉取）。
+    - 验证：命令 `dart format lib/features/bookshelf/services/cache_download_task_service.dart lib/features/bookshelf/views/cache_export_view.dart lib/features/bookshelf/views/cache_export_placeholder_view.dart lib/features/bookshelf/views/bookshelf_view.dart`；命令 `flutter test test/widget_test.dart` 通过；命令 `flutter test test/search_book_info_view_compile_test.dart test/simple_reader_view_compile_test.dart` 通过；手工路径（待回归）`书架 -> 更多 -> 缓存/导出 -> 下载 -> 确认`（校验下载态切换与章节缓存数量增长）以及 `下载进行中点击停止`（校验任务中断并回落空闲态）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_download` 状态机与批量缓存主链路，不改动导出配置键与书源结构。
+  - 下一项：按优先级继续推进 `P6-seq15`（`book_cache.xml / @+id/menu_export_all / 导出所有`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq400`（`txt_toc_rule_sel.xml / @+id/menu_disable_selection / 禁用所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq400`（`txt_toc_rule_sel.xml / @+id/menu_disable_selection / 禁用所选`）：`TXT 目录规则` 多选“更多”菜单补齐 legado 同义“禁用所选”入口。点击后仅对当前选中集合批量写入 `enabled=false` 并刷新列表；不追加成功提示，不跳转页面，保持多选态停留与静默状态流。
+  - `P5-seq400` 差异点清单（实施前）：
+    - legado `txt_toc_rule_sel.xml` 固定包含 `menu_disable_selection`；Flutter 侧此前多选“更多”菜单仅有“启用所选/导出所选”，缺少同层级“禁用所选”入口。
+    - legado `TxtTocRuleActivity.onMenuItemClick(menu_disable_selection)` 固定调用 `viewModel.disableSelection(*adapter.selection)`；Flutter 侧此前缺少按“当前选中集合”批量禁用的写库动作。
+    - legado `TxtTocRuleViewModel.disableSelection` 语义为仅重写所选规则 `enable=false` 并静默刷新列表；Flutter 侧此前无同义批量禁用状态机，入口不可达。
+  - `P5-seq400` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 目录规则 -> 多选 -> 勾选规则 -> 更多 -> 禁用所选`）。
+    - 状态：已同义（仅对当前选中规则批量写入 `enabled=false`；未选中规则保持原值；列表刷新后保留当前页面）。
+    - 异常：已同义（失败仅输出 `DisableSelectionTxtTocRuleError` 调试日志；页面保持当前状态且不追加扩展提示）。
+    - 文案：已同义（多选“更多”菜单文案补齐固定“禁用所选”）。
+    - 排版：已同义（入口位于既有多选“更多”动作层，不改动列表卡片、顶栏与底部操作栏布局）。
+    - 交互触发：已同义（仅在多选且存在选中项时可触发；执行后停留当前页，不触发导入/导出/条目级菜单链路）。
+    - 验证：命令 `dart format lib/features/reader/services/txt_toc_rule_store.dart lib/features/reader/views/txt_toc_rule_manage_view.dart`；命令 `flutter test test/simple_reader_view_compile_test.dart test/search_book_info_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 目录规则 -> 多选 -> 勾选至少一条启用规则 -> 更多 -> 禁用所选`（校验所选条目“已禁用”标记出现且无成功提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_disable_selection` 单项能力，不提前并入 `menu_export_selection`（`seq401`）。
+  - 下一项：按优先级继续推进 `P5-seq401`（`txt_toc_rule_sel.xml / @+id/menu_export_selection / 导出所选`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq399`（`txt_toc_rule_sel.xml / @+id/menu_enable_selection / 启用所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq399`（`txt_toc_rule_sel.xml / @+id/menu_enable_selection / 启用所选`）：`TXT 目录规则` 多选“更多”菜单补齐 legado 同义“启用所选”入口。点击后仅对当前选中集合批量写入 `enabled=true` 并刷新列表；不追加成功提示，不跳转页面，保持多选态停留与静默状态流。
+  - `P5-seq399` 差异点清单（实施前）：
+    - legado `txt_toc_rule_sel.xml` 固定包含 `menu_enable_selection`；Flutter 侧此前多选“更多”菜单仅有“导出所选”，缺少同层级“启用所选”入口。
+    - legado `TxtTocRuleActivity.onMenuItemClick(menu_enable_selection)` 固定调用 `viewModel.enableSelection(*adapter.selection)`；Flutter 侧此前缺少按“当前选中集合”批量启用的写库动作。
+    - legado `TxtTocRuleViewModel.enableSelection` 语义为仅重写所选规则 `enable=true` 并静默刷新列表；Flutter 侧此前无同义批量启用状态机，入口不可达。
+  - `P5-seq399` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 目录规则 -> 多选 -> 勾选规则 -> 更多 -> 启用所选`）。
+    - 状态：已同义（仅对当前选中规则批量写入 `enabled=true`；未选中规则保持原值；列表刷新后保留当前页面）。
+    - 异常：已同义（失败仅输出 `EnableSelectionTxtTocRuleError` 调试日志；页面保持当前状态且不追加扩展提示）。
+    - 文案：已同义（多选“更多”菜单文案固定“启用所选”）。
+    - 排版：已同义（入口位于既有多选“更多”动作层，不改动列表卡片、顶栏与底部操作栏布局）。
+    - 交互触发：已同义（仅在多选且存在选中项时可触发；执行后停留当前页，不触发导入/导出/条目级菜单链路）。
+    - 验证：命令 `dart format lib/features/reader/services/txt_toc_rule_store.dart lib/features/reader/views/txt_toc_rule_manage_view.dart`；命令 `flutter test test/simple_reader_view_compile_test.dart test/search_book_info_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 目录规则 -> 多选 -> 勾选至少一条禁用规则 -> 更多 -> 启用所选`（校验所选条目“已禁用”标记消失且无成功提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_enable_selection` 单项能力，不提前并入 `menu_disable_selection`（`seq400`）。
+  - 下一项：按优先级继续推进 `P5-seq400`（`txt_toc_rule_sel.xml / @+id/menu_disable_selection / 禁用所选`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq398`（`txt_toc_rule_item.xml / @+id/menu_del / 删除`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq398`（`txt_toc_rule_item.xml / @+id/menu_del / 删除`）：`TXT 目录规则` 列表条目补齐 legado 同义“更多 -> 删除”动作。点击后先清理当前条目选中态，再弹出确认框（标题“提醒”，内容“是否确认删除？\n<规则名>”）；仅在确认后删库并静默刷新列表，不追加成功提示、不跳转页面。
+  - `P5-seq398` 差异点清单（实施前）：
+    - legado `txt_toc_rule_item.xml` 固定包含 `menu_del`；Flutter 侧此前条目“更多”菜单仅有“置顶/置底”，缺少同层级“删除”入口。
+    - legado `TxtTocRuleAdapter.showMenu(menu_del)` 语义为先执行 `selected.remove(source)` 再触发删除回调；Flutter 侧此前缺少“删除前先清理选中态”的边界处理。
+    - legado `TxtTocRuleActivity.del` 为确认式删除（`draw + sure_del + source.name`）且全流程静默；Flutter 侧此前无条目级删除状态机。
+  - `P5-seq398` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 目录规则 -> 任一规则右侧更多 -> 删除`）。
+    - 状态：已同义（触发删除先移除当前条目选中态；仅确认后删库并刷新列表；取消不删库）。
+    - 异常：已同义（失败仅输出 `DeleteTxtTocRuleError` 调试日志；页面保持当前状态且不追加扩展提示）。
+    - 文案：已同义（删除确认框标题“提醒”，正文“是否确认删除？\n<规则名>”；动作“取消/确定”）。
+    - 排版：已同义（仅在既有条目更多菜单追加“删除”动作，不改动列表卡片与多选底栏布局）。
+    - 交互触发：已同义（仅非多选模式触发；保持“先清选中态 -> 再确认删除”的时序）。
+    - 验证：命令 `dart format lib/features/reader/services/txt_toc_rule_store.dart lib/features/reader/views/txt_toc_rule_manage_view.dart`；命令 `flutter test test/simple_reader_view_compile_test.dart test/search_book_info_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 目录规则 -> 任一规则右侧更多 -> 删除 -> 取消/确定`（校验取消不删库、确认后条目移除且无成功提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_del` 单项能力，不提前并入 `menu_enable_selection/menu_disable_selection`（`seq399~400`）。
+  - 下一项：按优先级继续推进 `P5-seq399`（`txt_toc_rule_sel.xml / @+id/menu_enable_selection / 启用所选`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq397`（`txt_toc_rule_item.xml / @+id/menu_bottom / 置底`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq397`（`txt_toc_rule_item.xml / @+id/menu_bottom / 置底`）：`TXT 目录规则` 列表条目补齐 legado 同义“更多 -> 置底”动作。点击后仅将目标规则 `serialNumber` 写为当前最大序号加一并静默刷新列表排序，不追加成功提示、不跳转页面。
+  - `P5-seq397` 差异点清单（实施前）：
+    - legado `txt_toc_rule_item.xml` 固定包含 `menu_bottom`；Flutter 侧此前条目“更多”菜单仅有“置顶”，缺少同层级“置底”入口。
+    - legado `TxtTocRuleViewModel.toBottom` 语义为读取全量最大序号后写入 `maxOrder + index`；Flutter 侧此前缺少对应 `serialNumber` 置底写库状态机。
+    - legado 置底动作全流程静默；Flutter 侧此前无该动作，缺少同义错误可观测口径。
+  - `P5-seq397` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 目录规则 -> 任一规则右侧更多 -> 置底`）。
+    - 状态：已同义（仅重写目标规则 `serialNumber=maxSerial+1`，其余规则不改写；列表按序号即时重排）。
+    - 异常：已同义（失败仅输出 `BottomTxtTocRuleError` 调试日志；页面保持当前状态且不追加扩展提示）。
+    - 文案：已同义（条目动作文案补齐“置底”；与“置顶”同层展示）。
+    - 排版：已同义（未改动列表卡片布局、多选底栏与导入导出布局）。
+    - 交互触发：已同义（仅在非多选模式触发；多选模式维持“点按即选中”语义）。
+    - 验证：命令 `dart format lib/features/reader/services/txt_toc_rule_store.dart lib/features/reader/views/txt_toc_rule_manage_view.dart`；命令 `flutter test test/simple_reader_view_compile_test.dart test/search_book_info_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 目录规则 -> 任一规则右侧更多 -> 置底`（校验目标规则下移到列表底部且无成功提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_bottom` 单项能力，不提前并入 `menu_del/menu_enable_selection/menu_disable_selection`（`seq398~400`）。
+  - 下一项：按优先级继续推进 `P5-seq398`（`txt_toc_rule_item.xml / @+id/menu_del / 删除`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq396`（`txt_toc_rule_item.xml / @+id/menu_top / 置顶`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq396`（`txt_toc_rule_item.xml / @+id/menu_top / 置顶`）：`TXT 目录规则` 列表条目补齐 legado 同义“更多 -> 置顶”动作。点击后仅将目标规则 `serialNumber` 写为当前最小序号减一并静默刷新列表排序，不追加成功提示、不跳转页面。
+  - `P5-seq396` 差异点清单（实施前）：
+    - legado `txt_toc_rule_item.xml` 固定包含 `menu_top`；Flutter 侧此前 `TXT 目录规则` 条目缺少条目级“更多”入口，无法触发同层级置顶动作。
+    - legado `TxtTocRuleViewModel.toTop` 语义为读取全量最小序号后写入 `minOrder - 1`；Flutter 侧此前缺少对应 `serialNumber` 置顶写库状态机。
+    - legado 置顶动作全流程静默；Flutter 侧此前无该动作，缺少同义错误可观测口径。
+  - `P5-seq396` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 目录规则 -> 任一规则右侧更多 -> 置顶`）。
+    - 状态：已同义（仅重写目标规则 `serialNumber=minSerial-1`，其余规则不改写；列表按序号即时重排）。
+    - 异常：已同义（失败仅输出 `TopTxtTocRuleError` 调试日志；页面保持当前状态且不追加扩展提示）。
+    - 文案：已同义（条目动作文案固定“置顶”）。
+    - 排版：已同义（非多选态条目补齐右侧“更多”热区；未改动多选底栏与导入导出布局）。
+    - 交互触发：已同义（仅在非多选模式触发；多选模式维持原有“点按即选中”语义）。
+    - 验证：命令 `dart format lib/features/reader/services/txt_toc_rule_store.dart lib/features/reader/views/txt_toc_rule_manage_view.dart`；命令 `flutter test test/simple_reader_view_compile_test.dart test/search_book_info_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 目录规则 -> 任一规则右侧更多 -> 置顶`（校验目标规则上移到列表顶部且无成功提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_top` 单项能力，不提前并入 `menu_bottom/menu_del/menu_enable_selection/menu_disable_selection`（`seq397~400`）。
+  - 下一项：按优先级继续推进 `P5-seq397`（`txt_toc_rule_item.xml / @+id/menu_bottom / 置底`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq393`（`txt_toc_rule_edit.xml / @+id/menu_save / 保存`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq393`（`txt_toc_rule_edit.xml / @+id/menu_save / 保存`）：`TXT 目录规则` 编辑页补齐 legado 同义“顶栏一级保存”状态机。点击“保存”后仅提交 `name/rule/example`，保留 `id/enabled/serialNumber`；校验通过后关闭编辑页并回传规则，管理页执行 `upsert` 落库并刷新列表，不追加成功提示。
+  - `P5-seq393` 差异点清单（实施前）：
+    - legado `txt_toc_rule_edit.xml` 固定提供 `menu_save` 顶栏一级动作；Flutter 侧虽已有“保存”按钮，但 `example` 字段保存时将空输入转成 `null`，无法对齐 legado `toString()` 的空串回写边界。
+    - legado `TxtTocRuleEditDialog.getRuleFromView` 仅更新 `name/rule/example`，并保留 `id/enable/serialNumber`；Flutter 侧需确保编辑已有规则时字段保持同义，不产生附加字段重置。
+    - legado `menu_save` 成功后直接关闭编辑页且无成功提示；Flutter 侧需保持“保存成功静默返回”语义，避免扩展反馈分支。
+  - `P5-seq393` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 目录规则 -> 点击规则进入编辑页 -> 顶栏保存`）。
+    - 状态：已同义（保存仅更新 `name/rule/example`；`id/enabled/serialNumber` 由初始规则透传保留）。
+    - 异常：已同义（名称为空提示“名称不能为空”；正则非法提示“正则语法错误或不支持(txt)：...”；校验失败停留当前页）。
+    - 文案：已同义（编辑页一级动作文案固定“保存”）。
+    - 排版：已同义（保存动作保持顶栏一级；未改动编辑表单与管理列表布局）。
+    - 交互触发：已同义（`保存 -> 校验 -> 回传 -> upsert 落库 -> 列表刷新`；保存成功静默返回）。
+    - 验证：命令 `dart format lib/features/reader/views/txt_toc_rule_edit_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 目录规则 -> 点击任一规则 -> 清空示例 -> 保存`（校验示例可被清空且列表刷新）；手工路径（待回归）`名称留空或输入非法正则后保存`（校验拦截提示并停留编辑页）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_save` 保存边界，不提前并入 `menu_copy_rule/menu_paste_rule` 之外的后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq396`（`txt_toc_rule_item.xml / @+id/menu_top / 置顶`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq387`（`txt_toc_rule.xml / @+id/menu_add / 添加`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq387`（`txt_toc_rule.xml / @+id/menu_add / 添加`）：`TXT 目录规则` 管理页补齐 legado 同义“添加”一级入口。点击“添加”后进入规则编辑页，保存时执行名称与正则校验；校验通过后回传并落库，列表刷新可见新增规则；校验失败则停留编辑页并提示错误。
+  - `P5-seq387` 差异点清单（实施前）：
+    - legado `txt_toc_rule.xml` 固定包含 `menu_add(@string/add)` 且位于顶栏一级动作；Flutter 侧此前仅有“多选/更多”，缺少同层级“添加”入口。
+    - legado `TxtTocRuleActivity.menu_add -> TxtTocRuleEditDialog` 支持“新建草稿 -> 编辑 -> 保存后落库”；Flutter 侧此前编辑页无保存回传，管理页无法新增规则。
+    - legado `TxtTocRuleEditDialog.checkValid` 固定校验“名称不能为空 + 正则可编译”；Flutter 侧此前缺少同义保存校验，无法对齐异常边界。
+  - `P5-seq387` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 目录规则 -> 右上角添加`）。
+    - 状态：已同义（点击“添加”进入空白编辑页；保存成功后落库并刷新列表；取消返回不落库）。
+    - 异常：已同义（名称为空提示“名称不能为空”；正则非法提示“正则语法错误或不支持(txt)：...”；保存失败记录 `SaveTxtTocRuleError`）。
+    - 文案：已同义（顶栏新增动作文案固定“添加”；编辑页新增动作文案“保存”）。
+    - 排版：已同义（“添加/多选/更多”并列于顶栏动作层，未改动列表与多选底栏布局）。
+    - 交互触发：已同义（`添加 -> 编辑 -> 保存 -> 回传 -> upsert 落库 -> 列表刷新`；编辑已有规则同链路回写）。
+    - 验证：命令 `dart format lib/features/reader/services/txt_toc_rule_store.dart lib/features/reader/views/txt_toc_rule_manage_view.dart lib/features/reader/views/txt_toc_rule_edit_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 目录规则 -> 右上角添加 -> 填写名称与正则 -> 保存`（校验新增可见）；手工路径（待回归）`名称留空或输入非法正则后保存`（校验拦截提示并停留编辑页）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_add` 及其保存校验闭环，不提前并入 `txt_toc_rule_edit.xml` 其它菜单能力。
+  - 下一项：按优先级继续推进 `P5-seq393`（`txt_toc_rule_edit.xml / @+id/menu_save / 保存`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq298`（`replace_rule_sel.xml / @+id/menu_bottom_sel / 置底所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq298`（`replace_rule_sel.xml / @+id/menu_bottom_sel / 置底所选`）：`文本替换规则` 多选“更多”菜单补齐 legado 同义“置底所选”入口。点击后仅对当前选中集合批量重写 `order` 为置底序列并刷新列表；不追加成功提示，不跳转页面，保持多选页内停留与静默状态流。
+  - `P5-seq298` 差异点清单（实施前）：
+    - legado `replace_rule_sel.xml` 固定包含 `menu_bottom_sel`；Flutter 侧此前多选“更多”菜单缺少“置底所选”入口。
+    - legado `ReplaceRuleActivity.onMenuItemClick(menu_bottom_sel)` 固定调用 `viewModel.bottomSelect(adapter.selection)`；Flutter 侧此前缺少按“当前选中集合”批量置底的触发链路。
+    - legado `ReplaceRuleViewModel.bottomSelect` 语义为 `maxOrder` 起步并按当前选中顺序执行 `order=maxOrder++` 批量写回，动作全程静默；Flutter 侧此前无该同义写库状态机。
+  - `P5-seq298` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 多选 -> 勾选规则 -> 更多 -> 置底所选`）。
+    - 状态：已同义（仅对当前选中规则批量重写 `order` 并置底，且保持选中集合在当前列表中的相对顺序）。
+    - 异常：已同义（写入异常仅输出 `BottomSelectionReplaceRuleError` 调试日志；页面保持当前状态且不追加扩展提示）。
+    - 文案：已同义（多选“更多”菜单文案固定“置底所选”）。
+    - 排版：已同义（入口位于既有多选“更多”动作层，不改动列表与底部操作栏布局）。
+    - 交互触发：已同义（仅在多选且存在选中项时可触发；执行后停留当前页，不触发导入/导出与条目级菜单链路）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；命令 `flutter test test/search_view_compile_test.dart test/widget_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 多选 -> 勾选至少两条规则 -> 更多 -> 置底所选`（校验所选规则按当前列表顺序移动到底部且无成功提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_bottom_sel` 单项能力，不提前并入 `txt_toc_rule.xml` 后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq387`（`txt_toc_rule.xml / @+id/menu_add / 添加`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq297`（`replace_rule_sel.xml / @+id/menu_top_sel / 置顶所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq297`（`replace_rule_sel.xml / @+id/menu_top_sel / 置顶所选`）：`文本替换规则` 多选“更多”菜单补齐 legado 同义“置顶所选”入口。点击后仅对当前选中集合批量重写 `order` 为置顶序列并刷新列表；不追加成功提示，不跳转页面，保持多选页内停留与静默状态流。
+  - `P5-seq297` 差异点清单（实施前）：
+    - legado `replace_rule_sel.xml` 固定包含 `menu_top_sel`；Flutter 侧此前多选“更多”菜单仅有“启用所选/禁用所选/导出所选”，入口缺失。
+    - legado `ReplaceRuleActivity.onMenuItemClick(menu_top_sel)` 固定调用 `viewModel.topSelect(adapter.selection)`；Flutter 侧此前缺少按“当前选中集合”批量置顶的触发链路。
+    - legado `ReplaceRuleViewModel.topSelect` 语义为 `minOrder - selectionSize` 起步并按当前列表顺序递增写回，确保“批量置顶且保持相对顺序”；Flutter 侧此前无该同义写库状态机。
+  - `P5-seq297` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 多选 -> 勾选规则 -> 更多 -> 置顶所选`）。
+    - 状态：已同义（仅对当前选中规则批量重写 `order` 并置顶，且保持选中集合在当前列表中的相对顺序）。
+    - 异常：已同义（写入异常仅输出 `TopSelectionReplaceRuleError` 调试日志；页面保持当前状态且不追加扩展提示）。
+    - 文案：已同义（多选“更多”菜单文案固定“置顶所选”）。
+    - 排版：已同义（入口位于既有多选“更多”动作层，不改动列表与底部操作栏布局）。
+    - 交互触发：已同义（仅在多选且存在选中项时可触发；执行后停留当前页，不触发导入/导出与条目级菜单链路）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；命令 `flutter test test/search_view_compile_test.dart test/widget_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 多选 -> 勾选至少两条规则 -> 更多 -> 置顶所选`（校验所选规则按当前列表顺序移动到顶部且无成功提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_top_sel` 单项能力，不提前并入 `menu_bottom_sel`（`seq298`）。
+  - 下一项：按优先级继续推进 `P5-seq298`（`replace_rule_sel.xml / @+id/menu_bottom_sel / 置底所选`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq296`（`replace_rule_sel.xml / @+id/menu_disable_selection / 禁用所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq296`（`replace_rule_sel.xml / @+id/menu_disable_selection / 禁用所选`）：`文本替换规则` 多选“更多”菜单补齐 legado 同义“禁用所选”入口。点击后仅对当前选中集合批量写入 `isEnabled=false` 并刷新列表；不追加成功提示，不跳转页面，保持多选页内停留与静默状态流。
+  - `P5-seq296` 差异点清单（实施前）：
+    - legado `replace_rule_sel.xml` 固定包含 `menu_disable_selection`；Flutter 侧此前多选“更多”菜单仅有“启用所选/导出所选”，入口缺失。
+    - legado `ReplaceRuleActivity.onMenuItemClick(menu_disable_selection)` 固定调用 `viewModel.disableSelection(adapter.selection)`；Flutter 侧此前缺少按“当前选中集合”批量禁用的写库动作。
+    - legado `ReplaceRuleViewModel.disableSelection` 语义为复制所选规则并统一写入 `isEnabled=false`，全流程静默；Flutter 侧此前无该同义状态流证据。
+  - `P5-seq296` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 多选 -> 勾选规则 -> 更多 -> 禁用所选`）。
+    - 状态：已同义（仅对当前选中规则批量置 `isEnabled=false` 并刷新列表；未选中规则保持原值）。
+    - 异常：已同义（写入异常仅输出 `DisableSelectionReplaceRuleError` 调试日志；页面保持当前状态且不追加扩展提示）。
+    - 文案：已同义（多选“更多”菜单文案固定“禁用所选”）。
+    - 排版：已同义（入口位于既有多选“更多”动作层，不改动列表与底部操作栏布局）。
+    - 交互触发：已同义（仅在多选且存在选中项时可触发；执行后停留当前页，不触发导入/导出以外链路）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；命令 `flutter test test/search_view_compile_test.dart test/widget_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 多选 -> 勾选至少一条启用规则 -> 更多 -> 禁用所选`（校验所选条目“禁用”标记出现，且无成功提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_disable_selection` 单项能力，不提前并入 `menu_top_sel/menu_bottom_sel`（`seq297~298`）。
+  - 下一项：按优先级继续推进 `P5-seq297`（`replace_rule_sel.xml / @+id/menu_top_sel / 置顶所选`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq295`（`replace_rule_sel.xml / @+id/menu_enable_selection / 启用所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq295`（`replace_rule_sel.xml / @+id/menu_enable_selection / 启用所选`）：`文本替换规则` 多选“更多”菜单补齐 legado 同义“启用所选”入口。点击后仅对当前选中集合批量写入 `isEnabled=true` 并刷新列表；不追加成功提示，不跳转页面，保持多选页内停留与静默状态流。
+  - `P5-seq295` 差异点清单（实施前）：
+    - legado `replace_rule_sel.xml` 固定包含 `menu_enable_selection`；Flutter 侧此前多选“更多”菜单仅有“导出所选”，入口缺失。
+    - legado `ReplaceRuleActivity.onMenuItemClick(menu_enable_selection)` 固定调用 `viewModel.enableSelection(adapter.selection)`；Flutter 侧此前缺少按“当前选中集合”批量启用的写库动作。
+    - legado `ReplaceRuleViewModel.enableSelection` 语义为复制所选规则并统一写入 `isEnabled=true`，全流程静默；Flutter 侧此前无该同义状态流证据。
+  - `P5-seq295` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 多选 -> 勾选规则 -> 更多 -> 启用所选`）。
+    - 状态：已同义（仅对当前选中规则批量置 `isEnabled=true` 并刷新列表；未选中规则保持原值）。
+    - 异常：已同义（写入异常仅输出 `EnableSelectionReplaceRuleError` 调试日志；页面保持当前状态且不追加扩展提示）。
+    - 文案：已同义（多选“更多”菜单文案固定“启用所选”）。
+    - 排版：已同义（入口位于既有多选“更多”动作层，不改动列表与底部操作栏布局）。
+    - 交互触发：已同义（仅在多选且存在选中项时可触发；执行后停留当前页，不触发导入/导出以外链路）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；命令 `flutter test test/search_view_compile_test.dart test/widget_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 多选 -> 勾选至少一条禁用规则 -> 更多 -> 启用所选`（校验所选条目“禁用”标记消失，且无成功提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_enable_selection` 单项能力，不提前并入 `menu_disable_selection/menu_top_sel/menu_bottom_sel`（`seq296~298`）。
+  - 下一项：按优先级继续推进 `P5-seq296`（`replace_rule_sel.xml / @+id/menu_disable_selection / 禁用所选`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq294`（`replace_rule_item.xml / @+id/menu_del / 删除`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq294`（`replace_rule_item.xml / @+id/menu_del / 删除`）：`文本替换规则` 条目“更多”菜单补齐 legado 同义“删除”入口。点击后先清理该条目的当前选中态，再弹出确认框（标题“提醒”，正文“是否确认删除？\n<规则名>”）；确认后执行删库并由列表流式刷新移除条目，取消则不删库。全流程保持静默，不追加成功提示，不跳转页面。
+  - `P5-seq294` 差异点清单（实施前）：
+    - legado `replace_rule_item.xml` 条目菜单固定包含 `menu_top/menu_bottom/menu_del`；Flutter 侧此前仅有“置顶/置底”，`menu_del` 入口缺失。
+    - legado `ReplaceRuleAdapter.showMenu(menu_del)` 语义为“先回调 `delete(item)`，并立即 `selected.remove(item)`”；Flutter 侧此前无“删除前先移除选中态”边界，无法对齐取消删除后的选中状态流。
+    - legado `ReplaceRuleActivity.delete` 固定弹出“提醒 + 是否确认删除？\n<规则名>”确认框，确认后才执行 `viewModel.delete(rule)`；Flutter 侧此前无等价确认链路。
+  - `P5-seq294` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 任一规则右侧更多 -> 删除`）。
+    - 状态：已同义（点击“删除”后先移除该条目选中态；确认后删库并移除条目，取消不删库）。
+    - 异常：已同义（失败仅输出 `DeleteReplaceRuleError` 调试日志；页面保持当前状态且不追加扩展提示）。
+    - 文案：已同义（动作文案“删除”；确认框标题“提醒”，正文“是否确认删除？\n<规则名>”）。
+    - 排版：已同义（入口继续位于条目“更多”动作层，与“置顶/置底”同层级，不改动列表布局）。
+    - 交互触发：已同义（点击“删除”仅触发确认链路；确认后删库，取消后静默返回；不触发编辑与批量操作链路）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；命令 `flutter test test/search_view_compile_test.dart test/widget_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 任一规则右侧更多 -> 删除 -> 取消/确定`（校验确认框文案、取消不删库、确认后条目消失且无成功提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_del` 单项能力，不提前并入 `replace_rule_sel.xml` 批量动作（`seq295~298`）。
+  - 下一项：按优先级继续推进 `P5-seq295`（`replace_rule_sel.xml / @+id/menu_enable_selection / 启用所选`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq293`（`replace_rule_item.xml / @+id/menu_bottom / 置底`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq293`（`replace_rule_item.xml / @+id/menu_bottom / 置底`）：`文本替换规则` 条目“更多”菜单补齐 legado 同义“置底”入口。点击后仅执行单条规则置底写库：读取当前规则最大 `order` 并写入 `maxOrder + 1`，随后由列表流式刷新自然重排；全流程保持静默，不追加成功提示，不跳转页面。
+  - `P5-seq293` 差异点清单（实施前）：
+    - legado `replace_rule_item.xml` 条目菜单固定包含 `menu_top/menu_bottom/menu_del`；Flutter 侧此前仅有“置顶”，`menu_bottom` 入口缺失。
+    - legado `ReplaceRuleAdapter.showMenu(menu_bottom)` 固定回调 `callBack.toBottom(item)`；Flutter 侧此前缺少条目级“置底”触发链路，无法对齐同层级热区语义。
+    - legado `ReplaceRuleViewModel.toBottom` 语义为 `order = maxOrder + 1` 后写库且静默返回；Flutter 侧此前无等价写库动作。
+  - `P5-seq293` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 任一规则右侧更多 -> 置底`）。
+    - 状态：已同义（点击后目标规则写入 `maxOrder + 1` 并在列表中后移；不影响其它规则启停状态）。
+    - 异常：已同义（失败仅输出 `BottomReplaceRuleError` 调试日志；页面保持当前状态且不追加扩展提示）。
+    - 文案：已同义（动作文案“置底”）。
+    - 排版：已同义（入口继续位于条目“更多”动作层，与既有“置顶”同层级，不改动列表布局）。
+    - 交互触发：已同义（点击后仅触发单条置底写库；不触发删除、编辑或批量操作链路）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；命令 `flutter test test/search_view_compile_test.dart test/widget_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 任一规则右侧更多 -> 置底`（校验目标规则后移且无成功提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_bottom` 单项能力，不提前并入 `menu_del`（`seq294`）与多选批量动作（`seq295~298`）。
+  - 下一项：按优先级继续推进 `P5-seq294`（`replace_rule_item.xml / @+id/menu_del / 删除`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq287`（`replace_rule.xml / @+id/menu_add_replace_rule / 新建替换`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq287`（`replace_rule.xml / @+id/menu_add_replace_rule / 新建替换`）：`文本替换规则` 页补齐 legado 同义“更多菜单 -> 新建替换”入口。将顶栏 `+` 入口下沉为“更多”菜单动作，点击后仅打开空白替换规则编辑页，不自动落库、不追加成功提示，返回即取消。
+  - `P5-seq287` 差异点清单（实施前）：
+    - legado `replace_rule.xml` 中 `menu_add_replace_rule` 为 `showAsAction=never`，入口位于一级“更多菜单”；Flutter 侧此前入口位于顶栏 `+`，缺少同层级菜单动作。
+    - legado `ReplaceRuleActivity.menu_add_replace_rule` 固定执行 `ReplaceEditActivity.startIntent(this)`，仅进入新建编辑承载页；Flutter 侧需确保触发后不附带自动保存副作用。
+    - `docs/plans/2026-02-21-legado-feature-priority-queue.csv` 中 `seq287` 仍为 `pending`，缺少完成态回填。
+  - `P5-seq287` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角更多 -> 新建替换`）。
+    - 状态：已同义（点击后进入空白编辑页；未保存直接返回不落库）。
+    - 异常：已同义（菜单忙碌态会禁用重复触发，不追加扩展提示）。
+    - 文案：已同义（动作文案“新建替换”）。
+    - 排版：已同义（移除顶栏 `+`，入口收敛到“更多”动作层级，匹配 `showAsAction=never`）。
+    - 交互触发：已同义（动作仅触发新建编辑承载页，不触发导入/导出/删除链路）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；命令 `flutter test test/search_view_compile_test.dart test/widget_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角更多 -> 新建替换`（校验进入空白编辑页且返回不落库）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_add_replace_rule` 入口层级与触发语义，不改动 `replace_rule_item`（`seq292~294`）后续能力。
+  - 下一项：按优先级继续推进 `P5-seq292`（`replace_rule_item.xml / @+id/menu_top / 置顶`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq286`（`replace_rule.xml / @+id/menu_group_null / 未分组`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq286`（`replace_rule.xml / @+id/menu_group_null / 未分组`）：`文本替换规则` 的“分组”弹层补齐 legado 同义 `menu_group_null` 语义。点击“未分组”后仅展示 `group` 为空、空白或包含“未分组”关键词的规则；筛选切换保持静默，不追加成功提示，不跳转页面。并将“未分组”关键词抽为统一常量，确保入口文案与判定口径一致可追踪。
+  - `P5-seq286` 差异点清单（实施前）：
+    - legado `ReplaceRuleActivity.menu_group_null` 固定执行 `searchView.setQuery(getString(R.string.no_group), true)`；Flutter 侧虽有“未分组”筛选分支，但关键词判定为散点硬编码，迁移证据不集中。
+    - legado `ReplaceRuleDao.flowNoGroup()` 语义为 `group is null` 或 `trim(group)=''` 或 `trim(group) like '%未分组%'`；Flutter 侧需明确保持同义判定边界。
+    - `docs/plans/2026-02-21-legado-feature-priority-queue.csv` 中 `seq286` 仍为 `pending`，缺少完成态回填。
+  - `P5-seq286` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角分组按钮 -> 未分组`）。
+    - 状态：已同义（点击后仅保留无分组规则；切换筛选时清空当前多选态并停留当前页）。
+    - 异常：已同义（空数据与筛选切换均保持静默，不追加扩展提示）。
+    - 文案：已同义（“未分组”入口文案与 no-group 判定关键词统一）。
+    - 排版：已同义（入口仍位于分组动作弹层，不改变 `menu_group` 已对齐的层级结构）。
+    - 交互触发：已同义（点击“未分组”直接触发 no-group 过滤；取消弹层不改变当前筛选状态）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；命令 `flutter test test/widget_test.dart test/search_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角分组按钮 -> 未分组`（校验仅展示无分组规则，且包含 `group` 含“未分组”的规则）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_group_null` 判定口径与回填证据，不改动 `menu_add_replace_rule`（`seq287`）后续能力。
+  - 下一项：按优先级继续推进 `P5-seq287`（`replace_rule.xml / @+id/menu_add_replace_rule / 新建替换`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq285`（`replace_rule.xml / @+id/menu_group_manage / 分组管理`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq285`（`replace_rule.xml / @+id/menu_group_manage / 分组管理`）：`文本替换规则` 的“分组”弹层补齐 legado 同义“分组管理”入口。点击后进入分组管理弹层（标题“分组管理”，右上角“添加分组”）；弹层内支持“编辑/删除”分组并实时刷新列表。添加分组语义对齐 legado `addGroup`：仅为 `group` 为空规则赋值；编辑/删除语义对齐 legado `upGroup/delGroup`：按逗号分组集合执行移除与重写，流程保持静默无成功提示。
+  - `P5-seq285` 差异点清单（实施前）：
+    - legado `replace_rule.xml` 的 `menu_group` 子菜单首项为 `menu_group_manage`；Flutter 侧此前仅有“全部/未分组/动态分组”筛选，缺少分组管理入口。
+    - legado `GroupManageDialog` 提供“分组管理”弹层与“添加/编辑/删除”分组动作；Flutter 侧此前无对应承载层。
+    - legado `ReplaceRuleViewModel` 提供 `addGroup/upGroup/delGroup` 变更链路；Flutter 侧此前无等价分组增删改写库能力。
+  - `P5-seq285` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角分组按钮 -> 分组管理`）。
+    - 状态：已同义（管理弹层支持“添加分组/编辑分组/删除”；变更后分组列表与规则列表即时刷新）。
+    - 异常：已同义（异常仅输出 `AddReplaceRuleGroupError/RenameReplaceRuleGroupError` 调试日志；不追加成功/失败扩展提示）。
+    - 文案：已同义（“分组管理”“添加分组”“编辑分组”“删除”“分组名称”）。
+    - 排版：已同义（分组管理采用独立弹层，顶部标题与添加动作同层，列表项右侧提供编辑/删除热区）。
+    - 交互触发：已同义（添加仅处理无分组规则；编辑/删除按分组集合静默落库；取消输入不落库）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；命令 `flutter test test/widget_test.dart test/search_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角分组按钮 -> 分组管理 -> 添加分组/编辑分组/删除分组`（校验无分组赋值、分组改名/删除与静默刷新）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_group_manage` 入口与分组管理状态机，不改动 `menu_group_null/menu_add_replace_rule`（`seq286/287`）后续能力。
+  - 下一项：按优先级继续推进 `P5-seq286`（`replace_rule.xml / @+id/menu_group_null / 未分组`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq284`（`replace_rule.xml / @+id/menu_group / 分组`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq284`（`replace_rule.xml / @+id/menu_group / 分组`）：`文本替换规则` 列表页补齐 legado 同义“顶栏一级分组入口”与分组筛选状态机。移除页面顶部胶囊分组条，改为右上角分组动作弹层；分组选项由规则 `group` 字段按 `[,;，；]` 拆分去重并按 legado 近似 `cnCompare` 排序。点击“全部/未分组/动态分组”后立即按对应条件过滤列表并清空当前多选态。
+  - `P5-seq284` 差异点清单（实施前）：
+    - legado `replace_rule.xml` 采用 `menu_group` 顶栏一级入口承载分组筛选；Flutter 侧此前为页面内胶囊筛选条，入口层级不一致。
+    - legado 分组集合来自 `flowGroups -> dealGroups`，会对 `group` 进行 `[,;，；]` 拆分后去重排序；Flutter 侧此前直接按整段 `group` 字符串去重，缺少拆分语义。
+    - legado `menu_group_null` 过滤语义为 `group 为空` 或 `group 包含“未分组”`；Flutter 侧此前无该等价筛选分支且额外提供了 legado 不存在的“未启用”分组。
+  - `P5-seq284` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角分组图标`）。
+    - 状态：已同义（分组弹层含“全部/未分组/动态分组”；点击即刷新列表过滤并保持当前页停留）。
+    - 异常：已同义（空规则集时分组入口可打开但不触发异常；过滤动作无额外提示）。
+    - 文案：已同义（动作标题“分组”；筛选项“全部/未分组/动态分组”）。
+    - 排版：已同义（分组入口从页面内容区上移到顶栏一级动作区；移除非 legado 胶囊筛选条）。
+    - 交互触发：已同义（“未分组”按 `group` 空值或包含“未分组”过滤；动态分组按 `group.contains` 命中过滤）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；命令 `flutter test test/widget_test.dart test/search_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角分组 -> 选择全部/未分组/任意分组`（校验过滤结果与多选态重置）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_group` 筛选入口与过滤语义，不改动 `menu_group_manage`（`seq285`）与 `menu_group_null/menu_add_replace_rule`（`seq286/287`）后续能力。
+  - 下一项：按优先级继续推进 `P5-seq285`（`replace_rule.xml / @+id/menu_group_manage / 分组管理`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq281`（`replace_edit.xml / @+id/menu_save / 保存`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq281`（`replace_edit.xml / @+id/menu_save / 保存`）：`文本替换规则` 编辑页补齐 legado 同义保存状态机。点击“保存”后先按编辑表单构建规则并执行有效性校验；校验失败提示 `save error, <原因>` 且停留当前编辑页；校验通过后执行落库，成功时关闭编辑页且不追加成功提示。对 `order == Int.MIN_VALUE` 的规则补齐 `maxOrder + 1` 分配语义，确保新建规则排序行为与 legado 一致。
+  - `P5-seq281` 差异点清单（实施前）：
+    - legado `ReplaceEditViewModel.save` 先执行 `checkValid()`；Flutter 侧此前 `ReplaceRuleEditView._save` 未做保存前阻断校验，存在无效规则直接保存并退出的语义偏差。
+    - legado 保存失败口径为 `save error, <localizedMessage>` 且页面不关闭；Flutter 侧此前点击保存后固定 `Navigator.pop`，失败也会离开编辑页。
+    - legado 当 `order == Int.MIN_VALUE` 时会在保存阶段自动写入 `maxOrder+1`；Flutter 侧此前未在保存路径收敛该边界。
+  - `P5-seq281` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 编辑任一规则 -> 右上角保存`）。
+    - 状态：已同义（保存成功后关闭编辑页；失败保持停留当前页）。
+    - 异常：已同义（保存异常输出 `SaveReplaceRuleError` 调试日志并提示 `save error, <原因>`）。
+    - 文案：已同义（一级动作文案“保存”；失败提示前缀固定 `save error,`）。
+    - 排版：已同义（维持编辑页顶栏“保存 + 更多”动作层级，不改动表单布局）。
+    - 交互触发：已同义（点击保存仅触发保存链路；不自动触发复制/粘贴与导入分支）。
+    - 验证：命令 `dart format lib/features/replace/models/replace_rule.dart lib/features/replace/views/replace_rule_edit_view.dart lib/features/replace/views/replace_rule_list_view.dart lib/features/reader/views/simple_reader_view.dart`；命令 `flutter test test/search_view_compile_test.dart test/simple_reader_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 编辑任一规则 -> 保存`（校验无效规则提示 `save error` 且失败不退出）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_save` 状态机与排序边界，不改动 `menu_group/menu_group_manage`（`seq284/285`）后续能力。
+  - 下一项：按优先级继续推进 `P5-seq284`（`replace_rule.xml / @+id/menu_group / 分组`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq225`（`dict_rule_sel.xml / @+id/menu_disable_selection / 禁用所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq225`（`dict_rule_sel.xml / @+id/menu_disable_selection / 禁用所选`）：`字典规则` 管理页补齐 legado 同义“多选 -> 更多 -> 禁用所选”动作。点击“禁用所选”后仅对当前选中集合批量写入 `enabled=false` 并刷新列表；不追加成功提示，不跳转页面，保持多选态停留。
+  - `P5-seq225` 差异点清单（实施前）：
+    - legado `dict_rule_sel.xml` 菜单包含 `menu_disable_selection`；Flutter 侧此前多选菜单仅有“启用所选/导出所选”，入口缺失。
+    - legado `DictRuleActivity.onMenuItemClick(menu_disable_selection)` 固定调用 `viewModel.disableSelection(*adapter.selection)`；Flutter 侧此前缺少按“当前选中集合”批量禁用的写库能力。
+    - legado 禁用动作为静默状态流（无成功提示且不离开当前页）；Flutter 侧此前无该动作语义证据。
+  - `P5-seq225` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 字典规则 -> 多选 -> 勾选规则 -> 更多 -> 禁用所选`）。
+    - 状态：已同义（仅对当前选中规则批量置 `enabled=false` 并刷新列表；未选中规则保持原值）。
+    - 异常：已同义（写入异常输出 `DisableSelectionDictRuleError` 调试日志；页面保持当前状态且不追加扩展提示）。
+    - 文案：已同义（多选“更多”菜单文案固定“禁用所选”）。
+    - 排版：已同义（入口位于既有多选“更多”动作层，不改动列表与底部操作栏布局）。
+    - 交互触发：已同义（仅在多选且存在选中项时可触发；执行后停留当前页）。
+    - 验证：命令 `dart format lib/features/reader/views/dict_rule_manage_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 字典规则 -> 多选 -> 勾选至少一条启用规则 -> 更多 -> 禁用所选`（校验所选条目的“禁用”标记出现且无成功提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_disable_selection` 批量禁用状态流，不改动 `menu_copy_rule`（`seq222`）与 `replace_edit/menu_save`（`seq281`）后续能力。
+  - 下一项：按优先级继续推进 `P5-seq281`（`replace_edit.xml / @+id/menu_save / 保存`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq224`（`dict_rule_sel.xml / @+id/menu_enable_selection / 启用所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq224`（`dict_rule_sel.xml / @+id/menu_enable_selection / 启用所选`）：`字典规则` 管理页补齐 legado 同义“多选 -> 更多 -> 启用所选”动作。点击“启用所选”后仅对当前选中集合批量写入 `enabled=true` 并刷新列表；不追加成功提示，不跳转页面，保持多选态停留。
+  - `P5-seq224` 差异点清单（实施前）：
+    - legado `dict_rule_sel.xml` 菜单包含 `menu_enable_selection`；Flutter 侧此前多选菜单仅有“导出所选”，入口缺失。
+    - legado `DictRuleActivity.onMenuItemClick(menu_enable_selection)` 固定调用 `viewModel.enableSelection(*adapter.selection)`；Flutter 侧此前缺少按“当前选中集合”批量启用的写库能力。
+    - legado 启用动作为静默状态流（无成功提示且不离开当前页）；Flutter 侧此前无该动作语义证据。
+  - `P5-seq224` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 字典规则 -> 多选 -> 勾选规则 -> 更多 -> 启用所选`）。
+    - 状态：已同义（仅对当前选中规则批量置 `enabled=true` 并刷新列表；未选中规则保持原值）。
+    - 异常：已同义（写入异常输出 `EnableSelectionDictRuleError` 调试日志；页面保持当前状态且不追加扩展提示）。
+    - 文案：已同义（多选“更多”菜单文案固定“启用所选”）。
+    - 排版：已同义（入口位于既有多选“更多”动作层，不改动列表与底部操作栏布局）。
+    - 交互触发：已同义（仅在多选且存在选中项时可触发；执行后停留当前页）。
+    - 验证：命令 `dart format lib/features/reader/services/dict_rule_store.dart lib/features/reader/views/dict_rule_manage_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 字典规则 -> 多选 -> 勾选至少一条禁用规则 -> 更多 -> 启用所选`（校验所选条目的“禁用”标记消失且无成功提示）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_enable_selection` 批量启用状态流，不改动 `menu_disable_selection`（`seq225`）与 `menu_copy_rule`（`seq222`）后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq225`（`dict_rule_sel.xml / @+id/menu_disable_selection / 禁用所选`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq221`（`dict_rule_edit.xml / @+id/menu_save / 保存`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq221`（`dict_rule_edit.xml / @+id/menu_save / 保存`）：`字典规则` 编辑页补齐 legado 同义顶栏一级“保存”动作。点击“保存”后仅提交当前表单的 `name/urlRule/showRule`，关闭编辑页并回到规则列表；管理页落库语义对齐 legado `DictRuleEditViewModel.save`：按“删除旧名称规则 -> 插入新规则”处理重命名，保留 `enabled/sortNumber`，成功后静默刷新列表，不追加成功提示。
+  - `P5-seq221` 差异点清单（实施前）：
+    - legado `dict_rule_edit.xml` 在编辑页菜单常驻 `menu_save`；Flutter 侧此前 `DictRuleEditView` 仅有“更多 -> 粘贴规则”，缺少保存入口，编辑结果不可持久化。
+    - legado `DictRuleEditDialog.getDictRule` 基于旧规则 `copy` 后仅覆盖 `name/urlRule/showRule`；Flutter 侧此前无对应提交链路，`enabled/sortNumber` 保留语义缺失。
+    - legado `DictRuleEditViewModel.save` 采用“删旧再插入”处理重命名；Flutter 侧此前未覆盖旧名删除边界，改名后会保留旧规则副本。
+  - `P5-seq221` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 字典规则 -> 新建/点击规则 -> 编辑页右上角保存`）。
+    - 状态：已同义（点击后提交表单并关闭编辑页；列表刷新可见结果；改名时旧名称规则被移除）。
+    - 异常：已同义（保存写入失败输出 `SaveDictRuleError` 并提示“保存失败：<原因>”，可观测且停留列表页）。
+    - 文案：已同义（顶栏一级动作文案“保存”）。
+    - 排版：已同义（编辑页顶栏为“保存 + 更多”并列动作层级；不改变表单结构）。
+    - 交互触发：已同义（保存成功后静默返回；不自动触发复制/粘贴与导入链路）。
+    - 验证：命令 `dart format lib/features/reader/views/dict_rule_edit_view.dart lib/features/reader/views/dict_rule_manage_view.dart lib/features/reader/services/dict_rule_store.dart`；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 字典规则 -> 右上角加号 -> 填写字段 -> 保存`（校验新增后列表可见）；手工路径 `设置 -> 源管理 -> 替换净化 -> 字典规则 -> 点击已有规则 -> 修改名称 -> 保存`（校验旧规则被替换且 `enabled/排序` 保留）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_save` 编辑提交链路，不改动 `menu_copy_rule`（`seq222`）与多选启停（`seq224/225`）后续能力。
+  - 下一项：按优先级继续推进 `P5-seq224`（`dict_rule_sel.xml / @+id/menu_enable_selection / 启用所选`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq215`（`dict_rule.xml / @+id/menu_add / 新建`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq215`（`dict_rule.xml / @+id/menu_add / 新建`）：`字典规则` 管理页补齐 legado 同义顶栏一级“新建”入口。点击右上角“加号”后直接进入空白字典规则编辑页（`name/urlRule/showRule` 初始为空），不触发导入流程、不自动保存、不跳转其它页面。
+  - `P5-seq215` 差异点清单（实施前）：
+    - legado `DictRuleActivity` 在 `dict_rule.xml` 顶栏常驻 `menu_add`，点击固定 `showDialogFragment<DictRuleEditDialog>()`；Flutter 侧此前 `DictRuleManageView` 顶栏仅有“多选/更多”，缺少同层级新建入口。
+    - legado 新建动作为“打开空白编辑承载页”，不伴随写库副作用；Flutter 侧此前无法从字典规则管理页直接触发空白编辑态。
+    - 该序号台账缺失，迁移证据链不完整。
+  - `P5-seq215` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 字典规则 -> 右上角加号`）。
+    - 状态：已同义（点击后仅打开空白编辑页；不自动保存、不触发导入链路）。
+    - 异常：已同义（忙碌态禁用按钮，避免重复触发；无额外扩展提示）。
+    - 文案：已同义（顶栏以加号图标承载 `menu_add` 一级动作语义）。
+    - 排版：已同义（新增动作位于导航栏一级操作区，保持“新建为一级入口、导入在更多菜单”层级）。
+    - 交互触发：已同义（非多选态点击加号直达编辑页；多选态隐藏新建入口）。
+    - 验证：命令 `dart format lib/features/reader/views/dict_rule_manage_view.dart`；`flutter test test/simple_reader_view_compile_test.dart test/widget_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 字典规则 -> 右上角加号`（校验进入空白编辑页且无自动落库）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_add` 入口可达性与空白编辑态触发，不改动 `menu_save/menu_copy_rule`（`seq221/222`）后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq221`（`dict_rule_edit.xml / @+id/menu_save / 保存`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq401`（`txt_toc_rule_sel.xml / @+id/menu_export_selection / 导出所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq401`（`txt_toc_rule_sel.xml / @+id/menu_export_selection / 导出所选`）：`TXT 目录规则` 管理页补齐 legado 同义“多选 -> 更多 -> 导出所选”闭环。页面新增多选承载（顶栏“多选/完成”切换、底部“全选/反选/更多”操作栏）；点击“导出所选”后按当前选中规则生成 JSON 并拉起系统保存，默认文件名收敛为 `exportTxtTocRule.json`；取消导出静默返回，成功后弹“导出成功”并提供“复制路径”动作。
+  - `P5-seq401` 差异点清单（实施前）：
+    - legado `TxtTocRuleActivity` 通过 `SelectActionBar.inflateMenu(txt_toc_rule_sel)` 承载 `menu_export_selection`；Flutter 侧此前 `TxtTocRuleManageView` 仅有导入链路，无多选承载层，入口不可达。
+    - legado `menu_export_selection` 固定调用导出器并使用默认文件名 `exportTxtTocRule.json`；Flutter 侧此前无 TXT 目录规则“导出所选”动作与默认文件名约束。
+    - legado 成功路径展示导出结果并支持复制，取消导出静默返回；Flutter 侧此前无对应状态流，迁移证据缺失。
+  - `P5-seq401` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 目录规则 -> 多选 -> 勾选规则 -> 更多 -> 导出所选`）。
+    - 状态：已同义（仅导出当前选中规则；默认文件名 `exportTxtTocRule.json`；取消导出静默返回）。
+    - 异常：已同义（导出失败输出 `ExportTxtTocRuleSelectionError` 并弹“导出失败：<错误>”可观测提示）。
+    - 文案：已同义（“多选/完成”“导出所选”“导出成功”“复制路径”）。
+    - 排版：已同义（列表页新增多选底栏承载，保持顶栏“更多”层级与热区语义；选中项高亮并带勾选图标）。
+    - 交互触发：已同义（多选态下通过顶栏或底栏“更多”均可进入批量菜单并触发导出）。
+    - 验证：命令 `dart format lib/features/reader/views/txt_toc_rule_manage_view.dart`；命令 `timeout 120s dart analyze lib/features/reader/views/txt_toc_rule_manage_view.dart`（仅 info，无 error/warning）；手工路径（待回归）`设置 -> 目录规则 -> 多选 -> 勾选规则 -> 更多 -> 导出所选`（校验默认文件名、取消静默、成功可复制）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_export_selection` 多选导出闭环，不改动 `menu_enable_selection/menu_disable_selection`（`seq399/400`）后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq215`（`dict_rule.xml / @+id/menu_add / 新建`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq395`（`txt_toc_rule_edit.xml / @+id/menu_paste_rule / 粘贴规则`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq395`（`txt_toc_rule_edit.xml / @+id/menu_paste_rule / 粘贴规则`）：新增 `TxtTocRuleEditView`，补齐 legado 同义“更多 -> 粘贴规则”动作。进入 `TXT 目录规则` 编辑页后，点击“粘贴规则”会读取剪贴板并按 `TxtTocRule` JSON 对象解析；解析成功仅回填 `名称/正则/示例` 三个输入框，保持停留当前编辑页，不自动保存、不跳转页面。并将管理页规则卡片点击动作接入编辑页，确保该入口真实可触发。
+  - `P5-seq395` 差异点清单（实施前）：
+    - legado `txt_toc_rule_edit.xml` 在编辑页菜单固定提供 `menu_paste_rule`；Flutter 侧此前无 TXT 目录规则编辑页，入口不可达。
+    - legado `TxtTocRuleEditDialog.menu_paste_rule` 调用 `pasteRule`：剪贴板为空提示“剪贴板为空”，JSON 非对象提示“格式不对”；成功仅 `upRuleView` 回填表单，不触发保存与跳转。
+    - Flutter 侧此前 `TxtTocRuleManageView` 仅提供导入链路，无规则编辑承载页，导致 `menu_paste_rule` 状态机缺失。
+  - `P5-seq395` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 目录规则 -> 点击任一规则 -> 右上角更多 -> 粘贴规则`）。
+    - 状态：已同义（粘贴成功仅回填 `名称/正则/示例`，不自动保存、不跳转）。
+    - 异常：已同义（剪贴板为空提示“剪贴板为空”；非法 JSON 或非对象 JSON 提示“格式不对”）。
+    - 文案：已同义（菜单文案“粘贴规则”；失败口径“剪贴板为空/格式不对”）。
+    - 排版：已同义（编辑页采用单页表单 + 顶栏“更多”动作层，未改变管理页导入入口层级）。
+    - 交互触发：已同义（粘贴后停留编辑页，字段即时更新，后续保存动作仍由后续序号承接）。
+    - 验证：命令 `dart format lib/features/reader/views/txt_toc_rule_edit_view.dart lib/features/reader/views/txt_toc_rule_manage_view.dart`；`flutter test test/source_list_view_compile_test.dart test/search_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 目录规则 -> 点击任一规则 -> 右上角更多 -> 粘贴规则`（校验空剪贴板/非法 JSON/合法 JSON 三类边界）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_paste_rule` 编辑态回填链路，不改动导入解析、规则存储结构与阅读主链路。
+  - 下一项：按优先级继续推进 `P5-seq401`（`txt_toc_rule_sel.xml / @+id/menu_export_selection / 导出所选`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq391`（`txt_toc_rule.xml / @+id/menu_import_default / 导入默认规则`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq391`（`txt_toc_rule.xml / @+id/menu_import_default / 导入默认规则`）：`TXT 目录规则` 管理页“更多”菜单补齐 legado 同义“导入默认规则”入口。点击后直接导入默认规则资产（`assets/source/txtTocRule.json`）并刷新列表；导入语义对齐 legado `DefaultData.importDefaultTocRules -> txtTocRuleDao.deleteDefault + insert`：先清理 `id<0` 默认规则再回灌默认规则，保留 `id>=0` 本地自定义规则，不追加成功提示。
+  - `P5-seq391` 差异点清单（实施前）：
+    - legado `TxtTocRuleActivity/TxtTocRuleDialog.menu_import_default` 固定走 `viewModel.importDefault()`；Flutter 侧此前“TXT 目录规则”更多菜单缺少“导入默认规则”入口，动作不可达。
+    - legado `DefaultData.importDefaultTocRules` 写库语义为 `deleteDefault(id<0) + insert(default)`；Flutter 侧此前仅覆盖本地/网络/二维码候选导入，缺少默认规则重置分支。
+    - legado 该动作为静默导入（无成功提示）；Flutter 侧此前无对应状态流，存在行为缺口。
+  - `P5-seq391` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 目录规则 -> 右上角更多 -> 导入默认规则`）。
+    - 状态：已同义（点击后直接导入默认规则并刷新列表；重复导入仅重置默认规则，保留自定义规则）。
+    - 异常：已同义（默认资产读取/解析异常写入调试日志，可观测；不追加扩展成功提示）。
+    - 文案：已同义（菜单文案固定“导入默认规则”）。
+    - 排版：已同义（入口位于顶栏“更多”动作层，不改变列表层级与热区）。
+    - 交互触发：已同义（`设置 -> 目录规则 -> 右上角更多 -> 导入默认规则`，执行后停留当前页并刷新列表）。
+    - 验证：命令 `dart format lib/features/reader/services/txt_toc_rule_store.dart lib/features/reader/views/txt_toc_rule_manage_view.dart`；手工路径（待回归）`设置 -> 目录规则 -> 右上角更多 -> 导入默认规则`（校验静默刷新）；手工路径 `连续两次导入默认规则`（校验仅重置默认规则且保留自定义规则）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_default` 入口与默认导入写库语义，不改动 `menu_add/menu_help` 等后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq395`（`txt_toc_rule_edit.xml / @+id/menu_paste_rule / 粘贴规则`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq390`（`txt_toc_rule.xml / @+id/menu_import_qr / 二维码导入`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq390`（`txt_toc_rule.xml / @+id/menu_import_qr / 二维码导入`）：`TXT 目录规则` 管理页“更多”菜单补齐 legado 同义“二维码导入”入口。点击后拉起扫码页，扫码文本直接复用既有“导入 TXT 目录规则”候选弹层；候选按本地 `id` 对比标记“新增/更新/已有”，默认勾选“新增+更新”，确认后仅导入勾选项。扫码取消或空结果保持静默返回，不写 `tocRuleUrl` 历史。
+  - `P5-seq390` 差异点清单（实施前）：
+    - legado `TxtTocRuleActivity/TxtTocRuleDialog.menu_import_qr` 固定走 `qrCodeResult.launch()`，回调结果直接进入 `ImportTxtTocRuleDialog(it)`；Flutter 侧此前仅有“本地导入/网络导入”，二维码入口不可达。
+    - legado 二维码分支与本地/网络导入共用同一候选状态机（新增/更新/已有，默认新增+更新）；Flutter 侧此前扫码链路未接入候选导入闭环。
+    - legado 二维码分支不维护 `tocRuleUrl` 历史；Flutter 侧若复用网络导入历史写入逻辑会产生跨入口状态污染。
+  - `P5-seq390` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 目录规则 -> 右上角更多 -> 二维码导入`）。
+    - 状态：已同义（扫码成功后直接进入候选弹层；候选按“新增/更新/已有”标记并默认勾选新增+更新；确认后仅导入勾选项）。
+    - 异常：已同义（扫码取消或空结果静默返回；解析失败提示 `ImportError:*`；读取失败提示 `readTextError:*`）。
+    - 文案：已同义（入口文案“二维码导入”；扫码标题“二维码导入”；候选状态文案“新增/更新/已有”）。
+    - 排版：已同义（二维码入口位于顶栏“更多”动作层；扫码返回后沿用既有候选弹层单层勾选布局）。
+    - 交互触发：已同义（`设置 -> 目录规则 -> 二维码导入 -> 扫码 -> 勾选候选 -> 导入`）。
+    - 验证：命令 `dart format lib/features/reader/views/txt_toc_rule_manage_view.dart`；手工路径（待回归）`设置 -> 目录规则 -> 右上角更多 -> 二维码导入 -> 扫码 -> 勾选候选 -> 导入`（校验扫码结果直达候选弹层、默认勾选新增+更新且仅导入勾选项）；手工路径 `二维码导入进入扫码页后取消`（校验静默返回且不落库）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_qr` 扫码触发链路，不改动 `menu_import_default`（`seq391`）后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq391`（`txt_toc_rule.xml / @+id/menu_import_default / 导入默认规则`）。
+- `2026-02-23`
+  - 状态变更：完成 `P5-seq389`（`txt_toc_rule.xml / @+id/menu_import_onLine / 网络导入`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq389`（`txt_toc_rule.xml / @+id/menu_import_onLine / 网络导入`）：`TXT 目录规则` 管理页“更多”菜单补齐 legado 同义“网络导入”入口。点击后先进入 URL 输入层（标题“网络导入”、占位 `url`），支持历史记录点选回填与删除，并默认注入 legado 默认地址 `https://gitee.com/fisher52/YueDuJson/raw/master/myTxtChapterRule.json`；确认后进入“导入 TXT 目录规则”候选弹层，候选按本地 `id` 对比标记“新增/更新/已有”，默认勾选“新增+更新”，确认后仅导入勾选项。
+  - `P5-seq389` 差异点清单（实施前）：
+    - legado `TxtTocRuleActivity/TxtTocRuleDialog.menu_import_onLine` 固定走 `showImportDialog`：先弹 URL 输入层并维护 `tocRuleUrl` 历史；Flutter 侧此前仅有“本地导入”，网络入口不可达。
+    - legado 输入层打开时会注入默认 URL（`myTxtChapterRule.json`）并提供历史项删除；Flutter 侧此前缺少该历史状态流。
+    - legado 确认后统一进入 `ImportTxtTocRuleDialog` 候选导入链路；Flutter 侧此前缺少“网络输入 -> 候选预览 -> 勾选导入”的完整闭环。
+  - `P5-seq389` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 目录规则 -> 右上角更多 -> 网络导入`）。
+    - 状态：已同义（输入后进入候选弹层；候选按“新增/更新/已有”标记；默认勾选新增+更新；确认后仅导入勾选项）。
+    - 异常：已同义（空输入静默返回；解析/网络异常提示 `ImportError:*`；历史删除即时回写）。
+    - 文案：已同义（“网络导入”“url”“历史记录”“导入 TXT 目录规则”“新增/更新/已有”）。
+    - 排版：已同义（输入层采用“输入区 + 历史记录区”单层结构；候选弹层沿用本地导入同层勾选布局）。
+    - 交互触发：已同义（`设置 -> 目录规则 -> 网络导入 -> 输入 URL/点选历史 -> 导入 -> 勾选候选 -> 导入`）。
+    - 验证：命令 `dart format lib/features/reader/views/txt_toc_rule_manage_view.dart`；手工路径（待回归）`设置 -> 目录规则 -> 右上角更多 -> 网络导入 -> 输入 URL 或点选历史 -> 导入 -> 勾选候选 -> 导入`（校验默认历史注入、历史回填/删除与候选默认勾选“新增+更新”）；按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_onLine` 输入层与历史状态机，不改动书源解析结构与阅读主链路。
+  - 下一项：按优先级继续推进 `P5-seq390`（`txt_toc_rule.xml / @+id/menu_import_qr / 二维码导入`）。
 - `2026-02-22`
+  - 状态变更：完成 `P5-seq388`（`txt_toc_rule.xml / @+id/menu_import_local / 本地导入`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq388`（`txt_toc_rule.xml / @+id/menu_import_local / 本地导入`）：新增 `TXT 目录规则` 管理页并补齐 legado 同义“右上角更多 -> 本地导入”入口；本地选档后进入“导入 TXT 目录规则”候选弹层，候选按本地 `id` 对比标记“新增/更新/已有”，默认勾选“新增+更新”，确认后仅导入勾选项。新增 `TxtTocRuleStore` 与默认资产 `assets/source/txtTocRule.json`；阅读页与详情页 `TXT 目录规则` 选择器改为读取该规则仓库，确保导入后立即可用于目录重建链路。
+  - `P5-seq388` 差异点清单（实施前）：
+    - legado `TxtTocRuleActivity.menu_import_local` 固定执行 `HandleFileContract(FILE, txt/json) -> ImportTxtTocRuleDialog`；Flutter 侧此前无 `TXT 目录规则` 管理页，入口不可达。
+    - legado 导入候选按本地 `id` 对比状态（新增/更新/已有）并默认勾选“新增+更新”；Flutter 侧此前缺少 TXT 目录规则候选状态机。
+    - legado 读档失败与解析失败口径分别为 `readTextError:*` 与 `ImportError:*`；Flutter 侧此前无该可观测分支。
+  - `P5-seq388` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 目录规则 -> 右上角更多 -> 本地导入`）。
+    - 状态：已同义（选档后进入候选弹层；候选按“新增/更新/已有”标记；默认仅勾选新增与更新；确认后仅导入勾选项）。
+    - 异常：已同义（取消选档静默返回；读档失败提示 `readTextError:*`；解析失败提示 `ImportError:*`）。
+    - 文案：已同义（页面标题“TXT 目录规则”；入口“本地导入”；候选弹层标题“导入 TXT 目录规则”；状态文案“新增/更新/已有”）。
+    - 排版：已同义（入口位于顶栏“更多”动作层；候选为单层勾选清单并展示状态标签）。
+    - 交互触发：已同义（`设置 -> 目录规则 -> 本地导入 -> 选择 txt/json -> 勾选候选 -> 导入`）。
+    - 验证：命令 `dart format lib/features/reader/models/txt_toc_rule.dart lib/features/reader/services/txt_toc_rule_store.dart lib/features/reader/views/txt_toc_rule_manage_view.dart lib/features/settings/views/source_management_view.dart lib/features/settings/views/settings_view.dart lib/features/reader/views/simple_reader_view.dart lib/features/search/views/search_book_info_view.dart`；`flutter test test/simple_reader_view_compile_test.dart test/search_book_info_view_compile_test.dart` 通过；`flutter test test/source_list_view_compile_test.dart test/search_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 目录规则 -> 本地导入 -> 选择 txt/json`（校验候选状态与默认勾选）；手工路径 `导入后进入阅读页/目录页 -> TXT 目录规则`（校验导入规则可见并可用于重建目录）。按仓库约束，未在开发阶段执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号新增 `txt_toc_rules` 持久化仓库并补齐 `menu_import_local`，不改动书源解析结构；阅读与详情页 `TXT 目录规则` 选择器由内置常量切换为“仓库规则优先 + 无规则回退默认规则”。
+  - 下一项：按优先级继续推进 `P5-seq389`（`txt_toc_rule.xml / @+id/menu_import_onLine / 网络导入`）。
+- `2026-02-22`
+  - 状态变更：完成 `P5-seq299`（`replace_rule_sel.xml / @+id/menu_export_selection / 导出所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq299`（`replace_rule_sel.xml / @+id/menu_export_selection / 导出所选`）：替换规则管理页补齐 legado 同义“多选 -> 更多 -> 导出所选”链路。页面新增多选态承载（顶栏“多选/完成”、底部“全选/反选/更多”操作栏）；点击“导出所选”后按当前选中规则生成 JSON 并拉起系统保存，默认文件名收敛为 `exportReplaceRule.json`；取消导出静默返回，导出成功弹“导出成功”并提供“复制路径”动作。
+  - `P5-seq299` 差异点清单（实施前）：
+    - legado `ReplaceRuleActivity` 通过 `SelectActionBar.inflateMenu(replace_rule_sel)` 承载 `menu_export_selection`；Flutter 侧此前“文本替换规则”仅有列表态，缺少多选态与批量菜单，入口不可达。
+    - legado 导出内容固定为 `adapter.selection` 的 JSON 数组且默认文件名为 `exportReplaceRule.json`；Flutter 侧此前仅支持“导出全部并复制到剪贴板”，缺少“仅导出选中集合”的文件导出链路。
+    - legado 取消导出无提示、成功后弹“导出成功”并可复制路径；Flutter 侧此前无该状态闭环。
+  - `P5-seq299` 逐项对照清单（实施后）：
+    - 入口：已同义（`替换净化 -> 文本替换规则 -> 多选 -> 勾选规则 -> 更多 -> 导出所选`）。
+    - 状态：已同义（导出动作仅序列化当前选中规则；默认文件名 `exportReplaceRule.json`）。
+    - 异常：已同义（取消导出静默返回；导出写入失败提示“导出失败：<原因>”并保留当前页面状态）。
+    - 文案：已同义（“多选”“完成”“导出所选”“导出成功”“复制路径”）。
+    - 排版：已同义（多选态底部动作栏提供“全选/反选/更多”，列表项展示选中态图标，导出入口保持“多选后进入更多菜单”的层级）。
+    - 交互触发：已同义（进入多选态后可批量勾选规则并触发导出所选）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；`flutter test test/search_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 多选 -> 勾选规则 -> 更多 -> 导出所选`（校验默认文件名 `exportReplaceRule.json`）；手工路径 `导出文件选择器中取消`（校验静默返回）；手工路径 `导出成功后点击复制路径`（校验剪贴板写入导出路径）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_export_selection` 多选导出闭环，不改动 `menu_enable_selection/menu_disable_selection/menu_top_sel/menu_bottom_sel`（`seq295~298`）后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq388`（`txt_toc_rule.xml / @+id/menu_import_local / 本地导入`）。
+- `2026-02-22`
+  - 状态变更：完成 `P5-seq290`（`replace_rule.xml / @+id/menu_import_qr / 二维码导入`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq290`（`replace_rule.xml / @+id/menu_import_qr / 二维码导入`）：替换规则列表页“更多”菜单补齐 legado 同义“二维码导入”入口。点击后拉起扫码页，扫码结果直接复用“导入替换规则”候选弹层；候选项按本地 `id` 对比标记“新增/更新/已有”，默认仅勾选“新增”；确认后仅导入勾选项并静默返回，不追加成功提示。扫码取消或空结果静默返回，且不写入 `replaceRuleRecordKey` 网络导入历史。
+  - `P5-seq290` 差异点清单（实施前）：
+    - legado `ReplaceRuleActivity.menu_import_qr` 固定走 `qrCodeResult.launch()`，回调结果直接进入 `ImportReplaceRuleDialog(it)`；Flutter 侧此前“文本替换规则”更多菜单缺少“二维码导入”入口，扫码触发路径不可达。
+    - legado 二维码分支与本地/网络导入共用同一候选状态机（新增/更新/已有，默认仅新增）；Flutter 侧此前仅覆盖本地/网络导入触发，扫码入口未接入候选导入链路。
+    - legado 扫码分支不维护 `replaceRuleRecordKey`；Flutter 侧若复用网络导入历史写入逻辑会产生跨入口状态污染。
+  - `P5-seq290` 逐项对照清单（实施后）：
+    - 入口：已同义（`替换净化 -> 文本替换规则 -> 右上角更多 -> 二维码导入`）。
+    - 状态：已同义（扫码成功后直接进入候选弹层；候选按“新增/更新/已有”标记并默认仅勾选新增；确认后仅导入勾选项）。
+    - 异常：已同义（扫码取消或空结果静默返回；解析失败提示 `ImportError:*`；读取失败提示 `readTextError:*`）。
+    - 文案：已同义（入口文案“二维码导入”；扫码标题“二维码导入”；候选状态文案“新增/更新/已有”）。
+    - 排版：已同义（二维码入口位于顶栏“更多”动作层；扫码返回后沿用既有候选弹层单层勾选布局）。
+    - 交互触发：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角更多 -> 二维码导入 -> 扫码 -> 勾选候选 -> 导入`）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；`flutter test test/widget_test.dart`、`flutter test test/search_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角更多 -> 二维码导入 -> 扫码`（校验扫码结果可进入候选弹层且默认仅勾选新增）；手工路径 `二维码导入进入扫码页后取消`（校验静默返回且不落库）。按仓库约束，未在开发阶段执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_qr` 扫码触发链路，不改动 `menu_group/menu_group_manage` 后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq299`（`replace_rule_sel.xml / @+id/menu_export_selection / 导出所选`）。
+- `2026-02-22`
+  - 状态变更：完成 `P5-seq289`（`replace_rule.xml / @+id/menu_import_onLine / 网络导入`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq289`（`replace_rule.xml / @+id/menu_import_onLine / 网络导入`）：替换规则列表页“更多”菜单将入口文案收敛为“网络导入”；点击后先弹 URL 输入层（标题“网络导入”、输入占位 `url`）并维护 `replaceRuleRecordKey` 历史（支持点选回填、删除回写）。确认后按输入内容进入“导入替换规则”候选弹层，候选项按 legado 同义规则标记“新增/更新/已有”，默认仅勾选“新增”；确认后仅导入勾选项并静默返回，不追加成功提示。
+  - `P5-seq289` 差异点清单（实施前）：
+    - legado `ReplaceRuleActivity.menu_import_onLine` 固定执行 `showImportDialog`：先弹 `import_on_line` 输入层（hint=`url`）并读写 `replaceRuleRecordKey` 历史，再进入 `ImportReplaceRuleDialog` 候选导入；Flutter 侧此前为“输入 URL 后直接写库”，缺少历史层与候选层。
+    - legado 网络导入与本地导入共用同一候选状态机（新增/更新/已有，默认仅新增）；Flutter 侧此前网络导入分支未复用候选勾选流程，状态语义不一致。
+    - legado 网络导入失败口径为 `ImportError:*`；Flutter 侧此前提示“导入失败/URL为空”，可观测输出与边界提示不一致。
+  - `P5-seq289` 逐项对照清单（实施后）：
+    - 入口：已同义（`替换净化 -> 文本替换规则 -> 右上角更多 -> 网络导入`）。
+    - 状态：已同义（网络导入改为“输入层 -> 候选预览 -> 勾选导入”，不再解析成功即直接写库）。
+    - 异常：已同义（空输入静默返回；解析失败提示 `ImportError:*`；网络异常按 `ImportError:*` 输出并保留静默取消边界）。
+    - 文案：已同义（入口文案“网络导入”；输入层标题“网络导入”；输入占位 `url`；候选状态文案“新增/更新/已有”）。
+    - 排版：已同义（输入层采用“输入区 + 历史记录区”单层结构；候选弹层沿用本地导入同层勾选布局）。
+    - 交互触发：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角更多 -> 网络导入`；历史支持点选回填与删除回写）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；`flutter test test/widget_test.dart`、`flutter test test/search_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角更多 -> 网络导入 -> 输入 URL/点选历史 -> 导入 -> 勾选候选 -> 导入`（校验默认仅勾选新增、HTTP/HTTPS 输入写入 `replaceRuleRecordKey` 历史且支持删除回写、导入成功静默返回）。按仓库约束，未在开发阶段执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_onLine` 的输入层、历史记录与候选导入链路，不改动 `menu_import_qr/menu_group` 后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq290`（`replace_rule.xml / @+id/menu_import_qr / 二维码导入`）。
+- `2026-02-22`
+  - 状态变更：完成 `P5-seq288`（`replace_rule.xml / @+id/menu_import_local / 本地导入`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq288`（`replace_rule.xml / @+id/menu_import_local / 本地导入`）：替换规则列表页“更多”菜单将入口文案收敛为“本地导入”；点击后仅允许选择 `txt/json` 文件，读取文本后进入“导入替换规则”候选弹层。候选项按 legado 同义规则标记“新增/更新/已有”，默认仅勾选“新增”；确认后仅导入勾选项并静默返回，不追加成功提示。
+  - `P5-seq288` 差异点清单（实施前）：
+    - legado `ReplaceRuleActivity.menu_import_local` 固定执行 `HandleFileContract(FILE, txt/json) -> ImportReplaceRuleDialog`；Flutter 侧此前入口文案为“从文件导入”，且解析成功后直接写库，缺少候选预览层。
+    - legado 导入弹层按本地 `id` 对比候选状态（新增/更新/已有），默认仅选中新增；Flutter 侧此前无状态分层与默认勾选策略。
+    - legado 本地导入失败口径为 `readTextError:*` / `ImportError:*`；Flutter 侧此前仅提示通用“导入失败”，可观测输出不一致。
+  - `P5-seq288` 逐项对照清单（实施后）：
+    - 入口：已同义（`替换净化 -> 文本替换规则 -> 右上角更多 -> 本地导入`）。
+    - 状态：已同义（本地导入改为“选档 -> 候选预览 -> 勾选导入”，不再直接写库）。
+    - 异常：已同义（读取失败提示 `readTextError:*`；解析失败提示 `ImportError:*`；取消选档或取消导入静默返回）。
+    - 文案：已同义（入口文案“本地导入”；候选状态文案“新增/更新/已有”；弹层标题“导入替换规则”）。
+    - 排版：已同义（候选弹层为单层勾选列表，顶部“取消/导入(N)”与“全选/取消全选”入口层级符合 legado 语义）。
+    - 交互触发：已同义（`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角更多 -> 本地导入`）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；`flutter test test/widget_test.dart`、`flutter test test/search_view_compile_test.dart` 通过；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 右上角更多 -> 本地导入 -> 选择 txt/json -> 勾选候选 -> 导入`（校验默认仅勾选新增与导入静默返回）。按仓库约束，未在开发阶段执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_local` 的候选导入闭环，不改动 `menu_import_onLine/menu_import_qr/menu_group` 后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq289`（`replace_rule.xml / @+id/menu_import_onLine / 网络导入`）。
+- `2026-02-22`
+  - 状态变更：完成 `P5-seq283`（`replace_edit.xml / @+id/menu_paste_rule / 粘贴规则`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq283`（`replace_edit.xml / @+id/menu_paste_rule / 粘贴规则`）：替换规则编辑页补齐 legado 同义“粘贴规则”入口。编辑页右上角新增“更多”动作，点击“粘贴规则”后读取剪贴板文本并按 `ReplaceRule` JSON 对象解析；成功仅回填当前表单字段并停留编辑页，不自动保存、不跳转；失败分支按 legado 固定口径提示“剪贴板为空”或“格式不对”。
+  - `P5-seq283` 差异点清单（实施前）：
+    - legado `replace_edit.xml` 在编辑页菜单提供 `menu_paste_rule`，触发 `ReplaceEditViewModel.pasteRule` 后仅执行 `upReplaceView` 回填，不自动保存。
+    - Flutter 侧此前 `ReplaceRuleEditView` 仅有“保存”一级动作，无编辑页“更多 -> 粘贴规则”入口；剪贴板入口仅存在于列表页“从剪贴板导入”，会直接写库，触发层级与状态语义不一致。
+    - legado 粘贴失败分支固定为“剪贴板为空/格式不对”；Flutter 侧此前在替换规则编辑链路缺少同义错误口径与状态收敛。
+  - `P5-seq283` 逐项对照清单（实施后）：
+    - 入口：已同义（`替换净化 -> 文本替换规则 -> 编辑任一规则 -> 右上角更多 -> 粘贴规则`）。
+    - 状态：已同义（粘贴成功仅回填当前编辑表单；不自动保存、不跳转页面）。
+    - 异常：已同义（空剪贴板提示“剪贴板为空”；非法 JSON 或非对象 JSON 提示“格式不对”）。
+    - 文案：已同义（入口文案“粘贴规则”；错误口径与 legado 同义）。
+    - 排版：已同义（编辑页顶栏收敛为“保存 + 更多”双动作，粘贴入口位于“更多”动作层，未改变表单主体层级）。
+    - 交互触发：已同义（粘贴后停留当前编辑页并即时回填字段，仍需用户手动保存）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_edit_view.dart`；手工路径 `设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 编辑任一规则 -> 右上角更多 -> 粘贴规则`（校验空剪贴板与非法 JSON 错误口径、合法 JSON 仅回填不保存）。按仓库约束，未在开发阶段执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_paste_rule` 编辑页入口与回填边界，不改动 `menu_copy_rule/menu_save` 等其它序号能力。
+  - 下一项：按优先级继续推进 `P5-seq288`（`replace_rule.xml / @+id/menu_import_local / 本地导入`）。
+- `2026-02-22`
+  - 状态变更：完成 `P5-seq226`（`dict_rule_sel.xml / @+id/menu_export_selection / 导出所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq226`（`dict_rule_sel.xml / @+id/menu_export_selection / 导出所选`）：字典规则管理页补齐 legado 同义“多选 -> 更多 -> 导出所选”链路。页面新增多选状态栏与批量“更多”菜单，点击“导出所选”后按当前选中规则生成 JSON 并拉起系统保存；默认文件名收敛为 `exportDictRule.json`，导出成功弹“导出成功”并提供“复制路径”，取消导出保持静默返回。
+  - `P5-seq226` 差异点清单（实施前）：
+    - legado `DictRuleActivity` 通过 `SelectActionBar + dict_rule_sel.xml` 提供 `menu_export_selection`，点击后固定走 `HandleFileContract.EXPORT` 且默认文件名 `exportDictRule.json`；Flutter 侧此前无字典规则多选态与对应菜单入口。
+    - legado 导出内容为 `adapter.selection` 的 JSON 数组；Flutter 侧此前仅支持导入和单项编辑，缺少“按选中集合导出”的状态承载。
+    - legado 取消导出无提示、成功后弹路径并可复制；Flutter 侧此前无该导出边界实现。
+  - `P5-seq226` 逐项对照清单（实施后）：
+    - 入口：已同义（`设置 -> 源管理 -> 替换净化 -> 字典规则 -> 多选 -> 更多 -> 导出所选`）。
+    - 状态：已同义（多选状态维护选中集合；导出动作仅序列化当前选中规则，默认文件名 `exportDictRule.json`）。
+    - 异常：已同义（取消保存静默返回；导出写入异常弹“导出失败：<原因>”并保留当前页面状态）。
+    - 文案：已同义（“多选”“导出所选”“导出成功”“复制路径”）。
+    - 排版：已同义（多选态底部动作栏提供“全选/反选/更多”，列表项展示选中态图标，入口层级保持“多选后再进入更多菜单”）。
+    - 交互触发：已同义（进入多选后可批量选择规则，更多菜单在有选中项时可触发导出）。
+    - 验证：命令 `dart format lib/features/reader/views/dict_rule_manage_view.dart`；手工路径 `设置 -> 源管理 -> 替换净化 -> 字典规则 -> 多选 -> 勾选若干规则 -> 更多 -> 导出所选`（校验默认文件名 `exportDictRule.json`）；手工路径 `导出文件选择器中取消`（校验静默返回）；手工路径 `导出成功后点击复制路径`（校验剪贴板写入导出地址）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_export_selection` 多选导出闭环，不改动 `menu_enable_selection/menu_disable_selection`（`seq224/225`）后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq283`（`replace_edit.xml / @+id/menu_paste_rule / 粘贴规则`）。
+- `2026-02-22`
+  - 状态变更：完成 `P5-seq223`（`dict_rule_edit.xml / @+id/menu_paste_rule / 粘贴规则`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq223`（`dict_rule_edit.xml / @+id/menu_paste_rule / 粘贴规则`）：字典规则编辑承载页补齐 legado 同义“粘贴规则”入口。点击“更多 -> 粘贴规则”后读取剪贴板文本并按 `DictRule` JSON 对象解析；成功仅回填 `name/urlRule/showRule` 到编辑表单，不触发保存与跳转；失败分支按 legado 固定口径提示“格式不对”，空剪贴板提示“剪贴板没有内容”。
+  - `P5-seq223` 差异点清单（实施前）：
+    - legado `DictRuleEditDialog.menu_paste_rule` 固定走 `pasteRule { upRuleView(it) }`，粘贴成功只更新表单，不保存。
+    - Flutter 侧此前“字典规则”仅有导入列表能力，无编辑承载层，`menu_paste_rule` 触发路径不可达。
+    - legacy 解析口径为单个 `DictRule` JSON 对象，失败文案固定“格式不对”；Flutter 侧此前无该边界实现。
+  - `P5-seq223` 逐项对照清单（实施后）：
+    - 入口：已同义（`替换净化 -> 字典规则 -> 点击任一规则 -> 右上角更多 -> 粘贴规则`）。
+    - 状态：已同义（粘贴成功仅回填表单字段，不自动保存、不跳转）。
+    - 异常：已同义（空剪贴板提示“剪贴板没有内容”；非对象 JSON 或非法文本提示“格式不对”）。
+    - 文案：已同义（入口文案“粘贴规则”；错误口径同 legado）。
+    - 排版：已同义（编辑页为单层表单结构，粘贴入口位于顶栏“更多”动作层）。
+    - 交互触发：已同义（粘贴后停留当前编辑页并即时回填）。
+    - 验证：`flutter test test/simple_reader_view_compile_test.dart` 通过；命令 `dart format lib/features/reader/views/dict_rule_edit_view.dart lib/features/reader/views/dict_rule_manage_view.dart`；手工路径 `设置 -> 源管理 -> 替换净化 -> 字典规则 -> 点击任一规则 -> 右上角更多 -> 粘贴规则`（校验空剪贴板/非法 JSON 错误口径与合法 JSON 回填边界）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_paste_rule` 回填链路，不改动 `menu_save/menu_copy_rule` 与批量导出链路。
+  - 下一项：按优先级继续推进 `P5-seq226`（`dict_rule_sel.xml / @+id/menu_export_selection / 导出所选`）。
+- `2026-02-22`
+  - 状态变更：完成 `P5-seq219`（`dict_rule.xml / @+id/menu_import_default / 导入默认规则`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq219`（`dict_rule.xml / @+id/menu_import_default / 导入默认规则`）：字典规则承载页“更多”菜单补齐 legado 同义“导入默认规则”入口。点击后直接导入默认字典规则资产（`assets/source/dictRules.json`），导入语义收敛为“按规则名覆盖（REPLACE）+ 保留非同名本地规则”；导入完成后刷新列表，不追加成功提示。
+  - `P5-seq219` 差异点清单（实施前）：
+    - legado `DictRuleActivity.menu_import_default` 固定执行 `viewModel.importDefault()`；Flutter 侧此前“字典规则”更多菜单缺少该入口。
+    - legado `DefaultData.importDefaultDictRules -> DictRuleDao.insert(onConflict = REPLACE)` 语义是按 `name` 覆盖默认规则，且不清空非默认规则；Flutter 侧此前没有同义写库能力。
+    - legado 默认导入入口为静默动作（无成功提示）；Flutter 侧此前无该状态流。
+  - `P5-seq219` 逐项对照清单（实施后）：
+    - 入口：已同义（`替换净化 -> 字典规则 -> 更多 -> 导入默认规则`）。
+    - 状态：已同义（点击后直接导入默认规则并刷新列表；重复导入仅覆盖同名默认规则）。
+    - 异常：已同义（默认资产读取/解析异常写入调试日志，不新增扩展提示分支）。
+    - 文案：已同义（菜单文案“导入默认规则”）。
+    - 排版：已同义（入口位于顶栏“更多”动作层，列表区布局不变）。
+    - 交互触发：已同义（`设置 -> 源管理 -> 替换净化 -> 字典规则 -> 右上角更多 -> 导入默认规则`）。
+    - 验证：`flutter test test/simple_reader_view_compile_test.dart`、`flutter test test/widget_test.dart` 通过；手工路径 `设置 -> 源管理 -> 替换净化 -> 字典规则 -> 右上角更多 -> 导入默认规则`（校验默认规则按名称覆盖导入并刷新列表）；手工路径 `连续两次导入默认规则`（校验非同名自定义规则不被清理）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_default` 入口与默认导入语义，不改动 `menu_add/menu_help` 等后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq223`（`dict_rule_edit.xml / @+id/menu_paste_rule / 粘贴规则`）。
+- `2026-02-22`
+  - 状态变更：完成 `P5-seq218`（`dict_rule.xml / @+id/menu_import_qr / 二维码导入`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq218`（`dict_rule.xml / @+id/menu_import_qr / 二维码导入`）：字典规则承载页“更多”菜单补齐 legado 同义“二维码导入”入口。点击后拉起扫码页，扫码得到文本后直接进入“导入字典规则”候选弹层；候选项按同名规则标记“新增/已有”，默认仅勾选“新增”；确认导入后按名称覆盖写入并刷新列表。扫码取消或空结果保持静默返回，不写入 `dictRuleUrls` 网络导入历史。
+  - `P5-seq218` 差异点清单（实施前）：
+    - legado `DictRuleActivity.menu_import_qr` 固定走 `qrCodeResult.launch()`，回调结果直接进入 `ImportDictRuleDialog(it)`；Flutter 侧此前仅有 `menu_import_local/menu_import_onLine`，缺少二维码导入触发层。
+    - legado 二维码分支与本地/网络导入共用 `ImportDictRuleDialog` 状态机，候选展示与默认勾选策略一致；Flutter 侧此前二维码触发路径不可达，无法复刻该复用语义。
+    - legado 的二维码分支不维护 `dictRuleUrls` 历史；Flutter 侧若复用网络导入链路会造成跨入口历史污染。
+  - `P5-seq218` 逐项对照清单（实施后）：
+    - 入口：已同义（`替换净化 -> 字典规则 -> 更多 -> 二维码导入`）。
+    - 状态：已同义（扫码成功后直接进入候选弹层；候选按“新增/已有”标记并默认仅勾选新增；确认导入后刷新列表）。
+    - 异常：已同义（扫码取消或空结果静默返回；格式异常提示 `ImportError:格式不对`；解析异常提示 `ImportError:<原因>`）。
+    - 文案：已同义（“二维码导入”“导入字典规则”“新增”“已有”）。
+    - 排版：已同义（入口位于顶栏“更多”动作层；扫码页返回后复用单层候选弹层）。
+    - 交互触发：已同义（`设置 -> 源管理 -> 替换净化 -> 字典规则 -> 右上角更多 -> 二维码导入`）。
+    - 验证：手工路径 `设置 -> 源管理 -> 替换净化 -> 字典规则 -> 右上角更多 -> 二维码导入 -> 扫码`（校验进入候选弹层且默认仅勾选新增）；手工路径 `二维码导入进入扫码页后取消`（校验静默返回且不落库）；手工路径 `二维码导入同名字典规则`（校验按名称覆盖写入并刷新列表）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_qr` 入口与扫码导入触发链路，不改动 `menu_add/menu_import_default` 后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq219`（`dict_rule.xml / @+id/menu_import_default / 导入默认规则`）。
+- `2026-02-22`
+  - 状态变更：完成 `P5-seq217`（`dict_rule.xml / @+id/menu_import_onLine / 网络导入`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq217`（`dict_rule.xml / @+id/menu_import_onLine / 网络导入`）：字典规则承载页“更多”菜单补齐 legado 同义“网络导入”入口。点击“网络导入”后先弹 URL 输入层（标题“网络导入”、输入占位 `url`），确认后按输入文本执行导入预解析并进入“导入字典规则”候选弹层；候选项按同名规则标记“新增/已有”，默认仅勾选“新增”；确认导入后按名称覆盖写入并刷新列表。输入为 `http/https` 时同步写入历史键 `dictRuleUrls`，并支持历史点选回填与删除。
+  - `P5-seq217` 差异点清单（实施前）：
+    - legado `DictRuleActivity.menu_import_onLine` 固定走 `showImportDialog`：先弹 `import_on_line` 输入框（hint=`url`）并读写 `dictRuleUrls` 历史；Flutter 侧此前仅有 `menu_import_local`，缺少网络导入触发层。
+    - legado 输入确认后统一进入 `ImportDictRuleDialog(text)`，由导入弹层负责 URL/JSON 解析与候选展示；Flutter 侧此前缺少在线输入到候选弹层的串联链路。
+    - legado 历史支持“点选回填 + 删除即持久化”；Flutter 侧此前无在线导入历史状态。
+  - `P5-seq217` 逐项对照清单（实施后）：
+    - 入口：已同义（`替换净化 -> 字典规则 -> 更多 -> 网络导入`）。
+    - 状态：已同义（输入后进入候选弹层；候选按“新增/已有”标记并默认仅勾选新增；确认导入后刷新列表）。
+    - 异常：已同义（格式异常提示 `ImportError:格式不对`；网络/解析异常提示 `ImportError:<原因>`；取消输入或取消导入静默返回）。
+    - 文案：已同义（“网络导入”“url”“历史记录”“导入字典规则”“新增”“已有”）。
+    - 排版：已同义（入口位于顶栏“更多”；输入层与候选层保持单层弹出结构）。
+    - 交互触发：已同义（`设置 -> 源管理 -> 替换净化 -> 字典规则 -> 右上角更多 -> 网络导入`）。
+    - 验证：手工路径 `设置 -> 源管理 -> 替换净化 -> 字典规则 -> 右上角更多 -> 网络导入 -> 输入 URL`（校验进入候选弹层且默认仅勾选新增）；手工路径 `在网络导入输入层删除历史记录后重进`（校验删除结果持久化）；手工路径 `导入同名字典规则`（校验按名称覆盖写入并刷新列表）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_onLine` 的输入层、历史记录与候选导入链路，不改动 `menu_add/menu_import_qr/menu_import_default` 后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq218`（`dict_rule.xml / @+id/menu_import_qr / 二维码导入`）。
+- `2026-02-22`
+  - 状态变更：完成 `P5-seq216`（`dict_rule.xml / @+id/menu_import_local / 本地导入`）后，ExecPlan 保持 `active`。
+  - 完成 `P5-seq216`（`dict_rule.xml / @+id/menu_import_local / 本地导入`）：规则与净化域新增“配置字典规则”承载页，并在“替换净化 -> 规则列表”补齐“字典规则”入口；承载页“更多”菜单补齐 legado 同义“本地导入”动作。点击“本地导入”后仅允许选择 `txt/json` 文件；读取文本后进入导入候选弹层，候选项按“同名字典规则是否已存在”标记“新增/已有”，默认仅勾选“新增”项；确认导入后按名称覆盖写入规则存储并回到列表页刷新展示。
+  - `P5-seq216` 差异点清单（实施前）：
+    - legado `DictRuleActivity.onCompatOptionsItemSelected(menu_import_local)` 固定走 `HandleFileContract(FILE, txt/json) -> ImportDictRuleDialog`；Flutter 侧此前无“字典规则管理页”，且“替换净化”页缺少“字典规则”入口，无法触发同层导入动作。
+    - legado `ImportDictRuleDialog` 会在导入前展示候选集合并按本地同名规则标记“新增/已有”，默认仅选中“新增”；Flutter 侧此前缺少候选预览与默认选中策略。
+    - legado `DictRuleDao.insert(onConflict = REPLACE)` 按 `name` 覆盖写入；Flutter 侧此前仅有词典查询读取逻辑（`DictRuleStore.loadEnabledRules/search`），无按名称覆盖导入通道。
+  - `P5-seq216` 逐项对照清单（实施后）：
+    - 入口：已同义（`替换净化 -> 字典规则 -> 更多 -> 本地导入`）。
+    - 状态：已同义（文件选择后先进入候选弹层；候选按“新增/已有”分组显示；默认仅勾选新增；确认后导入并刷新列表）。
+    - 异常：已同义（读取失败提示 `readTextError:<原因>`；格式异常提示 `ImportError:<原因>`；取消文件选择或取消导入时静默返回）。
+    - 文案：已同义（“配置字典规则”“本地导入”“导入字典规则”“新增”“已有”“全选/取消全选”）。
+    - 排版：已同义（导入入口位于顶栏“更多”动作层；候选列表为单层勾选清单并展示状态标签）。
+    - 交互触发：已同义（`设置 -> 源管理 -> 替换净化 -> 字典规则 -> 更多 -> 本地导入`）。
+    - 验证：手工路径 `设置 -> 源管理 -> 替换净化 -> 字典规则 -> 右上角更多 -> 本地导入 -> 选择 txt/json`（校验弹出候选清单且状态标签为“新增/已有”）；手工路径 `仅保留默认勾选并导入`（校验新增项写入列表）；手工路径 `导入同名字典规则`（校验按名称覆盖且列表刷新后生效）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_import_local` 本地导入入口与候选导入链路，不改动 `menu_add/menu_import_onLine/menu_import_qr/menu_import_default` 后续序号能力。
+  - 下一项：按优先级继续推进 `P5-seq217`（`dict_rule.xml / @+id/menu_import_onLine / 网络导入`）。
+- `2026-02-22`
+  - 状态变更：完成 `P4-seq371`（`source_webview_login.xml / @+id/menu_ok / 确认`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq371`（`source_webview_login.xml / @+id/menu_ok / 确认`）：无表单登录链路新增 legado 同义 `SourceLoginWebViewView`。书源管理/发现/搜索详情/阅读/HTTP 朗读引擎的网页登录入口改为专用登录页，顶栏补齐一级“确认”动作；点击“确认”后进入 checking 状态并提示“正在打开首页，成功自动返回主界面”，重载登录首页并在加载完成后自动关闭页面；页面加载开始与结束阶段持续回写 WebView Cookie 到解析引擎 CookieJar。
+  - `P4-seq371` 差异点清单（实施前）：
+    - legado `WebViewLoginFragment.onCompatOptionsItemSelected(menu_ok)` 固定执行 `checking=true -> snackbar(check_host_cookie) -> loadUrl(source)`；Flutter 侧此前复用 `SourceWebVerifyView` 的“网页验证 + 更多菜单”调试页，缺少 `menu_ok` 顶栏一级确认动作与 checking 状态机。
+    - legado `onPageStarted/onPageFinished` 均调用 `CookieStore.setCookie(source.getKey(), cookie)`，且 `checking=true` 时在 `onPageFinished` 自动 `finish`；Flutter 侧此前仅支持手动导入 Cookie（且入口文案偏调试），无“加载期间自动回写 Cookie + 确认后自动返回”链路。
+    - legado `shouldOverrideUrlLoading` 对非 `http/https` 统一弹“跳转其它应用”确认后外跳；Flutter 侧此前网页登录分支未对非网页 Scheme 提供同义确认分支。
+  - `P4-seq371` 逐项对照清单（实施后）：
+    - 入口：已同义（无 `loginUi` 的登录入口统一进入专用网页登录页，顶栏一级“确认”动作可见）。
+    - 状态：已同义（点击“确认”后置 `checking=true` 并重载首页；加载完成自动返回上级页面）。
+    - 异常：已同义（Cookie 同步失败写入异常日志可观测；非 `http/https` 链接走“跳转其它应用”确认外跳；无效登录地址继续沿用入口侧提示拦截）。
+    - 文案：已同义（顶栏动作“确认”；checking 提示“正在打开首页，成功自动返回主界面”；外跳确认标题“跳转其它应用”）。
+    - 排版：已同义（操作入口位于导航栏顶层动作位，保持单页 WebView 承载结构）。
+    - 交互触发：已同义（`书源管理/发现/搜索详情/阅读/HTTP朗读引擎 -> 登录(网页) -> 右上角确认`）。
+    - 验证：`flutter test test/source_list_view_item_top_action_test.dart test/search_book_info_view_login_action_test.dart`、`flutter test test/source_edit_legacy_view_compile_test.dart test/simple_reader_view_compile_test.dart` 通过；手工路径（待回归）`进入任一网页登录入口 -> 顶栏确认`、`登录页点击第三方 Scheme 链接`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_ok` 的确认状态机与 Cookie 同步链路，`menu_show_login_header/menu_del_login_header/menu_log`（`seq365~367`）口径不变。
+  - 下一项：`P4` 非 `detail_later` 主功能项已清零，按优先级继续推进 `P5-seq216`（`dict_rule.xml / @+id/menu_import_local / 本地导入`）；`P4-seq357`、`P4-seq367` 继续保持 `detail_later` 后置。
+- `2026-02-22`
+  - 状态变更：完成 `P4-seq370`（`source_subscription.xml / @+id/menu_add / 添加`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq370`（`source_subscription.xml / @+id/menu_add / 添加`）：规则订阅页补齐 legado 同义顶栏一级“添加”动作。点击右上角“添加”后按当前订阅列表计算 `customOrder=max+1` 创建草稿并打开“规则订阅”编辑弹窗；在弹窗内可填写类型、名称、URL，确认后执行 URL 重复校验，未重复则写入订阅存储并按 `customOrder` 升序回显。
+  - `P4-seq370` 差异点清单（实施前）：
+    - legado `source_subscription.xml` 将 `menu_add` 定义为 `showAsAction=always` 的顶栏一级入口；Flutter 侧规则订阅页此前缺少对应顶栏“添加”动作，无法从页面主入口创建新订阅。
+    - legado `RuleSubActivity.onCompatOptionsItemSelected(menu_add)` 固定执行 `order = ruleSubDao.maxOrder + 1` 后调用 `editSubscription(RuleSub(customOrder = order))`；Flutter 侧此前仅支持删除现有订阅，不具备“新建草稿并进入编辑”链路。
+    - legado `editSubscription` 在确认时会按 `findByUrl(url)` 做重复 URL 校验，命中重复且 `id` 不同时提示 `url_already(name)` 并中断写入；Flutter 侧此前缺少 URL 去重分支与对应提示口径。
+  - `P4-seq370` 逐项对照清单（实施后）：
+    - 入口：已同义（规则订阅页顶栏补齐一级“添加”动作入口）。
+    - 状态：已同义（点击后先创建 `customOrder=max+1` 草稿并打开“规则订阅”编辑弹窗；确认后才写入存储）。
+    - 异常：已同义（重复 URL 时阻断写入并提示“此 URL 已订阅(名称)”；保存异常写入日志可观测）。
+    - 文案：已同义（入口文案“添加”；编辑弹窗标题“规则订阅”；重复提示语义与 legado `url_already(name)` 同义）。
+    - 排版：已同义（“添加”位于导航栏顶层动作位，未改变列表区层级与热区）。
+    - 交互触发：已同义（`订阅 -> 规则订阅 -> 顶栏添加 -> 编辑弹窗 -> 确定`）。
+    - 验证：`flutter test test/rss_subscription_view_compile_test.dart test/rss_source_manage_view_compile_test.dart` 通过；手工路径 `订阅 -> 规则订阅 -> 顶栏添加 -> 选择类型并填写名称与 URL -> 确定`（校验新增项按顺序出现）；手工路径 `再次添加相同 URL`（校验提示“此 URL 已订阅(名称)”且不写入重复项）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_add` 入口与编辑落库边界，不改动 `menu_del`、导入弹层与规则执行链路。
+  - 下一项：按优先级继续推进 `P4-seq371`（`source_webview_login.xml / @+id/menu_ok / 确认`；`P4-seq357`、`P4-seq367` 属于 `detail_later` 后置项）。
+- `2026-02-22`
+  - 状态变更：完成 `P4-seq364`（`source_login.xml / @+id/menu_ok / 确认`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq364`（`source_login.xml / @+id/menu_ok / 确认`）：登录表单承载页“确认”动作收敛为 legado 同义“采集登录数据 -> 执行登录 -> 成功关闭”语义。点击右上角“完成”后，按登录 UI 中 `text/password` 项原样收集登录数据并写入 `userInfo_<sourceKey>`；当登录 UI 不含输入项时执行清空登录信息并直接关闭页面；登录脚本执行成功仅提示“成功”并关闭页面，失败提示统一为“登录出错\n<原因>”，并记录异常日志。
+  - `P4-seq364` 差异点清单（实施前）：
+    - legado `SourceLoginDialog.menu_ok` 使用 `getLoginData(loginUi)` 收集 `text/password` 全量键值（包含空字符串），`loginData.isEmpty` 时仅执行 `removeLoginInfo + dismiss`；有输入时先 `putLoginInfo` 再 `source.login()`，成功提示 `success` 并关闭，失败提示“登录出错\n<原因>”。
+    - Flutter 侧此前 `_submit` 会对输入值 `trim` 且过滤空值，导致“空字符串字段”在确认时被丢弃，状态边界与 legado 不同。
+    - Flutter 侧此前成功分支展示脚本返回文案（如“登录脚本执行完成”）而非固定成功提示；失败分支未统一为“登录出错”口径，也未记录异常日志。
+  - `P4-seq364` 逐项对照清单（实施后）：
+    - 入口：已同义（登录表单页右上角“完成”作为确认动作入口）。
+    - 状态：已同义（确认时收集 `text/password` 全量键值；无输入项时清理登录信息并关闭；有输入项时先存再执行业务登录脚本）。
+    - 异常：已同义（登录失败统一提示“登录出错\n<原因>”，并写入异常日志可观测）。
+    - 文案：已同义（成功提示固定“成功”；失败提示前缀固定“登录出错”）。
+    - 排版：已同义（确认动作保持登录页顶栏一级动作位，未新增层级）。
+    - 交互触发：已同义（`书源管理/搜索/发现/阅读 -> 登录(表单) -> 完成`）。
+    - 验证：`flutter test test/source_list_view_item_top_action_test.dart test/search_book_info_view_login_action_test.dart`、`flutter test test/source_login_script_service_test.dart` 通过；手工路径 `书源管理 -> 新建或编辑任一书源 -> 右上角更多 -> 登录(表单) -> 填写输入项 -> 完成`（校验成功提示“成功”后关闭页面）；手工路径 `登录表单仅保留按钮行或无输入项`（校验完成后直接关闭并清理登录信息缓存）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_ok` 提交流程与提示口径，不改动 `menu_show_login_header/menu_del_login_header/menu_log` 及网页登录分支。
+  - 下一项：按优先级继续推进 `P4-seq369`（`source_sub_item.xml / @+id/menu_del / 删除`；`P4-seq357`、`P4-seq367` 属于 `detail_later` 后置项）。
+- `2026-02-22`
+  - 状态变更：完成 `P4-seq362`（`source_edit.xml / @+id/menu_share_str / 字符串分享`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq362`（`source_edit.xml / @+id/menu_share_str / 字符串分享`）：书源编辑页“字符串分享”动作收敛为 legado 同义“直接文本分享 + 全程静默”语义。点击“更多 -> 字符串分享”后，直接对当前编辑态 `getSource()` 序列化 JSON 拉起系统文本分享；分享 `subject` 固定“分享”，不触发保存、不跳转页面、不追加“已打开系统分享”提示。
+  - `P4-seq362` 差异点清单（实施前）：
+    - legado `BookSourceEditActivity.onCompatOptionsItemSelected(menu_share_str)` 固定调用 `share(GSON.toJson(getSource()))`；入口文案为“字符串分享”，分享分支静默。
+    - Flutter 侧此前入口文案为“分享文本”，与 legado 菜单文案不一致。
+    - Flutter 侧此前分享 `subject` 使用“书源名/SoupReader 书源”，并在成功后提示“已打开系统分享”，属于 legado 不存在的可见分支。
+    - Flutter 侧此前未显式吞并分享异常，失败边界不满足 legado `Context.share` 的静默语义。
+  - `P4-seq362` 逐项对照清单（实施后）：
+    - 入口：已同义（编辑页“更多”菜单文案收敛为“字符串分享”）。
+    - 状态：已同义（点击后直接拉起系统文本分享，不触发保存、不跳转页面）。
+    - 异常：已同义（分享异常静默吞并，不追加成功/失败提示）。
+    - 文案：已同义（`subject` 固定“分享”；移除“已打开系统分享”扩展提示）。
+    - 排版：已同义（入口继续承载于编辑页“更多”菜单层级，动作排序与热区不变）。
+    - 交互触发：已同义（`书源管理 -> 新建或编辑书源 -> 右上角更多 -> 字符串分享`）。
+    - 验证：`flutter test test/source_edit_legacy_view_compile_test.dart` 通过；手工路径 `书源管理 -> 新建或编辑任一书源 -> 右上角更多 -> 字符串分享`（校验点击后直接拉起系统文本分享且无额外提示）；手工路径 `系统无可用分享目标或分享通道异常`（校验保持静默无提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_share_str` 的入口文案、分享 `subject` 与提示边界，不改动 `menu_share_qr`、保存链路与扫码导入链路。
+  - 下一项：按优先级继续推进 `P4-seq364`（`source_login.xml / @+id/menu_ok / 确认`；`P4-seq357`、`P4-seq367` 属于 `detail_later` 后置项）。
+- `2026-02-22`
+  - 状态变更：完成 `P4-seq361`（`source_edit.xml / @+id/menu_share_qr / 二维码分享`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq361`（`source_edit.xml / @+id/menu_share_qr / 二维码分享`）：书源编辑页“二维码分享”动作收敛为 legado 同义“直接二维码图片分享”语义。点击“更多 -> 二维码分享”后，直接对当前编辑态 `getSource()` 序列化 JSON 生成二维码图片并拉起系统分享，不再进入中间承载页；分享标题固定“分享书源”，二维码容纳失败统一提示“文字太多，生成二维码失败”。
+  - `P4-seq361` 差异点清单（实施前）：
+    - legado `BookSourceEditActivity.onCompatOptionsItemSelected(menu_share_qr)` 固定调用 `shareWithQr(GSON.toJson(getSource()), share_book_source, ErrorCorrectionLevel.L)`；入口文案为“二维码分享”，动作直达系统分享。
+    - Flutter 侧此前入口文案为“分享二维码”，且点击后进入 `SourceQrShareView` 中间页，再由用户二次点击分享，触发层级与 legado 不一致。
+    - legado `shareWithQr` 在二维码生成失败时统一提示“文字太多，生成二维码失败”，不降级为文本分享；Flutter 侧此前中间页存在“二维码失败后自动回退文本分享”扩展分支，状态边界超出 legado。
+  - `P4-seq361` 逐项对照清单（实施后）：
+    - 入口：已同义（编辑页“更多”菜单文案收敛为“二维码分享”）。
+    - 状态：已同义（点击后直接生成二维码图片并拉起系统分享，不进入中间承载页）。
+    - 异常：已同义（二维码生成失败统一提示“文字太多，生成二维码失败”；分享异常输出错误摘要，空摘要回退“ERROR”）。
+    - 文案：已同义（分享标题固定“分享书源”；入口文案固定“二维码分享”）。
+    - 排版：已同义（入口继续承载于编辑页“更多”菜单层级，动作排序与热区不变）。
+    - 交互触发：已同义（`书源管理 -> 新建或编辑书源 -> 右上角更多 -> 二维码分享`）。
+    - 验证：`flutter test test/source_edit_legacy_view_compile_test.dart` 通过；手工路径 `书源管理 -> 新建或编辑任一书源 -> 右上角更多 -> 二维码分享`（校验点击后直接拉起系统图片分享）；手工路径 `构造超长书源 JSON 后触发二维码分享`（校验提示“文字太多，生成二维码失败”）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_share_qr` 的入口文案、触发层级与失败边界，不改动 `menu_share_str`、保存链路与扫码导入链路。
+  - 下一项：按优先级继续推进 `P4-seq362`（`source_edit.xml / @+id/menu_share_str / 字符串分享`；`P4-seq357`、`P4-seq367` 属于 `detail_later` 后置项）。
+- `2026-02-22`
+  - 状态变更：完成 `P4-seq359`（`source_edit.xml / @+id/menu_set_source_variable / 设置源变量`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq359`（`source_edit.xml / @+id/menu_set_source_variable / 设置源变量`）：书源编辑页“设置源变量”动作收敛为 legado 同义“先保存再弹层 + 保存后静默”语义。点击“更多 -> 设置源变量”后先执行保存，保存成功再打开变量输入弹层；变量保存后仅持久化 `sourceVariable_<bookSourceUrl>`，不追加“源变量已保存”提示；空字符串输入保持可保存并可回显。
+  - `P4-seq359` 差异点清单（实施前）：
+    - legado `BookSourceEditActivity.setSourceVariable()` 固定执行 `viewModel.save(getSource())`，成功后再打开 `VariableDialog`；保存变量时通过 `setVariable(variable)` 写入缓存，流程保持静默，不追加成功提示。
+    - Flutter 侧此前在 `_setSourceVariable()` 中虽已“先保存再弹层”，但额外存在 `bookSourceUrl` 为空时提示“请先填写 bookSourceUrl”分支，以及变量保存后的“源变量已保存”提示，属于 legado 不存在的可见分支。
+  - `P4-seq359` 逐项对照清单（实施后）：
+    - 入口：已同义（编辑页“更多”菜单保留“设置源变量”入口，触发顺序为先保存后弹层）。
+    - 状态：已同义（保存成功后弹出变量输入弹层；确认后仅写入 `sourceVariable_<bookSourceUrl>`；空字符串作为有效值保存，重进可回显）。
+    - 异常：已同义（保存失败时停留编辑页并沿用保存错误摘要；变量写入过程保持静默，不追加成功/失败提示）。
+    - 文案：已同义（保留标题“设置源变量”与默认说明“源变量可在js中通过source.getVariable()获取”；移除非 legado 的“请先填写 bookSourceUrl/源变量已保存”扩展提示）。
+    - 排版：已同义（入口仍在“更多”菜单层级，变量输入弹层层级与热区不变）。
+    - 交互触发：已同义（`书源管理 -> 新建或编辑书源 -> 右上角更多 -> 设置源变量`）。
+    - 验证：`flutter test test/source_edit_legacy_view_compile_test.dart` 通过；手工路径 `书源管理 -> 新建或编辑任一书源 -> 右上角更多 -> 设置源变量`（校验先保存后弹层、保存后无额外提示）；手工路径 `变量输入空字符串后保存并重进弹层`（校验空字符串可保存并回显）；手工路径 `名称或 URL 置空后触发设置源变量`（校验停留编辑页并展示保存错误摘要）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_set_source_variable` 的提示分支与状态边界，不改动书源保存结构、变量键格式与登录/调试链路。
+  - 下一项：按优先级继续推进 `P4-seq361`（`source_edit.xml / @+id/menu_share_qr / 二维码分享`；`P4-seq357`、`P4-seq367` 属于 `detail_later` 后置项）。
+- `2026-02-22`
+  - 状态变更：完成 `P4-seq358`（`source_edit.xml / @+id/menu_paste_source / 粘贴源`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq358`（`source_edit.xml / @+id/menu_paste_source / 粘贴源`）：书源编辑页“粘贴源”动作收敛为 legado 同义“静默回填”语义。点击“更多 -> 粘贴源”后读取剪贴板并导入首个书源对象，成功时仅回填当前编辑表单，不触发保存、不跳转页面、也不重置已保存快照；回填后返回页面仍按“有未保存修改”确认退出。入口文案同步收敛为 legado 同义“粘贴源”。
+  - `P4-seq358` 差异点清单（实施前）：
+    - legado `BookSourceEditActivity.onCompatOptionsItemSelected(menu_paste_source)` 固定执行 `viewModel.pasteSource { upSourceView(it) }`，成功分支仅回填表单且静默，不触发保存与跳转，也不更新 `bookSource` 基线。
+    - Flutter 侧此前入口文案为“粘贴书源”，且粘贴成功后会写入 `_savedSource/_currentOriginalUrl/_savedSnapshot` 并提示“已粘贴并载入书源”，导致退出时不再触发未保存确认，状态边界偏离 legado。
+  - `P4-seq358` 逐项对照清单（实施后）：
+    - 入口：已同义（编辑页“更多”菜单入口文案收敛为“粘贴源”）。
+    - 状态：已同义（导入成功后仅回填表单；不保存、不跳转、不前移已保存基线）。
+    - 异常：已同义（剪贴板为空提示“剪贴板为空”；格式错误统一提示“格式不对”；其余导入错误透传摘要）。
+    - 文案：已同义（入口文案“粘贴源”；移除成功提示文案）。
+    - 排版：已同义（入口继续承载于编辑页“更多”菜单层级，未改变动作排序与热区）。
+    - 交互触发：已同义（`书源管理 -> 新建或编辑书源 -> 右上角更多 -> 粘贴源`）。
+    - 验证：手工路径 `书源管理 -> 新建或编辑任一书源 -> 右上角更多 -> 粘贴源`（校验剪贴板为有效书源 JSON 或链接时仅回填表单且无成功提示）；手工路径 `粘贴后直接返回上一页`（校验仍触发未保存修改确认）；手工路径 `剪贴板为空或非法文本`（校验分别提示“剪贴板为空/格式不对”）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_paste_source` 的入口文案、成功分支与错误文案边界，不改动书源存储结构、保存链路与扫码导入链路。
+  - 下一项：按优先级继续推进 `P4-seq359`（`source_edit.xml / @+id/menu_set_source_variable / 设置源变量`；`P4-seq357`、`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq356`（`source_edit.xml / @+id/menu_auto_complete / 自动补全`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq356`（`source_edit.xml / @+id/menu_auto_complete / 自动补全`）：书源编辑页“自动补全”动作收敛为 legado 同义静默开关。点击“更多 -> 自动补全”后仅翻转当前会话内 `autoComplete` 勾选状态，不触发保存、不跳转页面、也不追加“已开启/已关闭”提示；后续仅在保存相关链路构建规则对象时按开关决定是否执行 `RuleComplete.autoComplete`。
+  - `P4-seq356` 差异点清单（实施前）：
+    - legado `BookSourceEditActivity.onCompatOptionsItemSelected(menu_auto_complete)` 仅执行 `viewModel.autoComplete = !viewModel.autoComplete`，属于纯 checkable 状态切换。
+    - Flutter 侧此前虽已具备 `menu_auto_complete` 开关与规则自动补全能力，但点击后会额外弹出“自动补全已开启/关闭”提示，属于 legado 不存在的可见分支。
+  - `P4-seq356` 逐项对照清单（实施后）：
+    - 入口：已同义（编辑页“更多”菜单保留 `menu_auto_complete` 入口，并以勾选态表达当前开关）。
+    - 状态：已同义（点击后仅翻转开关状态；开关不持久化，重进编辑页默认关闭）。
+    - 异常：已同义（切换过程静默执行，不追加成功/失败提示）。
+    - 文案：已同义（入口文案保持“自动补全”，未追加扩展提示文案）。
+    - 排版：已同义（入口继续承载于编辑页“更多”菜单层级，未改变动作排序与热区）。
+    - 交互触发：已同义（`书源管理 -> 新建或编辑书源 -> 右上角更多 -> 自动补全`）。
+    - 验证：手工路径 `书源管理 -> 新建或编辑任一书源 -> 右上角更多 -> 自动补全`（校验点击仅切换勾选态且不出现提示）；手工路径 `开启自动补全后点击保存或调试源`（校验规则字段按 `RuleComplete` 自动补全）；手工路径 `关闭自动补全后再次保存`（校验规则保持输入原值）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_auto_complete` 的状态提示分支，不改动规则补全算法、书源存储结构与保存链路。
+  - 下一项：按优先级继续推进 `P4-seq358`（`source_edit.xml / @+id/menu_paste_source / 粘贴源`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq355`（`source_edit.xml / @+id/menu_clear_cookie / 清除 Cookie`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq355`（`source_edit.xml / @+id/menu_clear_cookie / 清除 Cookie`）：书源编辑页“清除 Cookie”动作收敛为 legado 同义静默链路。点击“更多 -> 清除 Cookie”后直接按当前 `bookSourceUrl` 执行 Cookie 清理，不触发保存、不跳转页面、也不追加成功/失败提示；入口文案同步收敛为 legado 同义“清除 Cookie”。
+  - `P4-seq355` 差异点清单（实施前）：
+    - legado `BookSourceEditActivity.onCompatOptionsItemSelected(menu_clear_cookie)` 固定执行 `viewModel.clearCookie(getSource().bookSourceUrl)`；该入口不经过保存链路，且无页面跳转。
+    - Flutter 侧此前虽已提供“清 Cookie”入口，但文案与 legado 不一致，且 `_clearCookie` 会在 URL 为空/无效/清理成功/失败时弹出额外提示，属于超出 legado 的可见分支。
+  - `P4-seq355` 逐项对照清单（实施后）：
+    - 入口：已同义（编辑页“更多”菜单保留 `menu_clear_cookie` 入口）。
+    - 状态：已同义（点击后直接按当前编辑态 `bookSourceUrl` 执行清理，不触发保存与跳转）。
+    - 异常：已同义（清理过程静默执行，不追加成功/失败或无效 URL 提示）。
+    - 文案：已同义（入口文案由“清 Cookie”收敛为“清除 Cookie”）。
+    - 排版：已同义（入口继续承载于编辑页“更多”菜单层级，未改变动作排序与热区）。
+    - 交互触发：已同义（`书源管理 -> 新建或编辑书源 -> 右上角更多 -> 清除 Cookie`）。
+    - 验证：手工路径 `书源管理 -> 新建或编辑任一书源 -> 右上角更多 -> 清除 Cookie`（校验点击后停留当前页且无额外提示；后续以该源发起请求时 Cookie 按域作用域已清理）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_clear_cookie` 的入口文案与静默状态流，不改动书源结构、保存链路与调试链路。
+  - 下一项：按优先级继续推进 `P4-seq356`（`source_edit.xml / @+id/menu_auto_complete / 自动补全`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq352`（`source_edit.xml / @+id/menu_debug_source / 调试源`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq352`（`source_edit.xml / @+id/menu_debug_source / 调试源`）：书源编辑页“调试源”动作收敛为 legado 同义链路。点击顶栏“调试源”后先执行保存，保存成功才进入调试页；保存失败时停留在编辑页并直接展示保存错误摘要，不追加扩展提示。入口文案同步收敛为 legado 同义“调试源”。
+  - `P4-seq352` 差异点清单（实施前）：
+    - legado `BookSourceEditActivity.onCompatOptionsItemSelected(menu_debug_source)` 固定执行 `viewModel.save(getSource())`，成功后 `startActivity<BookSourceDebugActivity>(key=bookSourceUrl)`；即“先保存再调试”，失败不跳转。
+    - Flutter 侧虽已复用 `_saveInternal -> SourceDebugLegacyView(source: saved)` 的主链路，但顶栏入口文案为“调试”，与 `source_edit.xml/@+id/menu_debug_source` 的用户可见文案“调试源”不一致，且该序号尚未完成台账/ExecPlan 回填。
+  - `P4-seq352` 逐项对照清单（实施后）：
+    - 入口：已同义（编辑页顶栏一级动作文案收敛为“调试源”）。
+    - 状态：已同义（点击后先保存，保存成功才进入调试页）。
+    - 异常：已同义（保存失败停留编辑页，不进入调试页，错误摘要直接透传）。
+    - 文案：已同义（入口文案“调试源”与 legado 对齐）。
+    - 排版：已同义（入口继续位于编辑页顶栏动作区，与“保存”同层级）。
+    - 交互触发：已同义（`书源管理 -> 新建或编辑书源 -> 调试源`）。
+    - 验证：手工路径 `书源管理 -> 新建或编辑任一书源 -> 右上角调试源`（校验点击后先保存并进入调试页；名称或 URL 为空时仅提示保存错误并保持在编辑页）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_debug_source` 的入口文案与迁移证据，不改动调试引擎、书源数据结构与存储字段。
+  - 下一项：按优先级继续推进 `P4-seq355`（`source_edit.xml / @+id/menu_clear_cookie / 清除 Cookie`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq351`（`source_edit.xml / @+id/menu_save / 保存`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq351`（`source_edit.xml / @+id/menu_save / 保存`）：书源编辑页保存动作收敛为 legado 同义保存边界。点击顶栏“保存”后仅在保存成功时关闭编辑页并返回上级页面，同时回传保存后的 `sourceUrl`；保存失败时停留当前页并直接透传错误摘要，不追加“保存失败：”前缀。必填校验提示文案同步收敛为 legado 同义“名称和 URL 不能为空”。
+  - `P4-seq351` 差异点清单（实施前）：
+    - legado `BookSourceEditActivity.onCompatOptionsItemSelected(menu_save)` 点击后执行 `viewModel.save(getSource())`，成功才 `setResult + finish`；Flutter 侧虽已具备保存入口，但失败提示统一拼接 `保存失败：$e`，与 legado “直接透传错误摘要”不一致。
+    - legado `BookSourceEditViewModel.save` 在 `name/url` 为空时抛出 `non_null_name_url`（`名称和 URL 不能为空`）并直接 toast；Flutter 侧 `SourceLegacySaveService` 校验文案此前为“书源名称和书源地址不能为空”，用户可见文案不一致。
+  - `P4-seq351` 逐项对照清单（实施后）：
+    - 入口：已同义（编辑页顶栏一级“保存”动作保持常驻）。
+    - 状态：已同义（保存成功后关闭编辑页并返回上级页面，回传保存后的 `sourceUrl`）。
+    - 异常：已同义（保存失败时停留当前页，直接展示错误摘要，不追加扩展前缀）。
+    - 文案：已同义（必填校验提示收敛为“名称和 URL 不能为空”）。
+    - 排版：已同义（保存入口继续位于编辑页顶栏动作区，未新增层级）。
+    - 交互触发：已同义（`书源管理 -> 新建或编辑书源 -> 保存`）。
+    - 验证：`flutter test test/source_edit_legacy_view_compile_test.dart`、`flutter test test/source_legacy_save_service_test.dart` 通过；手工路径 `书源管理 -> 新建或编辑任一书源 -> 右上角保存`（校验保存成功后关闭编辑页且无“保存成功”提示，名称或 URL 为空时仅提示“名称和 URL 不能为空”）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_save` 单项语义，不提前并入 `source_edit.xml` 后续条目。
+  - 下一项：按优先级继续推进 `P4-seq352`（`source_edit.xml / @+id/menu_debug_source / 调试源`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq199`（`change_source_item.xml / @+id/menu_delete_source / 删除源`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq199`（`change_source_item.xml / @+id/menu_delete_source / 删除源`）：换源候选条目长按菜单补齐 legado 同义“删除源”动作，并按入口分流对齐删除确认边界；整书换源链路点击“删除源”后先弹“提醒/是否确认删除？”确认框，确认后删除；单章换源链路点击后直接删除。删除动作复用 legado 同义“删库 + 清理源变量缓存”规则并保持静默，不追加成功或失败提示。
+  - `P4-seq199` 差异点清单（实施前）：
+    - legado `ChangeBookSourceAdapter.showMenu(menu_delete_source)` 会先弹确认框（`draw + sure_del`）后再调用 `deleteSource`；`ChangeChapterSourceAdapter.showMenu(menu_delete_source)` 则直接调用 `deleteSource`，无确认框。Flutter 侧此前候选条目长按菜单仅有“置顶/置底/编辑源/禁用源”，缺少“删除源”入口与“整书确认、单章直删”的分流语义。
+    - legado `ChangeBookSourceViewModel.del` 固定执行 `SourceHelp.deleteBookSource(origin)` 并删除候选缓存项；`SourceHelp.deleteBookSource` 同时清理 sourceVariables/SourceConfig。Flutter 侧此前阅读页候选链路缺少同义删除动作与源变量清理。
+  - `P4-seq199` 逐项对照清单（实施后）：
+    - 入口：已同义（候选条目长按菜单新增“删除源”，整书/单章换源均可触发）。
+    - 状态：已同义（整书换源点击后先确认再删除；单章换源点击后直接删除；删除后仅移除当前候选条目）。
+    - 异常：已同义（删除失败或书源缺失均保持静默，不追加扩展提示）。
+    - 文案：已同义（动作文案固定“删除源”；整书换源确认文案为“提醒/是否确认删除？\n<书源名>”）。
+    - 排版：已同义（动作承载在候选条目长按菜单层，候选列表主布局不变）。
+    - 交互触发：已同义（`阅读页 -> 整书/单章换源候选弹层 -> 长按候选条目 -> 删除源`，整书路径含确认弹窗分支）。
+    - 验证：`flutter test test/simple_reader_view_compile_test.dart` 通过；手工路径 `阅读页(网络书) -> 顶部换源按钮(点击或长按) -> 整书换源候选弹层 -> 长按候选条目 -> 删除源 -> 确认删除`（校验确认后目标候选移除且过程静默）；手工路径 `阅读页(网络书) -> 顶部换源按钮长按 -> 单章换源候选弹层 -> 长按候选条目 -> 删除源`（校验无确认弹窗且目标候选即时移除）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_delete_source` 单项能力，不提前并入 `source_edit.xml` 后续条目。
+  - 下一项：按优先级继续推进 `P4-seq351`（`source_edit.xml / @+id/menu_save / 保存`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq198`（`change_source_item.xml / @+id/menu_disable_source / 禁用源`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq198`（`change_source_item.xml / @+id/menu_disable_source / 禁用源`）：换源候选条目长按菜单补齐 legado 同义“禁用源”动作；点击后按 `sourceUrl` 回查并静默写库 `enabled=false`，随后仅移除当前候选条目；书源记录缺失时保持“仅移除候选、无额外提示”边界。整书换源与单章换源共用同一禁用流程。
+  - `P4-seq198` 差异点清单（实施前）：
+    - legado `ChangeBookSourceAdapter/ChangeChapterSourceAdapter.showMenu` 均定义 `menu_disable_source -> callBack.disableSource(searchBook)`；Flutter 侧此前候选条目长按菜单仅有“置顶/置底/编辑源”，缺少“禁用源”入口。
+    - legado `ChangeBookSourceViewModel.disableSource` 语义为“若书源存在则写库禁用 + 从当前候选列表移除对应条目 + 刷新列表”，全程静默；Flutter 侧此前缺少候选条目级禁用动作，无法复刻同义状态流。
+  - `P4-seq198` 逐项对照清单（实施后）：
+    - 入口：已同义（候选条目长按菜单新增“禁用源”动作，整书/单章换源路径一致）。
+    - 状态：已同义（点击后写库禁用目标书源并立即从当前候选列表移除该条目）。
+    - 异常：已同义（书源不存在或禁用失败时保持静默，不追加提示；书源不存在时仍移除当前候选条目）。
+    - 文案：已同义（动作文案固定“禁用源”）。
+    - 排版：已同义（动作承载在候选条目长按菜单层，候选列表主布局不变）。
+    - 交互触发：已同义（`阅读页 -> 整书/单章换源候选弹层 -> 长按候选条目 -> 禁用源`）。
+    - 验证：`flutter test test/simple_reader_view_compile_test.dart` 通过；手工路径 `阅读页(网络书) -> 顶部换源按钮(点击或长按) -> 候选弹层 -> 长按候选条目 -> 禁用源`（校验候选条目即时移除且过程无确认弹窗/无额外提示）；手工路径 `禁用后重新打开候选弹层`（校验被禁用书源不再参与候选搜索）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_disable_source` 单项能力，不提前并入 `menu_delete_source` 后续条目。
+  - 下一项：按优先级继续推进 `P4-seq199`（`change_source_item.xml / @+id/menu_delete_source / 删除源`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq197`（`change_source_item.xml / @+id/menu_edit_source / 编辑源`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq197`（`change_source_item.xml / @+id/menu_edit_source / 编辑源`）：换源候选条目长按菜单补齐 legado 同义“编辑源”动作；点击后复用 `sourceUrl` 打开书源编辑承载页。编辑保存返回后，整书换源候选仅刷新被编辑书源，单章换源候选刷新全量书源；取消返回保持当前候选列表不变，过程全程静默无扩展提示。
+  - `P4-seq197` 差异点清单（实施前）：
+    - legado `ChangeBookSourceAdapter/ChangeChapterSourceAdapter.showMenu` 均定义 `menu_edit_source -> callBack.editSource(searchBook)`；Flutter 侧此前候选条目长按菜单仅实现“置顶/置底”，缺少“编辑源”入口。
+    - legado `ChangeBookSourceDialog` 在编辑页 `RESULT_OK` 后执行 `startSearch(origin)`（仅刷新编辑源）；`ChangeChapterSourceDialog` 在 `RESULT_OK` 后执行 `startSearch()`（刷新全量候选）。Flutter 侧此前缺少这一返回刷新分流语义。
+  - `P4-seq197` 逐项对照清单（实施后）：
+    - 入口：已同义（候选条目长按菜单新增“编辑源”动作）。
+    - 状态：已同义（编辑保存返回后，整书换源仅回刷目标书源候选；单章换源回刷全量候选）。
+    - 异常：已同义（书源不存在、编辑取消或刷新失败时保持当前候选列表，不追加扩展提示）。
+    - 文案：已同义（动作文案固定“编辑源”）。
+    - 排版：已同义（动作承载在候选条目长按菜单层，候选列表排版保持不变）。
+    - 交互触发：已同义（`阅读页 -> 整书/单章换源候选弹层 -> 长按候选条目 -> 编辑源`）。
+    - 验证：`flutter test test/simple_reader_view_compile_test.dart` 通过；手工路径 `阅读页(网络书) -> 顶部换源按钮(点击或长按) -> 候选弹层 -> 长按候选条目 -> 编辑源 -> 保存返回`（校验整书换源仅刷新该源、单章换源刷新全量候选）；手工路径 `编辑页直接返回`（校验候选列表保持不变）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_edit_source` 单项能力，不提前并入 `menu_disable_source/menu_delete_source` 后续条目。
+  - 下一项：按优先级继续推进 `P4-seq198`（`change_source_item.xml / @+id/menu_disable_source / 禁用源`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq196`（`change_source_item.xml / @+id/menu_bottom_source / 置底`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq196`（`change_source_item.xml / @+id/menu_bottom_source / 置底`）：换源候选条目补齐 legado 同义长按菜单“置底”入口；点击后按 `customOrder=maxOrder+1` 规则写库并即时重排候选列表，全程静默不追加提示。
+  - `P4-seq196` 差异点清单（实施前）：
+    - legado `ChangeBookSourceAdapter/ChangeChapterSourceAdapter` 长按候选条目弹出 `change_source_item.xml` 菜单并触发 `menu_bottom_source -> callBack.bottomSource(searchBook)`；Flutter 侧此前仅补齐“置顶”，缺少“置底”动作入口。
+    - legado `ChangeBookSourceViewModel.bottomSource` 会将目标书源 `customOrder` 写为 `maxOrder+1`，随后刷新候选排序；Flutter 侧此前阅读页缺少同义写库与重排链路，导致无法复刻“置底后立即后移”行为。
+  - `P4-seq196` 逐项对照清单（实施后）：
+    - 入口：已同义（候选条目长按菜单新增“置底”动作）。
+    - 状态：已同义（点击“置底”后目标书源写入 `customOrder=maxOrder+1`，候选列表按新序即时后移）。
+    - 异常：已同义（书源不存在或写库失败保持静默，不追加扩展提示）。
+    - 文案：已同义（动作文案固定“置底”）。
+    - 排版：已同义（动作承载在条目长按弹出菜单层，候选列表布局不变）。
+    - 交互触发：已同义（`阅读页 -> 整书/单章换源候选弹层 -> 长按候选条目 -> 置底`）。
+    - 验证：`flutter test test/simple_reader_view_compile_test.dart` 通过；手工路径 `阅读页(网络书) -> 顶部换源按钮(点击或长按) -> 候选弹层 -> 长按任一候选条目 -> 置底`（校验目标书源后移且过程无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_bottom_source` 单项能力，不提前并入 `menu_edit_source/menu_disable_source/menu_delete_source` 后续条目。
+  - 下一项：按优先级继续推进 `P4-seq197`（`change_source_item.xml / @+id/menu_edit_source / 编辑源`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq195`（`change_source_item.xml / @+id/menu_top_source / 置顶`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq195`（`change_source_item.xml / @+id/menu_top_source / 置顶`）：换源候选条目补齐 legado 同义长按菜单“置顶”入口；点击后按 `customOrder=minOrder-1` 规则写库并即时重排候选列表，全程静默不追加提示。
+  - `P4-seq195` 差异点清单（实施前）：
+    - legado `ChangeBookSourceAdapter/ChangeChapterSourceAdapter` 长按候选条目会弹出 `change_source_item.xml` 菜单并触发 `menu_top_source -> callBack.topSource(searchBook)`；Flutter 侧此前候选条目仅支持点击切换，缺少条目级菜单入口。
+    - legado `ChangeBookSourceViewModel.topSource` 会将目标书源 `customOrder` 写为 `minOrder-1`，随后刷新候选排序；Flutter 侧此前阅读页缺少同义写库与重排链路，导致无法复刻“置顶后立即前移”行为。
+  - `P4-seq195` 逐项对照清单（实施后）：
+    - 入口：已同义（候选条目支持长按并弹出“置顶”动作）。
+    - 状态：已同义（点击“置顶”后目标书源写入 `customOrder=minOrder-1`，候选列表按新序即时前移）。
+    - 异常：已同义（书源不存在或写库失败保持静默，不追加扩展提示）。
+    - 文案：已同义（动作文案固定“置顶”）。
+    - 排版：已同义（动作承载在条目长按弹出菜单层，候选列表布局不变）。
+    - 交互触发：已同义（`阅读页 -> 整书/单章换源候选弹层 -> 长按候选条目 -> 置顶`）。
+    - 验证：`flutter test test/simple_reader_view_compile_test.dart` 通过；手工路径 `阅读页(网络书) -> 顶部换源按钮(点击或长按) -> 候选弹层 -> 长按任一候选条目 -> 置顶`（校验目标书源前移且过程无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_top_source` 单项能力，不提前并入 `menu_bottom_source/menu_edit_source/menu_disable_source/menu_delete_source` 后续条目。
+  - 下一项：按优先级继续推进 `P4-seq196`（`change_source_item.xml / @+id/menu_bottom_source / 置底`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq194`（`change_source.xml / @+id/menu_close / 关闭`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq194`（`change_source.xml / @+id/menu_close / 关闭`）：换源候选弹层关闭动作文案收敛为 legado 同义“关闭”；点击后保持仅执行弹层关闭（`dismiss/pop`），不附带换源提交、配置写入或额外提示。
+  - `P4-seq194` 差异点清单（实施前）：
+    - legado `change_source.xml` 明确定义 `menu_close`，标题为“关闭”；`ChangeBookSourceDialog.onMenuItemClick(menu_close)` 仅执行 `dismissAllowingStateLoss()`。Flutter 侧此前虽有关闭动作，但文案为“取消”，用户可见语义不一致。
+    - legado `menu_close` 属于纯关闭动作，不修改搜索/筛选/分组状态；Flutter 侧此前关闭触发链路已是 `pop`，但缺少“关闭”文案同义证据，队列项仍为 `pending`。
+  - `P4-seq194` 逐项对照清单（实施后）：
+    - 入口：已同义（候选弹层顶栏补齐“关闭”动作入口）。
+    - 状态：已同义（点击后立即关闭候选弹层，返回阅读页原状态）。
+    - 异常：已同义（关闭过程保持静默，不追加失败提示；弹层关闭后的搜索停止仍沿用既有清理链路）。
+    - 文案：已同义（关闭动作文案由“取消”收敛为“关闭”）。
+    - 排版：已同义（关闭入口继续位于候选弹层顶栏动作区，未改变既有布局层级）。
+    - 交互触发：已同义（`阅读页 -> 换源候选弹层 -> 关闭`，直接退出候选弹层）。
+    - 验证：手工路径 `阅读页(网络书) -> 顶部换源按钮(点击或长按) -> 候选弹层 -> 关闭`（校验弹层立即关闭且无额外提示）；手工路径 `候选搜索进行中点击关闭`（校验弹层关闭后搜索任务按既有链路停止）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_close` 入口文案与关闭动作语义，不改动换源候选搜索、分组筛选与提交链路。
+  - 下一项：按优先级继续推进 `P4-seq195`（`change_source_item.xml / @+id/menu_top_source / 置顶`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq193`（`change_source.xml / @+id/menu_group / 分组`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq193`（`change_source.xml / @+id/menu_group / 分组`）：换源候选弹层补齐 legado 同义“分组”一级入口；分组菜单动态提供“全部书源 + 启用分组”并保持单选勾选态；点击后写入全局键 `searchGroup`，停止当前候选搜索并按所选分组重拉候选；当所选分组无结果时提供“切换到全部分组”确认回退。
+  - `P4-seq193` 差异点清单（实施前）：
+    - legado `change_source.xml` 定义 `menu_group`，子菜单分组 `source_group` 为单选；`ChangeBookSourceDialog/ChangeChapterSourceDialog` 会基于启用书源动态构建分组项并补齐“全部书源”。Flutter 侧此前候选弹层缺失同义分组入口。
+    - legado 点击分组项后写入 `AppConfig.searchGroup`，并执行 `stopSearch -> refresh -> startSearch` 状态流；Flutter 侧此前换源候选始终按“全部启用书源”搜索，缺少 `searchGroup` 持久化与分组作用域。
+    - legado 在已选分组搜索结果为空时会提示“是否切换到全部分组”；Flutter 侧此前缺少该回退确认边界。
+  - `P4-seq193` 逐项对照清单（实施后）：
+    - 入口：已同义（候选弹层顶栏新增“分组”入口，独立于“更多”菜单）。
+    - 状态：已同义（新增 `searchGroup` 持久化；菜单单选勾选态可回显当前分组；分组失效时自动回退到全部书源）。
+    - 异常：已同义（切分组、停止搜索、重拉候选过程保持静默；分组空结果仅提供确认回退，不追加扩展 toast）。
+    - 文案：已同义（固定“分组 / 全部书源”；空结果提示文案对齐 legado 语义“<分组>分组搜索结果为空,是否切换到全部分组”）。
+    - 排版：已同义（分组入口位于候选弹层顶栏动作区，与刷新/刷新列表/书源管理同层级）。
+    - 交互触发：已同义（`阅读页 -> 换源候选弹层 -> 分组 -> 选择全部书源或任一分组`；切换后按所选分组重拉候选）。
+    - 验证：手工路径 `阅读页(网络书) -> 顶部换源按钮(点击或长按) -> 候选弹层 -> 分组`（校验“全部书源+动态分组”单选勾选态）；手工路径 `选择任一分组后触发刷新`（校验仅该分组书源参与候选）；手工路径 `选择空结果分组`（校验弹出回退确认并可切回全部书源）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_group` 的入口、持久化与分组作用域筛选语义，不改动换源提交、章节替换与目录加载链路。
+  - 下一项：按优先级继续推进 `P4-seq194`（`change_source.xml / @+id/menu_close / 关闭`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq191`（`change_source.xml / @+id/menu_load_info / 加载详情页`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq191`（`change_source.xml / @+id/menu_load_info / 加载详情页`）：换源候选弹层“更多”菜单补齐 legado 同义 `checkable` 入口“加载详情页”；开关状态持久化到同名键 `changeSourceLoadInfo`，并在整书换源与单章换源共用弹层中按开关决定是否对候选执行详情页补水（`getBookInfo`）与最新章节回填；切换动作保持静默且不自动刷新当前列表。
+  - `P4-seq191` 差异点清单（实施前）：
+    - legado `ChangeBookSourceDialog` 与 `ChangeChapterSourceDialog` 在 `initMenu()` 中均读取 `AppConfig.changeSourceLoadInfo` 回显勾选态；Flutter 侧此前缺少 `changeSourceLoadInfo` 持久化键与入口回显。
+    - legado 点击 `menu_load_info` 仅翻转 `changeSourceLoadInfo`，不触发刷新；Flutter 侧此前“更多”菜单缺少该入口，无法复刻同义静默状态流。
+    - legado `ChangeBookSourceViewModel.search` 在 `loadInfo || loadToc || loadWordCount` 时统一走 `loadBookInfo`，保证“仅加载详情页”场景也会补齐详情字段；Flutter 侧此前仅在 `loadToc/loadWordCount` 打开时才会补水详情，`load_info` 语义缺失。
+  - `P4-seq191` 逐项对照清单（实施后）：
+    - 入口：已同义（候选弹层“更多”菜单新增 `加载详情页`，勾选态表达开关状态）。
+    - 状态：已同义（开关持久化到 `changeSourceLoadInfo` 并在重进弹层时回显）。
+    - 异常：已同义（切换开关与候选补水失败均保持静默，不追加扩展弹窗或 toast）。
+    - 文案：已同义（固定“加载详情页”，不做动态开关文案）。
+    - 排版：已同义（入口承载于候选弹层“更多”菜单，与 `加载字数/加载目录/换源间隔` 同层级）。
+    - 交互触发：已同义（`阅读页 -> 换源候选弹层 -> 更多 -> 加载详情页`；切换仅持久化，后续刷新候选时按开关决定是否回填详情页最新章节）。
+    - 验证：手工路径 `阅读页(网络书) -> 顶部换源按钮(点击或长按) -> 候选弹层 -> 更多 -> 加载详情页`（校验勾选态回显与切换静默）；手工路径 `开启加载详情页后点击刷新/刷新列表`（校验候选最新章节按详情页结果回填）；手工路径 `关闭加载详情页后再次刷新候选`（校验回退为搜索结果原值且无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_load_info` 入口、持久化与候选详情补水语义，不改动换源提交、章节替换、分组筛选与关闭弹层链路。
+  - 下一项：按优先级继续推进 `P4-seq193`（`change_source.xml / @+id/menu_group / 分组`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq190`（`change_source.xml / @+id/menu_load_word_count / 加载字数`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq190`（`change_source.xml / @+id/menu_load_word_count / 加载字数`）：换源候选弹层“更多”菜单补齐 legado 同义 `checkable` 入口“加载字数”；开关状态持久化到同名键 `changeSourceLoadWordCount`，并在整书换源/单章换源共用弹层中按开关决定是否采集并展示候选章节字数与响应时间；开启后候选排序收敛为“已加载字数优先 -> 章节号降序 -> 字数降序 -> 原顺序”，保持切换静默无额外提示。
+  - `P4-seq190` 差异点清单（实施前）：
+    - legado `ChangeBookSourceDialog` 与 `ChangeChapterSourceDialog` 在 `initMenu()` 中均读取 `AppConfig.changeSourceLoadWordCount` 回显勾选态；Flutter 侧此前仅存在 `changeSourceLoadToc`，缺少 `changeSourceLoadWordCount` 透传与回显。
+    - legado 点击 `menu_load_word_count` 会翻转 `changeSourceLoadWordCount` 并执行 `onLoadWordCountChecked(true)->startRefreshList(true)`，只补刷未加载字数候选；Flutter 侧此前仅刷新目录数据，不会采集候选字数。
+    - legado 两个 Adapter 仅在 `changeSourceLoadWordCount=true` 时展示 `chapterWordCountText/respondTime` 并参与排序；Flutter 侧此前候选项缺少该展示与排序维度。
+  - `P4-seq190` 逐项对照清单（实施后）：
+    - 入口：已同义（候选弹层“更多”菜单新增 `加载字数`，勾选态表达开关状态）。
+    - 状态：已同义（开关持久化到 `changeSourceLoadWordCount` 并在重进弹层时回显）。
+    - 异常：已同义（采集失败仅在候选字数字段展示“获取字数失败：...”文本，不追加额外弹窗或 toast）。
+    - 文案：已同义（固定“加载字数”，不做动态开关文案）。
+    - 排版：已同义（入口承载于候选弹层“更多”菜单；候选条目字数与响应时间展示位与 legado 同层级）。
+    - 交互触发：已同义（`阅读页 -> 换源候选弹层 -> 更多 -> 加载字数`；开启后刷新候选可见字数/响应时间并按 legado 规则排序）。
+    - 验证：`flutter test test/simple_reader_view_compile_test.dart`、`flutter test test/reader_source_switch_helper_test.dart` 通过；手工路径 `阅读页(网络书) -> 顶部换源按钮(点击或长按) -> 候选弹层 -> 更多 -> 加载字数`（校验勾选态回显、开启后候选出现字数/响应时间、关闭后隐藏展示且无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_load_word_count` 的入口、持久化、候选采集展示与排序语义，不改动换源提交、章节替换与目录加载链路。
+  - 下一项：按优先级继续推进 `P4-seq191`（`change_source.xml / @+id/menu_load_info / 加载详情页`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq189`（`change_source.xml / @+id/menu_check_author / 校验作者`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq189`（`change_source.xml / @+id/menu_check_author / 校验作者`）：换源候选弹层“更多”菜单补齐 legado 同义 `checkable` 入口“校验作者”；开关状态持久化到同名键 `changeSourceCheckAuthor`，并在整书换源/单章换源共用弹层中按开关实时过滤候选作者匹配结果，保持“切换即生效、无额外提示”的状态流。
+  - `P4-seq189` 差异点清单（实施前）：
+    - legado `ChangeBookSourceDialog` 与 `ChangeChapterSourceDialog` 均在 `change_source.xml` 中提供 `menu_check_author(checkable)`，初始勾选态来自 `AppConfig.changeSourceCheckAuthor`；Flutter 侧此前缺少对应入口。
+    - legado 点击 `menu_check_author` 会翻转 `changeSourceCheckAuthor` 并执行 `viewModel.refresh()`；Flutter 侧此前候选过滤固定按作者条件执行，无法按开关切换。
+    - legado 偏好键名固定为 `changeSourceCheckAuthor`（默认 `false`）；Flutter 侧此前未持久化该配置，重进候选弹层无法回显状态。
+  - `P4-seq189` 逐项对照清单（实施后）：
+    - 入口：已同义（候选弹层“更多”菜单新增 `校验作者`，勾选态表达开关状态）。
+    - 状态：已同义（开关状态持久化到 `changeSourceCheckAuthor`，重进候选弹层可回显）。
+    - 异常：已同义（切换过程不追加成功/失败提示，保持静默状态流）。
+    - 文案：已同义（固定“校验作者”，不做动态开关文案）。
+    - 排版：已同义（入口承载于候选弹层“更多”菜单，与既有 `加载目录/换源间隔` 同层级）。
+    - 交互触发：已同义（`阅读页 -> 换源候选弹层 -> 更多 -> 校验作者`；切换后候选列表实时按作者匹配过滤）。
+    - 验证：手工路径 `阅读页(网络书) -> 顶部换源按钮(点击或长按) -> 候选弹层 -> 更多 -> 校验作者`（校验勾选态可切换并即时影响候选列表）；手工路径 `切换后关闭弹层并重新进入`（校验勾选态持久化回显）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_check_author` 的入口、持久化与候选过滤语义，不改动刷新列表、加载目录、候选提交与章节替换链路。
+  - 下一项：按优先级继续推进 `P4-seq190`（`change_source.xml / @+id/menu_load_word_count / 加载字数`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq186`（`change_source.xml / @+id/menu_start_stop / 停止`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq186`（`change_source.xml / @+id/menu_start_stop / 停止`）：换源候选弹层补齐 legado 同义“刷新/停止”同入口状态机；空闲态显示“刷新”，执行中切换为“停止（停止中）”，点击可中断当前换源候选搜索；整书换源与单章换源复用同一入口；请求链路补齐 `cancelToken` 透传，停止动作可取消进行中的搜索/详情/目录抓取请求并回落到稳定状态。
+  - `P4-seq186` 差异点清单（实施前）：
+    - legado `ChangeBookSourceDialog` 与 `ChangeChapterSourceDialog` 均处理 `menu_start_stop -> startOrStopSearch()`，并通过 `searchStateData` 将菜单文案在“停止/刷新”间切换；Flutter 侧此前无对应入口，仅有“刷新列表”。
+    - legado 运行中再次点击同一入口会执行 `stopSearch()` 取消任务；Flutter 侧此前刷新请求不可主动停止，只能等待 Future 结束。
+    - legado 取消后状态会立即回落到非运行态；Flutter 侧此前请求层未透传取消信号，难以对进行中的网络请求生效。
+  - `P4-seq186` 逐项对照清单（实施后）：
+    - 入口：已同义（候选弹层顶栏新增“刷新/停止”同入口动作；整书换源与单章换源均可见）。
+    - 状态：已同义（空闲态为“刷新”；执行中为“停止”，触发停止后显示“停止中”并在任务结束后回落）。
+    - 异常：已同义（停止/失败均保持当前候选列表且不追加扩展提示；关闭弹层时主动取消未完成任务）。
+    - 文案：已同义（动作文案按运行态切换“刷新/停止/停止中”）。
+    - 排版：已同义（入口承载于候选弹层顶栏动作区，与 `menu_start_stop` 的工具栏动作位语义同层）。
+    - 交互触发：已同义（`阅读页 -> 换源候选弹层 -> 刷新(启动) -> 停止`）。
+    - 验证：手工路径 `阅读页(网络书) -> 顶部换源按钮(点击或长按) -> 候选弹层 -> 刷新 -> 停止`（校验按钮状态在“刷新/停止/停止中”间切换，停止后可继续再次刷新）；手工路径 `候选搜索进行中点击取消关闭弹层`（校验任务被取消且无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_start_stop` 的状态机与取消链路，不改动既有换源成功提交、章节匹配与书源管理跳转语义。
+  - 下一项：按优先级继续推进 `P4-seq189`（`change_source.xml / @+id/menu_check_author / 校验作者`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq185`（`change_source.xml / @+id/menu_screen / 筛选`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq185`（`change_source.xml / @+id/menu_screen / 筛选`）：换源候选弹层补齐 legado 同义“筛选”动作位；筛选输入改为“顶栏筛选入口触发后展开”，展开时隐藏标题区，收起时恢复标题区并清空筛选词；输入后继续按“书源名 / 最新章节”实时过滤候选列表。
+  - `P4-seq185` 差异点清单（实施前）：
+    - legado `ChangeBookSourceDialog` / `ChangeChapterSourceDialog` 将 `menu_screen` 作为工具栏 `SearchView` 动作位承载，点击筛选后清空标题区，关闭筛选后恢复标题区；Flutter 侧此前将筛选框常驻在内容区，缺少动作位入口与状态切换。
+    - legado `viewModel.screen(newText)` 在输入变化时即时执行筛选；其查询语义由 `SearchBookDao.changeSourceSearch` 定义为匹配 `originName` 与 `latestChapterTitle`。Flutter 侧虽具备同字段过滤，但缺少与 `menu_screen` 对应的入口层级证据。
+    - 由于缺少动作位触发路径，`seq185` 在队列中持续 `pending`，与当前执行顺序（`seq161 -> seq185`）存在迁移证据缺口。
+  - `P4-seq185` 逐项对照清单（实施后）：
+    - 入口：已同义（候选弹层顶栏新增“筛选”动作位，对齐 legado `menu_screen` 工具栏入口语义）。
+    - 状态：已同义（点击“筛选”后展开输入框并隐藏标题区；收起后恢复标题区且清空筛选词）。
+    - 异常：已同义（空筛选词回退全量候选；无匹配时维持“无匹配候选”空态，不追加扩展提示）。
+    - 文案：已同义（入口文案固定“筛选”，输入占位收敛为“筛选”）。
+    - 排版：已同义（筛选输入从常驻内容区改为动作位触发展开，符合 legado 顶栏动作承载层级）。
+    - 交互触发：已同义（`阅读页 -> 换源候选弹层 -> 筛选 -> 输入关键词` 实时过滤，关键词匹配书源名与最新章节）。
+    - 验证：手工路径 `阅读页(网络书) -> 顶部换源按钮(点击或长按) -> 候选弹层 -> 筛选 -> 输入书源名关键词`（校验列表即时过滤且标题区隐藏）；手工路径 `筛选框点击清除并再次收起`（校验标题区恢复、列表回到全量候选）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_screen` 入口层级与筛选状态流，不改动换源搜索、目录加载与书源管理跳转链路。
+  - 下一项：按优先级继续推进 `P4-seq186`（`change_source.xml / @+id/menu_start_stop / 停止`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq161`（`book_source_sel.xml / @+id/menu_check_selected_interval / 选中所选区间`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq161`（`book_source_sel.xml / @+id/menu_check_selected_interval / 选中所选区间`）：书源管理多选“更多”菜单“选中所选区间”动作按 legado 语义完成收口；点击后以当前列表中已选项的最小/最大索引扩展连续选区并更新底栏计数，全程保持静默，不追加成功或失败提示。
+  - `P4-seq161` 差异点清单（实施前）：
+    - legado `BookSourceActivity.onMenuItemClick(menu_check_selected_interval)` 直接调用 `adapter.checkSelectedInterval()`；该动作属于纯选中态扩展，不触发写库、不弹提示。
+    - legado `BookSourceAdapter.checkSelectedInterval()` 以当前 `adapter.getItems()` 为基准，计算选中项索引区间 `[min,max]` 并将区间内条目全部加入选中集合，随后刷新该区间并更新计数。
+    - Flutter 侧 `SourceListView._expandSelectionInterval()` 行为已与上述语义同义，但该序号尚未完成台账/ExecPlan 验收回填，存在“实现已到位、迁移证据缺失”的执行差异。
+  - `P4-seq161` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理多选模式底栏“省略号 -> 选中所选区间”）。
+    - 状态：已同义（按当前可见列表中已选条目的最小/最大索引扩展为连续选区）。
+    - 异常：已同义（动作本身不追加提示；无可见选中时“更多”入口禁用，不触发扩展动作）。
+    - 文案：已同义（菜单文案固定“选中所选区间”）。
+    - 排版：已同义（入口继续承载于多选底栏 `CupertinoActionSheet` 的“批量操作”层级）。
+    - 交互触发：已同义（`书源管理 -> 多选模式 -> 省略号 -> 选中所选区间`）。
+    - 验证：手工路径 `书源管理 -> 多选模式至少勾选 2 个非连续书源 -> 省略号 -> 选中所选区间`（校验最小与最大选中位置间条目全部被选中且无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_check_selected_interval` 的迁移验收与证据回填，不改动书源存储、排序、校验与导出链路。
+  - 下一项：按优先级继续推进 `P4-seq185`（`change_source.xml / @+id/menu_screen / 筛选`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq160`（`book_source_sel.xml / @+id/menu_check_source / 校验所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq160`（`book_source_sel.xml / @+id/menu_check_source / 校验所选`）：书源管理多选“更多”菜单“校验所选”动作收敛 legado 同义语义；关键词弹窗改为“搜索关键词”并保留同层“校验设置”入口，点击“校验设置”时不关闭关键词弹窗；开始校验后仅通过顶部任务条与列表状态展示进度，不追加“已开始校验”扩展提示。
+  - `P4-seq160` 差异点清单（实施前）：
+    - legado `BookSourceActivity.menu_check_source -> checkSource()` 的关键词弹窗内，`校验设置` 为同层级入口（通过手动点击监听打开配置）且不会关闭当前关键词弹窗；Flutter 侧此前点击“校验设置”会先关闭关键词弹窗再进入设置，交互路径偏离。
+    - legado 开始校验后通过 `CHECK_SOURCE` 事件持续刷新进度（Snackbar + 列表项状态），入口动作本身不追加“已开始校验”提示；Flutter 侧此前会弹“已开始校验（N 条）”扩展提示，状态流偏离。
+    - legado 在已有任务执行时统一提示“已有书源在校验,等完成后再试”；Flutter 侧此前同配置场景提示“已恢复正在进行的检测任务”，口径偏离。
+  - `P4-seq160` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理多选模式底栏“省略号 -> 校验所选”）。
+    - 状态：已同义（开始校验后不弹“已开始校验”提示，仅由任务条与条目状态呈现进度）。
+    - 异常：已同义（运行中重复触发统一提示“已有书源在校验,等完成后再试”；空选中场景静默 no-op）。
+    - 文案：已同义（关键词弹窗标题收敛为“搜索关键词”；完成后自动筛选提示收敛为“发现有失效书源，已为您自动筛选！”）。
+    - 排版：已同义（关键词弹窗与“校验设置”保持同层结构，设置弹窗关闭后返回原关键词弹窗，不改变层级）。
+    - 交互触发：已同义（`书源管理 -> 多选模式 -> 省略号 -> 校验所选 -> 校验设置/开始校验`）。
+    - 验证：手工路径 `书源管理 -> 多选模式选择至少 1 个书源 -> 省略号 -> 校验所选 -> 校验设置 -> 返回关键词弹窗 -> 开始校验`（校验设置打开时关键词弹窗不关闭，开始后无“已开始校验”提示）；手工路径 `校验进行中再次触发校验所选`（校验提示口径为“已有书源在校验,等完成后再试”）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_check_source` 的弹窗交互层级、提示口径与启动状态流，不改动校验服务规则、书源分组判定与导出链路。
+  - 下一项：按优先级继续推进 `P4-seq161`（`book_source_sel.xml / @+id/menu_check_selected_interval / 选中所选区间`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq159`（`book_source_sel.xml / @+id/menu_share_source / 分享选中源`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq159`（`book_source_sel.xml / @+id/menu_share_source / 分享选中源`）：书源管理多选“更多”菜单“分享选中源”动作收敛 legado 同义语义；点击后沿用与“导出所选”一致的导出集合规则生成临时 JSON 并直接拉起系统文件分享，不追加“已打开系统分享/复制 JSON 兜底”等扩展提示与分支。
+  - `P4-seq159` 差异点清单（实施前）：
+    - legado `BookSourceActivity.onMenuItemClick(menu_share_source)` 直接执行 `viewModel.saveToFile(...) { share(it) }`；与 `menu_export_selection` 复用同一导出集合规则，随后调用 `Context.share(file)` 触发系统文件分享。
+    - legado `BookSourceViewModel.saveToFile` 固定写入 `filesDir/shareBookSource.json`；失败仅走 `toast(stackTrace)` 可观测分支，不追加“分享成功/失败兜底复制”扩展状态流。
+    - Flutter 侧此前入口文案为“分享所选”，分享时附带 `text/subject` 扩展参数并在成功后提示“已打开系统分享（N 条书源）”；失败时会退化为复制 JSON 到剪贴板并提示，用户可见状态流偏离 legado。
+  - `P4-seq159` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理多选模式底栏“省略号 -> 分享选中源”）。
+    - 状态：已同义（复用导出集合规则生成分享文件并直接调用系统分享，不追加额外分享文本与成功提示）。
+    - 异常：已同义（分享异常静默吞掉，不再回退到“复制 JSON + 提示”扩展分支）。
+    - 文案：已同义（动作文案由“分享所选”收敛为“分享选中源”）。
+    - 排版：已同义（入口承载在多选底栏 `CupertinoActionSheet` 的“批量操作”层级，平台差异可接受）。
+    - 交互触发：已同义（`书源管理 -> 多选模式 -> 省略号 -> 分享选中源`）。
+    - 验证：手工路径 `书源管理 -> 多选模式选择至少 1 个书源 -> 省略号 -> 分享选中源`（校验可直接拉起系统分享面板且过程无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_share_source` 的入口文案与分享状态流，不改动导出所选集合规则、校验与分组链路。
+  - 下一项：按优先级继续推进 `P4-seq160`（`book_source_sel.xml / @+id/menu_check_source / 校验所选`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq157`（`book_source_sel.xml / @+id/menu_bottom_sel / 置底所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq157`（`book_source_sel.xml / @+id/menu_bottom_sel / 置底所选`）：书源管理多选“更多”菜单“置底所选”动作收敛 legado 同义语义；点击后按当前选中集合批量置底并静默写库，不追加“已置底 N 条书源/当前未选择书源”等扩展提示。
+  - `P4-seq157` 差异点清单（实施前）：
+    - legado `BookSourceActivity.onMenuItemClick(menu_bottom_sel)` 直接执行 `viewModel.bottomSource(*adapter.selection.toTypedArray())`，动作链路无成功提示或兜底提示分支。
+    - legado `BookSourceViewModel.bottomSource` 先按 `customOrder` 升序排序，再以 `maxOrder + 1 + index` 批量写回 `customOrder`，并调用 `bookSourceDao.upOrder(array)` 持久化。
+    - Flutter 侧此前批量菜单文案为“置底”，且复用 `_batchMoveToTopBottom(..., false)`；动作结束后会追加“已置底 N 条书源”提示，空选中场景还会提示“当前未选择书源”，用户可见状态流偏离 legado。
+  - `P4-seq157` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理多选模式底栏“省略号 -> 置底所选”）。
+    - 状态：已同义（点击后按当前选中集合批量置底，顺序规则保持 `customOrder` 升序后分配最大序号）。
+    - 异常：已同义（无选中时“更多”按钮禁用；执行过程无扩展提示）。
+    - 文案：已同义（动作文案收敛为“置底所选”）。
+    - 排版：已同义（入口承载在多选底栏 `CupertinoActionSheet` 的“批量操作”层级，平台差异可接受）。
+    - 交互触发：已同义（`书源管理 -> 多选模式 -> 省略号 -> 置底所选`）。
+    - 验证：手工路径 `书源管理 -> 多选模式选择至少 2 个书源 -> 省略号 -> 置底所选 -> 返回列表底部观察顺序`（校验所选书源被批量置底且执行过程无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_bottom_sel` 的静默批量置底语义，不改动 `menu_share_source`（`seq159`）、校验与分组链路。
+  - 下一项：按优先级继续推进 `P4-seq159`（`book_source_sel.xml / @+id/menu_share_source / 分享选中源`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq156`（`book_source_sel.xml / @+id/menu_top_sel / 置顶所选`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq156`（`book_source_sel.xml / @+id/menu_top_sel / 置顶所选`）：书源管理多选“更多”菜单“置顶所选”动作收敛 legado 同义语义；点击后按当前选中集合批量置顶并静默写库，不追加“已置顶 N 条书源/当前未选择书源”等扩展提示。
+  - `P4-seq156` 差异点清单（实施前）：
+    - legado `BookSourceActivity.onMenuItemClick(menu_top_sel)` 直接执行 `viewModel.topSource(*adapter.selection.toTypedArray())`，动作链路无成功提示或兜底提示分支。
+    - legado `BookSourceViewModel.topSource` 先按 `customOrder` 升序排序，再以 `minOrder - 1 - index` 批量写回 `customOrder`，并调用 `bookSourceDao.upOrder(array)` 持久化。
+    - Flutter 侧此前“置顶”复用 `_batchMoveToTopBottom(..., true)`，动作结束后会追加“已置顶 N 条书源”提示；空选中场景还会提示“当前未选择书源”，用户可见状态流偏离 legado。
+  - `P4-seq156` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理多选模式底栏“省略号 -> 置顶所选”）。
+    - 状态：已同义（点击后按当前选中集合批量置顶，顺序规则保持 `customOrder` 升序后分配最小序号）。
+    - 异常：已同义（无选中时“更多”按钮禁用；执行过程无扩展提示）。
+    - 文案：已同义（动作文案收敛为“置顶所选”）。
+    - 排版：已同义（入口承载在多选底栏 `CupertinoActionSheet` 的“批量操作”层级，平台差异可接受）。
+    - 交互触发：已同义（`书源管理 -> 多选模式 -> 省略号 -> 置顶所选`）。
+    - 验证：手工路径 `书源管理 -> 多选模式选择至少 2 个书源 -> 省略号 -> 置顶所选 -> 返回列表顶部观察顺序`（校验所选书源被批量置顶且执行过程无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_top_sel` 的静默批量置顶语义，不改动 `menu_bottom_sel`（`seq157`）、分组、导出与校验链路。
+  - 下一项：按优先级继续推进 `P4-seq157`（`book_source_sel.xml / @+id/menu_bottom_sel / 置底所选`；`P4-seq367` 属于 `detail_later` 后置项）。
+  - 状态变更：完成 `P4-seq155`（`book_source_sel.xml / @+id/menu_disable_explore / 禁用发现`）后，ExecPlan 保持 `active`。
+  - 完成 `P4-seq155`（`book_source_sel.xml / @+id/menu_disable_explore / 禁用发现`）：书源管理多选“更多”菜单“禁用发现”动作收敛 legado 同义语义；点击后按当前选中集合批量写入 `enabledExplore=false`，不筛选已禁用项，不追加“已禁用 N 条书源的发现/已全部禁用”等扩展提示。
+  - `P4-seq155` 差异点清单（实施前）：
+    - legado `BookSourceActivity.onMenuItemClick(menu_disable_explore)` 直接执行 `viewModel.disableSelectExplore(adapter.selection)`，动作链路无成功提示或兜底提示分支。
+    - legado `BookSourceViewModel.disableSelectExplore` 直连 `bookSourceDao.enableExplore(false, sources)`；`BookSourceDao.enableExplore(enable, bookSources)` 对选中集合逐项写库，不过滤已禁用项。
+    - Flutter 侧此前“禁用发现”复用 `_batchSetExplore(..., false)`，会先过滤已禁用项并追加“所选书源发现已全部禁用/已禁用 N 条书源的发现”提示，用户可见状态流偏离 legado。
+  - `P4-seq155` 逐项对照清单（实施后）：
+    - 入口：已同义（书源管理多选模式底栏“省略号 -> 禁用发现”）。
+    - 状态：已同义（点击后按当前选中集合批量写入 `enabledExplore=false`；已禁用项保持禁用且不改动其它字段）。
+    - 异常：已同义（无选中时“更多”按钮禁用；执行过程无扩展提示）。
+    - 文案：已同义（动作文案固定“禁用发现”）。
+    - 排版：已同义（入口承载在多选底栏 `CupertinoActionSheet` 的“批量操作”层级，平台差异可接受）。
+    - 交互触发：已同义（`书源管理 -> 多选模式 -> 省略号 -> 禁用发现`）。
+    - 验证：手工路径 `书源管理 -> 多选模式选择至少 1 个已启用发现书源 -> 省略号 -> 禁用发现 -> 重新打开条目菜单`（校验目标书源切换为禁用发现且执行过程无额外提示）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_disable_explore` 的静默批量禁用语义，不改动 `menu_top_sel`（`seq156`）、分组、导出与校验链路。
+  - 下一项：按优先级继续推进 `P4-seq156`（`book_source_sel.xml / @+id/menu_top_sel / 置顶所选`；`P4-seq367` 属于 `detail_later` 后置项）。
   - 状态变更：完成 `P4-seq154`（`book_source_sel.xml / @+id/menu_enable_explore / 启用发现`）后，ExecPlan 保持 `active`。
   - 完成 `P4-seq154`（`book_source_sel.xml / @+id/menu_enable_explore / 启用发现`）：书源管理多选“更多”菜单“启用发现”动作收敛 legado 同义语义；点击后按当前选中集合批量写入 `enabledExplore=true`，不筛选已启用项，不追加“已启用 N 条书源的发现/已全部启用”等扩展提示。
   - `P4-seq154` 差异点清单（实施前）：
@@ -2501,6 +4093,53 @@
 
 ## Surprises & Discoveries
 
+- `2026-02-23`：推进 `P6-seq171` 时确认差异不止“缺少导出动作”，而是“缺少 `bookmark.xml` 对应承载页入口”。Flutter 侧已有 `book_toc/menu_export_bookmark`（单书导出），若直接复用会把 `AllBookmarkActivity`（全量书签）与 `BookTocActivity`（单书目录）语义混淆，形成伪一致。本次先补“设置 -> 书签 -> 所有书签”承载与全量排序，再落 `menu_export` 单项导出，`menu_export_md` 保持下一序号推进。
+- `2026-02-23`：对照 legado `AudioPlayActivity.menu_copy_audio_url -> sendToClip(AudioPlayService.url)` 时确认该入口关键语义是“常驻入口 + 直接复制 + 可空也可复制”。Flutter 当前阅读朗读链路未引入独立 `AudioPlayService.url` 状态，本序号将“当前播放 URL”映射为阅读会话实时章节链接（缺失时回落空字符串复制），并保持用户可见提示口径“已拷贝”同义。
+- `2026-02-23`：推进 `P8-seq349` 时确认差异核心不止“缺少 `menu_save` 顶栏按钮”，还包括“提交时序与反馈边界”：legado 是“字段先改草稿，统一保存后关闭”，而 Flutter 旧实现是“字段弹窗即时落盘 + 每次提示已保存”。若仅补一个保存按钮但仍保留即时落盘，会出现“保存按钮形同虚设”的伪一致。本次已收敛为统一提交状态机并补齐失败口径 `保存出错\n<原因>`。
+- `2026-02-23`：推进 `P8-seq248` 时确认 legado `deleteDoc -> finally(removeSelection)` 的关键并不是“删除成功后再移除 UI”，而是“删除动作完成后即从当前候选移除所选项”，即使个别文件删除失败也不阻塞列表移除时序。Flutter 侧若按“仅删除成功项才移除”实现，会与 legado 产生状态边界偏差；本序号已按同义时序收敛，并将失败可观测性下沉到异常日志。
+- `2026-02-23`：推进 `P8-seq246` 时确认差异不止“菜单缺少 `智能扫描` 入口”，还包括“扫描完成后必须有候选勾选承载，否则会退化成自动全量导入”。若仅补递归扫描并直接写库，会破坏 legado `扫描 -> 选择 -> 添加书架` 状态边界。本次同步收敛为“扫描候选弹层 + 默认全选 + 可取消 + 仅导入勾选项”闭环，并补齐失败明细可观测输出。
+- `2026-02-23`：推进 `P8-seq241` 时确认差异不止“菜单缺少 `选择文件夹` 入口”，还包括“目录选择结果需被后续文件选择链路消费”。若只补入口并持久化目录，而不把 `importBookPath` 接入 `pickFiles(initialDirectory)`，用户不会感知到目录记忆，属于伪一致。本次同步收敛为“入口 + 持久化 + 文件选择默认目录复用”闭环，并补齐取消静默/异常可观测边界。
+- `2026-02-23`：推进 `P6-seq16` 时确认缺口不止“更多菜单少一个替换净化入口”，还包括“导出链路缺少 `exportUseReplace && bookUseReplaceRule` 组合闸门”。若只补 checkable 入口不联动导出正文，会出现“勾选态可切换但导出内容不变化”的伪一致。本次同步将替换规则应用接入 TXT 与 EPUB 导出正文，避免状态机空转。
+- `2026-02-23`：推进 `P6-seq14` 时确认 legado `menu_book_group` 不只是“新增一个分组按钮”，还要求“分组切换后下载/导出范围跟随当前列表”。Flutter 侧若仅做视觉入口而不把过滤结果下沉到当前列表，会出现“分组显示变化但下载/导出仍跑全量”的伪一致。本次将分组过滤前置到页面数据集，确保后续动作默认消费当前分组集合。
+- `2026-02-23`：推进 `P6-seq28` 时确认 `menu_download_all` 的差异不止是“多一个长按入口”，还包含“下载起点固定为首章（索引 0）”的执行语义。若仅复用“下载之后章节”入口会导致起点仍落在当前章节，形成伪一致。本次同步把下载任务服务抽象为可配置起点，确保 `menu_download_after` 与 `menu_download_all` 共用状态机但起点分离。
+- `2026-02-23`：推进 `P6-seq22` 时确认 legado 的 `menu_export_folder` 是“纯目录配置入口”，不会触发导出任务；若在 Flutter 侧把该动作与“导出所有”绑定，会造成“点击导出文件夹即开始导出”的语义偏差。本次按同义边界收敛为“仅目录选择 + 持久化 + 取消静默返回”，导出仍由 `menu_export_all` 单独触发。
+- `2026-02-23`：推进 `P6-seq21` 时发现 Flutter 侧 `menu_parallel_export` 的缺口不仅是“菜单入口缺失”，还包括“导出任务并发度固定单线程”。若只补 checkable 入口而不联动导出并发，会出现“开关可勾选但导出行为不变”的伪一致。本次已同步将导出链路并发度接入 `parallelExportBook`（关闭 `1`、开启 `9`），并保持失败单项不阻断整书导出。
+- `2026-02-23`：推进 `P6-seq20` 时发现 Flutter 章节缓存模型只有 `content` 文本字段，没有 legado `BookHelp.getImage` 可直接复用的本地图片缓存路径；若仅补菜单开关会出现“可勾选但无图片产物”的伪一致。为保持用户可见语义，本次在导出链路补齐 `<img src>` 解析与图片写盘，并优先复用书源感知加载器（含 Cookie/请求头）抓取图片，失败按单文件日志记录且不阻断整书 TXT 导出。
+- `2026-02-23`：推进 `P6-seq19` 时发现该序号不只是“菜单勾选态持久化”。legado `ExportBookService.getExportData` 会直接使用 `includeTitle = !AppConfig.exportNoChapterName` 控制 TXT 导出正文是否写章节标题；若仅补入口而不联动导出构建，会产生“开关可切但导出内容不变”的语义偏差。本次已同步将 Flutter TXT 导出构建接入同义开关，避免出现伪完成。
+- `2026-02-23`：推进 `P6-seq15` 时发现 Flutter 侧缺少 legado `ExportBookService/AppConfig.exportType` 对应导出管线，若在本序号同时补齐 `Epub` 与导出格式设置会跨越 `seq17/24/25` 边界。本次按“一项一处理”先落 `menu_export_all` 基线能力（目录记忆 + 批量 TXT 导出 + 失败日志），并将 `自定义Epub导出章节/导出格式/导出编码` 保留在后续队列单项收敛，避免跨序号并项。
+- `2026-02-23`：推进 `P6-seq13` 时发现现有 `widget_test` 仍锚定 `CacheExportPlaceholderView + “缓存/导出（迁移中）”` 文案断言。若直接移除 placeholder 会导致无关序号回归断裂；本次采用“兼容壳 + 新承载页”双层结构（`CacheExportPlaceholderView -> CacheExportView`），在不改测试用例的前提下完成 `menu_download` 迁移并保持验证稳定。
+- `2026-02-23`：推进 `P5-seq400` 时再次发现 `feature-item-tracker.csv` 存在序号缺口：优先级队列包含 `seq400(txt_toc_rule_sel/menu_disable_selection)` 且状态为 `pending`，但跟踪台账中缺失对应行，导致“队列顺序”和“逐项证据”无法一一映射。本次已在完成实现后补齐 `seq400` 跟踪行并同步状态，避免后续按序执行断链。
+- `2026-02-23`：推进 `P5-seq399` 时再次发现 `feature-item-tracker.csv` 存在序号缺口：优先级队列包含 `seq399(txt_toc_rule_sel/menu_enable_selection)` 且状态为 `pending`，但跟踪台账中缺失对应行，导致“队列顺序”和“逐项证据”无法一一映射。本次已在完成实现后补齐 `seq399` 跟踪行并同步状态，避免后续按序执行断链。
+- `2026-02-23`：推进 `P5-seq393` 时发现 `TxtTocRule.copyWith` 与编辑页保存参数组合存在语义偏差：当用户清空“示例”后保存，Flutter 侧会把空输入转为 `null` 并被 `copyWith` 回落为旧值，导致“清空示例”不生效；而 legado `getRuleFromView` 使用 `toString()` 会写回空串。本次已改为按输入框原值（含空串）回写 `example`，消除保存边界偏差。
+- `2026-02-23`：推进 `P5-seq387` 时再次发现 `feature-item-tracker.csv` 存在序号缺口：优先级队列包含 `seq387(txt_toc_rule/menu_add)` 且状态为 `pending`，但跟踪台账中缺失对应行，导致“队列顺序”和“逐项证据”无法一一映射。本次已在完成实现后补齐 `seq387` 跟踪行并同步状态，避免后续按序执行断链。
+- `2026-02-23`：推进 `P5-seq297` 时再次发现 `feature-item-tracker.csv` 存在序号缺口：优先级队列包含 `seq297(replace_rule_sel/menu_top_sel)` 且状态为 `pending`，但跟踪台账中缺失对应行，导致“队列顺序”和“逐项证据”无法一一映射。本次已在完成实现后补齐 `seq297` 跟踪行并同步状态，避免后续按序执行断链。
+- `2026-02-23`：推进 `P5-seq286` 时再次发现 `feature-item-tracker.csv` 存在序号缺口：优先级队列包含 `seq286(replace_rule/menu_group_null)` 且状态为 `pending`，但跟踪台账中缺失对应行，导致“队列顺序”和“逐项证据”无法一一映射。本次已在完成实现后补齐 `seq286` 跟踪行并同步状态，避免后续按序执行断链。
+- `2026-02-23`：推进 `P5-seq285` 时发现 `feature-item-tracker.csv` 存在序号缺口：优先级队列包含 `seq285(replace_rule/menu_group_manage)` 且状态为 `pending`，但跟踪台账中缺失对应行，导致“队列顺序”和“逐项证据”无法一一映射。本次已在完成实现后补齐 `seq285` 跟踪行并同步状态，避免后续按序执行断链。
+- `2026-02-23`：推进 `P5-seq281` 时发现 `feature-item-tracker.csv` 存在序号缺口：优先级队列包含 `seq281(replace_edit/menu_save)` 且状态为 `pending`，但跟踪台账中缺失对应行，导致“队列顺序”和“逐项证据”无法一一映射。本次已在完成实现后补齐 `seq281` 跟踪行并同步状态，避免后续按序执行断链。
+- `2026-02-23`：推进 `P5-seq225` 时发现台账存在记录缺口：优先级队列已包含 `seq225(dict_rule_sel/menu_disable_selection)` 且状态为 `pending`，但 `feature-item-tracker.csv` 中缺失对应行，导致“按序执行”与“逐项证据”无法一一映射。本次已在完成实现后补齐 `seq225` 跟踪行并同步更新优先级状态，消除证据断链风险。
+- `2026-02-23`：对照 legado `dict_rule.xml/menu_add + DictRuleActivity.onCompatOptionsItemSelected` 时确认 `seq215` 的关键阻塞点不是“字典规则编辑能力缺失”，而是“管理页顶栏缺少一级新建入口导致空白编辑态不可达”。Flutter 侧此前只能从规则条目进入编辑页（已有规则），无法触发 legado 同义“新建空白规则”路径；本序号据此仅补入口可达性并保持 `menu_save/menu_copy_rule`（`seq221/222`）后置，不跨序号并项。
+- `2026-02-23`：对照 legado `TxtTocRuleActivity.initBottomActionBar + txt_toc_rule_sel/menu_export_selection` 时确认 `seq401` 的关键阻塞点不是“生成 JSON 文件能力”，而是“TXT 目录规则页缺少多选承载层导致入口不可达”。Flutter 侧此前已有导入链路但无 `menu_export_selection` 触发路径；本序号据此先补“多选状态 + 批量更多菜单”可达性，再落导出动作本身，并显式保持 `seq399/400`（启用/禁用所选）后置。
+- `2026-02-23`：对照 legado `DefaultData.importDefaultTocRules + TxtTocRuleDao.deleteDefault` 时确认 `menu_import_default` 的关键不是“把默认规则追加回列表”，而是“先清理默认规则（`id<0`）再回灌默认资产，并保留用户自定义规则（`id>=0`）”。若直接全量覆盖会误删自定义规则，若直接 merge 全量又会保留已被 legado 设计为应重置的默认项修改；本序号据此收敛为“仅重置默认规则集合”。
+- `2026-02-22`：对照 legado `ReplaceRuleActivity.initSelectActionView + replace_rule_sel/menu_export_selection` 时确认该序号的关键阻塞点不是“导出 JSON 能力”，而是“替换规则页缺少多选承载层导致入口不可达”。Flutter 侧已有全量导出能力，但若不先补“多选状态 + 批量更多菜单”，`menu_export_selection` 无法按 legado 路径触发；本序号据此先补可达性，再落导出动作本身，并显式保留 `seq295~298` 后置。
+- `2026-02-22`：对照 legado `ReplaceRuleActivity.menu_import_qr -> qrCodeResult.launch -> ImportReplaceRuleDialog(it)` 时确认该项关键不是“新增扫码能力”，而是“扫码入口与既有候选导入状态机复用”：扫码结果必须直达与本地/网络同一候选弹层，且不得污染 `replaceRuleRecordKey` 网络历史。本序号已按该边界收敛为“扫码直达候选 + 取消静默返回 + 不写历史”。
+- `2026-02-22`：对照 legado `ReplaceRuleActivity.showImportDialog + ImportReplaceRuleDialog` 时确认 `menu_import_onLine` 的核心并非“可从 URL 拉取 JSON”本身，而是“输入层历史闭环 + 候选导入复用”：仅 `http/https` 输入写入 `replaceRuleRecordKey` 历史，且历史需支持点选回填与删除回写；确认后必须进入与本地导入同一候选状态机（新增/更新/已有，默认仅新增）。若直接“输入后写库”会破坏同义状态流。本序号已按同名键与候选复用完成收敛。
+- `2026-02-22`：对照 legado `ReplaceEditActivity.menu_paste_rule -> ReplaceEditViewModel.pasteRule` 时确认该序号的核心不是“具备剪贴板导入能力”，而是“入口层级与状态边界同义”：动作必须位于编辑页“更多”菜单，且成功后仅回填表单、不自动保存。Flutter 侧此前仅在规则列表页提供“从剪贴板导入”并直接写库，虽可导入但语义与 legado 不同；本序号已收敛为编辑页回填链路。
+- `2026-02-22`：对照 legado `DictRuleActivity.initSelectActionView + menu_export_selection` 时确认该序号的关键阻塞点不是“文件导出能力”，而是“字典规则页缺少多选承载层导致入口不可达”。Flutter 侧已有文件保存能力，但若不先补“多选状态 + 批量更多菜单”，`menu_export_selection` 无法按 legado 路径触发；本序号据此先补可达性，再落导出动作本身。
+- `2026-02-22`：对照 legado `DictRuleEditDialog.menu_paste_rule` 时确认该序号的阻塞点不是“剪贴板解析能力”，而是“编辑承载层缺失导致动作不可达”。Flutter 侧字典规则页此前仅有导入列表，没有 `dict_rule_edit` 对应入口；本序号先补最小编辑承载页，再在该承载页补齐“更多 -> 粘贴规则”回填链路，避免出现“已实现解析但无法触发”的偏航。
+- `2026-02-22`：对照 legado `DictRuleActivity.menu_import_qr` 时确认二维码导入的核心是“扫码入口与导入候选复用”，而不是复用网络导入输入层。若把二维码结果走网络导入链路会误写 `dictRuleUrls` 历史，产生跨入口状态污染；本序号已收敛为“扫码结果直达候选弹层且不写历史”。
+- `2026-02-22`：对照 legado `DictRuleActivity.showImportDialog` 时确认 `menu_import_onLine` 的核心不是“可从 URL 拉取 JSON”本身，而是“输入层历史状态闭环”：仅 `http/https` 输入写入 `dictRuleUrls`，且历史可点选回填、删除后立即持久化。若只做 URL 输入不补历史回写/删除，会丢失 legado 同义状态流。本序号已按同名键补齐历史闭环。
+- `2026-02-22`：对照 legado `DictRuleActivity.menu_import_local` 时确认本序号阻塞点并非“导入解析能力”，而是“字典规则管理入口缺失导致动作不可达”。Flutter 侧虽已有 `DictRuleStore` 查询链路，但无对应管理页与导入菜单；本序号先补齐“替换净化 -> 字典规则 -> 更多 -> 本地导入”入口，再落候选导入闭环，避免出现“实现了导入逻辑但无法触发”的偏航。
+- `2026-02-22`：对照 legado `BookSourceEditActivity.menu_paste_source -> BookSourceEditViewModel.pasteSource/importSource` 时确认该项关键并非“能从剪贴板导入”，而是“成功后仅回填表单且不更新保存基线”。Flutter 端此前在粘贴成功后同步更新 `_savedSource/_savedSnapshot`，会让“粘贴后未保存退出确认”失效；本序号据此收敛为“静默回填、基线不前移”。
+- `2026-02-22`：对照 legado `BookSourceEditActivity.menu_clear_cookie -> BookSourceEditViewModel.clearCookie -> CookieStore.removeCookie` 时确认该项关键并非“尽量给出清理反馈”，而是“入口文案同义 + 点击后静默清理 + 不触发保存/跳转”。Flutter 端此前“清 Cookie”入口与多分支提示属于扩展语义，本序号据此收敛为“清除 Cookie + 按域作用域静默清理”。
+- `2026-02-22`：对照 legado `BookSourceEditActivity.menu_debug_source -> viewModel.save -> BookSourceDebugActivity(key=bookSourceUrl)` 时确认该项关键不是“能打开调试页”本身，而是“先保存再调试 + 失败不跳转 + 入口文案同义”。Flutter 端主链路已具备，缺口集中在顶栏文案与迁移证据回填，本序号据此收敛为“仅调整入口文案为调试源并补齐台账”。
+- `2026-02-22`：对照 legado `ChangeBookSourceDialog.editSourceResult` 与 `ChangeChapterSourceDialog.editSourceResult` 时确认 `menu_edit_source` 的返回刷新边界并不一致：整书换源仅重搜编辑源（`startSearch(origin)`），单章换源重搜全量候选（`startSearch()`）。若统一为单一刷新策略，会偏离其中一条链路的状态流。本序号据此在 Flutter 侧按入口分流刷新语义。
+- `2026-02-22`：对照 legado `change_source_item.xml + ChangeBookSourceAdapter/ChangeChapterSourceAdapter.showMenu` 时确认 `menu_top_source` 的迁移关键是“候选条目长按菜单承载”而非顶栏入口；若仅在弹层顶栏补“置顶”按钮会偏离 legacy 的条目级触发热区。本序号据此在候选条目层补齐长按动作并保持静默执行。
+- `2026-02-22`：对照 legado `change_source.xml/menu_close + ChangeBookSourceDialog.onMenuItemClick` 时确认该项的迁移关键是“固定文案‘关闭’ + 纯 dismiss 动作”，而不是新增任何关闭副作用；Flutter 侧功能链路已具备关闭能力，本序号主要补齐用户可见文案同义证据。
+- `2026-02-22`：对照 legado `ChangeBookSourceViewModel.search/loadBookInfo` 时确认 `menu_load_info` 的真实边界不是“单独展示一个开关”，而是“候选补水总闸门”的一部分：当 `loadInfo/loadToc/loadWordCount` 任一开启时都需进入详情补水链路；若仅在 `loadToc/loadWordCount` 打开时补水，会导致“仅加载详情页”场景失效。本序号据此将候选抓取条件收敛为三开关并集。
+- `2026-02-22`：执行 `P4-seq190` 定向回归时发现 `test/source_switch_candidate_sheet_test.dart` 仍沿用“筛选输入框默认展开”的旧断言（直接 `enterText`），而当前 `menu_screen` 语义已是“顶栏动作位触发展开”；该失败属于既有测试口径未跟随 `seq185` 收敛更新，不影响本序号功能链路判定。本次验证改以 `simple_reader_view_compile_test + reader_source_switch_helper_test + 手工路径` 作为可复现证据。
+- `2026-02-22`：对照 legado `ChangeBookSourceDialog/ChangeChapterSourceDialog.menu_start_stop` 时确认该项的关键不是“把按钮文案改成停止”，而是“同入口 start/stop 状态机 + 可取消请求链路”的组合语义：运行中点击同入口必须能中断正在进行的搜索任务，并在任务回收后回落到刷新态；若只切换 UI 文案而请求层不可取消，会产生明显行为偏差。
+- `2026-02-22`：对照 legado `ChangeBookSourceDialog/ChangeChapterSourceDialog.menu_screen` 时确认该项的关键不是“是否存在筛选算法”，而是“筛选入口承载层级 + 展开/收起状态机”：筛选必须由顶栏动作位触发，展开后标题区让位，关闭后恢复标题区；若仅保留内容区常驻输入框，即使过滤字段一致也会缺失 `menu_screen` 迁移证据。
+- `2026-02-22`：对照 legado `BookSourceActivity.menu_check_selected_interval -> BookSourceAdapter.checkSelectedInterval` 时确认本序号核心是“当前列表区间补选”而非数据写入动作：仅依据已选项在当前列表中的最小/最大索引扩展选中区间并刷新计数，不涉及数据库更新与提示反馈。Flutter 端对应行为已具备，缺口在于该序号尚未完成台账与 ExecPlan 验收证据回填。
 - `2026-02-22`：对照 legado `BookSourceActivity.menu_remove_group -> selectionRemoveFromGroups -> BookSourceViewModel.selectionRemoveFromGroups` 时确认该项是“固定文案 + 静默批量移除”语义：菜单文案与弹窗标题均为“移除分组”，确认后仅按选中集合执行 `removeGroup(groups)` 并批量写库，不追加“未选择/移除成功”提示。Flutter 端此前两条提示分支已在 `P4-seq153` 收敛。
 - `2026-02-22`：对照 legado `BookSourceActivity.menu_add_group -> selectionAddToGroups` 时确认该项是“固定文案 + 静默批量写入”语义：菜单文案与弹窗标题均为“添加分组”，确认后仅调用 `selectionAddToGroups(adapter.selection, group)` 批量写库，不追加“未选择/成功”提示。Flutter 端此前多出的提示分支已在 `P4-seq152` 收敛。
 - `2026-02-22`：对照 legado `BookSourceActivity.menu_enable_selection -> BookSourceViewModel.enableSelection` 时确认该项是“静默批量状态写入”语义：动作仅批量写 `enabled=true`，不追加“已启用 N 条/已全部启用”提示。Flutter 端此前复用通用批量开关方法会追加结果提示，本序号已收敛为静默链路。
@@ -2636,9 +4275,93 @@
 - `2026-02-21`：`P2-seq133` 对照 legado 时确认“二维码导入”链路只要求“扫码结果直接进入导入处理”；Flutter 端原有“扫码 URL 同步写入网络导入历史”属于扩展行为，已移除以避免跨入口状态耦合。
 - `2026-02-21`：`P2-seq134` 对照 legado 时确认 `menu_group_sources_by_domain` 的关键约束是“固定标题 + checkable 勾选态”，不是“根据状态切换开/关文案”；Flutter 端已收敛为固定“按域名分组显示”并补齐勾选态回归。
 - `2026-02-21`：`P2-seq136` 的 widget 回归如果直接走真实扫码页面，会受到 `mobile_scanner` 插件平台通道影响导致测试不稳定；本序号通过在调试页引入可注入扫码启动器，仅对 `menu_scan` 触发语义做定向断言，保证迁移证据稳定可复现。
+- `2026-02-23`：推进 `P6-seq24` 时发现仅补 `menu_export_type` 入口会形成“可切换但导出仍固定 TXT”的伪一致；同时 `epubx.EpubWriter` 对 `EpubPackage.Guide` 存在非空约束（缺失会触发空指针）。本次已同步补齐 `exportType -> 导出分支` 联动，并在 EPUB 构建中显式初始化 `Guide` 以稳定写出。
 
 ## Decision Log
 
+- `2026-02-23` 决策 247：`P6-seq171` 采用“先补承载入口可达性 + 单项导出收敛”策略：先在 `SettingsView` 补齐 `书签 -> 所有书签` 入口并新增 `AllBookmarkView` 承载 `bookmark.xml` 语义，再仅实现 `menu_export` 单项 JSON 导出，不提前并入 `menu_export_md`（`seq172`）。为对齐 legado `BookmarkDao.all` 顺序，`BookmarkRepository` 新增 `getAllBookmarksByLegacyOrder`（`bookName/bookAuthor/chapterIndex/chapterPos`）；导出服务新增 `exportAllJson` 并固定文件名 `bookmark-yyMMddHHmmss.json`，失败记 `ExceptionLogService(node=all_bookmark.menu_export)`，取消分支保持静默返回。
+- `2026-02-23` 决策 246：`P3-seq7` 采用“入口单项补齐 + 播放 URL 章节链接映射 + 复制可空同义”策略：在 `SimpleReaderView` 的“播放”菜单仅新增 `menu_copy_audio_url` 同义入口，点击后直接执行剪贴板写入并提示“已拷贝”；为对齐 legado `sendToClip(AudioPlayService.url)` 的“可空也可复制”边界，复制值统一取当前阅读会话可解出的章节链接，链接缺失时复制空字符串并保持成功提示。异常分支仅记录 `reader.menu.audio_play.copy_audio_url.failed` 日志，不新增扩展提示；`menu_log`（`seq10`）保持下一序号独立推进。
+- `2026-02-23` 决策 245：`P8-seq349` 采用“草稿态编辑 + 顶栏一级保存统一提交”策略：在 `RemoteBooksServerConfigView` 补齐 `menu_save` 同义入口，地址/账号/密码/同步目录改为先写草稿，点击右上角“保存”后统一调用 `SettingsService.saveAppSettings` 持久化并关闭页面；移除逐字段“已保存”提示，失败统一提示 `保存出错\n<原因>` 并停留当前页。`servers/menu_add`（`seq350`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-23` 决策 244：`P8-seq248` 采用“候选弹层单项补齐 + 删除后移除所选”策略：在 `BookshelfView._showScanImportSelectionDialog` 的动作区仅新增 `menu_del_selection` 同义“删除”入口；点击后调用 `ImportService.deleteLocalBooksByPaths` 按当前勾选集合执行文件删除，并在动作结束后从当前候选列表移除所选项，不追加成功提示。删除失败仅记录 `bookshelf.import.scan_folder.delete_file.failed` 日志，保持 legacy `deleteDoc -> finally(removeSelection)` 的时序语义；不跨序号并入 `server_config/menu_save`（`seq349`）后续能力。
+- `2026-02-23` 决策 243：`P8-seq246` 采用“入口单项补齐 + 候选勾选承载 + 批量导入汇总”策略：在 `BookshelfView` 书架“更多”菜单仅新增 `menu_scan_folder` 同义入口，点击后调用 `ImportService.scanImportDirectory` 基于 `importBookPath` 递归扫描 `txt/epub` 文件；扫描完成弹出候选勾选弹层（默认全选，支持全选/取消全选），确认后仅导入勾选项并回显成功/失败汇总。该策略保持 legado“扫描后再选择导入”状态边界，同时不跨序号并入 `import_book_sel/menu_del_selection`（`seq248`）后续删除动作。
+- `2026-02-23` 决策 242：`P8-seq241` 采用“入口单项补齐 + 目录记忆最小闭环”策略：在 `BookshelfView` 书架“更多”菜单仅新增 `menu_select_folder` 同义动作，点击后调用 `ImportService.selectImportDirectory`；成功仅持久化 legacy 同名键 `importBookPath`，取消静默返回，失败提示并记录 `ExceptionLogService`。为避免“仅保存不生效”的伪一致，`importLocalBook/importTxtFile/importEpubFile` 同步接入 `initialDirectory=getSavedImportDirectory()`，实现“先选目录、后选文件”的同义状态流。`menu_scan_folder`（`seq246`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-23` 决策 241：`P6-seq16` 采用“入口单项补齐 + 导出链路同源联动”策略：`CacheExportView` 顶栏“更多”菜单仅新增 checkable `menu_enable_replace`，菜单打开回显 `exportUseReplace`，点击只做翻转持久化；导出服务侧新增同名键读取并引入组合闸门 `exportUseReplace && bookUseReplaceRule`，仅在两者同时开启时应用替换净化规则。该策略避免跨序号改动导出格式/编码/目录能力，同时消除“开关可切换但导出无变化”的伪一致。
+- `2026-02-23` 决策 240：`P6-seq14` 采用“顶栏入口单项补齐 + 固定组先收敛 + 过滤作用域下沉”策略：`CacheExportView` 顶栏新增 `menu_book_group` 同义动作，菜单固定提供 legado 组序 `全部/本地/音频/网络未分组/本地未分组/更新失败`，并在选择后仅更新当前分组与列表过滤。为避免“仅视觉切组”的伪一致，下载与导出流程继续直接消费当前列表数据，使动作作用域天然随分组切换。考虑到当前 `Book` 模型尚未迁移 `audio/updateError` 类型位，本序号保留这两组入口但回落空列表，并在后续书架类型位迁移序号回补。
+- `2026-02-23` 决策 239：`P8-seq229` 采用“更多菜单单项补齐 + 默认规则选择器回填”策略：在 `DirectLinkUploadConfigView` 的“更多”菜单仅新增 `menu_import_default` 同义入口，点击后读取 `DirectLinkUploadConfigService.loadDefaultRules` 并弹出规则选择层；选中规则后仅执行表单回填（`uploadUrl/downloadUrlRule/summary/compress`），不触发保存与关闭。保持 `menu_copy_rule`（`seq227`）后置不并项，确保序号边界清晰。
+- `2026-02-23` 决策 238：`P8-seq228` 采用“先补可达承载页 + 粘贴动作单项收敛”策略：在 `OtherSettingsView` 补齐“源设置 -> 直链上传规则”入口并新增 `DirectLinkUploadConfigView` 承载页后，仅实现 `menu_paste_rule`。粘贴逻辑严格对齐 legado：读取剪贴板文本后按单个 `Rule` JSON 对象解析，成功仅回填表单，失败统一提示“剪贴板为空或格式不对”，不自动保存、不跳转页面；`menu_import_default/menu_copy_rule` 保持后续序号独立推进。
+- `2026-02-23` 决策 237：`P6-seq28` 采用“长按子菜单单项补齐 + 下载起点参数化复用”策略：在 `CacheExportView` 长按下载弹层仅新增 `menu_download_all` 入口，点击后复用既有下载状态机并走“空闲态确认 -> 从首章到末章缓存 / 运行中即停止”边界；在 `CacheDownloadTaskService` 抽象 `_startDownload` 并新增 `startDownloadAllChapters`（起点固定 `0`），`startDownloadFromCurrentChapter` 保持原始起点逻辑。该策略避免复制下载主链路，同时确保 `menu_download_after` 与 `menu_download_all` 仅在起点语义上差异化，不跨序号并入 `menu_log`（`seq26`）。
+- `2026-02-23` 决策 236：`P6-seq27` 采用“长按下载入口单项补齐 + 同源状态机复用”策略：在 `CacheExportView` 顶栏下载按钮仅补齐 `menu_download_after` 长按弹层入口，点击后复用既有 `menu_download` 链路（未运行时确认后按当前章节到末章缓存，运行中点击即停止），不新增并行下载策略与额外提示分支。`menu_download_all`（`seq28`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-23` 决策 235：`P6-seq25` 采用“入口单项补齐 + 导出写盘编码联动”策略：在 `CacheExportView` 顶栏“更多”菜单仅新增 `menu_export_charset` 同义入口，菜单标题回显 `导出编码(当前值)`；点击后弹输入式编码对话框（placeholder `charset name`，保留 legacy 编码候选提示）并持久化到同名键 `exportCharset`。为避免“入口可配但导出不生效”的伪一致，`CacheExportTaskService` 的 TXT 写盘链路同步改为按 `exportCharset` 编码输出（`UTF-8/GB2312/GB18030/GBK/Unicode/UTF-16/UTF-16LE/ASCII`），并保持未知编码按失败分支进入既有异常可观测链路。`menu_log`（`seq26`）继续遵循 `detail_later` 后置，不跨序号并项。
+- `2026-02-23` 决策 234：`P6-seq24` 采用“入口单项补齐 + 导出主链路同步联动”策略：在 `CacheExportView` 顶栏“更多”菜单仅新增 `menu_export_type` 同义入口，菜单标题回显 `导出格式(当前值)`，点击后提供 `txt/epub` 单选并持久化 `exportType`（索引）。为避免“开关可切但行为不变”的伪一致，`CacheExportTaskService.exportAllToDirectory` 同步按 `exportType` 分支导出：`txt` 维持原链路，`epub` 使用 `epubx.EpubWriter` 生成真实文件。保持导出编码与日志入口不变，不提前并入 `seq25~26`，继续一项一处理。
+- `2026-02-23` 决策 233：`P6-seq23` 采用“入口单项补齐 + 命名链路同源回收”策略：在 `CacheExportView` 顶栏“更多”菜单仅新增 `menu_export_file_name` 同义入口，点击后弹输入框并持久化 `bookExportFileName`；导出链路仅补齐 TXT 命名规则解析（变量 `name/author`，兼容 `epubIndex` 占位），规则为空或解析失败统一回退默认名并记录日志。保持导出目录、导出格式、导出编码与日志入口能力不变，不提前并入 `seq24~26`，维持一项一处理。
+- `2026-02-23` 决策 232：`P6-seq22` 采用“独立目录配置入口 + 静默边界保持”策略：在 `CacheExportView` 顶栏“更多”菜单仅新增 `menu_export_folder` 同义入口，点击后只打开目录选择并持久化目录，不触发导出任务；取消选择保持静默返回。为补齐失败可观测性，目录持久化异常写入 `ExceptionLogService`。不提前并入 `menu_export_file_name/menu_export_type/menu_export_charset/menu_log`（`seq23~26`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 231：`P6-seq21` 采用“顶栏更多单项入口 + checkable 回显 + 导出并发度联动”策略：在 `CacheExportView` 顶栏“更多”菜单仅新增 `menu_parallel_export` 同义入口，菜单打开时读取并回显 `parallelExportBook`，点击后即时翻转并持久化；在 `CacheExportTaskService` 导出链路按开关切换并发度（关闭 `1`、开启 `9`，对齐 legado `AppConst.MAX_THREAD`），用于章节文本组装与章节图片导出任务。保持导出主链路不变，不提前并入 `menu_export_folder/menu_export_file_name/menu_export_type/menu_export_charset`（`seq22~seq25`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 230：`P6-seq20` 采用“顶栏更多单项入口 + checkable 回显 + 导出链路联动”策略：在 `CacheExportView` 顶栏“更多”菜单仅新增 `menu_export_pics_file` 同义入口，菜单打开时读取并回显 `exportPictureFile`，点击后即时翻转并持久化；在 `CacheExportTaskService` 的 TXT 导出链路中按开关解析章节 `<img src>` 并导出到 `{书名_作者}/images/{章节}`。图片抓取优先复用书源感知加载器（对齐书源请求头/Cookie 语义），抓取失败按单文件日志记录且不阻断整书 TXT 导出。保持导出主链路不变，不提前并入 `menu_parallel_export/menu_export_folder/menu_export_file_name/menu_export_type/menu_export_charset`（`seq21~seq25`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 229：`P6-seq19` 采用“顶栏更多单项入口 + checkable 回显 + 导出正文联动”策略：在 `CacheExportView` 顶栏“更多”菜单仅新增 `menu_export_no_chapter_name` 同义入口，菜单打开时读取并回显 `exportNoChapterName` 当前值，点击后即时翻转并持久化；同时在 `CacheExportTaskService` 的 TXT 导出构建接入同义联动（开启时不写章节标题，关闭时恢复写入）。保持导出主链路不变，不提前并入 `menu_export_pics_file/menu_parallel_export/menu_export_folder/menu_export_file_name/menu_export_type/menu_export_charset`（`seq20~seq25`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 228：`P6-seq18` 采用“顶栏更多单项入口 + checkable 回显 + legado 键名持久化”策略：在 `CacheExportView` 顶栏“更多”菜单仅新增 `menu_export_web_dav` 同义入口，菜单打开时读取并回显 `webDavCacheBackup` 当前值，点击后即时翻转并持久化；保持导出主链路不变，不提前并入 `menu_export_no_chapter_name/menu_export_pics_file/menu_parallel_export/menu_export_folder/menu_export_file_name/menu_export_type/menu_export_charset`（`seq19~seq25`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 227：`P6-seq17` 采用“顶栏更多单项入口 + checkable 回显 + 同名键持久化”策略：在 `CacheExportView` 顶栏“更多”菜单仅新增 `menu_enable_custom_export` 同义入口，菜单打开时读取并回显 `enableCustomExport` 当前值，点击后即时翻转并持久化；保持导出主链路不变，不提前并入 `menu_export_web_dav/menu_export_no_chapter_name/menu_export_pics_file/menu_parallel_export/menu_export_folder/menu_export_file_name/menu_export_type/menu_export_charset`（`seq18~seq25`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 226：`P6-seq15` 采用“顶栏更多单项入口 + 导出目录记忆 + 批量 TXT 导出”策略：在 `CacheExportView` 顶栏仅新增 `更多 -> 导出所有` 入口，对齐 legado `menu_export_all` 层级；触发后优先复用已保存目录，不可写时走目录重选，取消分支静默返回。导出执行按当前列表逐本写出已缓存章节 TXT，并将单书失败写入 `ExceptionLogService` 汇总回显；不提前并入 `menu_enable_custom_export/menu_export_type/menu_export_charset`（`seq17/24/25`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 225：`P6-seq13` 采用“真实承载页优先 + 兼容壳保留”策略：新增 `CacheExportView` 承载 `menu_download` 全流程（确认式提交、下载/停止状态机、批量缓存与中断），同时保留 `CacheExportPlaceholderView` 作为路由兼容壳并透传到新页面，避免触发既有回归用例断裂。实现上复用 `BookshelfCatalogUpdateService` 补齐“目录缺失时先拉目录再缓存”的 legado 语义，新增 `CacheDownloadTaskService` 聚合下载任务与取消控制；不提前并入 `menu_export_all/menu_book_group/menu_log`（`seq15+`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 224：`P5-seq400` 采用“多选入口单项补齐 + 批量禁用静默写库”策略：在 `TxtTocRuleManageView` 多选“更多”菜单仅新增 `menu_disable_selection`，点击后按当前选中集合调用 `TxtTocRuleStore.disableRulesByIds` 批量写入 `enabled=false` 并刷新列表；全流程不追加成功提示、不跳转页面。为避免重复触发，补充 `_disablingSelection` 忙碌闸门并并入 `_selectionUpdating`，同时保持“启用所选/禁用所选/导出所选”共享同一批量动作忙碌指示；不提前并入 `menu_export_selection`（`seq401`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 223：`P5-seq399` 采用“多选入口单项补齐 + 批量启用静默写库”策略：在 `TxtTocRuleManageView` 多选“更多”菜单仅新增 `menu_enable_selection`，点击后按当前选中集合调用 `TxtTocRuleStore.enableRulesByIds` 批量写入 `enabled=true` 并刷新列表；全流程不追加成功提示、不跳转页面。为避免重复触发，新增 `_enablingSelection` 忙碌闸门并并入 `_menuBusy`；不提前并入 `menu_disable_selection`（`seq400`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 222：`P5-seq398` 采用“条目删除单项收敛 + legado 时序对齐”策略：在 `TxtTocRuleManageView` 条目更多菜单仅新增 `menu_del` 同义“删除”入口，触发顺序严格对齐 legado `menu_del -> selected.remove(item) -> del(item)`，先移除选中态再弹确认框；确认框文案收敛为“提醒 / 是否确认删除？\n<规则名>”，仅确认后调用 `TxtTocRuleStore.deleteRule` 删库并静默刷新列表，失败只记录 `DeleteTxtTocRuleError` 日志；不提前并入 `menu_enable_selection/menu_disable_selection`（`seq399~400`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 221：`P5-seq396` 采用“条目级更多入口最小补齐 + 单项置顶静默写库”策略：在 `TxtTocRuleManageView` 非多选态条目补齐右侧“更多”热区，但动作列表仅新增 `menu_top` 同义“置顶”入口；点击后调用 `TxtTocRuleStore.moveRuleToTop`，按 legado `minOrder - 1` 规则仅重写目标规则 `serialNumber` 并静默刷新列表，不追加成功提示。为避免并发重复触发，新增 `_toppingRule` 忙碌闸门并并入 `_menuBusy`；不提前并入 `menu_bottom/menu_del/menu_enable_selection/menu_disable_selection`（`seq397~400`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 220：`P5-seq393` 采用“保存边界同义优先 + 最小修正”策略：保留 `TxtTocRuleEditView` 现有顶栏“保存”入口与校验状态机，仅修正 `example` 写回逻辑为“按输入框原值提交（含空串）”，确保“清空示例后保存”与 legado `toString()` 语义一致；不扩展 `menu_copy_rule`（`seq394`）与条目菜单（`seq396+`）能力，保持一项一处理。
+- `2026-02-23` 决策 219：`P5-seq387` 采用“顶栏一级入口补齐 + 编辑保存链路打通 + 校验前置”策略：`TxtTocRuleManageView` 顶栏仅新增 `menu_add` 同义“添加”动作，点击后创建草稿规则并进入编辑页；`TxtTocRuleEditView` 补齐一级“保存”动作，保存前执行 legado 同义校验（名称不能为空、正则可编译），仅校验通过才回传规则。持久化层新增 `TxtTocRuleStore.upsertRule/createDraftRule`，保证“新增/编辑同链路回写 + 列表刷新”收敛；不提前并入 `txt_toc_rule_edit.xml` 其它菜单能力（`seq393+`），保持一项一处理。
+- `2026-02-23` 决策 218：`P5-seq298` 采用“多选入口单项补齐 + 静默批量置底 + 顺序保持”策略：`ReplaceRuleListView` 的多选“更多”菜单仅新增 `menu_bottom_sel`，点击后按当前列表中的选中顺序计算置底序列并批量写回 `order`（`maxOrder` 起步，逐项 `maxOrder++`），确保置底后相对顺序不变；全流程不追加成功提示、不跳转页面。为避免重复触发，补充 `_bottomingSelection` 菜单忙碌闸门并并入 `_selectionUpdating`，不提前并入 `txt_toc_rule.xml` 后续序号能力，保持一项一处理。
+- `2026-02-23` 决策 217：`P5-seq297` 采用“多选入口单项补齐 + 静默批量置顶 + 顺序保持”策略：`ReplaceRuleListView` 的多选“更多”菜单仅新增 `menu_top_sel`，点击后按当前列表中的选中顺序计算 `minOrder - selectionSize` 起始序列并批量写回 `order`，确保置顶后相对顺序不变；全流程不追加成功提示、不跳转页面。为避免重复触发，补充 `_toppingSelection` 菜单忙碌闸门并并入 `_selectionUpdating`，但不提前并入 `menu_bottom_sel`（`seq298`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 216：`P5-seq296` 采用“多选入口单项补齐 + 批量禁用静默写库”策略：`ReplaceRuleListView` 的多选“更多”菜单仅新增 `menu_disable_selection`，点击后按当前选中集合批量写入 `isEnabled=false` 并由流式列表刷新回显；全流程不追加成功提示、不跳转页面。为避免重复触发，补充 `_disablingSelection` 菜单忙碌闸门，并将 `_menuBusy` 统一收敛为 `_selectionUpdating`，但不提前并入 `menu_top_sel/menu_bottom_sel`（`seq297~298`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 215：`P5-seq295` 采用“多选入口单项补齐 + 批量启用静默写库”策略：`ReplaceRuleListView` 的多选“更多”菜单仅新增 `menu_enable_selection`，点击后按当前选中集合批量写入 `isEnabled=true` 并由流式列表刷新回显；全流程不追加成功提示、不跳转页面。为避免重复触发，补充 `_enablingSelection` 菜单忙碌闸门，但不提前并入 `menu_disable_selection/menu_top_sel/menu_bottom_sel`（`seq296~298`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 214：`P5-seq294` 采用“条目删除单项补齐 + 选中态先清理 + 确认后删库”策略：在替换规则条目“更多”菜单仅新增 `menu_del`，点击后先移除当前条目选中态，再弹出 legado 同义确认框（“提醒 / 是否确认删除？\n<规则名>”）；确认后执行删库并由列表流刷新，取消保持静默不删库；不提前并入 `replace_rule_sel` 批量动作（`seq295~298`），保持一项一处理。
+- `2026-02-23` 决策 213：`P5-seq286` 采用“单项语义证据补齐 + no-group 判定口径集中”策略：保留 `ReplaceRuleListView` 既有“分组弹层 -> 未分组”入口，不扩展新交互；将 no-group 关键词抽成统一常量并集中到 `_isNoGroupRule` 判定，明确对齐 legado `flowNoGroup` 的三段边界（`group` 为空/空白/包含“未分组”）。本序号只处理 `menu_group_null`，`menu_add_replace_rule`（`seq287`）继续后续单项推进，不跨序号并项。
+- `2026-02-23` 决策 212：`P5-seq285` 采用“分组入口层级补齐优先 + 管理弹层静默变更”策略：`ReplaceRuleListView` 的“分组”动作弹层新增 `menu_group_manage` 同义入口并打开“分组管理”弹层；弹层内仅实现 `添加分组/编辑分组/删除分组` 三个动作。写库语义对齐 legado：`添加分组` 仅作用于 `group` 为空规则；`编辑/删除分组` 按逗号分组集合移除旧组并静默落库，不追加成功提示。`menu_group_null/menu_add_replace_rule`（`seq286/287`）保持后续序号单独处理，不跨序号并项。
+- `2026-02-23` 决策 211：`P5-seq284` 采用“入口层级收敛优先 + 分组语义按 legado 拆分/命中”策略：`ReplaceRuleListView` 移除页面内胶囊分组条，补齐顶栏一级 `menu_group` 入口并以下拉动作承载“全部/未分组/动态分组”；动态分组由 `group` 按 `[,;，；]` 拆分去重后按 `cnCompareLikeLegado` 排序。“未分组”筛选按 `group` 为空或包含“未分组”命中，动态分组按 `group.contains` 命中，保持与 legado `flowNoGroup/flowGroupSearch` 同义边界；`menu_group_manage`（`seq285`）保持下一序号单独处理，不跨序号并项。
+- `2026-02-23` 决策 210：`P5-seq281` 采用“编辑页内部异步保存 + 失败不退出 + 排序边界补齐”策略：`ReplaceRuleEditView` 的 `menu_save` 改为先构建草稿并执行有效性校验，失败统一提示 `save error, <原因>` 且停留当前页；成功才关闭编辑页。调用方回调改为异步落库，并在 `order == Int.MIN_VALUE` 时按当前最大排序号补 `maxOrder+1`，对齐 legado `ReplaceEditViewModel.save` 语义，不提前并入 `menu_group/menu_group_manage`（`seq284/285`）后续能力。
+- `2026-02-23` 决策 209：`P5-seq225` 采用“单项入口独立收敛 + 静默批量禁用”策略：在 `DictRuleManageView` 多选“更多”菜单单独新增 `menu_disable_selection`，点击后仅对当前选中集合批量写入 `enabled=false` 并刷新列表；不追加成功提示、不跳转页面。实现上复用 `DictRuleStore.setEnabledForRuleNames(..., enabled: false)`，不提前并入 `replace_edit/menu_save`（`seq281`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 208：`P5-seq221` 采用“编辑页一级保存入口 + 旧名删除后新名写入”策略：在 `DictRuleEditView` 顶栏补齐 `menu_save` 同义动作，点击后仅回传 `name/urlRule/showRule` 表单值；`DictRuleManageView` 接收后调用 `DictRuleStore.saveRule(originalName, newRule)` 执行“删除旧名称规则 -> 插入新规则”，确保改名场景不残留旧规则，并保持 `enabled/sortNumber` 透传，不提前并入 `menu_copy_rule`（`seq222`）与多选启停（`seq224/225`）后续能力。
+- `2026-02-23` 决策 207：`P5-seq215` 采用“一级入口先收敛 + 空白编辑态直达”策略：在 `DictRuleManageView` 顶栏补齐 `menu_add` 同义加号动作，点击后仅打开空白 `DictRuleEditView`（`name/urlRule/showRule` 为空），不触发保存、不触发导入，不提前并入 `menu_save/menu_copy_rule`（`seq221/222`）后续能力，保持一项一处理。
+- `2026-02-23` 决策 206：`P5-seq401` 采用“先补多选承载可达性 + 导出动作单项收敛”策略：在 `TxtTocRuleManageView` 先补顶栏“多选/完成”和底部“全选/反选/更多”多选承载层，仅落 `menu_export_selection` 单项；导出目标固定为当前选中规则集合，默认文件名 `exportTxtTocRule.json`，取消导出静默返回，成功后弹路径并支持复制。`menu_enable_selection/menu_disable_selection`（`seq399/400`）继续后置，不跨序号并项。
+- `2026-02-23` 决策 205：`P5-seq391` 采用“入口单项补齐 + 默认规则集合重置”策略：`TxtTocRuleManageView` 的“更多”菜单仅新增 `menu_import_default` 单项，点击后直接执行默认规则导入，不引入候选弹层与成功提示。`TxtTocRuleStore.importDefaultRules` 写库语义对齐 legado `deleteDefault(id<0) + insert(default)`：先剔除本地默认规则，再导入资产 `assets/source/txtTocRule.json`，保留 `id>=0` 用户自定义规则；`menu_add/menu_help`（`seq395/392`）保持后续序号单独处理，不跨序号并项。
+- `2026-02-23` 决策 204：`P5-seq390` 采用“扫码入口单项补齐 + 候选导入链路复用 + 历史隔离”策略：`TxtTocRuleManageView` 的“更多”菜单仅新增 `menu_import_qr` 单项，点击后调用统一扫码服务并将扫码文本直接交给既有“导入 TXT 目录规则”候选弹层；候选状态保持“新增/更新/已有”，默认勾选新增+更新。二维码分支不写 `tocRuleUrl` 历史，避免与 `menu_import_onLine` 输入历史耦合。`menu_import_default`（`seq391`）保持后续序号单独处理，不跨序号并项。
+- `2026-02-23` 决策 203：`P5-seq389` 采用“URL 输入层同义优先 + `tocRuleUrl` 历史键复用 + 候选导入链路复用”策略：`TxtTocRuleManageView` 的“更多”菜单仅新增 `menu_import_onLine` 单项，点击后先弹“网络导入”输入层（占位 `url`），历史记录支持点选回填与删除，并按 legado 语义默认注入 `myTxtChapterRule.json` 地址；确认后复用既有“导入 TXT 目录规则”候选弹层完成勾选导入（默认勾选新增+更新）。`menu_import_qr/menu_import_default`（`seq390/391`）保持后续序号单独处理，不跨序号并项。
+- `2026-02-22` 决策 202：`P5-seq299` 采用“先补多选承载可达性 + 单项导出收敛”策略：在 `ReplaceRuleListView` 先补顶栏“多选/完成”与底部多选动作栏，仅落 `menu_export_selection` 单项；导出目标固定为当前选中集合，默认文件名 `exportReplaceRule.json`，取消导出静默返回，成功后弹路径并支持复制。`menu_enable_selection/menu_disable_selection/menu_top_sel/menu_bottom_sel`（`seq295~298`）继续后置，不跨序号并项。
+- `2026-02-22` 决策 201：`P5-seq290` 采用“扫码入口单项补齐 + 候选导入链路复用”策略：在 `ReplaceRuleListView` 的“更多”菜单仅新增 `menu_import_qr` 动作，点击后拉起扫码并将结果文本直接交给既有“导入替换规则”候选弹层；候选状态继续保持“新增/更新/已有”，默认仅选中新增。二维码导入链路不写入 `replaceRuleRecordKey` 历史，避免与 `menu_import_onLine` 输入历史耦合；`menu_group/menu_group_manage` 保持后续序号单独处理，不跨序号并项。
+- `2026-02-22` 决策 200：`P5-seq289` 采用“输入层历史同义优先 + 候选导入链路复用”策略：在 `ReplaceRuleListView` 的“更多”菜单仅收敛 `menu_import_onLine` 单项，点击后先弹“网络导入”输入层并使用 legado 同名历史键 `replaceRuleRecordKey`（支持点选回填与删除）；确认后复用既有“导入替换规则”候选弹层完成勾选导入，候选状态保持“新增/更新/已有”，默认仅选中新增。`menu_import_qr/menu_group` 保持后续序号单独处理，不跨序号并项。
+- `2026-02-22` 决策 199：`P5-seq288` 采用“入口文案收敛 + 候选导入闭环”策略：`ReplaceRuleListView` 的本地导入入口由“从文件导入”收敛为“本地导入”，并将导入行为从“解析成功即写库”改为“选档 -> 候选预览 -> 勾选导入”。候选状态严格按 legado `id` 比对规则输出“新增/更新/已有”，默认仅勾选新增；失败口径收敛为 `readTextError:*` / `ImportError:*`，成功后保持静默返回且不追加提示，不提前并入 `menu_import_onLine/menu_import_qr` 后续序号能力。
+- `2026-02-22` 决策 198：`P5-seq283` 采用“编辑承载页入口收敛 + 粘贴动作单项闭环”策略：在 `ReplaceRuleEditView` 顶栏补齐“保存 + 更多”双动作，并在“更多”中仅实现 `menu_paste_rule`，不提前并入 `menu_copy_rule` 等后续动作。粘贴解析严格按单个 `ReplaceRule` JSON 对象处理；成功仅回填编辑表单字段并停留当前页，不自动保存、不跳转；失败口径固定“剪贴板为空/格式不对”，保持与 legado `upReplaceView` 边界同义。
+- `2026-02-22` 决策 197：`P5-seq226` 采用“多选承载先补可达性 + 导出动作单项收敛”策略：在 `DictRuleManageView` 先补 `多选` 状态栏与批量“更多”菜单，仅落 `menu_export_selection` 单项，默认导出名固定 `exportDictRule.json`，取消导出静默返回，成功后弹路径并提供复制；不提前并入 `menu_enable_selection/menu_disable_selection`（`seq224/225`）后续能力，保持一项一处理。
+- `2026-02-22` 决策 196：`P5-seq223` 采用“最小编辑承载页先补可达性 + 粘贴动作单项收敛”策略：新增字典规则编辑承载页但仅实现 `menu_paste_rule`，不提前并入 `menu_save/menu_copy_rule`（`seq221/seq222`）后续能力。粘贴解析严格按单个 `DictRule` JSON 对象处理（非数组）；成功仅回填 `name/urlRule/showRule`，空剪贴板提示“剪贴板没有内容”，其它解析失败统一“格式不对”，全程不保存不跳转，保持与 legado `upRuleView` 同义边界。
+- `2026-02-22` 决策 195：`P5-seq218` 采用“扫码入口独立收敛 + 候选导入链路复用”策略：在 `DictRuleManageView` 的“更多”菜单仅新增 `menu_import_qr` 单项，点击后调用统一扫码服务并将结果文本直接交给既有“导入字典规则”候选弹层；候选状态与默认勾选继续沿用“新增/已有 + 默认仅新增”。二维码导入链路不写入 `dictRuleUrls` 历史，避免与 `menu_import_onLine` 的输入历史状态耦合。`menu_import_default/menu_add` 保持后续序号单独处理，不跨序号并项。
+- `2026-02-22` 决策 194：`P5-seq217` 采用“输入层历史同义优先 + 候选导入链路复用”策略：在 `DictRuleManageView` 的“更多”菜单仅新增 `menu_import_onLine` 单项，点击后先弹“网络导入”输入层并使用 legado 同名历史键 `dictRuleUrls`（支持回填与删除）；确认后复用既有“导入字典规则”候选弹层完成勾选导入，默认仅选中新增项。`menu_import_qr/menu_import_default/menu_add` 保持后续序号单独处理，不跨序号并项。
+- `2026-02-22` 决策 193：`P5-seq216` 采用“入口可达优先 + 候选导入同义闭环”策略：先在 `TextRulesSettingsView` 补齐“字典规则”入口并新增 `DictRuleManageView` 承载页，再在该页“更多”菜单仅实现 `menu_import_local`；本地导入固定 `txt/json` 选档，导入前展示候选并按同名规则标记“新增/已有”，默认仅勾选新增，确认后按 `name` 覆盖写入。`menu_add/menu_import_onLine/menu_import_qr/menu_import_default` 维持后续序号单独推进，不跨序号并项。
+- `2026-02-22` 决策 192：`P4-seq371` 采用“专用网页登录页 + 顶栏确认状态机 + 自动 Cookie 回写”策略：新增 `SourceLoginWebViewView` 承载无 `loginUi` 登录分支，顶栏一级动作固定“确认”；点击后设置 checking 并提示“正在打开首页，成功自动返回主界面”，重载首页并在加载完成后自动关闭页面。Cookie 同步改为页面加载开始/结束双时机自动回写，平台桥接补齐 `WebViewCookieBridge.getCookiesForUrl`（iOS+Android）；非 `http/https` 跳转统一走“跳转其它应用”确认外跳。`seq357/seq367` 继续按 `detail_later` 后置，不跨序号并项。
+- `2026-02-22` 决策 191：`P4-seq370` 采用“顶栏一级添加 + 草稿弹窗编辑后落库”策略：在 `RuleSubscriptionView` 顶栏补齐 `menu_add` 同义入口，点击后先按当前列表计算 `customOrder=max+1` 生成草稿，再进入“规则订阅”编辑弹窗收集 `type/name/url`。确认时执行 URL 重复校验（命中重复且非同 id 则提示“此 URL 已订阅(名称)”并中断），未重复才写入存储；不提前并入条目点击导入与编辑图标等非本序号能力，保持一项一处理。
+- `2026-02-22` 决策 190：`P4-seq364` 采用“登录表单确认链路同义优先”策略：`SourceLoginFormView` 的 `menu_ok` 提交从“过滤空值 + 展示脚本回执文案”收敛为“按 `text/password` 全量键值提交（含空字符串）-> 先写 `userInfo_<sourceKey>` -> 执行登录脚本 -> 成功固定提示‘成功’并关闭”；失败统一口径“登录出错\n<原因>”并写入异常日志。`menu_log`（`seq367`）保持后续序号单独处理，避免跨序号并项。
+- `2026-02-22` 决策 189：`P4-seq362` 采用“入口文案收敛 + 文本分享静默化”策略：`SourceEditLegacyView.menu_share_str` 由“分享文本 + 成功提示 + 动态 subject”收敛为“字符串分享 + 固定 `subject=分享` + 全程静默”；点击后仅执行当前编辑态 `getSource()` JSON 的系统文本分享，不触发保存/跳转；分享异常显式吞并不提示。`menu_ok`（`seq364`）保持待下一序号单独处理，避免跨序号并项。
+- `2026-02-22` 决策 188：`P4-seq361` 采用“入口文案收敛 + 直出二维码图片分享 + 无 fallback”策略：`SourceEditLegacyView.menu_share_qr` 由“进入中间承载页二次分享”收敛为“直接对当前编辑态 `getSource()` JSON 生成二维码并拉起系统分享”，标题固定“分享书源”，二维码纠错级别显式对齐 `L`；二维码生成失败统一提示“文字太多，生成二维码失败”，分享异常仅透传错误摘要并回退 `ERROR`，不追加文本分享降级。`menu_share_str`（`seq362`）保持待下一序号单独处理，避免跨序号并项。
+- `2026-02-22` 决策 187：`P4-seq359` 采用“保留先保存再弹层主链路，仅收敛扩展提示分支”策略：`SourceEditLegacyView.menu_set_source_variable` 继续复用 `_saveInternal(showSuccessMessage: false)` 成功后打开变量弹层的既有流程；删除非 legado 的“请先填写 bookSourceUrl”分支与“源变量已保存”提示，变量保存后仅写入 `sourceVariable_<bookSourceUrl>` 并保持静默。`menu_share_qr`（`seq361`）保持待下一序号单独处理，避免跨序号并项。
+- `2026-02-22` 决策 186：`P4-seq358` 采用“入口文案收敛 + 成功静默回填 + 保存基线不前移”策略：`SourceEditLegacyView` 将 `menu_paste_source` 文案收敛为“粘贴源”；点击后读取剪贴板并导入首个书源，成功时仅执行 `_loadSourceToFields` 回填，不更新 `_savedSource/_currentOriginalUrl/_savedSnapshot`，确保回填后仍保持“未保存修改”确认边界；错误文案按 legado 收敛为“剪贴板为空/格式不对”主口径。`menu_set_source_variable`（`seq359`）保持待下一序号单独处理，避免跨序号并项。
+- `2026-02-22` 决策 185：`P4-seq355` 采用“入口文案收敛 + 清理分支静默化”策略：`SourceEditLegacyView` 的 `menu_clear_cookie` 文案统一为 legado 同义“清除 Cookie”，点击后按当前编辑态 `bookSourceUrl` 执行域作用域 Cookie 清理并吞并异常，不追加“URL 无效/清理成功/失败”提示，不触发保存与跳转；不提前并入 `menu_auto_complete`（`seq356`）后续能力，保持一项一处理。
+- `2026-02-22` 决策 184：`P4-seq352` 采用“保留先保存再调试主链路，仅收敛入口文案与迁移证据”策略：继续复用现有 `_saveInternal -> SourceDebugLegacyView(source: saved)` 语义（保存成功进入调试，失败停留编辑页），仅将顶栏动作文案从“调试”收敛为 legado 同义“调试源”，并回填 queue/tracker/ExecPlan；不提前并入 `menu_clear_cookie/menu_auto_complete`（`seq355/356`）后续能力，保持一项一处理。
+- `2026-02-22` 决策 183：`P4-seq351` 采用“保留既有保存成功即退出主链路，仅收敛失败提示与必填校验文案”策略：`menu_save` 成功路径继续保持“保存成功后关闭编辑页并回传 `sourceUrl`”，不新增成功提示；失败路径改为直接透传错误摘要，不追加“保存失败：”前缀；`name/url` 必填校验文案收敛为 legado 同义“名称和 URL 不能为空”。本序号不提前并入 `menu_debug_source`（`seq352`）后续能力，保持一项一处理。
+- `2026-02-22` 决策 182：`P4-seq199` 采用“共享候选弹层补齐删除入口 + 按入口分流确认边界”策略：在 `SourceSwitchCandidateSheet` 长按候选菜单新增“删除源”动作，由阅读页回调执行同义删除链路；整书换源入口开启删除前确认弹窗，单章换源入口保持直接删除。删除实现统一复用“删除书源记录 + 清理 sourceVariable 缓存”规则并保持静默状态流，不提前并入 `source_edit.xml`（`seq351+`）后续能力，保持一项一处理。
+- `2026-02-22` 决策 181：`P4-seq198` 采用“条目长按单项补齐 + 静默禁用并移除当前候选”策略：在 `SourceSwitchCandidateSheet` 长按候选菜单新增“禁用源”动作，点击后由阅读页按 `sourceUrl` 回查目标书源并写库 `enabled=false`，随后仅移除当前点击候选；书源缺失场景保持 legado 同义静默边界（仅移除候选，不追加提示）。本序号不提前并入 `menu_delete_source`（`seq199`）能力，保持一项一处理。
+- `2026-02-22` 决策 180：`P4-seq197` 采用“条目长按入口补齐 + 编辑返回按入口分流刷新”策略：在 `SourceSwitchCandidateSheet` 长按候选菜单新增“编辑源”动作，点击后复用现有书源编辑承载页并透传 `sourceUrl`。编辑保存返回后，整书换源链路按 legado `startSearch(origin)` 仅回刷目标书源候选，单章换源链路按 legado `startSearch()` 回刷全量候选；取消返回保持列表不变，不追加扩展提示，不提前并入 `menu_disable_source/menu_delete_source`（`seq198/199`）后续能力。
+- `2026-02-22` 决策 179：`P4-seq196` 采用“条目长按入口对称补齐 + 单项置底静默写库”策略：在 `SourceSwitchCandidateSheet` 长按候选菜单新增“置底”动作，点击后由阅读页执行 `customOrder=maxOrder+1` 写库并按新序重排当前候选列表；不追加成功提示，不提前并入 `menu_edit_source/menu_disable_source/menu_delete_source`（`seq197~199`）后续能力，保持一项一处理。
+- `2026-02-22` 决策 178：`P4-seq195` 采用“条目长按入口优先 + 单项置顶静默写库”策略：在 `SourceSwitchCandidateSheet` 仅新增候选条目长按菜单动作“置顶”，点击后由阅读页执行 `customOrder=minOrder-1` 写库并按新序重排当前候选列表；不追加成功提示，不提前并入 `menu_bottom_source/menu_edit_source/menu_disable_source/menu_delete_source`（`seq196~199`）后续能力，保持一项一处理。
+- `2026-02-22` 决策 177：`P4-seq194` 采用“单项文案收敛 + 纯关闭动作保持”策略：将换源候选弹层顶栏关闭动作文案由“取消”收敛为 legado 同义“关闭”，点击继续仅执行 `Navigator.pop/dismiss`；不追加状态写入、提示反馈或搜索副作用，不提前并入 `change_source_item.xml`（`seq195+`）后续条目能力，保持一项一处理。
+- `2026-02-22` 决策 176：`P4-seq193` 采用“候选弹层顶栏分组入口 + 全局键同名持久化 + 空结果确认回退”策略：在 `SourceSwitchCandidateSheet` 新增独立“分组”动作，不并入“更多”菜单；分组选项按启用书源动态生成并补齐“全部书源”单选项，选中后写入 legado 同名键 `searchGroup` 并执行“停止当前搜索 -> 按分组重拉候选”。当所选分组无结果时，补齐 legado 同义确认回退弹窗，允许一键切回全部书源；不提前并入 `menu_close`（`seq194`）后续能力，保持一项一处理。
+- `2026-02-22` 决策 175：`P4-seq191` 采用“共享候选弹层补齐 checkable 入口 + 候选补水并集闸门”策略：在 `SourceSwitchCandidateSheet` 新增“更多 -> 加载详情页”动作，点击仅翻转并持久化 `changeSourceLoadInfo`；不自动刷新当前候选。候选抓取阶段将补水条件收敛为 `loadInfo || loadToc || loadWordCount`，开启 `menu_load_info` 时仅补齐 `getBookInfo` 并回填最新章节，不提前并入 `menu_group/menu_close`（`seq193/194`）后续能力。
+- `2026-02-22` 决策 174：`P4-seq190` 采用“开关持久化优先 + 候选抓取链路按需补水”策略：在共享候选弹层新增 `menu_load_word_count` checkable 入口并持久化到 legado 同名键 `changeSourceLoadWordCount`；当开关关闭时保持现有候选抓取链路不额外请求正文；当开关开启时仅在候选抓取/刷新阶段补齐“详情->目录->当前章正文长度”采集，并按 legado 规则执行“字数加载优先 + 章节号降序 + 字数降序 + 原顺序”排序；不提前并入 `menu_load_info/menu_group/menu_close`（`seq191/193/194`）后续能力。
+- `2026-02-22` 决策 173：`P4-seq189` 采用“全候选采集 + 弹层侧作者校验过滤”策略：候选搜索阶段统一按书名采集并保留全部候选，`menu_check_author` 仅控制候选弹层展示过滤（`author.contains(currentAuthor)`），并将状态持久化到 `changeSourceCheckAuthor`；切换动作保持静默，不追加扩展提示，也不并入 `menu_load_word_count/menu_load_info/menu_group/menu_close`（`seq190/191/193/194`）后续能力。
+- `2026-02-22` 决策 172：`P4-seq186` 采用“同入口状态机优先 + 取消链路下沉”策略：候选弹层新增独立 `menu_start_stop` 同义动作，空闲态执行“刷新候选搜索”，运行态执行“停止当前搜索”；为保证停止语义可落地，将 `cancelToken` 从阅读页换源流程透传至 `RuleParserEngine.search/getBookInfo/getToc/getContent/_fetch` 请求链路。`menu_refresh_list`（`seq188`）保持“刷新当前候选集合”独立动作，不与 `menu_start_stop` 并项。
+- `2026-02-22` 决策 171：`P4-seq185` 采用“入口层级收敛优先”策略：候选弹层仅补齐 `menu_screen` 顶栏动作位与展开/收起状态机（展开隐藏标题区、收起恢复并清空筛选词），筛选算法继续复用既有“书源名/最新章节”实时过滤实现；不提前并入 `menu_start_stop/menu_check_author/menu_load_word_count/menu_load_info/menu_group/menu_close`（`seq186/189/190/191/193/194`）后续能力，保持一项一处理。
+- `2026-02-22` 决策 170：`P4-seq161` 采用“行为保持 + 证据补齐”策略：`book_source_sel/menu_check_selected_interval` 运行时代码保持现状，不引入额外写库或提示分支；以 legado `adapter.checkSelectedInterval()` 为准补齐差异清单、逐项对照与手工回归证据，并将队列推进到 `seq185(menu_screen)`，避免跨序号并项。
+- `2026-02-22` 决策 169：`P4-seq160` 采用“关键词弹窗同层配置 + 启动静默 + 运行中统一提示”策略：`menu_check_source` 保持多选菜单入口不变，仅收敛三处用户可见语义：1）关键词弹窗标题改为“搜索关键词”，且“校验设置”按钮改为同层打开配置弹窗并保留关键词弹窗；2）开始校验后不再追加“已开始校验（N 条）”扩展提示，进度统一由任务条与列表状态呈现；3）任务运行中重复触发统一提示“已有书源在校验,等完成后再试”。`menu_check_selected_interval`（`seq161`）保持待下一序号单独处理，避免跨序号并项。
+- `2026-02-22` 决策 168：`P4-seq159` 采用“入口文案收敛 + 文件分享静默化”策略：仅收敛 `book_source_sel/menu_share_source` 的菜单文案与分享状态流，动作改为“按导出集合规则生成分享文件后直接调用系统分享”；移除“已打开系统分享”提示、失败复制 JSON 兜底与额外 `text/subject` 扩展参数。`menu_check_source`（`seq160`）保持待下一序号单独处理，避免跨序号并项。
+- `2026-02-22` 决策 167：`P4-seq157` 采用“单项入口独立收敛 + 静默批量置底”策略：仅将 `book_source_sel/menu_bottom_sel` 从通用 `_batchMoveToTopBottom` 分离为独立 `_batchMoveSelectionToBottom` 动作；点击后按当前选中集合直接执行批量置底写库，不追加成功或兜底提示。`menu_share_source`（`seq159`）保持原实现待下一序号单独处理，避免跨序号并项。
+- `2026-02-22` 决策 166：`P4-seq156` 采用“单项入口独立收敛 + 静默批量置顶”策略：仅将 `book_source_sel/menu_top_sel` 从通用 `_batchMoveToTopBottom` 分离为独立 `_batchMoveSelectionToTop` 动作；点击后按当前选中集合直接执行批量置顶写库，不追加成功或兜底提示。`menu_bottom_sel`（`seq157`）保持原实现待下一序号单独处理，避免跨序号并项。
+- `2026-02-22` 决策 165：`P4-seq155` 采用“单项入口独立收敛 + 静默批量禁用发现”策略：仅将 `book_source_sel/menu_disable_explore` 从通用 `_batchSetExplore` 分离为独立 `_batchDisableExplore` 动作；点击后按当前选中集合直接写入 `enabledExplore=false`，不筛选已禁用项，不追加成功或兜底提示。`menu_top_sel`（`seq156`）保持待下一序号单独处理，避免跨序号并项。
 - `2026-02-22` 决策 164：`P4-seq154` 采用“单项入口独立收敛 + 静默批量启用发现”策略：仅将 `book_source_sel/menu_enable_explore` 从通用 `_batchSetExplore` 分离为独立 `_batchEnableExplore` 动作；点击后按当前选中集合直接写入 `enabledExplore=true`，不筛选已启用项，不追加成功或兜底提示。`menu_disable_explore`（`seq155`）保持原实现待下一序号单独处理，避免跨序号并项。
 - `2026-02-22` 决策 163：`P4-seq153` 采用“单项入口收敛 + 静默批量移除分组”策略：仅收敛 `book_source_sel/menu_remove_group` 的动作边界，菜单文案与弹窗标题统一为“移除分组”；确认非空输入后仅按当前选中集合批量移除对应分组并写库，移除“无选中/成功移除”扩展提示。`menu_enable_explore`（`seq154`）保持待下一序号单独处理，避免跨序号并项。
 - `2026-02-22` 决策 162：`P4-seq152` 采用“单项入口收敛 + 静默批量追加分组”策略：仅收敛 `book_source_sel/menu_add_group` 的入口文案与动作边界，菜单文案/弹窗标题统一为“添加分组”；确认非空输入后仅按当前选中集合批量追加分组并写库，移除“无选中/成功写入”扩展提示。`menu_remove_group`（`seq153`）保持待下一序号单独处理，避免跨序号并项。
@@ -2808,6 +4531,72 @@
 
 ## Outcomes & Retrospective
 
+- `2026-02-23`：完成 `P6-seq171`（`menu_export`）迁移闭环，已补齐“设置页书签入口 + 所有书签承载页 + 顶栏更多单项‘导出’ + 全量书签按 legado 顺序导出 JSON + 文件名 `bookmark-yyMMddHHmmss.json` + 失败日志可观测 + 取消导出静默返回”的同义证据；`menu_export_md(seq172)` 保持下一序号独立推进。
+- `2026-02-23`：完成 `P3-seq7`（`menu_copy_audio_url`）迁移闭环，已补齐“阅读页播放菜单拷贝播放 URL 入口 + 复制值映射当前章节链接 + 缺失链接复制空值 + 成功提示‘已拷贝’ + 复制失败仅日志可观测”的同义证据；队列推进到下一项 `seq10(audio_play/menu_log)`。
+- `2026-02-23`：完成 `P8-seq349`（`menu_save`）迁移闭环，已补齐“服务器配置页顶栏一级保存入口 + 字段草稿态编辑 + 点击保存统一落盘并关闭 + 失败提示 `保存出错\n<原因>` + 移除逐字段‘已保存’提示”的同义证据；`menu_copy_rule(seq227)` 继续 `detail_later` 后置；队列推进到下一项 `seq350(servers/menu_add)`。
+- `2026-02-23`：完成 `P8-seq248`（`menu_del_selection`）迁移闭环，已补齐“智能扫描候选弹层删除入口 + 按选中集合执行文件删除 + 删除动作结束后移除所选候选项 + 失败日志可观测 + 全流程静默无成功提示”的同义证据；`menu_copy_rule(seq227)` 继续 `detail_later` 后置；队列推进到下一项 `seq349(server_config/menu_save)`。
+- `2026-02-23`：完成 `P8-seq246`（`menu_scan_folder`）迁移闭环，已补齐“书架更多菜单智能扫描入口 + `importBookPath` 目录递归扫描 + 扫描候选勾选弹层（默认全选/全选切换）+ 仅导入勾选项 + 导入成功/失败汇总明细”的同义证据；`menu_copy_rule(seq227)` 继续 `detail_later` 后置；队列推进到下一项 `seq248(import_book_sel/menu_del_selection)`。
+- `2026-02-23`：完成 `P8-seq241`（`menu_select_folder`）迁移闭环，已补齐“书架更多菜单选择文件夹入口 + 目录选择成功仅保存 `importBookPath` + 取消静默不覆盖 + 异常可观测日志 + 本地导入默认目录复用”的同义证据；`menu_copy_rule(seq227)` 继续 `detail_later` 后置；队列推进到下一项 `seq246(import_book/menu_scan_folder)`。
+- `2026-02-23`：完成 `P6-seq16`（`menu_enable_replace`）迁移闭环，已补齐“缓存/导出页顶栏更多菜单替换净化入口 + `exportUseReplace` 勾选态回显与持久化 + 导出链路按 `exportUseReplace && bookUseReplaceRule` 应用替换规则（TXT 与 EPUB）”的同义证据；`menu_copy_rule(seq227)` 继续 `detail_later` 后置；队列推进到下一项 `seq241(import_book/menu_select_folder)`。
+- `2026-02-23`：完成 `P8-seq229`（`menu_import_default`）迁移闭环，已补齐“直链上传配置更多菜单导入默认规则入口 + 默认规则选择层 + 选择后仅回填上传URL/下载URL规则/注释/是否压缩 + 不自动保存不关闭页面”的同义证据；`menu_copy_rule(seq227)` 继续 `detail_later` 后置；队列推进到下一项 `seq247(import_book/menu_import_file_name)`。
+- `2026-02-23`：完成 `P8-seq228`（`menu_paste_rule`）迁移闭环，已补齐“直链上传配置更多菜单粘贴规则入口 + 剪贴板 Rule JSON 解析 + 成功仅回填表单 + 失败统一提示‘剪贴板为空或格式不对’ + 不自动保存不跳转”的同义证据；队列推进到下一项 `seq229(direct_link_upload_config/menu_import_default)`。
+- `2026-02-23`：完成 `P6-seq28`（`menu_download_all`）迁移闭环，已补齐“缓存/导出页长按下载子菜单 `下载全部章节` 入口 + 空闲态确认后首章到末章缓存 + 运行中同入口停止任务 + 下载进度回显复用既有链路”的同义证据；`menu_log(seq26)` 继续 `detail_later` 后置；队列推进到下一项 `seq228(direct_link_upload_config/menu_paste_rule)`。
+- `2026-02-23`：完成 `P6-seq25`（`menu_export_charset`）迁移闭环，已补齐“缓存/导出页顶栏更多菜单导出编码入口 + 当前编码标题回显 + `exportCharset` 持久化 + TXT 导出写盘按所选编码生效（空值回落 UTF-8）”的同义证据；`menu_log(seq26)` 维持 `detail_later` 后置；队列推进到下一项 `seq27(book_cache_download/menu_download_after)`。
+- `2026-02-23`：完成 `P6-seq24`（`menu_export_type`）迁移闭环，已补齐“缓存/导出页顶栏更多菜单导出格式入口 + 当前格式标题回显 + `exportType` 持久化 + 导出链路按 `txt/epub` 分支执行（`epub` 真实文件写出）”的同义证据；导出编码与日志入口能力保留后续序号收敛；队列推进到下一项 `seq25(book_cache/menu_export_charset)`。
+- `2026-02-23`：完成 `P6-seq23`（`menu_export_file_name`）迁移闭环，已补齐“缓存/导出页顶栏更多菜单导出文件名入口 + 弹窗回显与保存 `bookExportFileName` + 导出命名按 JS 规则解析（`name/author`）+ 规则异常回退默认命名并记录日志”的同义证据；导出格式/导出编码与日志能力保留后续序号收敛；队列推进到下一项 `seq24(book_cache/menu_export_type)`。
+- `2026-02-23`：完成 `P6-seq22`（`menu_export_folder`）迁移闭环，已补齐“缓存/导出页顶栏更多菜单导出文件夹入口 + 目录选择后持久化默认导出目录 + 取消选择静默返回 + 不触发导出任务”的同义证据；导出文件名/格式/编码与日志能力保留后续序号收敛；队列推进到下一项 `seq23(book_cache/menu_export_file_name)`。
+- `2026-02-23`：完成 `P6-seq21`（`menu_parallel_export`）迁移闭环，已补齐“缓存/导出页顶栏更多菜单多线程导出入口 + 菜单勾选态读取与回显 + legado 同名键 `parallelExportBook` 持久化切换 + 导出并发度开关（关闭 `1`、开启 `9`）”的同义证据；导出文件夹/文件名/格式/编码能力保留后续序号收敛；队列推进到下一项 `seq22(book_cache/menu_export_folder)`。
+- `2026-02-23`：完成 `P6-seq20`（`menu_export_pics_file`）迁移闭环，已补齐“缓存/导出页顶栏更多菜单 TXT 导出图片入口 + 菜单勾选态读取与回显 + legado 同名键 `exportPictureFile` 持久化切换 + TXT 导出图片写盘链路（按书籍/章节目录结构）”的同义证据；并行导出与导出目录/文件名/格式/编码能力保留后续序号收敛；队列推进到下一项 `seq21(book_cache/menu_parallel_export)`。
+- `2026-02-23`：完成 `P6-seq19`（`menu_export_no_chapter_name`）迁移闭环，已补齐“缓存/导出页顶栏更多菜单 TXT 不导出章节名入口 + 菜单勾选态读取与回显 + legado 同名键 `exportNoChapterName` 持久化切换 + TXT 导出正文章节标题开关联动”的同义证据；TXT 图片导出/并行导出/导出目录与格式配置能力保留后续序号收敛；队列推进到下一项 `seq20(book_cache/menu_export_pics_file)`。
+- `2026-02-23`：完成 `P6-seq18`（`menu_export_web_dav`）迁移闭环，已补齐“缓存/导出页顶栏更多菜单导出到 WebDav 入口 + 菜单勾选态读取与回显 + legado 同名键 `webDavCacheBackup` 持久化切换”的同义证据；TXT 导出细项/导出格式/导出编码能力保留后续序号收敛；队列推进到下一项 `seq19(book_cache/menu_export_no_chapter_name)`。
+- `2026-02-23`：完成 `P6-seq17`（`menu_enable_custom_export`）迁移闭环，已补齐“缓存/导出页顶栏更多菜单自定义Epub导出章节入口 + 菜单勾选态读取与回显 + 同名键 `enableCustomExport` 持久化切换”的同义证据；导出到 WebDav/TXT 导出细项/导出格式/导出编码能力保留后续序号收敛；队列推进到下一项 `seq18(book_cache/menu_export_web_dav)`。
+- `2026-02-23`：完成 `P6-seq15`（`menu_export_all`）迁移闭环，已补齐“缓存/导出页顶栏更多菜单导出所有入口 + 导出目录复用与重选 + 当前列表批量导出已缓存章节 TXT + 失败写异常日志 + 导出汇总回显”的同义证据；`自定义Epub导出章节/导出格式/导出编码` 保留后续序号收敛；队列推进到下一项 `seq17(book_cache/menu_enable_custom_export)`。
+- `2026-02-23`：完成 `P6-seq13`（`menu_download`）迁移闭环，已补齐“缓存/导出页顶栏下载入口 + 下载前确认弹窗 + 运行态下载/停止切换 + 从当前章节到末章批量缓存 + 运行中可中断 + 失败写异常日志”的同义证据；队列推进到下一项 `seq15(book_cache/menu_export_all)`。
+- `2026-02-23`：完成 `P5-seq400`（`menu_disable_selection`）迁移闭环，已补齐“TXT 目录规则多选更多菜单禁用所选入口 + 仅对选中集合批量写入 `enabled=false` + 刷新后保持页面停留 + 全流程静默无成功提示”的同义证据；队列推进到下一项 `seq401(txt_toc_rule_sel/menu_export_selection)`。
+- `2026-02-23`：完成 `P5-seq399`（`menu_enable_selection`）迁移闭环，已补齐“TXT 目录规则多选更多菜单启用所选入口 + 仅对选中集合批量写入 `enabled=true` + 刷新后保持页面停留 + 全流程静默无成功提示”的同义证据；队列推进到下一项 `seq400(txt_toc_rule_sel/menu_disable_selection)`。
+- `2026-02-23`：完成 `P5-seq398`（`menu_del`）迁移闭环，已补齐“TXT 目录规则条目更多菜单删除入口 + 删除前先移除选中态 + ‘提醒/是否确认删除？\n规则名’确认框 + 仅确认后删库刷新 + 失败仅调试日志 + 全流程静默无成功提示”的同义证据；队列推进到下一项 `seq399(txt_toc_rule_sel/menu_enable_selection)`。
+- `2026-02-23`：完成 `P5-seq396`（`menu_top`）迁移闭环，已补齐“TXT 目录规则条目右侧更多入口 + 单项置顶动作 + 置顶按 `serialNumber=minOrder-1` 写回 + 失败仅调试日志 + 全流程静默无成功提示”的同义证据；队列推进到下一项 `seq397(txt_toc_rule_item/menu_bottom)`。
+- `2026-02-23`：完成 `P5-seq393`（`menu_save`）迁移闭环，已补齐“TXT 目录规则编辑页顶栏一级保存动作 + 校验通过后静默回传并关闭 + 保存仅提交 `name/rule/example` + `example` 空串清空边界同义”的证据；队列推进到下一项 `seq396(txt_toc_rule_item/menu_top)`。
+- `2026-02-23`：完成 `P5-seq387`（`menu_add`）迁移闭环，已补齐“TXT 目录规则管理页顶栏添加入口 + 新建草稿进入编辑页 + 编辑页保存动作 + 名称/正则保存前校验 + 保存成功回传并落库刷新”的同义证据；队列推进到下一项 `seq393(txt_toc_rule_edit/menu_save)`。
+- `2026-02-23`：完成 `P5-seq294`（`menu_del`）迁移闭环，已补齐“替换规则条目更多菜单删除入口 + 删除前移除条目选中态 + ‘提醒/是否确认删除？\n规则名’确认框 + 确认后删库刷新 + 全流程静默无成功提示”的同义证据；队列推进到下一项 `seq295(replace_rule_sel/menu_enable_selection)`。
+- `2026-02-23`：完成 `P5-seq286`（`menu_group_null`）迁移闭环，已补齐“分组弹层未分组入口 + no-group 三段判定边界（`group` 为空/空白/包含‘未分组’）+ 切换筛选静默停留页面”的同义证据；队列推进到下一项 `seq287(replace_rule/menu_add_replace_rule)`。
+- `2026-02-23`：完成 `P5-seq285`（`menu_group_manage`）迁移闭环，已补齐“分组弹层中的分组管理入口 + 分组管理承载弹层 + 添加分组仅赋值无分组规则 + 编辑/删除分组静默写库并即时刷新”的同义证据；队列推进到下一项 `seq286(replace_rule/menu_group_null)`。
+- `2026-02-23`：完成 `P5-seq281`（`menu_save`）迁移闭环，已补齐“替换规则编辑页保存前有效性校验 + `save error` 失败口径 + 保存失败不退出 + `order==Int.MIN_VALUE` 自动分配 `maxOrder+1` + 保存成功关闭编辑页且无成功提示”的同义证据；队列推进到下一项 `seq284(replace_rule/menu_group)`。
+- `2026-02-23`：完成 `P5-seq225`（`menu_disable_selection`）迁移闭环，已补齐“字典规则多选更多菜单禁用所选入口 + 仅对选中集合批量写入 `enabled=false` + 刷新后保持页面停留 + 全流程静默无成功提示”的同义证据；队列推进到下一项 `seq281(replace_edit/menu_save)`。
+- `2026-02-23`：完成 `P5-seq215`（`menu_add`）迁移闭环，已补齐“字典规则管理页顶栏一级新建入口 + 点击直达空白编辑页 + 全程不自动保存/不触发导入”的同义证据；队列推进到下一项 `seq221(dict_rule_edit/menu_save)`。
+- `2026-02-23`：完成 `P5-seq401`（`menu_export_selection`）迁移闭环，已补齐“TXT 目录规则多选承载入口 + 批量更多菜单导出所选 + 默认文件名 `exportTxtTocRule.json` + 取消导出静默返回 + 成功路径可复制”的同义证据；队列推进到下一项 `seq215(dict_rule/menu_add)`。
+- `2026-02-23`：完成 `P5-seq391`（`menu_import_default`）迁移闭环，已补齐“TXT 目录规则更多菜单导入默认规则入口 + 点击后直接导入默认资产 + 默认规则集合重置（删除 `id<0` 后回灌）+ 保留 `id>=0` 自定义规则 + 导入成功静默刷新无提示”的同义证据；队列推进到下一项 `seq395(txt_toc_rule_edit/menu_paste_rule)`。
+- `2026-02-23`：完成 `P5-seq390`（`menu_import_qr`）迁移闭环，已补齐“TXT 目录规则更多菜单二维码导入入口 + 扫码结果直达候选导入弹层 + 候选状态（新增/更新/已有）+ 默认勾选新增/更新 + 仅提交勾选项 + 二维码分支不写 `tocRuleUrl` 历史”的同义证据；队列推进到下一项 `seq391(txt_toc_rule/menu_import_default)`。
+- `2026-02-23`：完成 `P5-seq389`（`menu_import_onLine`）迁移闭环，已补齐“TXT 目录规则更多菜单网络导入入口 + URL 输入层 + `tocRuleUrl` 历史回填/删除 + 默认历史注入 `myTxtChapterRule.json` + 候选状态（新增/更新/已有）+ 默认勾选新增/更新 + 仅提交勾选项”的同义证据；队列推进到下一项 `seq390(txt_toc_rule/menu_import_qr)`。
+- `2026-02-22`：完成 `P5-seq299`（`menu_export_selection`）迁移闭环，已补齐“替换规则多选承载入口 + 批量更多菜单导出所选 + 默认文件名 `exportReplaceRule.json` + 取消导出静默返回 + 成功路径可复制”的同义证据；队列推进到下一项 `seq388(txt_toc_rule/menu_import_local)`。
+- `2026-02-22`：完成 `P5-seq290`（`menu_import_qr`）迁移闭环，已补齐“替换规则更多菜单二维码导入入口 + 扫码结果直达候选导入弹层 + 候选状态（新增/更新/已有）+ 默认仅勾选新增 + 仅提交勾选项 + 二维码分支不写 `replaceRuleRecordKey` 历史”的同义证据；队列推进到下一项 `seq299(replace_rule_sel/menu_export_selection)`。
+- `2026-02-22`：完成 `P5-seq289`（`menu_import_onLine`）迁移闭环，已补齐“替换规则更多菜单网络导入入口 + URL 输入层 + `replaceRuleRecordKey` 历史回填/删除 + 候选状态（新增/更新/已有）+ 默认仅勾选新增 + 仅提交勾选项 + 导入成功静默返回”的同义证据；队列推进到下一项 `seq290(replace_rule/menu_import_qr)`。
+- `2026-02-22`：完成 `P5-seq288`（`menu_import_local`）迁移闭环，已补齐“替换规则更多菜单本地导入入口文案收敛 + `txt/json` 选档 + 候选状态（新增/更新/已有）+ 默认仅勾选新增 + 仅提交勾选项 + 导入成功静默返回”的同义证据；队列推进到下一项 `seq289(replace_rule/menu_import_onLine)`。
+- `2026-02-22`：完成 `P5-seq283`（`menu_paste_rule`）迁移闭环，已补齐“替换规则编辑页顶栏更多入口 + 粘贴规则动作 + 空剪贴板/非法 JSON 固定错误口径 + 成功仅回填表单且不自动保存”的同义证据；队列推进到下一项 `seq288(replace_rule/menu_import_local)`。
+- `2026-02-22`：完成 `P5-seq226`（`menu_export_selection`）迁移闭环，已补齐“字典规则多选入口 + 批量更多菜单导出所选 + 默认文件名 `exportDictRule.json` + 取消导出静默返回 + 成功路径可复制”的同义证据；队列推进到下一项 `seq283(replace_edit/menu_paste_rule)`。
+- `2026-02-22`：完成 `P5-seq218`（`menu_import_qr`）迁移闭环，已补齐“字典规则更多菜单二维码导入入口 + 扫码结果直达候选导入弹层 + 候选状态（新增/已有）+ 默认仅勾选新增 + 仅提交勾选项 + 二维码分支不写 `dictRuleUrls` 历史”的同义证据；队列推进到下一项 `seq219(dict_rule/menu_import_default)`。
+- `2026-02-22`：完成 `P5-seq217`（`menu_import_onLine`）迁移闭环，已补齐“字典规则更多菜单网络导入入口 + URL 输入层 + `dictRuleUrls` 历史回填/删除 + 候选状态（新增/已有）+ 默认仅勾选新增 + 仅提交勾选项”的同义证据；队列推进到下一项 `seq218(dict_rule/menu_import_qr)`。
+- `2026-02-22`：完成 `P5-seq216`（`menu_import_local`）迁移闭环，已补齐“替换净化页字典规则入口 + 配置字典规则承载页 + 更多菜单本地导入入口 + `txt/json` 选档 + 候选状态（新增/已有）+ 默认仅勾选新增 + 按名称覆盖导入”的同义证据；队列推进到下一项 `seq217(dict_rule/menu_import_onLine)`。
+- `2026-02-22`：完成 `P4-seq371`（`menu_ok`）迁移闭环，已补齐“无表单登录专用网页登录页 + 顶栏一级‘确认’动作 + checking 提示‘正在打开首页，成功自动返回主界面’ + 确认后重载首页并自动返回 + WebView Cookie 自动回写到 CookieJar + 非 http(s) 外跳确认”的同义证据；`P4` 非 `detail_later` 主功能项已清零，队列推进到 `P5-seq216(dict_rule/menu_import_local)`。
+- `2026-02-22`：完成 `P4-seq362`（`menu_share_str`）迁移闭环，已补齐“更多菜单文案收敛为‘字符串分享’ + 点击后直接系统文本分享（无保存/无跳转）+ `subject` 固定‘分享’ + 成功无提示 + 分享异常静默吞并”的同义证据；队列推进到下一项 `seq364(source_login/menu_ok)`（`seq357/seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq361`（`menu_share_qr`）迁移闭环，已补齐“更多菜单文案收敛为‘二维码分享’ + 点击后直接二维码图片分享（无中间承载页）+ 分享标题固定‘分享书源’ + 二维码生成失败提示‘文字太多，生成二维码失败’ + 无文本分享 fallback”的同义证据；队列推进到下一项 `seq362(menu_share_str)`（`seq357/seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq358`（`menu_paste_source`）迁移闭环，已补齐“更多菜单入口文案收敛为‘粘贴源’ + 粘贴成功仅回填表单且不提示成功 + 不更新已保存快照与原始 URL 基线 + 粘贴后返回仍触发未保存确认”的同义证据；队列推进到下一项 `seq359(menu_set_source_variable)`（`seq357/seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq355`（`menu_clear_cookie`）迁移闭环，已补齐“书源编辑页更多菜单入口文案收敛为‘清除 Cookie’ + 点击后直接按当前 `bookSourceUrl` 清理 Cookie + 全流程静默无提示且不触发保存/跳转”的同义证据；队列推进到下一项 `seq356(menu_auto_complete)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq352`（`menu_debug_source`）迁移闭环，已补齐“编辑页顶栏入口文案收敛为‘调试源’ + 点击后先保存再进入调试页 + 保存失败停留编辑页且不进入调试页”的同义证据；队列推进到下一项 `seq355(menu_clear_cookie)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq351`（`menu_save`）迁移闭环，已补齐“编辑页保存失败提示直接透传错误摘要（无‘保存失败：’前缀）+ 必填校验文案收敛为‘名称和 URL 不能为空’ + 保存成功后关闭编辑页并回传 `sourceUrl` 且无成功提示”的同义证据；队列推进到下一项 `seq352(menu_debug_source)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq197`（`menu_edit_source`）迁移闭环，已补齐“换源候选条目长按编辑源入口 + 编辑承载页回跳 + 整书/单章换源按 legado 分流刷新（单源/全量）+ 取消返回保持列表”的同义证据；队列推进到下一项 `seq198(menu_disable_source)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq195`（`menu_top_source`）迁移闭环，已补齐“换源候选条目长按置顶入口 + `customOrder=minOrder-1` 写库 + 候选顺序即时前移 + 全流程静默无提示”的同义证据；队列推进到下一项 `seq196(menu_bottom_source)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq194`（`menu_close`）迁移闭环，已补齐“换源候选弹层关闭动作文案收敛为‘关闭’ + 点击仅关闭弹层无额外副作用”的同义证据；队列推进到下一项 `seq195(menu_top_source)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq193`（`menu_group`）迁移闭环，已补齐“换源候选弹层顶栏分组入口 + 动态分组选项（含全部书源）单选勾选态 + 全局键 `searchGroup` 持久化 + 切组后停止并重拉候选 + 分组空结果确认回退到全部书源”的同义证据；队列推进到下一项 `seq194(menu_close)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq191`（`menu_load_info`）迁移闭环，已补齐“换源候选弹层加载详情页 checkable 入口 + 同名键 `changeSourceLoadInfo` 持久化 + 开启后候选详情补水并回填最新章节 + 切换静默不自动刷新”的同义证据；队列推进到下一项 `seq193(menu_group)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq190`（`menu_load_word_count`）迁移闭环，已补齐“换源候选弹层加载字数 checkable 入口 + 同名键 `changeSourceLoadWordCount` 持久化 + 开启后候选字数/响应时间采集展示 + 按 legacy 字数优先规则排序”的同义证据；队列推进到下一项 `seq191(menu_load_info)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq185`（`menu_screen`）迁移闭环，已补齐“换源候选弹层顶栏筛选入口 + 筛选展开/收起标题区状态切换 + 输入实时过滤（书源名/最新章节）+ 收起后清空筛选词”的同义证据；队列推进到下一项 `seq186(menu_start_stop)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq161`（`menu_check_selected_interval`）迁移闭环，确认“多选区间补选”行为与 legado 同义：点击后按当前可见列表中已选项最小/最大索引补齐连续选区并更新计数，全程静默无提示；队列推进到下一项 `seq185(menu_screen)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq160`（`menu_check_source`）迁移闭环，已补齐“校验所选关键词弹窗同层校验设置入口 + 校验设置打开不关闭关键词弹窗 + 启动静默无‘已开始校验’提示 + 运行中重复触发统一提示 + 失效自动筛选提示文案收敛”的同义证据；队列推进到下一项 `seq161(menu_check_selected_interval)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq159`（`menu_share_source`）迁移闭环，已补齐“书源多选菜单分享选中源入口 + 导出集合规则复用 + 直接系统文件分享 + 全流程无扩展提示/无复制兜底”的同义证据；队列推进到下一项 `seq160(menu_check_source)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq157`（`menu_bottom_sel`）迁移闭环，已补齐“书源多选菜单置底所选入口 + 批量置底写库 + 全流程静默无提示”的同义证据；队列推进到下一项 `seq159(menu_share_source)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq156`（`menu_top_sel`）迁移闭环，已补齐“书源多选菜单置顶所选入口 + 批量置顶写库 + 全流程静默无提示”的同义证据；队列推进到下一项 `seq157(menu_bottom_sel)`（`seq367` 后置）。
+- `2026-02-22`：完成 `P4-seq155`（`menu_disable_explore`）迁移闭环，已补齐“书源多选菜单禁用发现入口 + 批量写入 `enabledExplore=false` + 不筛选已禁用项 + 全流程静默无提示”的同义证据；队列推进到下一项 `seq156(menu_top_sel)`（`seq367` 后置）。
 - `2026-02-22`：完成 `P4-seq154`（`menu_enable_explore`）迁移闭环，已补齐“书源多选菜单启用发现入口 + 批量写入 `enabledExplore=true` + 不筛选已启用项 + 全流程静默无提示”的同义证据；队列推进到下一项 `seq155(menu_disable_explore)`（`seq367` 后置）。
 - `2026-02-22`：完成 `P4-seq153`（`menu_remove_group`）迁移闭环，已补齐“书源多选菜单移除分组入口 + 输入弹窗标题收敛 + 按选中集合批量移除分组 + 全流程静默无提示”的同义证据；队列推进到下一项 `seq154(menu_enable_explore)`（`seq367` 后置）。
 - `2026-02-22`：完成 `P4-seq152`（`menu_add_group`）迁移闭环，已补齐“书源多选菜单添加分组入口 + 输入弹窗标题收敛 + 按选中集合批量追加分组 + 全流程静默无提示”的同义证据；队列推进到下一项 `seq153(menu_remove_group)`（`seq367` 后置）。

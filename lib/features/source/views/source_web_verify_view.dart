@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -75,8 +73,8 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
   }
 
   Future<void> _importCookies() async {
-    if (!Platform.isIOS) {
-      await _showMessage('仅 iOS 支持从 WebView 导入 Cookie');
+    if (!WebViewCookieBridge.isSupported) {
+      await _showMessage('当前平台不支持从 WebView 导入 Cookie');
       return;
     }
 

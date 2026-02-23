@@ -1,5 +1,7 @@
 /// 替换净化规则 - 字段对齐 Legado `ReplaceRule`
 class ReplaceRule {
+  static const int unsetOrder = -2147483648; // Int.MIN_VALUE
+
   final int id; // Long
   final String name;
   final String? group;
@@ -27,7 +29,7 @@ class ReplaceRule {
     this.isEnabled = true,
     this.isRegex = true,
     this.timeoutMillisecond = 3000,
-    this.order = -2147483648, // Int.MIN_VALUE
+    this.order = unsetOrder,
   });
 
   factory ReplaceRule.create() {
@@ -101,7 +103,7 @@ class ReplaceRule {
       isEnabled: parseBool(json['isEnabled'], true),
       isRegex: parseBool(json['isRegex'], true),
       timeoutMillisecond: parseInt(json['timeoutMillisecond'], 3000),
-      order: parseInt(json['order'], -2147483648),
+      order: parseInt(json['order'], unsetOrder),
     );
   }
 
@@ -123,4 +125,3 @@ class ReplaceRule {
     };
   }
 }
-

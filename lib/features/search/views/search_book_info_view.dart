@@ -31,6 +31,7 @@ import '../../reader/services/reader_bookmark_export_service.dart';
 import '../../reader/services/reader_charset_service.dart';
 import '../../reader/services/chapter_title_display_helper.dart';
 import '../../reader/services/reader_source_switch_helper.dart';
+import '../../reader/services/txt_toc_rule_store.dart';
 import '../../reader/views/simple_reader_view.dart';
 import '../../reader/widgets/source_switch_candidate_sheet.dart';
 import '../../replace/services/replace_rule_service.dart';
@@ -40,7 +41,7 @@ import '../../source/services/rule_parser_engine.dart';
 import '../../source/services/source_login_ui_helper.dart';
 import '../../source/services/source_login_url_resolver.dart';
 import '../../source/views/source_login_form_view.dart';
-import '../../source/views/source_web_verify_view.dart';
+import '../../source/views/source_login_webview_view.dart';
 import '../services/search_book_info_edit_helper.dart';
 import '../services/search_book_info_menu_helper.dart';
 import '../services/search_book_info_refresh_helper.dart';
@@ -113,6 +114,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   late final ReaderCharsetService _readerCharsetService;
   late final ReaderBookmarkExportService _bookmarkExportService;
   late final ChapterTitleDisplayHelper _chapterTitleDisplayHelper;
+  final TxtTocRuleStore _txtTocRuleStore = TxtTocRuleStore();
 
   late SearchResult _activeResult;
   BookSource? _source;
@@ -553,9 +555,27 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     return normalized;
   }
 
+  Future<List<TxtTocRuleOption>> _loadTxtTocRuleOptions() async {
+    final enabledRules = await _txtTocRuleStore.loadEnabledRules();
+    if (enabledRules.isEmpty) {
+      return TxtParser.defaultTocRuleOptions;
+    }
+    return enabledRules
+        .map(
+          (rule) => TxtTocRuleOption(
+            name: rule.name,
+            rule: rule.rule,
+            example: (rule.example ?? '').trim(),
+          ),
+        )
+        .toList(growable: false);
+  }
+
   Future<String?> _pickTxtTocRuleRegex({
     required String currentRegex,
-  }) {
+  }) async {
+    final options = await _loadTxtTocRuleOptions();
+    if (!mounted) return null;
     return showCupertinoModalPopup<String?>(
       context: context,
       builder: (sheetContext) {
@@ -570,7 +590,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                 normalizedCurrent.isEmpty ? '✓ 自动识别（默认）' : '自动识别（默认）',
               ),
             ),
-            for (final option in TxtParser.defaultTocRuleOptions)
+            for (final option in options)
               CupertinoActionSheetAction(
                 onPressed: () => Navigator.pop(sheetContext, option.rule),
                 child: Text(
@@ -1039,7 +1059,10 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceWebVerifyView(initialUrl: resolvedUrl),
+        builder: (_) => SourceLoginWebViewView(
+          source: source,
+          initialUrl: resolvedUrl,
+        ),
       ),
     );
   }
@@ -1656,11 +1679,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           onToggleSplitLongChapter: showSplitLongChapterAction
               ? _handleToggleSplitLongChapterFromToc
               : null,
-          onToggleUseReplace:
-              showUseReplaceAction ? _handleToggleUseReplaceFromToc : null,
-          onToggleLoadWordCount: showLoadWordCountAction
-              ? _handleToggleLoadWordCountFromToc
-              : null,
+          onToggleUseReplace: _handleToggleUseReplaceFromToc,
+          onToggleLoadWordCount: _handleToggleLoadWordCountFromToc,
           onExportBookmark:
               showExportBookmarkAction ? _handleExportBookmarkFromToc : null,
           onExportBookmarkMarkdown: showExportBookmarkAction

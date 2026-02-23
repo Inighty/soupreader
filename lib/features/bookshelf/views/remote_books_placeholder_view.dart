@@ -2,16 +2,31 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/services/webdav_service.dart';
 import '../../settings/views/app_help_dialog.dart';
 import '../../settings/views/app_log_dialog.dart';
+import '../models/remote_server.dart';
 import '../services/remote_books_service.dart';
-import 'remote_books_server_config_view.dart';
+import '../services/remote_server_store.dart';
+import 'remote_books_servers_view.dart';
 
 enum _RemoteBooksSortKey {
   defaultTime,
   name,
+}
+
+class _RemoteBooksServerContext {
+  const _RemoteBooksServerContext({
+    required this.settings,
+    required this.isDefaultServer,
+    required this.customRootUrl,
+  });
+
+  final AppSettings settings;
+  final bool isDefaultServer;
+  final String? customRootUrl;
 }
 
 /// 远程书籍入口承载页（对应 legado: menu_remote -> RemoteBookActivity）。
@@ -43,6 +58,7 @@ class _RemoteBooksPlaceholderViewState
     extends State<RemoteBooksPlaceholderView> {
   late final RemoteBooksService _remoteBooksService;
   late final SettingsService _settingsService;
+  late final RemoteServerStore _remoteServerStore;
   final List<RemoteBookEntry> _dirStack = <RemoteBookEntry>[];
   List<RemoteBookEntry> _entries = const <RemoteBookEntry>[];
   bool _loading = false;
@@ -50,17 +66,19 @@ class _RemoteBooksPlaceholderViewState
   DateTime? _lastRefreshAt;
   _RemoteBooksSortKey _sortKey = _RemoteBooksSortKey.defaultTime;
   bool _sortAscending = false;
+  bool _isDefaultServer = true;
 
   @override
   void initState() {
     super.initState();
     _remoteBooksService = widget.remoteBooksService ?? RemoteBooksService();
     _settingsService = widget.settingsService ?? SettingsService();
+    _remoteServerStore = RemoteServerStore();
     _refreshCurrentDirectory();
   }
 
   String _currentPathLabel() {
-    final buffer = StringBuffer('books/');
+    final buffer = StringBuffer(_isDefaultServer ? 'books/' : '/');
     for (final dir in _dirStack) {
       final name = dir.displayName.trim();
       if (name.isEmpty) continue;
@@ -70,9 +88,11 @@ class _RemoteBooksPlaceholderViewState
     return buffer.toString();
   }
 
-  String? _currentDirectoryUrl() {
-    if (_dirStack.isEmpty) return null;
-    return _dirStack.last.path;
+  String? _currentDirectoryUrl({
+    required String? customRootUrl,
+  }) {
+    if (_dirStack.isNotEmpty) return _dirStack.last.path;
+    return customRootUrl;
   }
 
   String _compactReason(String text, {int maxLength = 180}) {
@@ -184,16 +204,19 @@ class _RemoteBooksPlaceholderViewState
       _entries = const <RemoteBookEntry>[];
     });
     try {
-      final settings = _settingsService.appSettings;
+      final context = _resolveServerContext();
       final entries = await _remoteBooksService.listCurrentDirectory(
-        settings: settings,
-        currentDirectoryUrl: _currentDirectoryUrl(),
+        settings: context.settings,
+        currentDirectoryUrl: _currentDirectoryUrl(
+          customRootUrl: context.customRootUrl,
+        ),
       );
       if (!mounted) return;
       setState(() {
         _entries = _sortEntriesLikeLegado(entries);
         _errorMessage = null;
         _lastRefreshAt = DateTime.now();
+        _isDefaultServer = context.isDefaultServer;
       });
     } catch (error) {
       if (!mounted) return;
@@ -202,6 +225,8 @@ class _RemoteBooksPlaceholderViewState
           : _compactReason(error.toString());
       setState(() {
         _errorMessage = '获取webDav书籍出错\n$reason';
+        final context = _resolveServerContext();
+        _isDefaultServer = context.isDefaultServer;
       });
     } finally {
       if (!mounted) return;
@@ -271,15 +296,49 @@ class _RemoteBooksPlaceholderViewState
   }
 
   Future<void> _openServerConfig() async {
-    await Navigator.of(context).push<void>(
-      CupertinoPageRoute<void>(
-        builder: (_) => RemoteBooksServerConfigView(
-          settingsService: _settingsService,
+    await Navigator.of(context).push<bool>(
+      CupertinoPageRoute<bool>(
+        builder: (_) => RemoteBooksServersView(
+          serverStore: _remoteServerStore,
         ),
       ),
     );
     if (!mounted) return;
     await _refreshCurrentDirectory();
+  }
+
+  _RemoteBooksServerContext _resolveServerContext() {
+    final defaultSettings = _settingsService.appSettings;
+    final selectedServerId = _remoteServerStore.getSelectedServerId();
+    if (selectedServerId == RemoteServer.defaultServerId) {
+      return _RemoteBooksServerContext(
+        settings: defaultSettings,
+        isDefaultServer: true,
+        customRootUrl: null,
+      );
+    }
+
+    final selectedServer = _remoteServerStore.getServerById(selectedServerId);
+    if (selectedServer == null) {
+      return _RemoteBooksServerContext(
+        settings: defaultSettings,
+        isDefaultServer: true,
+        customRootUrl: null,
+      );
+    }
+
+    final customRootUrl = selectedServer.normalizedUrl;
+    final customSettings = defaultSettings.copyWith(
+      webDavUrl: customRootUrl,
+      webDavAccount: selectedServer.username,
+      webDavPassword: selectedServer.password,
+      webDavDir: '',
+    );
+    return _RemoteBooksServerContext(
+      settings: customSettings,
+      isDefaultServer: false,
+      customRootUrl: customRootUrl.isEmpty ? null : customRootUrl,
+    );
   }
 
   Future<void> _openHelp() async {

@@ -25,7 +25,12 @@ class SettingsService {
   static const String _keyBookUseReplaceRuleMap = 'book_use_replace_rule_map';
   static const String _keyTocUiUseReplace = 'toc_ui_use_replace';
   static const String _keyTocUiLoadWordCount = 'toc_ui_load_word_count';
+  static const String _keyChangeSourceCheckAuthor = 'changeSourceCheckAuthor';
+  static const String _keyChangeSourceLoadWordCount =
+      'changeSourceLoadWordCount';
+  static const String _keyChangeSourceLoadInfo = 'changeSourceLoadInfo';
   static const String _keyChangeSourceLoadToc = 'changeSourceLoadToc';
+  static const String _keyChangeSourceGroup = 'searchGroup';
   static const String _keyBatchChangeSourceDelay = 'batchChangeSourceDelay';
   static const String _keyBookPageAnimMap = 'book_page_anim_map';
   static const String _keyBookReSegmentMap = 'book_re_segment_map';
@@ -439,6 +444,47 @@ class SettingsService {
   bool getChangeSourceLoadToc({bool fallback = false}) {
     if (!_isInitialized) return fallback;
     return _prefs.getBool(_keyChangeSourceLoadToc) ?? fallback;
+  }
+
+  bool getChangeSourceLoadInfo({bool fallback = false}) {
+    if (!_isInitialized) return fallback;
+    return _prefs.getBool(_keyChangeSourceLoadInfo) ?? fallback;
+  }
+
+  bool getChangeSourceLoadWordCount({bool fallback = false}) {
+    if (!_isInitialized) return fallback;
+    return _prefs.getBool(_keyChangeSourceLoadWordCount) ?? fallback;
+  }
+
+  Future<void> saveChangeSourceLoadWordCount(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyChangeSourceLoadWordCount, enabled);
+  }
+
+  bool getChangeSourceCheckAuthor({bool fallback = false}) {
+    if (!_isInitialized) return fallback;
+    return _prefs.getBool(_keyChangeSourceCheckAuthor) ?? fallback;
+  }
+
+  String getChangeSourceGroup({String fallback = ''}) {
+    if (!_isInitialized) return fallback.trim();
+    final value = _prefs.getString(_keyChangeSourceGroup) ?? fallback;
+    return value.trim();
+  }
+
+  Future<void> saveChangeSourceCheckAuthor(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyChangeSourceCheckAuthor, enabled);
+  }
+
+  Future<void> saveChangeSourceGroup(String group) async {
+    if (!_isInitialized) return;
+    await _prefs.setString(_keyChangeSourceGroup, group.trim());
+  }
+
+  Future<void> saveChangeSourceLoadInfo(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyChangeSourceLoadInfo, enabled);
   }
 
   Future<void> saveChangeSourceLoadToc(bool enabled) async {

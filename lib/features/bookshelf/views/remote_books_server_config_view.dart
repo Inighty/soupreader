@@ -1,20 +1,19 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
-import '../../../core/models/app_settings.dart';
-import '../../../core/services/settings_service.dart';
-import '../../../core/services/webdav_service.dart';
+import '../models/remote_server.dart';
+import '../services/remote_server_store.dart';
 
-/// 远程书籍服务器配置页（对应 legado `menu_server_config` 入口）。
+/// 远程书籍服务器配置编辑页（对应 legado `ServerConfigDialog`）。
 class RemoteBooksServerConfigView extends StatefulWidget {
   const RemoteBooksServerConfigView({
     super.key,
-    this.settingsService,
-    this.webDavService,
+    this.serverStore,
+    this.initialServer,
   });
 
-  final SettingsService? settingsService;
-  final WebDavService? webDavService;
+  final RemoteServerStore? serverStore;
+  final RemoteServer? initialServer;
 
   @override
   State<RemoteBooksServerConfigView> createState() =>
@@ -23,26 +22,26 @@ class RemoteBooksServerConfigView extends StatefulWidget {
 
 class _RemoteBooksServerConfigViewState
     extends State<RemoteBooksServerConfigView> {
-  late final SettingsService _settingsService;
-  late final WebDavService _webDavService;
+  late final RemoteServerStore _serverStore;
+  late final int _serverId;
+
+  late String _nameDraft;
+  late String _urlDraft;
+  late String _usernameDraft;
+  late String _passwordDraft;
+
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _settingsService = widget.settingsService ?? SettingsService();
-    _webDavService = widget.webDavService ?? WebDavService();
-    _settingsService.appSettingsListenable.addListener(_onSettingsChanged);
-  }
-
-  @override
-  void dispose() {
-    _settingsService.appSettingsListenable.removeListener(_onSettingsChanged);
-    super.dispose();
-  }
-
-  void _onSettingsChanged() {
-    if (!mounted) return;
-    setState(() {});
+    _serverStore = widget.serverStore ?? RemoteServerStore();
+    final initial = widget.initialServer;
+    _serverId = initial?.id ?? DateTime.now().microsecondsSinceEpoch;
+    _nameDraft = initial?.name ?? '';
+    _urlDraft = initial?.url ?? '';
+    _usernameDraft = initial?.username ?? '';
+    _passwordDraft = initial?.password ?? '';
   }
 
   String _brief(String value, {String fallback = '未设置'}) {
@@ -58,11 +57,18 @@ class _RemoteBooksServerConfigViewState
     return '已设置（${text.length} 位）';
   }
 
-  Future<void> _editWebDavField({
+  String _compactReason(String value, {int maxLength = 180}) {
+    final normalized = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.isEmpty) return '未知错误';
+    if (normalized.length <= maxLength) return normalized;
+    return '${normalized.substring(0, maxLength)}...';
+  }
+
+  Future<void> _editField({
     required String title,
     required String placeholder,
     required String initialValue,
-    required Future<void> Function(String value) onSave,
+    required void Function(String value) onChanged,
     bool obscureText = false,
   }) async {
     final controller = TextEditingController(text: initialValue);
@@ -93,32 +99,38 @@ class _RemoteBooksServerConfigViewState
     );
     controller.dispose();
     if (result == null) return;
-    await onSave(result.trim());
-    if (!mounted) return;
-    _showMessage('已保存');
+    setState(() {
+      onChanged(result.trim());
+    });
   }
 
-  Future<void> _testWebDavConnection() async {
-    showCupertinoDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CupertinoActivityIndicator()),
-    );
-
-    var message = '连接成功，已准备 WebDav books 目录';
+  Future<void> _saveServerConfig() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+    });
     try {
-      await _webDavService
-          .ensureUploadDirectories(_settingsService.appSettings);
+      await _serverStore.upsertServer(
+        RemoteServer(
+          id: _serverId,
+          name: _nameDraft.trim(),
+          url: _urlDraft.trim(),
+          username: _usernameDraft.trim(),
+          password: _passwordDraft.trim(),
+        ),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
     } catch (error) {
-      message = error.toString();
+      if (!mounted) return;
+      _showMessage('保存出错\n${_compactReason(error.toString())}');
     } finally {
       if (mounted) {
-        Navigator.pop(context);
+        setState(() {
+          _saving = false;
+        });
       }
     }
-
-    if (!mounted) return;
-    _showMessage(message);
   }
 
   void _showMessage(String message) {
@@ -139,9 +151,14 @@ class _RemoteBooksServerConfigViewState
 
   @override
   Widget build(BuildContext context) {
-    final settings = _settingsService.appSettings;
     return AppCupertinoPageScaffold(
       title: '服务器配置',
+      trailing: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(28, 28),
+        onPressed: _saving ? null : _saveServerConfig,
+        child: _saving ? const CupertinoActivityIndicator() : const Text('保存'),
+      ),
       child: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
@@ -149,76 +166,57 @@ class _RemoteBooksServerConfigViewState
             header: const Text('WebDav'),
             children: [
               CupertinoListTile.notched(
-                title: const Text('服务器地址'),
-                additionalInfo: Text(
-                  _brief(
-                    settings.webDavUrl,
-                    fallback: AppSettings.defaultWebDavUrl,
-                  ),
-                ),
+                title: const Text('名称'),
+                additionalInfo: Text(_brief(_nameDraft)),
                 trailing: const CupertinoListTileChevron(),
-                onTap: () => _editWebDavField(
-                  title: '服务器地址',
-                  placeholder: 'https://dav.example.com/dav/',
-                  initialValue: settings.webDavUrl,
-                  onSave: (value) async {
-                    await _settingsService.saveAppSettings(
-                      settings.copyWith(webDavUrl: value),
-                    );
+                onTap: () => _editField(
+                  title: '名称',
+                  placeholder: '请输入名称',
+                  initialValue: _nameDraft,
+                  onChanged: (value) {
+                    _nameDraft = value;
+                  },
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('地址'),
+                additionalInfo: Text(_brief(_urlDraft)),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => _editField(
+                  title: '地址',
+                  placeholder: 'https://dav.example.com/books/',
+                  initialValue: _urlDraft,
+                  onChanged: (value) {
+                    _urlDraft = value;
                   },
                 ),
               ),
               CupertinoListTile.notched(
                 title: const Text('账号'),
-                additionalInfo: Text(_brief(settings.webDavAccount)),
+                additionalInfo: Text(_brief(_usernameDraft)),
                 trailing: const CupertinoListTileChevron(),
-                onTap: () => _editWebDavField(
-                  title: 'WebDav 账号',
+                onTap: () => _editField(
+                  title: '账号',
                   placeholder: '请输入账号',
-                  initialValue: settings.webDavAccount,
-                  onSave: (value) async {
-                    await _settingsService.saveAppSettings(
-                      settings.copyWith(webDavAccount: value),
-                    );
+                  initialValue: _usernameDraft,
+                  onChanged: (value) {
+                    _usernameDraft = value;
                   },
                 ),
               ),
               CupertinoListTile.notched(
                 title: const Text('密码'),
-                additionalInfo: Text(_maskSecret(settings.webDavPassword)),
+                additionalInfo: Text(_maskSecret(_passwordDraft)),
                 trailing: const CupertinoListTileChevron(),
-                onTap: () => _editWebDavField(
-                  title: 'WebDav 密码',
+                onTap: () => _editField(
+                  title: '密码',
                   placeholder: '请输入密码',
-                  initialValue: settings.webDavPassword,
+                  initialValue: _passwordDraft,
                   obscureText: true,
-                  onSave: (value) async {
-                    await _settingsService.saveAppSettings(
-                      settings.copyWith(webDavPassword: value),
-                    );
+                  onChanged: (value) {
+                    _passwordDraft = value;
                   },
                 ),
-              ),
-              CupertinoListTile.notched(
-                title: const Text('同步目录'),
-                additionalInfo: Text(_brief(settings.webDavDir, fallback: '/')),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _editWebDavField(
-                  title: '同步目录',
-                  placeholder: '可留空，例如 booksync',
-                  initialValue: settings.webDavDir,
-                  onSave: (value) async {
-                    await _settingsService.saveAppSettings(
-                      settings.copyWith(webDavDir: value),
-                    );
-                  },
-                ),
-              ),
-              CupertinoListTile.notched(
-                title: const Text('测试连接'),
-                additionalInfo: const Text('检查授权并准备 books 目录'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: _testWebDavConnection,
               ),
             ],
           ),

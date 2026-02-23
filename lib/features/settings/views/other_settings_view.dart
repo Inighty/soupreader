@@ -7,6 +7,8 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
+import '../services/direct_link_upload_config_service.dart';
+import 'direct_link_upload_config_view.dart';
 import 'developer_tools_view.dart';
 import 'settings_placeholders.dart';
 import 'settings_ui_tokens.dart';
@@ -21,13 +23,17 @@ class OtherSettingsView extends StatefulWidget {
 
 class _OtherSettingsViewState extends State<OtherSettingsView> {
   final SettingsService _settingsService = SettingsService();
+  final DirectLinkUploadConfigService _directLinkUploadConfigService =
+      DirectLinkUploadConfigService();
   late AppSettings _appSettings;
+  String _directLinkUploadSummary = '未设置';
 
   @override
   void initState() {
     super.initState();
     _appSettings = _settingsService.appSettings;
     _settingsService.appSettingsListenable.addListener(_onChanged);
+    unawaited(_loadDirectLinkUploadSummary());
   }
 
   @override
@@ -39,6 +45,25 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
   void _onChanged() {
     if (!mounted) return;
     setState(() => _appSettings = _settingsService.appSettings);
+  }
+
+  Future<void> _loadDirectLinkUploadSummary() async {
+    final rule = await _directLinkUploadConfigService.loadRule();
+    final summary = rule.summary.trim();
+    if (!mounted) return;
+    setState(() {
+      _directLinkUploadSummary = summary.isEmpty ? '未设置' : summary;
+    });
+  }
+
+  Future<void> _openDirectLinkUploadConfig() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (context) => const DirectLinkUploadConfigView(),
+      ),
+    );
+    if (!mounted) return;
+    await _loadDirectLinkUploadSummary();
   }
 
   Future<void> _pickBookshelfViewMode() async {
@@ -152,6 +177,12 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
           CupertinoListSection.insetGrouped(
             header: const Text('源设置'),
             children: [
+              CupertinoListTile.notched(
+                title: const Text('直链上传规则'),
+                additionalInfo: Text(_directLinkUploadSummary),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _openDirectLinkUploadConfig,
+              ),
               CupertinoListTile.notched(
                 title: const Text('服务器证书验证'),
                 additionalInfo: _plannedInfo(),

@@ -63,7 +63,7 @@ Future<void> _invokeClearCacheAction(WidgetTester tester) async {
   expect(clearCacheAction, findsOneWidget);
   final action = tester.widget<CupertinoActionSheetAction>(clearCacheAction);
   await tester.runAsync(() async {
-    action.onPressed?.call();
+    action.onPressed();
     await Future<void>.delayed(const Duration(milliseconds: 120));
   });
   await tester.pump();

@@ -5,10 +5,16 @@ import '../../source/services/rule_parser_engine.dart';
 class ReaderSourceSwitchCandidate {
   final BookSource source;
   final SearchResult book;
+  final String chapterWordCountText;
+  final int chapterWordCount;
+  final int respondTimeMs;
 
   const ReaderSourceSwitchCandidate({
     required this.source,
     required this.book,
+    this.chapterWordCountText = '',
+    this.chapterWordCount = -1,
+    this.respondTimeMs = -1,
   });
 }
 
@@ -73,6 +79,10 @@ class ReaderSourceSwitchHelper {
     required Book currentBook,
     required List<BookSource> enabledSources,
     required List<SearchResult> searchResults,
+    bool loadWordCountEnabled = false,
+    Map<String, String> chapterWordCountTextByKey = const <String, String>{},
+    Map<String, int> chapterWordCountByKey = const <String, int>{},
+    Map<String, int> respondTimeMsByKey = const <String, int>{},
   }) {
     final currentSource = normalizeForCompare(currentBook.sourceUrl ?? '');
     final title = normalizeForCompare(currentBook.title);
@@ -99,7 +109,17 @@ class ReaderSourceSwitchHelper {
       final dedupeKey = '$sourceKey|$bookUrl';
       if (bookUrl.isEmpty || !seenCandidateKeys.add(dedupeKey)) continue;
 
-      final candidate = ReaderSourceSwitchCandidate(source: source, book: item);
+      final chapterWordCountText =
+          chapterWordCountTextByKey[dedupeKey]?.trim() ?? '';
+      final chapterWordCount = chapterWordCountByKey[dedupeKey] ?? -1;
+      final respondTimeMs = respondTimeMsByKey[dedupeKey] ?? -1;
+      final candidate = ReaderSourceSwitchCandidate(
+        source: source,
+        book: item,
+        chapterWordCountText: chapterWordCountText,
+        chapterWordCount: chapterWordCount,
+        respondTimeMs: respondTimeMs,
+      );
       final itemAuthor = normalizeForCompare(item.author);
       final authorMatched =
           author.isNotEmpty && itemAuthor.isNotEmpty && author == itemAuthor;
@@ -111,7 +131,40 @@ class ReaderSourceSwitchHelper {
       }
     }
 
-    return <ReaderSourceSwitchCandidate>[...exact, ...fallback];
+    final merged = <ReaderSourceSwitchCandidate>[...exact, ...fallback];
+    if (!loadWordCountEnabled || merged.length <= 1) {
+      return merged;
+    }
+    final indexed = merged.asMap().entries.toList(growable: false);
+    indexed.sort((a, b) {
+      final left = a.value;
+      final right = b.value;
+      final leftWordCountLoaded = left.chapterWordCount > 1000;
+      final rightWordCountLoaded = right.chapterWordCount > 1000;
+      if (leftWordCountLoaded != rightWordCountLoaded) {
+        return rightWordCountLoaded ? 1 : -1;
+      }
+      final leftChapterNum = _extractChapterIndexFromWordCountText(
+        left.chapterWordCountText,
+      );
+      final rightChapterNum = _extractChapterIndexFromWordCountText(
+        right.chapterWordCountText,
+      );
+      final chapterNumCompare = rightChapterNum.compareTo(leftChapterNum);
+      if (chapterNumCompare != 0) return chapterNumCompare;
+      final wordCountCompare = right.chapterWordCount.compareTo(
+        left.chapterWordCount,
+      );
+      if (wordCountCompare != 0) return wordCountCompare;
+      return a.key.compareTo(b.key);
+    });
+    return indexed.map((entry) => entry.value).toList(growable: false);
+  }
+
+  static int _extractChapterIndexFromWordCountText(String text) {
+    final match = RegExp(r'^\[(\d+)\]').firstMatch(text.trim());
+    if (match == null) return -1;
+    return int.tryParse(match.group(1) ?? '') ?? -1;
   }
 
   static List<ReaderSourceSwitchCandidate> filterCandidates({
@@ -134,6 +187,29 @@ class ReaderSourceSwitchHelper {
     return candidates.where((candidate) {
       return containsKeyword(candidate.source.bookSourceName) ||
           containsKeyword(candidate.book.lastChapter);
+    }).toList(growable: false);
+  }
+
+  static List<ReaderSourceSwitchCandidate> filterCandidatesByAuthor({
+    required List<ReaderSourceSwitchCandidate> candidates,
+    required String authorKeyword,
+    required bool checkAuthorEnabled,
+  }) {
+    if (!checkAuthorEnabled) {
+      return List<ReaderSourceSwitchCandidate>.from(
+        candidates,
+        growable: false,
+      );
+    }
+    final keyword = authorKeyword.trim();
+    if (keyword.isEmpty) {
+      return List<ReaderSourceSwitchCandidate>.from(
+        candidates,
+        growable: false,
+      );
+    }
+    return candidates.where((candidate) {
+      return candidate.book.author.contains(keyword);
     }).toList(growable: false);
   }
 

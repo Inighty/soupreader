@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -12,6 +13,7 @@ import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
+import '../../import/book_import_file_name_rule_service.dart';
 import '../../import/import_service.dart';
 import '../../reader/views/simple_reader_view.dart';
 import '../../search/views/search_book_info_view.dart';
@@ -52,6 +54,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   late final SourceRepository _sourceRepo;
   late final BookAddService _bookAddService;
   late final ImportService _importService;
+  late final BookImportFileNameRuleService _bookImportFileNameRuleService;
   late final SettingsService _settingsService;
   late final BookshelfImportExportService _bookshelfIo;
   late final BookshelfBooklistImportService _booklistImporter;
@@ -59,6 +62,8 @@ class _BookshelfViewState extends State<BookshelfView> {
   StreamSubscription<List<Book>>? _booksSubscription;
   List<Book> _books = [];
   bool _isImporting = false;
+  bool _isSelectingImportFolder = false;
+  bool _isScanningImportFolder = false;
   bool _isAddingByUrl = false;
   bool _cancelAddByUrlRequested = false;
   bool _isUpdatingCatalog = false;
@@ -75,6 +80,7 @@ class _BookshelfViewState extends State<BookshelfView> {
       _sourceRepo = SourceRepository(db);
       _bookAddService = BookAddService(database: db);
       _importService = ImportService();
+      _bookImportFileNameRuleService = BookImportFileNameRuleService();
       _settingsService = SettingsService();
       _bookshelfIo = BookshelfImportExportService();
       _booklistImporter = BookshelfBooklistImportService();
@@ -203,7 +209,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   Future<void> _importLocalBook() async {
-    if (_isImporting) return;
+    if (_isImporting || _isScanningImportFolder) return;
 
     setState(() => _isImporting = true);
 
@@ -226,6 +232,344 @@ class _BookshelfViewState extends State<BookshelfView> {
         setState(() => _isImporting = false);
       }
     }
+  }
+
+  Future<void> _selectImportFolder() async {
+    if (_isImporting || _isSelectingImportFolder || _isScanningImportFolder) {
+      return;
+    }
+
+    setState(() => _isSelectingImportFolder = true);
+
+    try {
+      final result = await _importService.selectImportDirectory();
+      if (!mounted) return;
+      if (result.success && result.directoryPath != null) {
+        _showMessage('已选择文件夹：${result.directoryPath}');
+        return;
+      }
+      if (!result.cancelled && result.errorMessage != null) {
+        _showMessage('选择文件夹失败：${result.errorMessage}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSelectingImportFolder = false);
+      }
+    }
+  }
+
+  Future<void> _scanImportFolder() async {
+    if (_isImporting || _isSelectingImportFolder || _isScanningImportFolder) {
+      return;
+    }
+    setState(() => _isScanningImportFolder = true);
+
+    try {
+      final scanResult = await _importService.scanImportDirectory();
+      if (!mounted) return;
+      if (!scanResult.success) {
+        if (scanResult.errorMessage != null &&
+            scanResult.errorMessage!.isNotEmpty) {
+          _showMessage('智能扫描失败：${scanResult.errorMessage}');
+        }
+        return;
+      }
+
+      if (scanResult.candidates.isEmpty) {
+        _showMessage('当前文件夹未扫描到可导入的 TXT/EPUB 文件');
+        return;
+      }
+
+      final selectedFilePaths =
+          await _showScanImportSelectionDialog(scanResult: scanResult);
+      if (!mounted || selectedFilePaths == null || selectedFilePaths.isEmpty) {
+        return;
+      }
+
+      setState(() => _isImporting = true);
+      final summary =
+          await _importService.importLocalBooksByPaths(selectedFilePaths);
+      if (!mounted) return;
+      setState(() => _isImporting = false);
+
+      _loadBooks();
+      _showMessage(_buildScanImportSummaryMessage(summary));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isScanningImportFolder = false;
+          _isImporting = false;
+        });
+      }
+    }
+  }
+
+  Future<List<String>?> _showScanImportSelectionDialog({
+    required ImportScanResult scanResult,
+  }) async {
+    final candidates = List<ImportScanCandidate>.from(scanResult.candidates);
+    final selectedPaths =
+        candidates.map((candidate) => candidate.filePath).toSet();
+    var deletingSelection = false;
+
+    return showCupertinoDialog<List<String>>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final rootPath = scanResult.rootDirectoryPath;
+            final isAllSelected = candidates.isNotEmpty &&
+                selectedPaths.length == candidates.length;
+            return CupertinoAlertDialog(
+              title: const Text('智能扫描'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    Text('已扫描到 ${candidates.length} 个可导入文件'),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: math
+                          .min(320, math.max(180, candidates.length * 56))
+                          .toDouble(),
+                      child: ListView.builder(
+                        itemCount: candidates.length,
+                        itemBuilder: (context, index) {
+                          final candidate = candidates[index];
+                          final isSelected =
+                              selectedPaths.contains(candidate.filePath);
+                          final relativePath =
+                              _formatScanCandidatePath(candidate, rootPath);
+                          return CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            onPressed: () {
+                              setDialogState(() {
+                                if (isSelected) {
+                                  selectedPaths.remove(candidate.filePath);
+                                } else {
+                                  selectedPaths.add(candidate.filePath);
+                                }
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          candidate.fileName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: isSelected
+                                                ? CupertinoColors.activeBlue
+                                                : CupertinoColors.label
+                                                    .resolveFrom(context),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          relativePath,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: CupertinoColors.systemGrey
+                                                .resolveFrom(context),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    isSelected
+                                        ? CupertinoIcons
+                                            .check_mark_circled_solid
+                                        : CupertinoIcons.circle,
+                                    size: 18,
+                                    color: isSelected
+                                        ? CupertinoColors.activeBlue
+                                        : CupertinoColors.systemGrey,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                CupertinoDialogAction(
+                  onPressed: deletingSelection
+                      ? null
+                      : () => Navigator.pop(dialogContext),
+                  child: const Text('取消'),
+                ),
+                CupertinoDialogAction(
+                  onPressed: deletingSelection || candidates.isEmpty
+                      ? null
+                      : () {
+                          setDialogState(() {
+                            if (isAllSelected) {
+                              selectedPaths.clear();
+                              return;
+                            }
+                            selectedPaths
+                              ..clear()
+                              ..addAll(
+                                candidates
+                                    .map((candidate) => candidate.filePath)
+                                    .toList(growable: false),
+                              );
+                          });
+                        },
+                  child: Text(
+                    isAllSelected ? '取消全选' : '全选',
+                  ),
+                ),
+                CupertinoDialogAction(
+                  isDestructiveAction: true,
+                  onPressed: deletingSelection || selectedPaths.isEmpty
+                      ? null
+                      : () async {
+                          final deletingPaths =
+                              selectedPaths.toList(growable: false);
+                          setDialogState(() => deletingSelection = true);
+                          await _importService
+                              .deleteLocalBooksByPaths(deletingPaths);
+                          if (!context.mounted) return;
+                          setDialogState(() {
+                            final deletingSet = deletingPaths.toSet();
+                            candidates.removeWhere(
+                              (candidate) =>
+                                  deletingSet.contains(candidate.filePath),
+                            );
+                            selectedPaths.removeWhere(deletingSet.contains);
+                            deletingSelection = false;
+                          });
+                        },
+                  child: Text(
+                    deletingSelection ? '删除中...' : '删除',
+                  ),
+                ),
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  onPressed: selectedPaths.isEmpty || deletingSelection
+                      ? null
+                      : () {
+                          Navigator.pop(
+                            dialogContext,
+                            selectedPaths.toList(growable: false),
+                          );
+                        },
+                  child: const Text('导入'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatScanCandidatePath(
+    ImportScanCandidate candidate,
+    String? rootPath,
+  ) {
+    final normalizedRoot = (rootPath ?? '').trim();
+    if (normalizedRoot.isEmpty) {
+      return candidate.filePath;
+    }
+    final normalizedCandidate = p.normalize(candidate.filePath);
+    if (normalizedCandidate == normalizedRoot) {
+      return candidate.fileName;
+    }
+    if (!p.isWithin(normalizedRoot, normalizedCandidate)) {
+      return normalizedCandidate;
+    }
+    final relative = p.relative(
+      normalizedCandidate,
+      from: normalizedRoot,
+    );
+    return relative.isEmpty ? candidate.fileName : relative;
+  }
+
+  String _buildScanImportSummaryMessage(BatchImportResult summary) {
+    if (summary.totalCount <= 0) {
+      return '未选择可导入文件';
+    }
+
+    final lines = <String>[
+      '智能扫描导入完成：成功 ${summary.successCount} 项，失败 ${summary.failedCount} 项',
+    ];
+    if (summary.failures.isNotEmpty) {
+      lines.add('');
+      lines.add('失败详情（最多 5 条）：');
+      for (final failure in summary.failures.take(5)) {
+        lines.add('${p.basename(failure.filePath)}：${failure.errorMessage}');
+      }
+    }
+    return lines.join('\n');
+  }
+
+  Future<void> _showImportFileNameRuleDialog() async {
+    final controller = TextEditingController(
+      text: _bookImportFileNameRuleService.getRule(),
+    );
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return CupertinoAlertDialog(
+          title: const Text('导入文件名'),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '使用js处理文件名变量src，将书名作者分别赋值到变量name author',
+                  textAlign: TextAlign.left,
+                ),
+                const SizedBox(height: 10),
+                CupertinoTextField(
+                  controller: controller,
+                  placeholder: 'js',
+                  maxLines: 5,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('取消'),
+            ),
+            CupertinoDialogAction(
+              isDefaultAction: true,
+              onPressed: () async {
+                final rule = controller.text;
+                Navigator.pop(dialogContext);
+                await _bookImportFileNameRuleService.saveRule(rule);
+              },
+              child: const Text('确定'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
   }
 
   Future<void> _openGlobalSearch() async {
@@ -921,6 +1265,29 @@ class _BookshelfViewState extends State<BookshelfView> {
             onPressed: () {
               Navigator.pop(context);
               _importLocalBook();
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: Text(
+              _isSelectingImportFolder ? '选择文件夹（进行中）' : '选择文件夹',
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              _selectImportFolder();
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('智能扫描'),
+            onPressed: () {
+              Navigator.pop(context);
+              _scanImportFolder();
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('导入文件名'),
+            onPressed: () {
+              Navigator.pop(context);
+              _showImportFileNameRuleDialog();
             },
           ),
           CupertinoActionSheetAction(

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:soupreader/core/database/database_service.dart';
@@ -163,6 +164,7 @@ class _FakeRuleParserEngine extends RuleParserEngine {
     BookSource source,
     String bookUrl, {
     bool clearRuntimeVariables = true,
+    CancelToken? cancelToken,
   }) async {
     return bookInfo;
   }
@@ -172,6 +174,7 @@ class _FakeRuleParserEngine extends RuleParserEngine {
     BookSource source,
     String tocUrl, {
     bool clearRuntimeVariables = true,
+    CancelToken? cancelToken,
   }) async {
     tocRequestUrls.add(tocUrl);
     return tocByUrl[tocUrl.trim()] ?? const <TocItem>[];

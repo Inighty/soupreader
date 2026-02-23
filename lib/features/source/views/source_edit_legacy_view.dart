@@ -1,8 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,8 +36,7 @@ import '../services/source_rule_complete.dart';
 import 'keyboard_assists_config_sheet.dart';
 import 'source_debug_legacy_view.dart';
 import 'source_login_form_view.dart';
-import 'source_qr_share_view.dart';
-import 'source_web_verify_view.dart';
+import 'source_login_webview_view.dart';
 
 class SourceEditLegacyView extends StatefulWidget {
   final String? originalUrl;
@@ -349,7 +355,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
               padding: EdgeInsets.zero,
               minimumSize: const Size(30, 30),
               onPressed: _saveAndOpenDebug,
-              child: const Text('调试'),
+              child: const Text('调试源'),
             ),
             CupertinoButton(
               padding: EdgeInsets.zero,
@@ -741,13 +747,12 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
               Navigator.pop(popupContext);
               _clearCookie();
             },
-            child: const Text('清 Cookie'),
+            child: const Text('清除 Cookie'),
           ),
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(popupContext);
               setState(() => _autoComplete = !_autoComplete);
-              _showMessage('自动补全已${_autoComplete ? '开启' : '关闭'}');
             },
             child: Text('自动补全 ${_autoComplete ? '✓' : ''}'),
           ),
@@ -763,7 +768,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
               Navigator.pop(popupContext);
               _pasteSourceJson();
             },
-            child: const Text('粘贴书源'),
+            child: const Text('粘贴源'),
           ),
           CupertinoActionSheetAction(
             onPressed: () {
@@ -782,16 +787,16 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(popupContext);
-              _shareSourceJsonQrFallback();
+              _shareSourceJsonQr();
             },
-            child: const Text('分享二维码'),
+            child: const Text('二维码分享'),
           ),
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(popupContext);
               _shareSourceJsonText();
             },
-            child: const Text('分享文本'),
+            child: const Text('字符串分享'),
           ),
           CupertinoActionSheetAction(
             onPressed: () {
@@ -1159,32 +1164,102 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   Future<void> _shareSourceJsonText() async {
     final source = _buildSourceFromFields();
     final text = LegadoJson.encode(source.toJson());
-    await SharePlus.instance.share(
-      ShareParams(
-        text: text,
-        subject: source.bookSourceName.trim().isEmpty
-            ? 'SoupReader 书源'
-            : source.bookSourceName.trim(),
-      ),
-    );
-    if (!mounted) return;
-    _showMessage('已打开系统分享');
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: text,
+          subject: '分享',
+        ),
+      );
+    } catch (_) {
+      // 对齐 legado Context.share(text)：分享异常静默，不追加成功/失败提示。
+    }
   }
 
-  Future<void> _shareSourceJsonQrFallback() async {
+  Future<void> _shareSourceJsonQr() async {
     final source = _buildSourceFromFields();
     final text = LegadoJson.encode(source.toJson());
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      CupertinoPageRoute<void>(
-        builder: (_) => SourceQrShareView(
-          text: text,
-          subject: source.bookSourceName.trim().isEmpty
-              ? '书源二维码'
-              : source.bookSourceName.trim(),
+    final qrFile = await _buildShareQrPngFile(text);
+    if (qrFile == null) {
+      if (!mounted) return;
+      _showMessage('文字太多，生成二维码失败');
+      return;
+    }
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          files: <XFile>[
+            XFile(qrFile.path, mimeType: 'image/png'),
+          ],
+          subject: '分享书源',
+          text: '分享书源',
         ),
-      ),
-    );
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage(_resolveShareErrorMessage(error));
+    }
+  }
+
+  Future<File?> _buildShareQrPngFile(String payload) async {
+    if (kIsWeb) return null;
+    try {
+      final painter = QrPainter(
+        data: payload,
+        version: QrVersions.auto,
+        errorCorrectionLevel: QrErrorCorrectLevel.L,
+        eyeStyle: const QrEyeStyle(
+          eyeShape: QrEyeShape.square,
+          color: CupertinoColors.black,
+        ),
+        dataModuleStyle: const QrDataModuleStyle(
+          dataModuleShape: QrDataModuleShape.square,
+          color: CupertinoColors.black,
+        ),
+      );
+      final imageData = await painter.toImageData(
+        1024,
+        format: ui.ImageByteFormat.png,
+      );
+      final Uint8List? bytes = imageData?.buffer.asUint8List();
+      if (bytes == null || bytes.isEmpty) {
+        return null;
+      }
+      final dir = await getTemporaryDirectory();
+      final file = File(
+        p.join(
+          dir.path,
+          'source_qr_share_${DateTime.now().millisecondsSinceEpoch}.png',
+        ),
+      );
+      await file.writeAsBytes(bytes, flush: true);
+      return file;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _resolveShareErrorMessage(Object error) {
+    final raw = error.toString().trim();
+    if (raw.isEmpty) return 'ERROR';
+
+    const exceptionPrefix = 'Exception:';
+    if (raw.startsWith(exceptionPrefix)) {
+      final message = raw.substring(exceptionPrefix.length).trim();
+      return message.isEmpty ? 'ERROR' : message;
+    }
+
+    const platformPrefix = 'PlatformException(';
+    if (raw.startsWith(platformPrefix) && raw.endsWith(')')) {
+      final body = raw.substring(platformPrefix.length, raw.length - 1);
+      final segments = body.split(',');
+      if (segments.length >= 2) {
+        final message = segments[1].trim();
+        if (message.isNotEmpty) return message;
+      }
+    }
+
+    return raw;
   }
 
   Future<void> _pasteSourceJson() async {
@@ -1197,19 +1272,27 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
 
     final result = await _importExportService.importFromText(text);
     if (!result.success || result.sources.isEmpty) {
-      _showMessage(result.errorMessage ?? '粘贴失败：未识别到有效书源');
+      _showMessage(_resolvePasteSourceError(result.errorMessage));
       return;
     }
 
     final source = result.sources.first;
     _loadSourceToFields(source);
-    _savedSource = source;
-    _currentOriginalUrl = source.bookSourceUrl.trim().isEmpty
-        ? null
-        : source.bookSourceUrl.trim();
-    _savedSnapshot = _snapshotFor(source);
-    if (!mounted) return;
-    _showMessage('已粘贴并载入书源');
+  }
+
+  String _resolvePasteSourceError(String? rawMessage) {
+    final message = (rawMessage ?? '').trim();
+    if (message.isEmpty) {
+      return '格式不对';
+    }
+    if (message == '无效链接' ||
+        message.contains('格式错误') ||
+        message.contains('JSON') ||
+        message.contains('sourceUrls') ||
+        message.contains('未识别到有效书源')) {
+      return '格式不对';
+    }
+    return message;
   }
 
   Future<void> _importFromQrCode() async {
@@ -1274,7 +1357,10 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
 
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceWebVerifyView(initialUrl: resolvedUrl),
+        builder: (_) => SourceLoginWebViewView(
+          source: saved,
+          initialUrl: resolvedUrl,
+        ),
       ),
     );
   }
@@ -1303,11 +1389,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     final saved = await _saveInternal(showSuccessMessage: false);
     if (saved == null) return;
 
-    final sourceKey = saved.bookSourceUrl.trim();
-    if (sourceKey.isEmpty) {
-      _showMessage('请先填写 bookSourceUrl');
-      return;
-    }
+    final sourceKey = saved.bookSourceUrl;
 
     final note = _displayVariableComment(saved);
     final current = await SourceVariableStore.getVariable(sourceKey) ?? '';
@@ -1354,58 +1436,18 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     if (result == null) return;
 
     await SourceVariableStore.putVariable(sourceKey, result);
-    if (!mounted) return;
-    _showMessage('源变量已保存');
   }
 
   Future<void> _clearCookie() async {
     final url = _bookSourceUrlCtrl.text.trim();
-    if (url.isEmpty) {
-      _showMessage('请先填写 bookSourceUrl');
-      return;
-    }
-
-    final allCandidates = <Uri>[];
-    final seen = <String>{};
-    void addAll(Iterable<Uri> uris) {
-      for (final uri in uris) {
-        final key = uri.toString();
-        if (seen.add(key)) {
-          allCandidates.add(uri);
-        }
+    final candidates = SourceCookieScopeResolver.resolveDomainCandidates(url);
+    for (final uri in candidates) {
+      try {
+        await CookieStore.jar.delete(uri, true);
+      } catch (_) {
+        // 对齐 legado：clearCookie 分支静默执行，不追加成功/失败提示。
       }
     }
-
-    addAll(SourceCookieScopeResolver.resolveClearCandidates(url));
-    if (allCandidates.isEmpty) {
-      _showMessage('bookSourceUrl 不是有效 URL');
-      return;
-    }
-
-    var cleared = 0;
-    Object? lastError;
-    try {
-      for (final uri in allCandidates) {
-        try {
-          await CookieStore.jar.delete(uri, true);
-          cleared += 1;
-        } catch (e) {
-          lastError = e;
-        }
-      }
-    } catch (e) {
-      lastError = e;
-    }
-
-    if (cleared > 0) {
-      _showMessage('已清理该书源 Cookie');
-      return;
-    }
-    if (lastError != null) {
-      _showMessage('清理 Cookie 失败：$lastError');
-      return;
-    }
-    _showMessage('未找到可清理的 Cookie');
   }
 
   Future<void> _save() async {
@@ -1430,10 +1472,25 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
       return saved;
     } catch (e) {
       if (mounted) {
-        _showMessage('保存失败：$e');
+        _showMessage(_legacyErrorMessage(e));
       }
       return null;
     }
+  }
+
+  String _legacyErrorMessage(Object error) {
+    if (error is FormatException) {
+      final message = error.message.toString().trim();
+      if (message.isNotEmpty) return message;
+    }
+    final raw = error.toString().trim();
+    const prefix = 'FormatException:';
+    if (raw.startsWith(prefix)) {
+      final message = raw.substring(prefix.length).trim();
+      if (message.isNotEmpty) return message;
+    }
+    if (raw.isNotEmpty) return raw;
+    return 'Error';
   }
 
   Future<bool> _confirmExitIfDirty() async {

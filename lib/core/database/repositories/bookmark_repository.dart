@@ -105,6 +105,24 @@ class BookmarkRepository {
     return list;
   }
 
+  /// legado `BookmarkDao.all` 同义排序：
+  /// bookName, bookAuthor, chapterIndex, chapterPos（均升序）
+  List<BookmarkEntity> getAllBookmarksByLegacyOrder() {
+    final list = _cacheById.values.toList(growable: false);
+    list.sort((a, b) {
+      final byName = a.bookName.compareTo(b.bookName);
+      if (byName != 0) return byName;
+      final byAuthor = a.bookAuthor.compareTo(b.bookAuthor);
+      if (byAuthor != 0) return byAuthor;
+      final byChapter = a.chapterIndex.compareTo(b.chapterIndex);
+      if (byChapter != 0) return byChapter;
+      final byPos = a.chapterPos.compareTo(b.chapterPos);
+      if (byPos != 0) return byPos;
+      return a.createdTime.compareTo(b.createdTime);
+    });
+    return list;
+  }
+
   bool hasBookmark(String bookId, int chapterIndex, {int? chapterPos}) {
     return _cacheById.values.any((b) =>
         b.bookId == bookId &&
@@ -112,7 +130,8 @@ class BookmarkRepository {
         (chapterPos == null || b.chapterPos == chapterPos));
   }
 
-  BookmarkEntity? getBookmarkAt(String bookId, int chapterIndex, int chapterPos) {
+  BookmarkEntity? getBookmarkAt(
+      String bookId, int chapterIndex, int chapterPos) {
     for (final item in _cacheById.values) {
       if (item.bookId == bookId &&
           item.chapterIndex == chapterIndex &&

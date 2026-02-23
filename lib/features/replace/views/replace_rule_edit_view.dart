@@ -1,12 +1,22 @@
+import 'dart:convert';
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../models/replace_rule.dart';
 import '../services/replace_rule_engine.dart';
 
+enum _ReplaceRuleEditMenuAction {
+  pasteRule,
+}
+
+typedef ReplaceRuleSaveCallback = Future<void> Function(ReplaceRule rule);
+
 class ReplaceRuleEditView extends StatefulWidget {
   final ReplaceRule initial;
-  final ValueChanged<ReplaceRule> onSave;
+  final ReplaceRuleSaveCallback onSave;
 
   const ReplaceRuleEditView({
     super.key,
@@ -19,6 +29,8 @@ class ReplaceRuleEditView extends StatefulWidget {
 }
 
 class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
+  static const String _replaceRuleInvalidMessage = '替换规则为空或者不满足正则表达式要求';
+
   final ReplaceRuleEngine _engine = ReplaceRuleEngine();
 
   late ReplaceRule _rule;
@@ -34,6 +46,7 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
 
   final TextEditingController _testInputCtrl = TextEditingController();
   String _testOutput = '';
+  bool _saving = false;
 
   @override
   void initState() {
@@ -84,10 +97,67 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
     });
   }
 
-  void _save() {
-    _syncRuleFromFields();
-    widget.onSave(_rule);
-    Navigator.pop(context);
+  ReplaceRule _buildRuleForSave() {
+    final timeoutText = _timeoutCtrl.text.trim();
+    final timeoutMillisecond =
+        timeoutText.isEmpty ? 3000 : int.parse(timeoutText);
+    final orderText = _orderCtrl.text.trim();
+    final order = orderText.isEmpty ? _rule.order : int.parse(orderText);
+    return _rule.copyWith(
+      name: _nameCtrl.text,
+      group: _groupCtrl.text.trim().isEmpty ? null : _groupCtrl.text.trim(),
+      pattern: _patternCtrl.text,
+      replacement: _replacementCtrl.text,
+      scope: _scopeCtrl.text.trim().isEmpty ? null : _scopeCtrl.text.trim(),
+      excludeScope: _excludeScopeCtrl.text.trim().isEmpty
+          ? null
+          : _excludeScopeCtrl.text.trim(),
+      timeoutMillisecond: timeoutMillisecond,
+      order: order,
+    );
+  }
+
+  String _resolveSaveError(Object error) {
+    if (error is FormatException) {
+      final message = error.message.toString().trim();
+      if (message.isEmpty) return 'ERROR';
+      return message;
+    }
+    final raw = '$error'.trim();
+    if (raw.isEmpty) return 'ERROR';
+    return raw.replaceFirst(RegExp(r'^(Exception|Error):\s*'), '');
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    ReplaceRule draftRule;
+    try {
+      draftRule = _buildRuleForSave();
+    } catch (error, stackTrace) {
+      debugPrint('SaveReplaceRuleError:$error\n$stackTrace');
+      await _showMessage('save error, ${_resolveSaveError(error)}');
+      return;
+    }
+    if (!_engine.isValid(draftRule)) {
+      debugPrint('SaveReplaceRuleError:$_replaceRuleInvalidMessage');
+      await _showMessage('save error, $_replaceRuleInvalidMessage');
+      return;
+    }
+    setState(() {
+      _rule = draftRule;
+      _saving = true;
+    });
+    try {
+      await widget.onSave(draftRule);
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (error, stackTrace) {
+      debugPrint('SaveReplaceRuleError:$error\n$stackTrace');
+      await _showMessage('save error, ${_resolveSaveError(error)}');
+    } finally {
+      if (!mounted) return;
+      setState(() => _saving = false);
+    }
   }
 
   Future<void> _runTest() async {
@@ -98,16 +168,116 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
     setState(() => _testOutput = out);
   }
 
+  Future<void> _showMoreMenu() async {
+    if (_saving) return;
+    final selected = await showCupertinoModalPopup<_ReplaceRuleEditMenuAction>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('编辑规则'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(
+              sheetContext,
+              _ReplaceRuleEditMenuAction.pasteRule,
+            ),
+            child: const Text('粘贴规则'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (selected == null) return;
+    switch (selected) {
+      case _ReplaceRuleEditMenuAction.pasteRule:
+        await _pasteRuleFromClipboard();
+        return;
+    }
+  }
+
+  Future<void> _pasteRuleFromClipboard() async {
+    final clipData = await Clipboard.getData(Clipboard.kTextPlain);
+    final clipText = clipData?.text;
+    if (clipText == null || clipText.trim().isEmpty) {
+      await _showMessage('剪贴板为空');
+      return;
+    }
+    try {
+      final decoded = json.decode(clipText);
+      if (decoded is! Map) {
+        throw const FormatException('格式不对');
+      }
+      final source = decoded.map<String, dynamic>(
+        (key, value) => MapEntry('$key', value),
+      );
+      final pastedRule = ReplaceRule.fromJson(source);
+      _nameCtrl.text = pastedRule.name;
+      _groupCtrl.text = pastedRule.group ?? '';
+      _patternCtrl.text = pastedRule.pattern;
+      _replacementCtrl.text = pastedRule.replacement;
+      _scopeCtrl.text = pastedRule.scope ?? '';
+      _excludeScopeCtrl.text = pastedRule.excludeScope ?? '';
+      _timeoutCtrl.text = pastedRule.timeoutMillisecond.toString();
+      setState(() {
+        _rule = _rule.copyWith(
+          name: pastedRule.name,
+          group: pastedRule.group,
+          pattern: pastedRule.pattern,
+          replacement: pastedRule.replacement,
+          scope: pastedRule.scope,
+          excludeScope: pastedRule.excludeScope,
+          isRegex: pastedRule.isRegex,
+          scopeTitle: pastedRule.scopeTitle,
+          scopeContent: pastedRule.scopeContent,
+          timeoutMillisecond: pastedRule.timeoutMillisecond,
+        );
+      });
+    } catch (_) {
+      await _showMessage('格式不对');
+    }
+  }
+
+  Future<void> _showMessage(String message) async {
+    if (!mounted) return;
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('提示'),
+        content: Text('\n$message'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('好'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final valid = _engine.isValid(_rule);
 
     return AppCupertinoPageScaffold(
       title: '编辑规则',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        onPressed: _save,
-        child: const Text('保存'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minSize: 30,
+            onPressed: _saving ? null : _save,
+            child: const Text('保存'),
+          ),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minSize: 30,
+            onPressed: _saving ? null : _showMoreMenu,
+            child: const Icon(CupertinoIcons.ellipsis),
+          ),
+        ],
       ),
       child: ListView(
         children: [

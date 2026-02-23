@@ -16,7 +16,7 @@ import '../../source/services/source_login_ui_helper.dart';
 import '../../source/services/source_login_url_resolver.dart';
 import '../../source/views/source_edit_legacy_view.dart';
 import '../../source/views/source_login_form_view.dart';
-import '../../source/views/source_web_verify_view.dart';
+import '../../source/views/source_login_webview_view.dart';
 import '../services/discovery_filter_helper.dart';
 import 'discovery_explore_results_view.dart';
 
@@ -361,7 +361,10 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceWebVerifyView(initialUrl: resolvedUrl),
+        builder: (_) => SourceLoginWebViewView(
+          source: source,
+          initialUrl: resolvedUrl,
+        ),
       ),
     );
   }
