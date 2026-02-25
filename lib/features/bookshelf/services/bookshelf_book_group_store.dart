@@ -96,11 +96,17 @@ class BookshelfBookGroupStore {
     return count < _maxCustomGroupCount;
   }
 
-  Future<BookshelfBookGroup> addGroup(String groupName) async {
+  Future<BookshelfBookGroup> addGroup(
+    String groupName, {
+    String? cover,
+    int bookSort = -1,
+    bool enableRefresh = true,
+  }) async {
     final normalizedName = groupName.trim();
     if (normalizedName.isEmpty) {
       throw ArgumentError('分组名称不能为空');
     }
+    final normalizedCover = (cover ?? '').trim();
     final groups = await getGroups();
     final customCount = groups
         .where(
@@ -119,8 +125,9 @@ class BookshelfBookGroupStore {
       groupName: normalizedName,
       show: true,
       order: maxOrder + 1,
-      bookSort: -1,
-      enableRefresh: true,
+      cover: normalizedCover.isEmpty ? null : normalizedCover,
+      bookSort: bookSort,
+      enableRefresh: enableRefresh,
     );
     final nextGroups = <BookshelfBookGroup>[...groups, created];
     await saveGroups(nextGroups);

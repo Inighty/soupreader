@@ -204,7 +204,7 @@ priority_order,seq,phase,menu_file,item_id,title_zh,current_status,priority_tier
 203,175,P6,bookshelf_manage.xml,@+id/menu_export_all_use_book_source,导出所有书的书源,done,SUPPORT,3620,P6+critical_action+done
 204,181,P6,bookshelf_menage_sel.xml,@+id/menu_change_source,批量换源,pending,SUPPORT,3620,P6+critical_action
 205,182,P6,bookshelf_menage_sel.xml,@+id/menu_clear_cache,清理缓存,pending,SUPPORT,3620,P6+critical_action
-206,29,P6,book_group_manage.xml,@+id/menu_add,添加分组,pending,SUPPORT,3500,P6
+206,29,P6,book_group_manage.xml,@+id/menu_add,添加分组,done,SUPPORT,3500,P6
 207,173,P6,bookshelf_manage.xml,@+id/menu_book_group,分组,pending,SUPPORT,3500,P6
 208,174,P6,bookshelf_manage.xml,@+id/menu_group_manage,分组管理,pending,SUPPORT,3500,P6
 209,176,P6,bookshelf_manage.xml,@+id/menu_open_book_info_by_click_title,点击书名打开详情,pending,SUPPORT,3500,P6

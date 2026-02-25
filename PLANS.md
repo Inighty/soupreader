@@ -62,6 +62,12 @@
 
 ## Progress（动态）
 
+- `2026-02-25`
+  - 问题修复：恢复缺失文件 `lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`（按提交 `85da07b` 的实现回补），修复 `bookshelf_view.dart` 与 `test/widget_test.dart` 的 `uri_does_not_exist / undefined_identifier`。
+  - 问题修复：`tool/_tmp_html_test.dart` 的调试输出由 `print` 收敛为 `stdout.writeln`，消除 `avoid_print` 信息项。
+  - 为什么：本次报错由“书架管理承载页文件缺失 + 临时脚本 print”触发，阻塞静态检查与本地联调。
+  - 如何验证：执行 `dart analyze lib/features/bookshelf/views/bookshelf_view.dart lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart test/widget_test.dart tool/_tmp_html_test.dart`，结果 `No issues found!`（开发阶段未执行 `flutter analyze`）。
+  - 兼容影响：无旧书源兼容性破坏；仅恢复既有页面文件与静态检查修复，不改变五段链路行为。
 - `2026-02-23`
   - analyze 全清零：在 `analysis_options.yaml` 增加项目级信息规则降噪配置（仅 `info` 类规则，未屏蔽 `error/warning`），覆盖 `deprecated_member_use/control_flow_in_finally/use_build_context_synchronously` 等高频提示，保证当前迁移主线可持续推进。
   - 验证：`dart analyze lib test --format machine` 统计为 `ERROR=0 / WARNING=0 / INFO=0`。

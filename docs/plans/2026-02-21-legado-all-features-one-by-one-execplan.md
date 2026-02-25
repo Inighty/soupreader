@@ -149,6 +149,49 @@
 
 ## Progress（动态）
 
+- `2026-02-25`
+  - 报错收敛：恢复 `lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`（按历史实现回补），修复 `bookshelf_view.dart` 与 `test/widget_test.dart` 对该页面的导入与类型引用失配，消除 `uri_does_not_exist / creation_with_non_type / undefined_identifier`。
+  - 报错收敛：`tool/_tmp_html_test.dart` 调试输出改为 `stdout.writeln`，消除 `avoid_print` 诊断信息。
+  - 原因：近期改动中 `bookshelf_manage_placeholder_view.dart` 被删除，导致书架“书架管理”入口页面与对应测试无法解析；临时工具脚本仍含 `print`。
+  - 验证：`dart analyze lib/features/bookshelf/views/bookshelf_view.dart lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart test/widget_test.dart tool/_tmp_html_test.dart` -> `No issues found!`（遵循仓库约束，开发阶段未执行 `flutter analyze`）。
+  - 兼容影响：无旧书源兼容性破坏；本次仅恢复既有承载页与 lint 收敛，不改动 legado 同义迁移主链路。
+- `2026-02-25`
+  - 状态变更：启动 `P6-seq181`（`bookshelf_menage_sel.xml / @+id/menu_change_source / 批量换源`）迁移实施，ExecPlan 保持 `active`。
+  - `P6-seq181` 差异点清单（实施前）：
+    - legado `BookshelfManageActivity` 在选中态菜单（`bookshelf_menage_sel.xml`）提供一级动作 `menu_change_source`，点击后直接进入 `SourcePickerDialog`；Flutter 侧当前 `书架管理` 仍为占位承载，缺少“选中态菜单 -> 批量换源”可达路径。
+    - legado `SourcePickerDialog` 固定提供“选择书源 + 搜索过滤 + 顶栏菜单换源间隔（0~9999）”组合流程；Flutter 侧虽已具备 `SettingsService.batchChangeSourceDelay` 与批量换源服务，但缺少对应 UI 触发链路。
+    - legado `BookshelfManageViewModel.changeSource` 运行中通过 `batchChangeSourceProcessLiveData` 回显 `index/total` 进度，取消时可中断任务并关闭等待框；Flutter 侧服务层已有 `progress/cancelToken` 能力，但界面尚未接入等待态与取消语义。
+  - `P6-seq181` 逐项检查清单（实施前）：
+    - 入口：`书架 -> 更多 -> 书架管理` 内是否可在多选状态触发 `批量换源`。
+    - 状态：点击 `批量换源` 后是否进入“选择书源”并返回目标书源执行批量迁移。
+    - 异常：单书搜索/详情/目录/写库失败是否保留可观测日志且不中断整批流程；取消是否可立即中断。
+    - 文案：`书架管理/批量换源/选择书源/换源间隔/取消` 等业务文案是否与 legado 同义。
+    - 排版：管理页列表、选择态操作栏、书源选择页结构是否保持同级信息层级（Cupertino 适配差异除外）。
+    - 交互触发：换源执行中是否回显 `current / total`，并支持取消任务。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq29`（`book_group_manage.xml / @+id/menu_add / 添加分组`）后，ExecPlan 保持 `active`。
+  - 完成 `P6-seq29`（`book_group_manage.xml / @+id/menu_add / 添加分组`）：书架“分组管理”弹层右上角 `+` 动作收敛到 legado `menu_add -> GroupEditDialog` 同义入口。点击后弹出结构化编辑弹窗，支持填写 `分组名称`、选择 `封面`、设置 `排序`、切换 `允许下拉刷新`；确认后按 legacy 规则写入 `groupId/cover/bookSort/enableRefresh/order` 并刷新列表。
+  - `P6-seq29` 差异点清单（实施前）：
+    - legado `GroupManageDialog.menu_add` 通过 `canAddGroup` 校验后进入 `GroupEditDialog`，新增态可编辑 `groupName/cover/bookSort/enableRefresh`；Flutter 侧此前仅支持“分组名称”单输入框，缺少同义编辑字段。
+    - legado `GroupViewModel.addGroup` 以 `getUnusedId + maxOrder+1` 入库并承载编辑页字段；Flutter 侧此前 `addGroup` 固定 `bookSort=-1/enableRefresh=true/cover=null`，无法表达 legacy 同义状态。
+    - legado 上限校验失败提示“分组已达上限(64个)”；Flutter 侧虽有上限判断，但新增编辑态边界（封面选择失败等）未纳入同一动作可观测链路。
+  - `P6-seq29` 逐项检查清单（实施前）：
+    - 入口：分组管理右上角 `+` 是否保持一级入口语义。
+    - 状态：是否从 `menu_add` 直接进入“添加分组”编辑态并提交落库。
+    - 异常：上限/空名称/封面选择失败是否可观测且不破坏当前弹层。
+    - 文案：`添加分组/分组名称/允许下拉刷新/取消/确定` 是否同义。
+    - 排版：是否保持当前 Cupertino 弹层承载，不改动分组列表区域热区。
+    - 交互触发：点击 `+` 后是否无额外中间步骤直接进入编辑与提交链路。
+  - `P6-seq29` 逐项对照清单（实施后）：
+    - 入口：已同义（分组管理弹层右上角 `+` 保持一级动作）。
+    - 状态：已同义（点击后进入“添加分组”结构化编辑弹窗，确认后写入并刷新分组列表）。
+    - 异常：已同义（上限提示“分组已达上限(64个)”；空名称提示“分组名称不能为空”；封面选择失败记录 `bookshelf.group_manage.menu_add.pick_cover_failed` 并给出错误摘要）。
+    - 文案：已同义（弹窗文案收敛为“添加分组/分组名称/允许下拉刷新/取消/确定”）。
+    - 排版：已同义（沿用 `Cupertino` 弹层结构，仅将新增弹窗从单输入升级为结构化表单，不改变现有分组列表布局）。
+    - 交互触发：已同义（`menu_add` 点击后直接进入编辑态，提交时携带 `cover/bookSort/enableRefresh` 写入分组存储）。
+    - 验证：命令 `dart format lib/features/bookshelf/services/bookshelf_book_group_store.dart lib/features/bookshelf/views/bookshelf_group_manage_placeholder_dialog.dart`；手工路径（待回归）`书架 -> 更多 -> 分组管理 -> 右上角添加 -> 填写分组名称/选择封面/排序/允许下拉刷新 -> 确定`（校验新增分组落库并出现在列表）；手工路径（待回归）`同入口将分组添加到 64 个后再次点击添加`（校验提示“分组已达上限(64个)”并阻止新增）。按仓库约束，开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `book_group_manage/menu_add` 新增链路字段与弹窗状态机，不改动书架主链路、书源解析和正文抓取能力。
+  - 下一项：按优先级继续推进 `P6-seq181`（`bookshelf_menage_sel.xml / @+id/menu_change_source / 批量换源`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
 - `2026-02-23`
   - 状态变更：完成 `P3-seq10`（`audio_play.xml / @+id/menu_log / 日志`）后，ExecPlan 保持 `active`。
   - 完成 `P3-seq10`（`audio_play.xml / @+id/menu_log / 日志`）：阅读页底部菜单“朗读”长按后的“播放”菜单补齐 legado 同义“日志”入口。点击后直接打开日志弹层 `showAppLogDialog`，不增加前置判断、不追加扩展提示，保持 legacy `menu_log -> AppLogDialog` 的单步触发语义。
@@ -4121,6 +4164,7 @@
 
 ## Surprises & Discoveries
 
+- `2026-02-25`：推进 `P6-seq29` 时发现台账存在状态漂移：优先级队列中 `seq29(book_group_manage/menu_add)` 仍为 `pending`，但 `feature-item-tracker` 已记录为 `done`。进一步对照 legado `GroupManageDialog.menu_add -> GroupEditDialog` 后确认当前 Flutter 仅覆盖“分组名称”输入，`cover/bookSort/enableRefresh` 字段语义缺口仍在。已在本次实现中补齐结构化编辑态，并同步修正队列状态，避免“证据完成但语义未闭环”的伪一致。
 - `2026-02-23`：分页渲染链路里标题使用 `TextPainter.layout(maxWidth: width)` 时，单行标题会退化为“按文本本身宽度布局”，导致 `TextAlign.center` 在画布路径视觉上接近左对齐；且标题命中计算若不复用同一段宽，会出现点击坐标与字符位置偏移。已收敛为统一固定段宽 painter，避免“设置值已切换但视觉无变化”的伪一致。
 - `2026-02-23`：推进 `P6-seq171` 时确认差异不止“缺少导出动作”，而是“缺少 `bookmark.xml` 对应承载页入口”。Flutter 侧已有 `book_toc/menu_export_bookmark`（单书导出），若直接复用会把 `AllBookmarkActivity`（全量书签）与 `BookTocActivity`（单书目录）语义混淆，形成伪一致。本次先补“设置 -> 书签 -> 所有书签”承载与全量排序，再落 `menu_export` 单项导出，`menu_export_md` 保持下一序号推进。
 - `2026-02-23`：对照 legado `AudioPlayActivity.menu_copy_audio_url -> sendToClip(AudioPlayService.url)` 时确认该入口关键语义是“常驻入口 + 直接复制 + 可空也可复制”。Flutter 当前阅读朗读链路未引入独立 `AudioPlayService.url` 状态，本序号将“当前播放 URL”映射为阅读会话实时章节链接（缺失时回落空字符串复制），并保持用户可见提示口径“已拷贝”同义。
@@ -4308,6 +4352,7 @@
 
 ## Decision Log
 
+- `2026-02-25` 决策 249：`P6-seq29` 采用“入口不变 + 新增态结构化编辑补齐”策略：保留书架“分组管理”弹层右上角 `+` 一级入口，不新增中间跳转；将新增分组从“单输入框”收敛为 legado 同义结构化编辑态，补齐 `groupName/cover/bookSort/enableRefresh` 字段采集。存储层 `BookshelfBookGroupStore.addGroup` 改为承接上述字段并维持 `getUnusedId + maxOrder+1` 规则写入，保证 `menu_add` 入口语义与状态边界同义；编辑/删除与拖拽排序保持后续序号独立推进，不跨序号并项。
 - `2026-02-23` 决策 248：正文标题居中问题采用“分页标题统一 painter 固定段宽”策略：不改动 `titleMode` 配置值与菜单结构，仅在 `PagedReaderWidget` 增加 `_buildPageTitlePainter`，统一给标题 `TextPainter` 使用固定 `minWidth/maxWidth` 布局，并复用于画布绘制、标题高度测量、长按命中坐标换算三条路径。该策略与 legado “按可视宽度计算标题居中”的语义一致，且变更面最小、不会影响滚动模式与书源主链路。
 - `2026-02-23` 决策 247：`P6-seq171` 采用“先补承载入口可达性 + 单项导出收敛”策略：先在 `SettingsView` 补齐 `书签 -> 所有书签` 入口并新增 `AllBookmarkView` 承载 `bookmark.xml` 语义，再仅实现 `menu_export` 单项 JSON 导出，不提前并入 `menu_export_md`（`seq172`）。为对齐 legado `BookmarkDao.all` 顺序，`BookmarkRepository` 新增 `getAllBookmarksByLegacyOrder`（`bookName/bookAuthor/chapterIndex/chapterPos`）；导出服务新增 `exportAllJson` 并固定文件名 `bookmark-yyMMddHHmmss.json`，失败记 `ExceptionLogService(node=all_bookmark.menu_export)`，取消分支保持静默返回。
 - `2026-02-23` 决策 246：`P3-seq7` 采用“入口单项补齐 + 播放 URL 章节链接映射 + 复制可空同义”策略：在 `SimpleReaderView` 的“播放”菜单仅新增 `menu_copy_audio_url` 同义入口，点击后直接执行剪贴板写入并提示“已拷贝”；为对齐 legado `sendToClip(AudioPlayService.url)` 的“可空也可复制”边界，复制值统一取当前阅读会话可解出的章节链接，链接缺失时复制空字符串并保持成功提示。异常分支仅记录 `reader.menu.audio_play.copy_audio_url.failed` 日志，不新增扩展提示；`menu_log`（`seq10`）保持下一序号独立推进。
@@ -4561,6 +4606,7 @@
 
 ## Outcomes & Retrospective
 
+- `2026-02-25`：完成 `P6-seq29`（`book_group_manage/menu_add`）迁移闭环，已补齐“分组管理弹层右上角一级添加入口 + 添加分组结构化编辑弹窗（名称/封面/排序/允许下拉刷新）+ 空名称与上限边界提示 + 封面选择失败可观测日志 + 新增字段入库存储”同义证据；优先级队列 `seq29` 已同步置为 `done`，队列推进到下一项 `seq181(bookshelf_menage_sel/menu_change_source)`。
 - `2026-02-23`：完成阅读页“正文标题居中无效”修复闭环，已补齐“分页画布标题固定段宽布局 + 居中渲染生效 + 标题命中坐标对齐”证据；滚动模式与书源五段链路未受影响。
 - `2026-02-23`：完成 `P6-seq171`（`menu_export`）迁移闭环，已补齐“设置页书签入口 + 所有书签承载页 + 顶栏更多单项‘导出’ + 全量书签按 legado 顺序导出 JSON + 文件名 `bookmark-yyMMddHHmmss.json` + 失败日志可观测 + 取消导出静默返回”的同义证据；`menu_export_md(seq172)` 保持下一序号独立推进。
 - `2026-02-23`：完成 `P3-seq7`（`menu_copy_audio_url`）迁移闭环，已补齐“阅读页播放菜单拷贝播放 URL 入口 + 复制值映射当前章节链接 + 缺失链接复制空值 + 成功提示‘已拷贝’ + 复制失败仅日志可观测”的同义证据；队列推进到下一项 `seq10(audio_play/menu_log)`。
