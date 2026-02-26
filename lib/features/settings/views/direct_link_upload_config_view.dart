@@ -8,6 +8,7 @@ import '../models/direct_link_upload_rule.dart';
 import '../services/direct_link_upload_config_service.dart';
 
 enum _DirectLinkUploadConfigMenuAction {
+  copyRule,
   pasteRule,
   importDefault,
 }
@@ -108,6 +109,13 @@ class _DirectLinkUploadConfigViewState
           CupertinoActionSheetAction(
             onPressed: () => Navigator.pop(
               sheetContext,
+              _DirectLinkUploadConfigMenuAction.copyRule,
+            ),
+            child: const Text('拷贝规则'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(
+              sheetContext,
               _DirectLinkUploadConfigMenuAction.pasteRule,
             ),
             child: const Text('粘贴规则'),
@@ -128,6 +136,9 @@ class _DirectLinkUploadConfigViewState
     );
     if (selected == null) return;
     switch (selected) {
+      case _DirectLinkUploadConfigMenuAction.copyRule:
+        await _copyRuleToClipboard();
+        return;
       case _DirectLinkUploadConfigMenuAction.pasteRule:
         await _pasteRuleFromClipboard();
         return;
@@ -135,6 +146,14 @@ class _DirectLinkUploadConfigViewState
         await _importDefaultRule();
         return;
     }
+  }
+
+  Future<void> _copyRuleToClipboard() async {
+    final rule = _buildRuleFromForm();
+    if (rule == null) return;
+    await Clipboard.setData(
+      ClipboardData(text: jsonEncode(rule.toJson())),
+    );
   }
 
   Future<void> _importDefaultRule() async {

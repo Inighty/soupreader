@@ -5,11 +5,15 @@ import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../reader/views/simple_reader_view.dart';
+import '../../search/models/search_scope_group_helper.dart';
 import '../models/book.dart';
 
 /// 阅读记录
 ///
-/// 当前实现：基于 `Book.lastReadTime` 的简易列表。
+/// 对齐 legado `ReadRecordActivity`：
+/// - `readRecordSort=0`：名称排序
+/// - `readRecordSort=1`：阅读时长排序
+/// - `readRecordSort=2`：阅读时间排序
 class ReadingHistoryView extends StatefulWidget {
   const ReadingHistoryView({super.key});
 
@@ -18,13 +22,17 @@ class ReadingHistoryView extends StatefulWidget {
 }
 
 class _ReadingHistoryViewState extends State<ReadingHistoryView> {
+  static const int _readRecordSortByName = 0;
   static const int _readRecordSortByReadLong = 1;
   static const int _readRecordSortByReadTime = 2;
 
   late final BookRepository _bookRepo;
   late final SettingsService _settingsService;
+  final TextEditingController _searchController = TextEditingController();
   bool _enableReadRecord = true;
-  int _readRecordSort = _readRecordSortByReadTime;
+  int _readRecordSort = _readRecordSortByName;
+  String _searchQuery = '';
+  bool _clearingAll = false;
 
   @override
   void initState() {
@@ -33,8 +41,14 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
     _settingsService = SettingsService();
     _enableReadRecord = _settingsService.enableReadRecord;
     _readRecordSort = _settingsService.getReadRecordSort(
-      fallback: _readRecordSortByReadTime,
+      fallback: _readRecordSortByName,
     );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -53,37 +67,129 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
           final books = snapshot.data ?? _bookRepo.getAllBooks();
           final readRecordDurationByBookId =
               _settingsService.getBookReadRecordDurationSnapshot();
-          final history =
-              books.where((b) => b.lastReadTime != null && b.isReading).toList(
-                    growable: false,
-                  );
-          _sortHistory(history, readRecordDurationByBookId);
-
-          if (history.isEmpty) {
-            return _buildEmptyState(context);
-          }
-
-          return ListView.builder(
-            itemCount: history.length,
-            itemBuilder: (context, index) {
-              final book = history[index];
-              return GestureDetector(
-                onLongPress: () => _showActions(book),
-                child: CupertinoListTile.notched(
-                  title: Text(book.title),
-                  subtitle: Text(_subtitleForBook(book)),
-                  trailing: const CupertinoListTileChevron(),
-                  onTap: () => _openReader(book),
+          final history = List<Book>.from(
+            books.where((b) => b.lastReadTime != null && b.isReading).toList(
+                  growable: false,
                 ),
-              );
-            },
+          );
+          _sortHistory(history, readRecordDurationByBookId);
+          final filteredHistory = _applySearchFilter(history);
+          final totalReadDurationMs =
+              _settingsService.getTotalBookReadRecordDurationMs();
+
+          return Column(
+            children: [
+              _buildSearchBox(),
+              _buildAllTimeHeader(
+                allTimeMs: totalReadDurationMs,
+                hasHistory: history.isNotEmpty,
+                history: history,
+              ),
+              Expanded(
+                child: filteredHistory.isEmpty
+                    ? _buildEmptyState(
+                        context,
+                        isSearching: _searchQuery.trim().isNotEmpty,
+                      )
+                    : ListView.builder(
+                        itemCount: filteredHistory.length,
+                        itemBuilder: (context, index) {
+                          final book = filteredHistory[index];
+                          return GestureDetector(
+                            onLongPress: () => _showActions(book),
+                            child: CupertinoListTile.notched(
+                              title: Text(book.title),
+                              subtitle: Text(
+                                _subtitleForBook(
+                                  book,
+                                  readRecordDurationByBookId,
+                                ),
+                              ),
+                              trailing: const CupertinoListTileChevron(),
+                              onTap: () => _openReader(book),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
           );
         },
       ),
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildSearchBox() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+      child: CupertinoSearchTextField(
+        controller: _searchController,
+        placeholder: '搜索',
+        onChanged: (value) {
+          if (!mounted) return;
+          setState(() => _searchQuery = value);
+        },
+      ),
+    );
+  }
+
+  Widget _buildAllTimeHeader({
+    required int allTimeMs,
+    required bool hasHistory,
+    required List<Book> history,
+  }) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemBackground.resolveFrom(context),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: CupertinoColors.separator.resolveFrom(context),
+          width: 0.6,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '总阅读时间',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _formatDuration(allTimeMs),
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: CupertinoColors.label.resolveFrom(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            minSize: 28,
+            onPressed: (!hasHistory || _clearingAll)
+                ? null
+                : () => _clearAllReadRecord(history),
+            child: _clearingAll
+                ? const CupertinoActivityIndicator(radius: 9)
+                : const Text('清空'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, {required bool isSearching}) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -95,7 +201,7 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
           ),
           const SizedBox(height: 16),
           Text(
-            '暂无阅读记录',
+            isSearching ? '无匹配记录' : '暂无阅读记录',
             style: TextStyle(
               fontSize: 17,
               color: CupertinoColors.secondaryLabel.resolveFrom(context),
@@ -106,16 +212,44 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
     );
   }
 
-  String _subtitleForBook(Book book) {
-    final progress = (book.readProgress * 100).clamp(0, 100).toStringAsFixed(1);
+  List<Book> _applySearchFilter(List<Book> books) {
+    final key = _searchQuery.trim();
+    if (key.isEmpty) return books;
+    return books
+        .where((book) => book.title.toLowerCase().contains(key.toLowerCase()))
+        .toList(growable: false);
+  }
+
+  String _subtitleForBook(
+    Book book,
+    Map<String, int> readRecordDurationByBookId,
+  ) {
     final lastRead = book.lastReadTime;
+    final readDuration = readRecordDurationByBookId[book.id] ?? 0;
     final lastReadText = lastRead == null
         ? '—'
         : '${lastRead.year}-${_two(lastRead.month)}-${_two(lastRead.day)}';
-    return '${book.author} · 进度 $progress% · $lastReadText';
+    return '阅读时长 ${_formatDuration(readDuration)}\n最近阅读 $lastReadText';
   }
 
   String _two(int v) => v.toString().padLeft(2, '0');
+
+  String _formatDuration(int milliseconds) {
+    final safeMs = milliseconds < 0 ? 0 : milliseconds;
+    final days = safeMs ~/ (1000 * 60 * 60 * 24);
+    final hours = (safeMs % (1000 * 60 * 60 * 24)) ~/ (1000 * 60 * 60);
+    final minutes = (safeMs % (1000 * 60 * 60)) ~/ (1000 * 60);
+    final seconds = (safeMs % (1000 * 60)) ~/ 1000;
+    final dayText = days > 0 ? '${days}天' : '';
+    final hourText = hours > 0 ? '${hours}小时' : '';
+    final minuteText = minutes > 0 ? '${minutes}分钟' : '';
+    final secondText = seconds > 0 ? '${seconds}秒' : '';
+    final text = '$dayText$hourText$minuteText$secondText';
+    if (text.trim().isEmpty) {
+      return '0秒';
+    }
+    return text;
+  }
 
   void _sortHistory(
     List<Book> books,
@@ -131,7 +265,11 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
       });
       return;
     }
-    books.sort(_compareByReadTimeDescThenTitle);
+    if (_readRecordSort == _readRecordSortByReadTime) {
+      books.sort(_compareByReadTimeDescThenTitle);
+      return;
+    }
+    books.sort(_compareByNameLikeLegado);
   }
 
   int _compareByReadTimeDescThenTitle(Book left, Book right) {
@@ -141,31 +279,29 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
         right.lastReadTime ?? DateTime.fromMillisecondsSinceEpoch(0);
     final byReadTime = rightTime.compareTo(leftTime);
     if (byReadTime != 0) return byReadTime;
-    return left.title.compareTo(right.title);
+    return _compareByNameLikeLegado(left, right);
+  }
+
+  int _compareByNameLikeLegado(Book left, Book right) {
+    return SearchScopeGroupHelper.cnCompareLikeLegado(left.title, right.title);
   }
 
   void _showTopActions() {
     showCupertinoModalPopup<void>(
       context: context,
-      builder: (context) => CupertinoActionSheet(
+      builder: (sheetContext) => CupertinoActionSheet(
         actions: [
           CupertinoActionSheetAction(
-            child: Text(
-              '${_readRecordSort == _readRecordSortByReadLong ? '✓ ' : ''}阅读时长排序',
-            ),
-            onPressed: () async {
-              Navigator.pop(context);
-              await _settingsService.saveReadRecordSort(
-                _readRecordSortByReadLong,
-              );
-              if (!mounted) return;
-              setState(() => _readRecordSort = _readRecordSortByReadLong);
+            child: const Text('排序'),
+            onPressed: () {
+              Navigator.of(sheetContext).pop();
+              _showSortActions();
             },
           ),
           CupertinoActionSheetAction(
             child: Text('${_enableReadRecord ? '✓ ' : ''}开启记录'),
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.of(sheetContext).pop();
               final nextValue = !_enableReadRecord;
               await _settingsService.saveEnableReadRecord(nextValue);
               if (!mounted) return;
@@ -175,7 +311,59 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
         ],
         cancelButton: CupertinoActionSheetAction(
           child: const Text('取消'),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.of(sheetContext).pop(),
+        ),
+      ),
+    );
+  }
+
+  void _showSortActions() {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('排序'),
+        actions: [
+          CupertinoActionSheetAction(
+            child: Text(
+              '${_readRecordSort == _readRecordSortByName ? '✓ ' : ''}名称排序',
+            ),
+            onPressed: () async {
+              Navigator.of(sheetContext).pop();
+              await _settingsService.saveReadRecordSort(_readRecordSortByName);
+              if (!mounted) return;
+              setState(() => _readRecordSort = _readRecordSortByName);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: Text(
+              '${_readRecordSort == _readRecordSortByReadLong ? '✓ ' : ''}阅读时长排序',
+            ),
+            onPressed: () async {
+              Navigator.of(sheetContext).pop();
+              await _settingsService.saveReadRecordSort(
+                _readRecordSortByReadLong,
+              );
+              if (!mounted) return;
+              setState(() => _readRecordSort = _readRecordSortByReadLong);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: Text(
+              '${_readRecordSort == _readRecordSortByReadTime ? '✓ ' : ''}阅读时间排序',
+            ),
+            onPressed: () async {
+              Navigator.of(sheetContext).pop();
+              await _settingsService.saveReadRecordSort(
+                _readRecordSortByReadTime,
+              );
+              if (!mounted) return;
+              setState(() => _readRecordSort = _readRecordSortByReadTime);
+            },
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('取消'),
+          onPressed: () => Navigator.of(sheetContext).pop(),
         ),
       ),
     );
@@ -191,6 +379,57 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
         ),
       ),
     );
+  }
+
+  Future<bool> _showDeleteConfirm({
+    required String message,
+  }) async {
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('删除'),
+        content: Text(message),
+        actions: [
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('删除'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
+  Future<void> _clearSingleReadRecord(Book book) async {
+    final confirmed = await _showDeleteConfirm(
+      message: '是否确认删除 ${book.title}？',
+    );
+    if (!confirmed) return;
+    await _bookRepo.clearReadingRecord(book.id);
+    await _settingsService.clearBookReadRecordDuration(book.id);
+  }
+
+  Future<void> _clearAllReadRecord(List<Book> history) async {
+    if (_clearingAll) return;
+    final confirmed = await _showDeleteConfirm(message: '是否确认删除？');
+    if (!confirmed) return;
+    if (!mounted) return;
+    setState(() => _clearingAll = true);
+    try {
+      for (final book in history) {
+        await _bookRepo.clearReadingRecord(book.id);
+      }
+      await _settingsService.clearAllBookReadRecordDuration();
+    } finally {
+      if (mounted) {
+        setState(() => _clearingAll = false);
+      }
+    }
   }
 
   void _showActions(Book book) {
@@ -210,8 +449,7 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
             child: const Text('清除阅读记录'),
             onPressed: () async {
               Navigator.pop(context);
-              await _bookRepo.clearReadingRecord(book.id);
-              await _settingsService.clearBookReadRecordDuration(book.id);
+              await _clearSingleReadRecord(book);
             },
           ),
           CupertinoActionSheetAction(

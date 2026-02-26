@@ -1,51 +1,81 @@
-# Active Context（任务快速定位）
+# ACTIVE CONTEXT
 
-状态：`active`  
-最后更新：`2026-02-26`
+- 最后更新时间: 2026-02-26
+- 主计划: `PLANS.md`
+- 当前阶段: `2026-02-26 legado「我的」全量迁移（除 Web 服务）`
+- 当前状态: `active`
 
-## 1) 默认读取顺序（强制）
+## 当前任务
+- ID: `MY-18`
+- 目标: 在 `docs/plans/2026-02-26-my-menu-parity-checklist.md` 按 `P0/P1/P2/EX-01` 回填逐项结论（已同义/差异）、原因与处理动作，并持续补齐终验证据
+- 依赖: `MY-03`~`MY-17`（已完成）
+- 交付物: `docs/plans/2026-02-26-my-menu-parity-checklist.md`、`tool/my_menu_regression_guard.sh`
+- 验证: 结构字段检查（`legado 对照项/当前实现文件/检查维度/结论/原因/处理动作`）+ `PLANS.md` 索引接入检查 + 回归守卫脚本（`tool/my_menu_regression_guard.sh`）+ 手工路径终验（`MY-19`）
 
-1. 完整读取本文件（轻量快照）。
-2. 仅读取 `PLANS.md` 前置索引区（快速定位主计划与 Todo）。
-3. 仅按需定向读取 `docs/plans/2026-02-21-legado-all-features-one-by-one-execplan.md` 对应小节。  
-4. 未触发深读条件时，禁止默认全量扫描所有计划文件与历史 Progress。
+## 当前任务拆解（台账执行）
+1. `P0`（书源/TXT/替换/字典）: `done`（已完成初次回填，待 `MY-19` 补手工证据）
+2. `P1`（备份/主题/其它设置）: `done`（已完成初次回填，待 `MY-19` 补手工证据）
+3. `P2`（书签/阅读记录/关于/文件管理）: `done`（已完成初次回填，待 `MY-19` 补手工证据）
+4. `EX-01`（`webService`）: `blocked`（按范围冻结，保留占位语义）
+5. 台账终验回填: `in_progress`（按手工路径逐条补证据）
+6. 回归守卫脚本: `done`（新增固定字段齐全性 + `R-01~R-13` 单锚点一致性 + `EX-01` blocked 语义禁入检查，支持“字段缺失非 0 / 修复后 0”）
 
-## 2) 当前执行面
+## 下一任务
+- ID: `MY-19`
+- 目标: 统一回归验证与提交前检查（提交前仅一次 `flutter analyze`）
+- 依赖: `MY-18`
 
-- 主计划：`legado 全功能逐项迁移（One-by-One）`
-- 主计划状态：`active`
-- 主执行文档：`docs/plans/2026-02-21-legado-all-features-one-by-one-execplan.md`
-- 跟踪台账：`docs/plans/2026-02-21-legado-feature-item-tracker.csv`
-- 优先级队列：`docs/plans/2026-02-21-legado-feature-priority-queue.csv`
-- 当前任务：`P3-seq92 / book_read_record.xml / @+id/menu_sort_read_time / 阅读时间排序`
-- 当前任务状态：`active`
-- 下一任务：`完成 P3-seq92 后按全局 detail_later 队列继续推进 P3-seq89（book_read_record/menu_sort）`
+## 阻塞项
+- `EX-01 webService`: `blocked`
+  - 原因: 需求明确“除 Web 服务外”
+  - 处理: 仅保留一级入口占位语义，不进入实现
 
-## 3) 阻塞与冻结
-
-- `P3(book_manga)`：`blocked`（用户冻结，未收到“开始做漫画功能”指令前不解锁）
-- `detail_later` 全局后置项：保持后置，不与主功能并行启动
-
-## 4) 最近交付（仅保留近期）
-
-- `2026-02-26`：完成 `P3-seq91`（`book_read_record/menu_sort_read_long`），对照 legado `book_read_record.xml` 与 `ReadRecordActivity(sortMode=1)` 收敛“阅读记录页阅读时长排序”语义；Flutter 侧在 `ReadingHistoryView` 右上角“更多”菜单补齐 checkable 动作“阅读时长排序”，点击后写入 `readRecordSort=1` 并按累计阅读时长降序刷新列表；`SimpleReaderView` 同步补齐阅读会话时长增量累计并持久化到 `SettingsService`，仅在 `enableReadRecord=true` 时计入，清除阅读记录时同步清理该书时长。优先级队列 `seq91` 已置 `done`，tracker 已回填 `seq91(done)` 与 `seq92(pending)` 映射行，队列推进下一项 `P3-seq92`（book_read_record/menu_sort_read_time）。
-
-- `2026-02-26`：完成 `P3-seq86`（`book_read/menu_help`），对照 legado `book_read.xml`、`ReadBookActivity.onCompatOptionsItemSelected(menu_help)`、`ReadBookActivity.showHelp("readMenuHelp")` 与 `ActivityExtensions.showHelp(fileName)` 收敛“阅读菜单帮助入口文档化承载”语义；Flutter 侧 `SimpleReaderView` 在 `ReaderLegacyReadMenuAction.help` 分支由 toast 收敛为读取 `assets/web/help/md/readMenuHelp.md` 后弹出 `showAppHelpDialog`，关闭后保持当前阅读会话状态，失败分支提示“帮助文档加载失败：<error>”。优先级队列 `seq86` 已置 `done`，tracker 已回填 `seq86(done)` 映射行，队列推进下一项 `P3-seq91`（book_read_record/menu_sort_read_long）。
-
-- `2026-02-26`：完成 `P3-seq85`（`book_read/menu_log`），对照 legado `book_read.xml` 与 `ReadBookActivity.onCompatOptionsItemSelected(menu_log)` 收敛“阅读菜单日志入口”语义；Flutter 侧 `SimpleReaderView` 在 `ReaderLegacyReadMenuAction.log` 分支改为直接弹出 `showAppLogDialog`，点击后无前置条件、关闭后保持当前阅读会话状态，不再跳转异常日志页。优先级队列 `seq85` 已置 `done`，tracker 已回填 `seq85(done)` 与 `seq86(pending)` 映射行，队列推进下一项 `P3-seq86`（book_read/menu_help）。
-
-- `2026-02-26`：完成 `P2-seq170`（`book_toc/menu_log`），对照 legado `book_toc.xml` 与 `TocActivity.onCompatOptionsItemSelected(menu_log)` 收敛“目录页更多菜单日志入口”语义；Flutter 侧 `SearchBookInfoView` 的目录承载 `_SearchBookTocView` 在“目录操作”菜单补齐一级动作“日志”，点击后直接弹出 `showAppLogDialog` 且无前置条件限制，关闭后保持当前目录页状态不变。优先级队列 `seq170` 已置 `done`，tracker 已回填 `seq170(done)` 映射行，队列推进下一项 `P3-seq85`（book_read/menu_log）。
-
-- `2026-02-26`：完成 `P10-seq407`（`web_view/menu_copy_url`），对照 legado `web_view.xml`、`WebViewActivity.onCompatOptionsItemSelected(menu_copy_url)` 与 `Context.sendToClip` 收敛“网页承载页拷贝 URL”语义；Flutter 侧 `SourceWebVerifyView` 的“更多”菜单补齐一级动作“拷贝 URL”，点击后固定复制 `initialUrl(baseUrl)` 到剪贴板并提示“复制完成”，成功路径保持当前网页承载页停留。优先级队列 `seq407` 已置 `done`，tracker 已回填 `seq407(done)` 映射行，队列推进下一项 `P2-seq170`（book_toc/menu_log）。
-
-## 5) 深度读取触发条件
-
-- 快照与 `PLANS.md` / 主 ExecPlan 关键信息不一致；
-- 当前任务进入 `blocked`，或出现迁移例外（需走 AGENTS 1.1.2）；
-- 需要切换 Phase/里程碑，且无法由当前快照判定下一项；
-- 需求方明确要求全量审阅历史计划与进度。
-
-## 6) 回填要求（每个可交付点）
-
-- 必须同步更新：`最后更新`、`当前任务`、`下一任务`、`阻塞与冻结`、`最近交付`。
-- 若与主 ExecPlan 记录冲突，先修正冲突再继续实现。
+## 最近交付（最多 5 条）
+1. `MY-18` 进行中：升级回归守卫脚本 `my_menu_regression_guard.sh`（结构门禁）
+   - 变更文件：`tool/my_menu_regression_guard.sh`
+   - 新增字段齐全性检查：逐文件强制 `入口/步骤/结果/异常分支/处理动作/关联锚点` 六字段单定义
+   - 新增锚点一致性检查：`R-01~R-13` 证据 `关联锚点` 与主回归单 `台账引用锚点` 一一对应且单锚点
+   - 保留 EX-01 专项守卫：`R-13` 仅允许 `blocked` 占位语义，禁止出现 webService 功能实现验收描述
+   - 运行验证1：`tool/my_menu_regression_guard.sh` 当前仓库输出逐项 `PASS/FAIL` 与命中行号，返回 `exit 0`
+   - 运行验证2（故障注入）：临时移除 `R-01` 的 `处理动作` 字段后脚本返回 `exit 1`；恢复字段后返回 `exit 0`
+   - 兼容影响: 仅文档结构守卫升级，不影响运行时代码、持久化键或数据库结构
+2. `MY-18` 进行中：P2-04 文件管理补齐 `menu_create` 同义链路
+   - 变更文件：`lib/features/settings/views/file_manage_view.dart`
+   - 顶栏新增“新建文件夹”入口（对应 legado `file_chooser.xml/menu_create`）
+   - 新增输入弹窗与创建流程：默认在当前目录创建子文件夹，成功后清空筛选并刷新列表
+   - 新增异常提示分支：空名称、名称非法、名称已存在、IO 异常均可观测
+   - 命令验证：`rg -n "新建文件夹|_showCreateFolderDialog|_createFolder|文件夹名不能为空|名称已存在" lib/features/settings/views/file_manage_view.dart`
+   - 启动冒烟：`flutter test test/widget_test.dart --plain-name "App launches correctly"` 通过
+   - 兼容影响: 仅页面交互增强，不新增数据库结构与持久化键
+3. `MY-16` 完成：关于页菜单与偏好项（日志/崩溃/协议/更新）迁移
+   - 顶栏补齐 legacy `about.xml` 菜单：保留 `分享` 并新增 `评分`（`market://details` + Web 回退）
+   - 列表补齐 `contributors/update_log/check_update/crashLog/saveLog/createHeapDump/privacyPolicy/license/disclaimer` 全入口
+   - `更新日志` 摘要改为 `版本 <versionName>`；文档入口统一接入 `assets/docs/*.md`
+   - `崩溃日志` 接入 `ExceptionLogsView(title: 崩溃日志)`；清空动作补确认与结果提示
+   - `保存日志/创建堆转储` 落地到备份目录（`logs/*.json`、`heapDump/*.json`），未设目录/写入失败分支均有明确提示与日志节点
+   - `app_help_dialog` 支持自定义标题，about 文档可按入口语义展示
+   - 命令冒烟：`flutter test test/widget_test.dart --plain-name "App launches correctly"` 通过
+   - 手工路径：`我的 -> 关于` 逐项点击校验可达与提示语义（CLI 环境待终端外执行）
+   - 兼容影响: 新增静态资源 `assets/docs/*`，复用既有 `backupPath/ExceptionLogService`，无数据库结构变更
+4. `MY-15` 完成：阅读记录页搜索/总时长/清理交互收口
+   - 新增搜索过滤（书名关键字实时过滤）与空搜索态文案
+   - 新增“总阅读时间 + 清空”头部区域，时长格式对齐 legacy `formatDuring`
+   - 新增全量清理确认（`是否确认删除？`），确认后清空全部阅读记录与阅读时长
+   - 单条“清除阅读记录”补齐二次确认（`是否确认删除 <书名>？`）
+   - 保留“继续阅读/清除阅读记录/从书架移除”边界动作与排序/开关勾选态持久化
+   - `SettingsService` 新增 `getTotalBookReadRecordDurationMs/clearAllBookReadRecordDuration`
+   - 命令冒烟：`flutter test test/widget_test.dart --plain-name "App launches correctly"` 通过
+   - 手工路径：`我的 -> 阅读记录` 验证排序切换、开启记录、搜索、单条删除与全量清理流程（CLI 环境待终端外执行）
+   - 兼容影响: 复用既有 `book_read_record_duration_map`，无数据库结构变更
+5. `MY-14` 完成：书签页菜单与条目点击闭环
+   - 书签页顶栏动作收口并保持仅 `导出/导出(MD)`（对齐 `bookmark.xml`）
+   - 条目点击新增“书签详情”弹层，展示章节/书籍/进度/摘录摘要
+   - 详情弹层新增 `定位阅读`，按 `chapterPos -> chapterProgress` 写入后跳转 `SimpleReaderView` 完成定位
+   - 导出成功/失败均写入 `all_bookmark.menu_export(_md)` 日志节点；定位失败写入 `all_bookmark.item_open_reader`
+   - `ReaderBookmarkExportService` 成功返回统一文案 `导出成功`，提示语义稳定
+   - 命令冒烟：`flutter test test/widget_test.dart --plain-name "App launches correctly"` 通过
+   - 手工路径：`我的 -> 书签` 验证 `导出 JSON/MD + 条目点击详情 + 定位阅读` 闭环（CLI 环境待终端外执行）
+   - 兼容影响: 仅复用既有书签字段与阅读进度键，无数据库结构变更
+## 备注
+- 迁移级别口径保持不变：交互路径、状态流转、边界处理、菜单结构、文案语义需与 legado 同义（UI 风格差异除外）。
+- 若出现无法等价复现，先在 `PLANS.md` 标记 `blocked` 并记录原因/影响/替代方案/回补计划，再继续其它分支。

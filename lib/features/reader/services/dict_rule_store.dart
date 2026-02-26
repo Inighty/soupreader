@@ -170,6 +170,24 @@ class DictRuleStore {
     await saveRules(updated);
   }
 
+  Future<void> deleteRulesByNames(Iterable<String> ruleNames) async {
+    final targetNames = ruleNames.toSet();
+    if (targetNames.isEmpty) {
+      return;
+    }
+    final rules = await loadRules();
+    if (rules.isEmpty) {
+      return;
+    }
+    final filtered = rules
+        .where((rule) => !targetNames.contains(rule.name))
+        .toList(growable: false);
+    if (filtered.length == rules.length) {
+      return;
+    }
+    await saveRules(filtered);
+  }
+
   Future<List<DictRule>> loadEnabledRules() async {
     final rules = await loadRules();
     final enabled = rules.where((rule) => rule.enabled).toList(growable: false)
@@ -319,7 +337,9 @@ class DictRuleStore {
     }
 
     final document = html_parser.parse(body);
-    return _ruleParserEngine.parseRuleForContext(document, ruleText, baseUrl).trim();
+    return _ruleParserEngine
+        .parseRuleForContext(document, ruleText, baseUrl)
+        .trim();
   }
 
   bool _looksLikeJsoupScript(String rule) {

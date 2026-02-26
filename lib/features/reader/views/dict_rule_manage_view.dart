@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/qr_scan_service.dart';
+import '../../settings/views/app_help_dialog.dart';
 import '../models/dict_rule.dart';
 import '../services/dict_rule_store.dart';
 import 'dict_rule_edit_view.dart';
@@ -34,6 +35,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
   bool _exportingSelection = false;
   bool _enablingSelection = false;
   bool _disablingSelection = false;
+  bool _deletingSelection = false;
   bool _selectionMode = false;
   List<DictRule> _rules = const <DictRule>[];
   final Set<String> _selectedRuleNames = <String>{};
@@ -44,14 +46,19 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
     _reloadRules();
   }
 
+  bool get _selectionUpdating => _enablingSelection || _disablingSelection;
+
+  bool get _selectionActionBusy =>
+      _selectionUpdating || _exportingSelection || _deletingSelection;
+
   bool get _menuBusy =>
       _importingDefault ||
       _importingLocal ||
       _importingOnline ||
       _importingQr ||
-      _enablingSelection ||
-      _disablingSelection ||
-      _exportingSelection;
+      _selectionUpdating ||
+      _exportingSelection ||
+      _deletingSelection;
 
   Future<void> _reloadRules() async {
     if (mounted) {
@@ -172,13 +179,6 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
           CupertinoActionSheetAction(
             onPressed: () => Navigator.pop(
               sheetContext,
-              _DictRuleMenuAction.importDefault,
-            ),
-            child: const Text('导入默认规则'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
               _DictRuleMenuAction.importLocal,
             ),
             child: const Text('本地导入'),
@@ -196,6 +196,18 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
               _DictRuleMenuAction.importQr,
             ),
             child: const Text('二维码导入'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(
+              sheetContext,
+              _DictRuleMenuAction.importDefault,
+            ),
+            child: const Text('导入默认规则'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () =>
+                Navigator.pop(sheetContext, _DictRuleMenuAction.help),
+            child: const Text('帮助'),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
@@ -217,6 +229,9 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
         return;
       case _DictRuleMenuAction.importQr:
         await _importQrRules();
+        return;
+      case _DictRuleMenuAction.help:
+        await _showDictRuleHelp();
         return;
     }
   }
@@ -348,6 +363,23 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
     } finally {
       if (!mounted) return;
       setState(() => _disablingSelection = false);
+    }
+  }
+
+  Future<void> _deleteSelectedRules() async {
+    if (_deletingSelection) return;
+    final selectedNames = _selectedRuleNames.toSet();
+    if (selectedNames.isEmpty) return;
+    setState(() => _deletingSelection = true);
+    try {
+      await _ruleStore.deleteRulesByNames(selectedNames);
+      await _reloadRules();
+    } catch (error, stackTrace) {
+      debugPrint('DeleteSelectionDictRuleError:$error');
+      debugPrint('$stackTrace');
+    } finally {
+      if (!mounted) return;
+      setState(() => _deletingSelection = false);
     }
   }
 
@@ -917,6 +949,21 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
     );
   }
 
+  Future<void> _showDictRuleHelp() async {
+    try {
+      final markdownText =
+          await rootBundle.loadString('assets/web/help/md/dictRuleHelp.md');
+      if (!mounted) return;
+      await showAppHelpDialog(context, markdownText: markdownText);
+    } catch (error) {
+      if (!mounted) return;
+      await _showMessageDialog(
+        title: '帮助',
+        message: '帮助文档加载失败：$error',
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedCount = _selectedRuleNames.length;
@@ -955,7 +1002,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                 ? (hasSelection && !_menuBusy ? _showSelectionMoreMenu : null)
                 : (_menuBusy ? null : _showMoreMenu),
             child: _selectionMode
-                ? (_exportingSelection
+                ? (_selectionActionBusy
                     ? const CupertinoActivityIndicator(radius: 9)
                     : Icon(
                         CupertinoIcons.ellipsis_circle,
@@ -1095,6 +1142,28 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                           ),
                           CupertinoButton(
                             padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            minimumSize: const Size(30, 30),
+                            onPressed: hasSelection && !_menuBusy
+                                ? _deleteSelectedRules
+                                : null,
+                            child: _deletingSelection
+                                ? const CupertinoActivityIndicator(radius: 9)
+                                : Text(
+                                    '删除',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: hasSelection && !_menuBusy
+                                          ? CupertinoColors.systemRed
+                                              .resolveFrom(context)
+                                          : disabledColor,
+                                    ),
+                                  ),
+                          ),
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(
                               horizontal: 4,
                               vertical: 6,
                             ),
@@ -1102,7 +1171,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                             onPressed: hasSelection && !_menuBusy
                                 ? _showSelectionMoreMenu
                                 : null,
-                            child: _exportingSelection
+                            child: _selectionActionBusy
                                 ? const CupertinoActivityIndicator(radius: 9)
                                 : Icon(
                                     CupertinoIcons.ellipsis_circle,
@@ -1123,10 +1192,11 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
 }
 
 enum _DictRuleMenuAction {
-  importDefault,
   importLocal,
   importOnline,
   importQr,
+  importDefault,
+  help,
 }
 
 enum _DictRuleSelectionMenuAction {

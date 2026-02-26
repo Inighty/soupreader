@@ -14,6 +14,7 @@ import '../../../core/database/repositories/replace_rule_repository.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/legado_json.dart';
 import '../../search/models/search_scope_group_helper.dart';
+import '../../settings/views/app_help_dialog.dart';
 import '../models/replace_rule.dart';
 import '../services/replace_rule_import_export_service.dart';
 import 'replace_rule_edit_view.dart';
@@ -46,6 +47,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   bool _disablingSelection = false;
   bool _toppingSelection = false;
   bool _bottomingSelection = false;
+  bool _deletingSelection = false;
   bool _selectionMode = false;
   final Set<int> _selectedRuleIds = <int>{};
 
@@ -55,12 +57,16 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       _toppingSelection ||
       _bottomingSelection;
 
+  bool get _selectionActionBusy =>
+      _exportingSelection || _selectionUpdating || _deletingSelection;
+
   bool get _menuBusy =>
       _importingLocal ||
       _importingOnline ||
       _importingQr ||
       _exportingSelection ||
-      _selectionUpdating;
+      _selectionUpdating ||
+      _deletingSelection;
 
   @override
   void initState() {
@@ -123,7 +129,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                         : null)
                     : (_menuBusy ? null : _showMoreMenu),
                 child: _selectionMode
-                    ? (_exportingSelection || _selectionUpdating
+                    ? (_selectionActionBusy
                         ? const CupertinoActivityIndicator(radius: 9)
                         : Icon(
                             CupertinoIcons.ellipsis_circle,
@@ -206,6 +212,28 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                         ),
                         CupertinoButton(
                           padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
+                          minimumSize: const Size(30, 30),
+                          onPressed: hasSelection && !_menuBusy
+                              ? () => _confirmDeleteSelectedRules(rules)
+                              : null,
+                          child: _deletingSelection
+                              ? const CupertinoActivityIndicator(radius: 9)
+                              : Text(
+                                  '删除',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: hasSelection && !_menuBusy
+                                        ? CupertinoColors.systemRed
+                                            .resolveFrom(context)
+                                        : disabledColor,
+                                  ),
+                                ),
+                        ),
+                        CupertinoButton(
+                          padding: const EdgeInsets.symmetric(
                             horizontal: 4,
                             vertical: 6,
                           ),
@@ -213,7 +241,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                           onPressed: hasSelection && !_menuBusy
                               ? () => _showSelectionMoreMenu(rules)
                               : null,
-                          child: _exportingSelection || _selectionUpdating
+                          child: _selectionActionBusy
                               ? const CupertinoActivityIndicator(radius: 9)
                               : Icon(
                                   CupertinoIcons.ellipsis_circle,
@@ -766,13 +794,6 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('从剪贴板导入'),
-            onPressed: () {
-              Navigator.pop(context);
-              _importFromClipboard();
-            },
-          ),
-          CupertinoActionSheetAction(
             child: const Text('本地导入'),
             onPressed: () {
               Navigator.pop(context);
@@ -794,18 +815,10 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('导出'),
+            child: const Text('帮助'),
             onPressed: () {
               Navigator.pop(context);
-              _export();
-            },
-          ),
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            child: const Text('删除未启用规则'),
-            onPressed: () {
-              Navigator.pop(context);
-              _repo.deleteDisabledRules();
+              _showReplaceRuleHelp();
             },
           ),
         ],
@@ -896,6 +909,50 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     } catch (error, stackTrace) {
       debugPrint('DeleteReplaceRuleError:$error');
       debugPrint('$stackTrace');
+    }
+  }
+
+  Future<void> _confirmDeleteSelectedRules(
+      List<ReplaceRule> visibleRules) async {
+    final selectedRules = _selectedRulesByCurrentOrder(visibleRules);
+    if (selectedRules.isEmpty) return;
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('提醒'),
+        content: const Text('是否确认删除？'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      return;
+    }
+    await _deleteSelectedRules(selectedRules);
+  }
+
+  Future<void> _deleteSelectedRules(List<ReplaceRule> selectedRules) async {
+    if (_deletingSelection || selectedRules.isEmpty) return;
+    setState(() => _deletingSelection = true);
+    try {
+      final targetIds = selectedRules.map((rule) => rule.id).toSet();
+      await _repo.deleteRulesByIds(targetIds);
+      _selectedRuleIds.removeWhere(targetIds.contains);
+    } catch (error, stackTrace) {
+      debugPrint('DeleteSelectionReplaceRuleError:$error');
+      debugPrint('$stackTrace');
+    } finally {
+      if (!mounted) return;
+      setState(() => _deletingSelection = false);
     }
   }
 
@@ -1141,22 +1198,6 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       if (!mounted) return;
       setState(() => _bottomingSelection = false);
     }
-  }
-
-  Future<void> _importFromClipboard() async {
-    final data = await Clipboard.getData('text/plain');
-    final text = data?.text?.trim();
-    if (text == null || text.isEmpty) {
-      _showMessage('剪贴板为空');
-      return;
-    }
-    final result = _io.importFromJson(text);
-    if (!result.success) {
-      _showMessage(result.errorMessage ?? '导入失败');
-      return;
-    }
-    await _repo.addRules(result.rules);
-    _showMessage('成功导入 ${result.rules.length} 条规则');
   }
 
   Future<void> _importFromFile() async {
@@ -1555,17 +1596,6 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     return value.startsWith('{') || value.startsWith('[');
   }
 
-  Future<void> _export() async {
-    final rules = _repo.getAllRules()
-      ..sort((a, b) => a.order.compareTo(b.order));
-    final jsonText = LegadoJson.encode(
-      rules.map((r) => r.toJson()).toList(growable: false),
-    );
-    // iOS/Android：保存文件；Web：复制到剪贴板（这里统一复制，避免平台差异）
-    await Clipboard.setData(ClipboardData(text: jsonText));
-    _showMessage('已复制 JSON（可粘贴保存为 replaceRule.json）');
-  }
-
   Future<void> _writeExportText(String outputPath, String text) async {
     final uri = Uri.tryParse(outputPath);
     if (uri != null && uri.scheme.toLowerCase() == 'file') {
@@ -1621,6 +1651,18 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
         ],
       ),
     );
+  }
+
+  Future<void> _showReplaceRuleHelp() async {
+    try {
+      final markdownText =
+          await rootBundle.loadString('assets/web/help/md/replaceRuleHelp.md');
+      if (!mounted) return;
+      await showAppHelpDialog(context, markdownText: markdownText);
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage('帮助文档加载失败：$error');
+    }
   }
 
   List<_ReplaceRuleImportCandidate> _buildImportCandidates(

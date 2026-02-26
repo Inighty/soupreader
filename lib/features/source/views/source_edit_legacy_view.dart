@@ -754,7 +754,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
               Navigator.pop(popupContext);
               setState(() => _autoComplete = !_autoComplete);
             },
-            child: Text('自动补全 ${_autoComplete ? '✓' : ''}'),
+            child: Text('${_autoComplete ? '✓ ' : ''}自动补全'),
           ),
           CupertinoActionSheetAction(
             onPressed: () {

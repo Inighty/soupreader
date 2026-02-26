@@ -1158,6 +1158,13 @@ class _SourceListViewState extends State<SourceListView> {
         title: const Text('排序'),
         actions: [
           CupertinoActionSheetAction(
+            child: Text('${!_sortAscending ? '✓ ' : ''}反序'),
+            onPressed: () {
+              setState(() => _sortAscending = !_sortAscending);
+              Navigator.pop(context);
+            },
+          ),
+          CupertinoActionSheetAction(
             child:
                 Text('${_sortMode == _SourceSortMode.manual ? '✓ ' : ''}手动排序'),
             onPressed: () => pickSort(_SourceSortMode.manual),
@@ -1189,13 +1196,6 @@ class _SourceListViewState extends State<SourceListView> {
             child:
                 Text('${_sortMode == _SourceSortMode.enabled ? '✓ ' : ''}是否启用'),
             onPressed: () => pickSort(_SourceSortMode.enabled),
-          ),
-          CupertinoActionSheetAction(
-            child: Text('${!_sortAscending ? '✓ ' : ''}反序'),
-            onPressed: () {
-              setState(() => _sortAscending = !_sortAscending);
-              Navigator.pop(context);
-            },
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
@@ -1824,7 +1824,7 @@ class _SourceListViewState extends State<SourceListView> {
     if (!ok) return;
 
     await Future.wait(
-      selected.map((source) => _sourceRepo.deleteSource(source.bookSourceUrl)),
+      selected.map((source) => _deleteSourceByLegacyRule(source.bookSourceUrl)),
     );
 
     setState(() {

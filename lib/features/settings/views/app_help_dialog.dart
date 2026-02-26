@@ -1,21 +1,30 @@
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show SelectableText;
 
 Future<void> showAppHelpDialog(
   BuildContext context, {
   required String markdownText,
+  String title = '帮助',
 }) {
   return showCupertinoDialog<void>(
     context: context,
-    builder: (_) => _AppHelpDialog(markdownText: markdownText),
+    builder: (_) => _AppHelpDialog(
+      title: title,
+      markdownText: markdownText,
+    ),
   );
 }
 
 class _AppHelpDialog extends StatelessWidget {
+  final String title;
   final String markdownText;
 
-  const _AppHelpDialog({required this.markdownText});
+  const _AppHelpDialog({
+    required this.title,
+    required this.markdownText,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -42,11 +51,11 @@ class _AppHelpDialog extends StatelessWidget {
                     child: Row(
                       children: [
                         const SizedBox(width: 48),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            '帮助',
+                            title,
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w600,
                             ),
@@ -65,8 +74,8 @@ class _AppHelpDialog extends StatelessWidget {
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(14, 10, 14, 18),
-                      child: Text(
-                        markdownText,
+                      child: SelectableText(
+                        markdownText.trim().isEmpty ? '暂无内容' : markdownText,
                         style: TextStyle(
                           fontSize: 14,
                           height: 1.48,

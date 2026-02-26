@@ -48,6 +48,22 @@ class ThemeConfigService {
     return true;
   }
 
+  String? sharePayloadAt(int index) {
+    final configs = loadConfigs();
+    if (index < 0 || index >= configs.length) return null;
+    return configs[index].toJsonText();
+  }
+
+  Future<bool> deleteAt(int index) async {
+    final next = List<ThemeConfigEntry>.from(loadConfigs());
+    if (index < 0 || index >= next.length) {
+      return false;
+    }
+    next.removeAt(index);
+    await _saveConfigs(next);
+    return true;
+  }
+
   Future<void> _saveConfigs(List<ThemeConfigEntry> configs) async {
     final payload = configs.map((config) => config.toJson()).toList();
     await _database.putSetting(_configSettingKey, payload);

@@ -55,7 +55,8 @@ class PagedReaderWidget extends StatefulWidget {
   // legado 提示层基线参数：用于分页模式的页眉/页脚占位计算（含边缘间距与分割线节奏）。
   static const double _tipHeaderFontSize = 12.0;
   static const double _tipFooterFontSize = 11.0;
-  static const double _tipEdgeInset = 6.0;
+  static const double _tipHeaderEdgeInset = 6.0;
+  static const double _tipFooterEdgeInset = 0.0;
   static const double _tipLineGap = 6.0;
   static const double _tipDividerThickness = 0.5;
   static const double topOffset = 37;
@@ -68,7 +69,7 @@ class PagedReaderWidget extends StatefulWidget {
     if (!settings.shouldShowHeader(showStatusBar: showStatusBar)) return 0.0;
     final dividerHeight =
         settings.showHeaderLine ? _tipLineGap + _tipDividerThickness : 0.0;
-    return _tipEdgeInset +
+    return _tipHeaderEdgeInset +
         settings.headerPaddingTop +
         _tipHeaderFontSize +
         settings.headerPaddingBottom +
@@ -81,7 +82,7 @@ class PagedReaderWidget extends StatefulWidget {
     if (!settings.shouldShowFooter()) return 0.0;
     final dividerHeight =
         settings.showFooterLine ? _tipLineGap + _tipDividerThickness : 0.0;
-    return _tipEdgeInset +
+    return _tipFooterEdgeInset +
         settings.footerPaddingBottom +
         _tipFooterFontSize +
         settings.footerPaddingTop +
@@ -599,7 +600,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
 
     if (_showHeader) {
       final y = topSafe +
-          PagedReaderWidget._tipEdgeInset +
+          PagedReaderWidget._tipHeaderEdgeInset +
           widget.settings.headerPaddingTop;
       _paintTipRow(
         canvas,
@@ -663,7 +664,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
       )..layout();
       final y = size.height -
           bottomSafe -
-          PagedReaderWidget._tipEdgeInset -
+          PagedReaderWidget._tipFooterEdgeInset -
           widget.settings.footerPaddingBottom -
           samplePainter.height;
       _paintTipRow(
@@ -3026,7 +3027,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
               if (_showHeader)
                 Positioned(
                   top: topSafe +
-                      PagedReaderWidget._tipEdgeInset +
+                      PagedReaderWidget._tipHeaderEdgeInset +
                       widget.settings.headerPaddingTop,
                   left: headerInsets.left,
                   right: headerInsets.right,
@@ -3073,7 +3074,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
               if (_showFooter)
                 Positioned(
                   bottom: bottomSafe +
-                      PagedReaderWidget._tipEdgeInset +
+                      PagedReaderWidget._tipFooterEdgeInset +
                       widget.settings.footerPaddingBottom,
                   left: footerInsets.left,
                   right: footerInsets.right,

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/qr_scan_service.dart';
+import '../../settings/views/app_help_dialog.dart';
 import '../models/txt_toc_rule.dart';
 import '../services/txt_toc_rule_store.dart';
 import 'txt_toc_rule_edit_view.dart';
@@ -43,7 +44,8 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
 
   bool get _selectionUpdating => _enablingSelection || _disablingSelection;
 
-  bool get _selectionActionBusy => _selectionUpdating || _exportingSelection;
+  bool get _selectionActionBusy =>
+      _selectionUpdating || _exportingSelection || _deletingRule;
 
   bool get _menuBusy =>
       _importingDefault ||
@@ -186,6 +188,11 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
             ),
             child: const Text('导入默认规则'),
           ),
+          CupertinoActionSheetAction(
+            onPressed: () =>
+                Navigator.pop(sheetContext, _TxtTocRuleMenuAction.help),
+            child: const Text('帮助'),
+          ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(sheetContext),
@@ -206,6 +213,9 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
         return;
       case _TxtTocRuleMenuAction.importQr:
         await _importQrRules();
+        return;
+      case _TxtTocRuleMenuAction.help:
+        await _showTxtTocRuleHelp();
         return;
     }
   }
@@ -356,6 +366,58 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
       });
     } catch (error, stackTrace) {
       debugPrint('DeleteTxtTocRuleError:$error');
+      debugPrint('$stackTrace');
+    } finally {
+      if (!mounted) return;
+      setState(() => _deletingRule = false);
+    }
+  }
+
+  Future<void> _confirmDeleteSelectedRules() async {
+    final selectedIds = _selectedRuleIds.toSet();
+    if (selectedIds.isEmpty) return;
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('提醒'),
+        content: const Text('是否确认删除？'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      return;
+    }
+    await _deleteSelectedRules(selectedIds);
+  }
+
+  Future<void> _deleteSelectedRules(Set<int> selectedIds) async {
+    if (_deletingRule || selectedIds.isEmpty) return;
+    setState(() => _deletingRule = true);
+    try {
+      await _ruleStore.deleteRulesByIds(selectedIds);
+      final rules = await _ruleStore.loadRules();
+      if (!mounted) return;
+      final availableIds = rules.map((item) => item.id).toSet();
+      setState(() {
+        _rules = rules;
+        _selectedRuleIds.removeWhere((id) => !availableIds.contains(id));
+        if (_rules.isEmpty) {
+          _selectionMode = false;
+          _selectedRuleIds.clear();
+        }
+      });
+    } catch (error, stackTrace) {
+      debugPrint('DeleteSelectionTxtTocRuleError:$error');
       debugPrint('$stackTrace');
     } finally {
       if (!mounted) return;
@@ -1040,6 +1102,21 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
     );
   }
 
+  Future<void> _showTxtTocRuleHelp() async {
+    try {
+      final markdownText =
+          await rootBundle.loadString('assets/web/help/md/txtTocRuleHelp.md');
+      if (!mounted) return;
+      await showAppHelpDialog(context, markdownText: markdownText);
+    } catch (error) {
+      if (!mounted) return;
+      await _showMessageDialog(
+        title: '帮助',
+        message: '帮助文档加载失败：$error',
+      );
+    }
+  }
+
   String _formatImportError(Object error) {
     if (error is FileSystemException) {
       final message = error.message.trim();
@@ -1198,6 +1275,28 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                                     hasSelection ? enabledColor : disabledColor,
                               ),
                             ),
+                          ),
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            minimumSize: const Size(30, 30),
+                            onPressed: hasSelection && !_menuBusy
+                                ? _confirmDeleteSelectedRules
+                                : null,
+                            child: _deletingRule
+                                ? const CupertinoActivityIndicator(radius: 9)
+                                : Text(
+                                    '删除',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: hasSelection && !_menuBusy
+                                          ? CupertinoColors.systemRed
+                                              .resolveFrom(context)
+                                          : disabledColor,
+                                    ),
+                                  ),
                           ),
                           CupertinoButton(
                             padding: const EdgeInsets.symmetric(
@@ -1486,6 +1585,7 @@ enum _TxtTocRuleMenuAction {
   importLocal,
   importOnline,
   importQr,
+  help,
 }
 
 enum _TxtTocRuleItemMenuAction {

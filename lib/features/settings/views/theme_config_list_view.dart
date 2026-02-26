@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/models/app_settings.dart';
@@ -74,12 +75,49 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
   Future<void> _applyConfig(ThemeConfigEntry config) async {
     final targetMode =
         config.isNightTheme ? AppAppearanceMode.dark : AppAppearanceMode.light;
-    if (_settingsService.appSettings.appearanceMode == targetMode) {
-      return;
-    }
     await _settingsService.saveAppSettings(
       _settingsService.appSettings.copyWith(appearanceMode: targetMode),
     );
+  }
+
+  Future<void> _shareConfig(int index) async {
+    final payload = _themeConfigService.sharePayloadAt(index);
+    if (payload == null) return;
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: payload,
+          subject: '主题分享',
+        ),
+      );
+    } catch (_) {
+      // 对齐 legado Context.share(text, title)：分享失败静默吞掉。
+    }
+  }
+
+  Future<void> _deleteConfig(int index) async {
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('删除'),
+        content: const Text('\n是否确认删除？'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _themeConfigService.deleteAt(index);
+    if (!mounted) return;
+    await _reloadConfigs();
   }
 
   bool _isSelectedConfig(ThemeConfigEntry config) {
@@ -145,10 +183,41 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
                             title: Text('暂无主题配置'),
                           ),
                         ]
-                      : _configs.map((config) {
+                      : _configs.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final config = entry.value;
                           return CupertinoListTile.notched(
                             title: Text(_titleText(config)),
                             additionalInfo: Text(_modeText(config)),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                CupertinoButton(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 0,
+                                  ),
+                                  minSize: 28,
+                                  onPressed: () => _shareConfig(index),
+                                  child: const Icon(
+                                    CupertinoIcons.share,
+                                    size: 18,
+                                  ),
+                                ),
+                                CupertinoButton(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 0,
+                                  ),
+                                  minSize: 28,
+                                  onPressed: () => _deleteConfig(index),
+                                  child: const Icon(
+                                    CupertinoIcons.delete,
+                                    size: 18,
+                                  ),
+                                ),
+                              ],
+                            ),
                             onTap: () => _applyConfig(config),
                           );
                         }).toList(),

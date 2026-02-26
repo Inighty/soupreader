@@ -68,7 +68,8 @@ class ReplaceRuleRepository {
   }
 
   List<ReplaceRule> getEnabledRulesSorted() {
-    final list = getAllRules().where((r) => r.isEnabled).toList(growable: false);
+    final list =
+        getAllRules().where((r) => r.isEnabled).toList(growable: false);
     list.sort((a, b) => a.order.compareTo(b.order));
     return list;
   }
@@ -83,8 +84,7 @@ class ReplaceRuleRepository {
 
   Future<void> addRules(List<ReplaceRule> rules) async {
     if (rules.isEmpty) return;
-    final companions =
-        rules.map(_modelToCompanion).toList(growable: false);
+    final companions = rules.map(_modelToCompanion).toList(growable: false);
     await _driftDb.batch((batch) {
       batch.insertAllOnConflictUpdate(_driftDb.replaceRuleRecords, companions);
     });
@@ -103,6 +103,18 @@ class ReplaceRuleRepository {
           ..where((r) => r.id.equals(id)))
         .go();
     _cacheById.remove(id);
+    _emitCacheSnapshot();
+  }
+
+  Future<void> deleteRulesByIds(Iterable<int> ids) async {
+    final targetIds = ids.toSet();
+    if (targetIds.isEmpty) {
+      return;
+    }
+    await (_driftDb.delete(_driftDb.replaceRuleRecords)
+          ..where((r) => r.id.isIn(targetIds)))
+        .go();
+    _cacheById.removeWhere((id, _) => targetIds.contains(id));
     _emitCacheSnapshot();
   }
 

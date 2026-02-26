@@ -4992,6 +4992,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 return;
               }
               Navigator.pop(sheetContext);
+              await _copySelectedTextFromMenu(selection.text);
+            },
+            child: _buildTextActionMenuLabel('复制'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              if (_contentSelectMenuLongPressHandled) {
+                _contentSelectMenuLongPressHandled = false;
+                return;
+              }
+              Navigator.pop(sheetContext);
               await _openBookmarkEditorFromSelectedText(selectedText);
             },
             child: _buildTextActionMenuLabel('书签'),
@@ -5209,6 +5220,30 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     } catch (error) {
       _showToast(_resolveTextActionErrorMessage(error));
     }
+  }
+
+  Future<void> _copySelectedTextFromMenu(String selectedText) async {
+    if (selectedText.isEmpty) {
+      return;
+    }
+    try {
+      await Clipboard.setData(ClipboardData(text: selectedText));
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'reader.menu.content_select_action.copy.failed',
+        message: '复制选中文本失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'bookId': widget.bookId,
+          'chapterIndex': _currentChapterIndex,
+          'textLength': selectedText.length,
+        },
+      );
+      return;
+    }
+    if (!mounted) return;
+    _showCopyToast('已拷贝');
   }
 
   Future<void> _shareSelectedText(String selectedText) async {
@@ -7555,6 +7590,48 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showCopyToast(String message) {
+    if (!mounted) return;
+    showCupertinoModalPopup<void>(
+      context: context,
+      barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
+      builder: (toastContext) {
+        final navigator = Navigator.of(toastContext);
+        unawaited(Future<void>.delayed(const Duration(milliseconds: 1100), () {
+          if (navigator.mounted && navigator.canPop()) {
+            navigator.pop();
+          }
+        }));
+        return SafeArea(
+          top: false,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 28),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemBackground
+                    .resolveFrom(context)
+                    .withValues(alpha: 0.96),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: CupertinoColors.separator.resolveFrom(context),
+                ),
+              ),
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: CupertinoColors.label.resolveFrom(context),
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -15938,20 +16015,63 @@ class _ReaderContentEditorPageState extends State<_ReaderContentEditorPage> {
 
   Future<void> _copyAll() async {
     final payload = '${_titleController.text}\n${_contentController.text}';
-    await Clipboard.setData(ClipboardData(text: payload));
+    try {
+      await Clipboard.setData(ClipboardData(text: payload));
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'reader.menu.content_edit.copy_all.failed',
+        message: '拷贝所有失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'payloadLength': payload.length,
+        },
+      );
+      return;
+    }
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    _showCopyToast('已拷贝');
+  }
+
+  void _showCopyToast(String message) {
+    if (!mounted) return;
+    showCupertinoModalPopup<void>(
       context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('复制全文'),
-        content: const Text('\n已复制到剪贴板'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('确定'),
+      barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
+      builder: (toastContext) {
+        final navigator = Navigator.of(toastContext);
+        unawaited(Future<void>.delayed(const Duration(milliseconds: 1100), () {
+          if (navigator.mounted && navigator.canPop()) {
+            navigator.pop();
+          }
+        }));
+        return SafeArea(
+          top: false,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 28),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemBackground
+                    .resolveFrom(context)
+                    .withValues(alpha: 0.96),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: CupertinoColors.separator.resolveFrom(context),
+                ),
+              ),
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: CupertinoColors.label.resolveFrom(context),
+                  fontSize: 13,
+                ),
+              ),
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

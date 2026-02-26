@@ -29,6 +29,10 @@ class ThemeConfigEntry {
     };
   }
 
+  String toJsonText() {
+    return jsonEncode(toJson());
+  }
+
   static ThemeConfigEntry? tryParseJsonText(String rawText) {
     final normalized = rawText.trim();
     if (normalized.isEmpty) return null;

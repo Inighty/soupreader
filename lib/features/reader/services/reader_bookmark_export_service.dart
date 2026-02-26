@@ -290,6 +290,7 @@ class ReaderBookmarkExportService {
       return ReaderBookmarkExportResult(
         success: true,
         outputPath: normalizedPath,
+        message: '导出成功',
       );
     } catch (e) {
       return ReaderBookmarkExportResult(

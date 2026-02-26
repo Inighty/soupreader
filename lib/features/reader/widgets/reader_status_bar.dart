@@ -34,7 +34,8 @@ class ReaderStatusBar extends StatefulWidget {
   State<ReaderStatusBar> createState() => _ReaderStatusBarState();
 }
 
-const double _legacyTipEdgeInset = 6.0;
+const double _legacyHeaderTipEdgeInset = 6.0;
+const double _legacyFooterTipEdgeInset = 0.0;
 
 class _ReaderStatusBarState extends State<ReaderStatusBar> {
   final Battery _battery = Battery();
@@ -100,7 +101,7 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
             top: widget.settings.footerPaddingTop,
             bottom: bottomInset +
                 widget.settings.footerPaddingBottom +
-                _legacyTipEdgeInset,
+                _legacyFooterTipEdgeInset,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -325,7 +326,7 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
           padding: EdgeInsets.only(
             top: topInset +
                 widget.settings.headerPaddingTop +
-                _legacyTipEdgeInset,
+                _legacyHeaderTipEdgeInset,
             bottom: widget.settings.headerPaddingBottom,
             left: widget.settings.headerPaddingLeft,
             right: widget.settings.headerPaddingRight,

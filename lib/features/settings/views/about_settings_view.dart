@@ -1,15 +1,21 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show SelectableText;
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/exception_log_service.dart';
+import '../../../core/services/settings_service.dart';
+import 'app_help_dialog.dart';
+import 'exception_logs_view.dart';
 
 class AboutSettingsView extends StatefulWidget {
   const AboutSettingsView({super.key});
@@ -22,30 +28,44 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
   static const String _fallbackAppName = 'SoupReader';
   static const String _appShareDescription =
       'SoupReader 下载链接：\nhttps://github.com/Inighty/soupreader/releases';
+  static const String _contributorsUrl =
+      'https://github.com/gedoor/legado/graphs/contributors';
+  static const String _contributorsSummary =
+      'gedoor、Invinciblelee 和 Xwite 等，详情请在 GitHub 中查看';
+
+  final SettingsService _settingsService = SettingsService();
+  final ExceptionLogService _exceptionLogService = ExceptionLogService();
 
   String _version = '—';
+  String _versionSummary = '版本 —';
   String _appName = _fallbackAppName;
+  String _packageName = '';
 
   @override
   void initState() {
     super.initState();
-    _loadVersion();
+    _loadPackageInfo();
   }
 
-  Future<void> _loadVersion() async {
+  Future<void> _loadPackageInfo() async {
     try {
       final info = await PackageInfo.fromPlatform();
-      final appName = info.appName.trim();
       if (!mounted) return;
+      final appName = info.appName.trim();
+      final version = info.version.trim();
       setState(() {
         _appName = appName.isEmpty ? _fallbackAppName : appName;
-        _version = '${info.version} (${info.buildNumber})';
+        _version = version.isEmpty ? '—' : version;
+        _versionSummary = '版本 $_version';
+        _packageName = info.packageName.trim();
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _appName = _fallbackAppName;
         _version = '—';
+        _versionSummary = '版本 —';
+        _packageName = '';
       });
     }
   }
@@ -53,50 +73,96 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
   @override
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
-      title: '关于与诊断',
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size(30, 30),
-        onPressed: _handleShare,
-        child: const Icon(CupertinoIcons.share),
-      ),
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
-        children: [
-          CupertinoListSection.insetGrouped(
-            header: const Text('应用'),
+      title: '关于',
+      trailing: _buildTrailingActions(),
+      child: ValueListenableBuilder<List<ExceptionLogEntry>>(
+        valueListenable: _exceptionLogService.listenable,
+        builder: (context, logs, _) {
+          return ListView(
+            padding: const EdgeInsets.only(top: 8, bottom: 20),
             children: [
-              CupertinoListTile.notched(
-                title: const Text('应用名称'),
-                additionalInfo: const Text('SoupReader'),
+              CupertinoListSection.insetGrouped(
+                children: [
+                  CupertinoListTile.notched(
+                    title: const Text('开发人员'),
+                    additionalInfo: const Text(_contributorsSummary),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _openContributors,
+                  ),
+                  CupertinoListTile.notched(
+                    title: const Text('更新日志'),
+                    additionalInfo: Text(_versionSummary),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _openUpdateLog,
+                  ),
+                  CupertinoListTile.notched(
+                    title: const Text('检查更新'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _checkUpdate,
+                  ),
+                ],
               ),
-              CupertinoListTile.notched(
-                title: const Text('版本'),
-                additionalInfo: Text(_version),
+              CupertinoListSection.insetGrouped(
+                header: const Text('其它'),
+                children: [
+                  CupertinoListTile.notched(
+                    title: const Text('崩溃日志'),
+                    additionalInfo: Text('${logs.length} 条'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _openCrashLogs,
+                  ),
+                  CupertinoListTile.notched(
+                    title: const Text('保存日志'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _saveLog,
+                  ),
+                  CupertinoListTile.notched(
+                    title: const Text('创建堆转储'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _createHeapDump,
+                  ),
+                  CupertinoListTile.notched(
+                    title: const Text('用户隐私与协议'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _openPrivacyPolicy,
+                  ),
+                  CupertinoListTile.notched(
+                    title: const Text('开源许可'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _openLicense,
+                  ),
+                  CupertinoListTile.notched(
+                    title: const Text('免责声明'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _openDisclaimer,
+                  ),
+                ],
               ),
+              const SizedBox(height: 24),
             ],
-          ),
-          CupertinoListSection.insetGrouped(
-            header: const Text('更新'),
-            children: [
-              CupertinoListTile.notched(
-                title: const Text('检查更新'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: _checkUpdate,
-              ),
-            ],
-          ),
-          CupertinoListSection.insetGrouped(
-            header: const Text('说明'),
-            children: const [
-              CupertinoListTile(
-                title: Text('如遇到书源解析问题，建议在“书源”中导出相关书源 JSON 便于排查。'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-        ],
+          );
+        },
       ),
+    );
+  }
+
+  Widget _buildTrailingActions() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CupertinoButton(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          minimumSize: const Size(30, 30),
+          onPressed: _handleShare,
+          child: const Icon(CupertinoIcons.share, size: 20),
+        ),
+        CupertinoButton(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          minimumSize: const Size(30, 30),
+          onPressed: _openScoring,
+          child: const Icon(CupertinoIcons.hand_thumbsup, size: 20),
+        ),
+      ],
     );
   }
 
@@ -108,78 +174,429 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
           subject: _appName,
         ),
       );
-    } catch (_) {
-      // 对齐 legado Context.share(text, title)：分享失败静默吞掉。
-    }
-  }
-
-  Future<void> _checkUpdate() async {
-    showCupertinoDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CupertinoActivityIndicator()),
-    );
-
-    try {
-      final dio = Dio();
-      final response = await dio.get(
-        'https://github-action-cf.mcshr.workers.dev/latest',
-      );
-
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      if (response.statusCode == 200) {
-        final updateInfo = _parseUpdateInfo(response.data);
-        if (updateInfo == null) {
-          _showMessage('检查失败');
-          return;
-        }
-        if (updateInfo.downloadUrl.isEmpty) {
-          _showMessage('未找到安装包');
-          return;
-        }
-        if (updateInfo.updateBody.trim().isEmpty) {
-          _showMessage('没有数据');
-          return;
-        }
-        _showUpdateInfo(updateInfo);
-        return;
-      }
-
-      _showMessage('检查失败');
-    } catch (e, stackTrace) {
-      ExceptionLogService().record(
-        node: 'app_update.check_update',
-        message: '检查更新失败',
-        error: e,
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: 'about.menu_share_it',
+        message: '分享动作触发失败',
+        error: error,
         stackTrace: stackTrace,
       );
-      if (mounted) {
-        Navigator.pop(context);
-        if (e is DioException && e.response?.statusCode == 404) {
-          _showMessage('暂无更新');
-        } else {
-          _showMessage('检查失败');
-        }
-      }
+      if (!mounted) return;
+      await _showMessage('分享失败：${_errorSummary(error)}');
     }
   }
 
-  void _showMessage(String message) {
-    showCupertinoDialog(
+  Future<void> _openScoring() async {
+    final packageName = _packageName.trim();
+    if (packageName.isEmpty) {
+      await _showMessage('未获取到应用包名，无法打开评分入口');
+      return;
+    }
+
+    final marketUri = Uri.parse('market://details?id=$packageName');
+    final webUri =
+        Uri.parse('https://play.google.com/store/apps/details?id=$packageName');
+
+    try {
+      final marketStarted = await launchUrl(
+        marketUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (marketStarted) return;
+
+      final webStarted = await launchUrl(
+        webUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (webStarted) return;
+
+      await _showMessage('未找到可用的评分入口');
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: 'about.menu_scoring',
+        message: '评分入口打开失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'packageName': packageName,
+        },
+      );
+      if (!mounted) return;
+      await _showMessage('评分入口打开失败：${_errorSummary(error)}');
+    }
+  }
+
+  Future<void> _openContributors() async {
+    await _openExternalUrl(
+      _contributorsUrl,
+      node: 'about.contributors',
+      failureMessage: '打开开发人员页面失败',
+    );
+  }
+
+  Future<void> _openCrashLogs() async {
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => const ExceptionLogsView(
+          title: '崩溃日志',
+          emptyHint: '暂无崩溃日志',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openUpdateLog() async {
+    await _openDoc(
+      title: '更新日志',
+      assetPath: 'assets/docs/update_log.md',
+      node: 'about.update_log',
+    );
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    await _openDoc(
+      title: '用户隐私与协议',
+      assetPath: 'assets/docs/privacy_policy.md',
+      node: 'about.privacy_policy',
+    );
+  }
+
+  Future<void> _openLicense() async {
+    await _openDoc(
+      title: '开源许可',
+      assetPath: 'assets/docs/LICENSE.md',
+      node: 'about.license',
+    );
+  }
+
+  Future<void> _openDisclaimer() async {
+    await _openDoc(
+      title: '免责声明',
+      assetPath: 'assets/docs/disclaimer.md',
+      node: 'about.disclaimer',
+    );
+  }
+
+  Future<void> _openDoc({
+    required String title,
+    required String assetPath,
+    required String node,
+  }) async {
+    try {
+      final markdownText = await rootBundle.loadString(assetPath);
+      if (!mounted) return;
+      await showAppHelpDialog(
+        context,
+        title: title,
+        markdownText: markdownText,
+      );
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: node,
+        message: '文档加载失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{'assetPath': assetPath},
+      );
+      if (!mounted) return;
+      await _showMessage('文档加载失败：${_errorSummary(error)}');
+    }
+  }
+
+  Future<void> _saveLog() async {
+    final settings = _settingsService.appSettings;
+    final backupPath = settings.backupPath.trim();
+    if (backupPath.isEmpty) {
+      await _showMessage('未设置备份目录');
+      return;
+    }
+
+    if (!settings.recordLog) {
+      final shouldContinue = await _confirmAction(
+        title: '记录日志未开启',
+        message: '当前“记录日志”未开启，仍将导出当前已采集日志。',
+        confirmText: '继续',
+      );
+      if (!shouldContinue) return;
+    }
+
+    try {
+      final filePath = await _writeLogsToBackup(backupPath);
+      _exceptionLogService.record(
+        node: 'about.save_log',
+        message: '日志保存成功',
+        context: <String, dynamic>{
+          'filePath': filePath,
+          'entries': _exceptionLogService.count,
+        },
+      );
+      await _showMessage('已保存至备份目录\n$filePath');
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: 'about.save_log',
+        message: '日志保存失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'backupPath': backupPath,
+        },
+      );
+      if (!mounted) return;
+      await _showMessage('保存日志失败：${_errorSummary(error)}');
+    }
+  }
+
+  Future<void> _createHeapDump() async {
+    final settings = _settingsService.appSettings;
+    final backupPath = settings.backupPath.trim();
+    if (backupPath.isEmpty) {
+      await _showMessage('未设置备份目录');
+      return;
+    }
+
+    if (!settings.recordHeapDump) {
+      final shouldContinue = await _confirmAction(
+        title: '堆转储未开启',
+        message: '当前“记录堆转储”未开启，仍将尝试创建诊断堆快照。',
+        confirmText: '继续',
+      );
+      if (!shouldContinue) return;
+    }
+
+    try {
+      final filePath = await _writeHeapDumpToBackup(backupPath);
+      _exceptionLogService.record(
+        node: 'about.create_heap_dump',
+        message: '堆转储保存成功',
+        context: <String, dynamic>{
+          'filePath': filePath,
+        },
+      );
+      await _showMessage('已保存至备份目录\n$filePath');
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: 'about.create_heap_dump',
+        message: '创建堆转储失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'backupPath': backupPath,
+        },
+      );
+      if (!mounted) return;
+      await _showMessage('创建堆转储失败：${_errorSummary(error)}');
+    }
+  }
+
+  Future<String> _writeLogsToBackup(String backupPath) async {
+    final backupDir = Directory(backupPath);
+    if (!await backupDir.exists()) {
+      await backupDir.create(recursive: true);
+    }
+
+    final logsDir = Directory(p.join(backupDir.path, 'logs'));
+    if (!await logsDir.exists()) {
+      await logsDir.create(recursive: true);
+    }
+
+    final fileName = 'soupreader_logs_${_fileTimestamp()}.json';
+    final file = File(p.join(logsDir.path, fileName));
+
+    final payload = <String, dynamic>{
+      'generatedAt': DateTime.now().toIso8601String(),
+      'appName': _appName,
+      'packageName': _packageName,
+      'version': _version,
+      'entries': _exceptionLogService.entries
+          .map((entry) => entry.toJson())
+          .toList(growable: false),
+    };
+
+    final content = const JsonEncoder.withIndent('  ').convert(payload);
+    await file.writeAsString(content, flush: true);
+    return file.path;
+  }
+
+  Future<String> _writeHeapDumpToBackup(String backupPath) async {
+    final backupDir = Directory(backupPath);
+    if (!await backupDir.exists()) {
+      await backupDir.create(recursive: true);
+    }
+
+    final dumpDir = Directory(p.join(backupDir.path, 'heapDump'));
+    if (!await dumpDir.exists()) {
+      await dumpDir.create(recursive: true);
+    }
+
+    final fileName = 'soupreader_heap_dump_${_fileTimestamp()}.json';
+    final file = File(p.join(dumpDir.path, fileName));
+
+    final payload = <String, dynamic>{
+      'generatedAt': DateTime.now().toIso8601String(),
+      'note': 'Flutter 暂不支持原生 HPROF，本文件为运行时堆快照信息。',
+      'currentRssBytes': ProcessInfo.currentRss,
+      'maxRssBytes': ProcessInfo.maxRss,
+      'logCount': _exceptionLogService.count,
+      'recentLogNodes': _exceptionLogService.entries
+          .take(20)
+          .map((entry) => entry.node)
+          .toList(growable: false),
+    };
+
+    final content = const JsonEncoder.withIndent('  ').convert(payload);
+    await file.writeAsString(content, flush: true);
+    return file.path;
+  }
+
+  String _fileTimestamp() {
+    final now = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    String three(int v) => v.toString().padLeft(3, '0');
+    return '${now.year}${two(now.month)}${two(now.day)}_'
+        '${two(now.hour)}${two(now.minute)}${two(now.second)}${three(now.millisecond)}';
+  }
+
+  Future<bool> _confirmAction({
+    required String title,
+    required String message,
+    required String confirmText,
+  }) async {
+    if (!mounted) return false;
+    final confirmed = await showCupertinoDialog<bool>(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('提示'),
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text(title),
         content: Text('\n$message'),
         actions: [
           CupertinoDialogAction(
-            child: const Text('好'),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(confirmText),
           ),
         ],
       ),
     );
+    return confirmed == true;
+  }
+
+  Future<void> _openExternalUrl(
+    String url, {
+    required String node,
+    required String failureMessage,
+  }) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      await _showMessage('$failureMessage：链接无效');
+      return;
+    }
+
+    try {
+      final started = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (started) return;
+      await _showMessage('$failureMessage：未找到可处理的应用');
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: node,
+        message: failureMessage,
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{'url': url},
+      );
+      if (!mounted) return;
+      await _showMessage('$failureMessage：${_errorSummary(error)}');
+    }
+  }
+
+  Future<void> _checkUpdate() async {
+    if (!mounted) return;
+    showCupertinoDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CupertinoActivityIndicator()),
+    );
+
+    _AppUpdateInfo? updateInfo;
+    String? errorMessage;
+
+    try {
+      final response = await Dio().get(
+        'https://github-action-cf.mcshr.workers.dev/latest',
+      );
+      if (response.statusCode != 200) {
+        errorMessage = '检查更新失败：HTTP ${response.statusCode ?? '-'}';
+      } else {
+        final parsed = _parseUpdateInfo(response.data);
+        if (parsed == null) {
+          errorMessage = '检查更新失败：响应解析失败';
+        } else if (parsed.downloadUrl.trim().isEmpty) {
+          errorMessage = '检查更新失败：未找到安装包';
+        } else if (parsed.updateBody.trim().isEmpty) {
+          errorMessage = '检查更新失败：更新说明为空';
+        } else {
+          updateInfo = parsed;
+        }
+      }
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: 'app_update.check_update',
+        message: '检查更新失败',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      errorMessage = '检查更新失败：${_errorSummary(error)}';
+    }
+
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+    if (!mounted) return;
+
+    if (updateInfo != null) {
+      _showUpdateInfo(updateInfo);
+      return;
+    }
+    await _showMessage(errorMessage ?? '检查更新失败');
+  }
+
+  Future<void> _showMessage(String message) async {
+    if (!mounted) return;
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('提示'),
+        content: Text('\n$message'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('好'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _errorSummary(Object error) {
+    if (error is DioException) {
+      final statusCode = error.response?.statusCode;
+      if (statusCode != null) {
+        return 'HTTP $statusCode';
+      }
+      final message = error.message?.trim();
+      if (message != null && message.isNotEmpty) {
+        return message;
+      }
+    }
+    final text = error.toString().trim();
+    if (text.isEmpty) return '未知错误';
+    if (text.length <= 120) return text;
+    return '${text.substring(0, 120)}...';
   }
 
   _AppUpdateInfo? _parseUpdateInfo(dynamic rawData) {
@@ -277,7 +694,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
   }
 
   void _showUpdateInfo(_AppUpdateInfo updateInfo) {
-    showCupertinoDialog(
+    showCupertinoDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (_) => _AppUpdateDialog(
@@ -296,7 +713,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
 
     final uri = Uri.tryParse(downloadUrl);
     if (uri == null) {
-      ExceptionLogService().record(
+      _exceptionLogService.record(
         node: 'app_update.menu_download',
         message: '更新下载链接无效',
         context: {
@@ -304,7 +721,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
           'fileName': fileName,
         },
       );
-      _showMessage('下载启动失败');
+      await _showMessage('下载启动失败');
       return;
     }
 
@@ -314,7 +731,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
         mode: LaunchMode.externalApplication,
       );
       if (!started) {
-        ExceptionLogService().record(
+        _exceptionLogService.record(
           node: 'app_update.menu_download',
           message: '更新下载未能启动',
           context: {
@@ -322,13 +739,13 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
             'fileName': fileName,
           },
         );
-        _showMessage('下载启动失败');
+        await _showMessage('下载启动失败');
         return;
       }
       if (!mounted) return;
-      _showMessage('开始下载');
+      await _showMessage('开始下载');
     } catch (error, stackTrace) {
-      ExceptionLogService().record(
+      _exceptionLogService.record(
         node: 'app_update.menu_download',
         message: '更新下载触发失败',
         error: error,
@@ -339,7 +756,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
         },
       );
       if (!mounted) return;
-      _showMessage('下载启动失败');
+      await _showMessage('下载启动失败');
     }
   }
 }
@@ -410,9 +827,7 @@ class _AppUpdateDialog extends StatelessWidget {
                         CupertinoButton(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           minSize: 30,
-                          onPressed: () async {
-                            await onDownload();
-                          },
+                          onPressed: onDownload,
                           child: const Text('下载'),
                         ),
                       ],

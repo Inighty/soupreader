@@ -4,6 +4,8 @@
 # `codex --dangerously-bypass-approvals-and-sandbox exec
 # "continue to next task"` on a loop, restarting immediately if the codex
 # process stays silent for longer than the configured inactivity timeout.
+# It can also detect "no-op runs" (command succeeds but repository content
+# fingerprint does not change) and stop after repeated no-op streaks.
 
 set -euo pipefail
 
@@ -29,6 +31,35 @@ print_current_command() {
   echo "[codex-monitor] command: ${quoted[*]}"
 }
 
+is_in_git_repo() {
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
+compute_worktree_fingerprint() {
+  local tracked_hash
+  local staged_hash
+  local untracked_hash
+
+  tracked_hash=$(
+    git -c core.quotepath=false diff --no-ext-diff --binary -- . \
+      | sha256sum \
+      | awk '{print $1}'
+  )
+  staged_hash=$(
+    git -c core.quotepath=false diff --no-ext-diff --cached --binary -- . \
+      | sha256sum \
+      | awk '{print $1}'
+  )
+  untracked_hash=$(
+    git -c core.quotepath=false ls-files --others --exclude-standard -z \
+      | xargs -0 -r sha256sum \
+      | sha256sum \
+      | awk '{print $1}'
+  )
+
+  printf '%s|%s|%s\n' "$tracked_hash" "$staged_hash" "$untracked_hash"
+}
+
 terminate_codex_process() {
   local pid=$1
   local grace_seconds=${2:-5}
@@ -48,9 +79,13 @@ terminate_codex_process() {
 }
 
 # Allow overrides via env vars: CODEX_MONITOR_INACTIVITY_TIMEOUT (seconds)
-# and CODEX_MONITOR_INTERVAL_SECONDS (pause between completed runs).
+# CODEX_MONITOR_INTERVAL_SECONDS (pause between completed runs),
+# CODEX_MONITOR_REQUIRE_WORKTREE_CHANGE (1/0),
+# CODEX_MONITOR_MAX_NO_CHANGE_RUNS (integer >= 1).
 inactivity_timeout=${CODEX_MONITOR_INACTIVITY_TIMEOUT:-60}
 pause_seconds=${CODEX_MONITOR_INTERVAL_SECONDS:-60}
+require_worktree_change=${CODEX_MONITOR_REQUIRE_WORKTREE_CHANGE:-1}
+max_no_change_runs=${CODEX_MONITOR_MAX_NO_CHANGE_RUNS:-3}
 
 run_codex_with_watchdog() {
   local inactivity_limit=$1
@@ -60,8 +95,16 @@ run_codex_with_watchdog() {
   local inactivity_triggered=0
   local line
   local output_dir
+  local worktree_check_enabled=0
+  local start_fingerprint=""
+  local end_fingerprint=""
   output_dir=$(mktemp -d -t codex-monitor-XXXXXX)
   local output_fifo="$output_dir/codex-output"
+
+  if [[ "$require_worktree_change" != "0" ]] && is_in_git_repo; then
+    worktree_check_enabled=1
+    start_fingerprint=$(compute_worktree_fingerprint)
+  fi
 
   mkfifo "$output_fifo"
   TERM=xterm "${cmd[@]}" >"$output_fifo" 2>&1 &
@@ -88,10 +131,10 @@ run_codex_with_watchdog() {
         printf '%s\n' "$line"
       done
 
-      if ! wait "$codex_pid"; then
-        exit_code=$?
-      else
+      if wait "$codex_pid"; then
         exit_code=0
+      else
+        exit_code=$?
       fi
       break
     fi
@@ -101,10 +144,10 @@ run_codex_with_watchdog() {
     if (( now - last_output >= inactivity_limit )); then
       echo "[codex-monitor] no output from codex for ${inactivity_limit}s; terminating run..." >&2
       terminate_codex_process "$codex_pid"
-      if ! wait "$codex_pid"; then
-        exit_code=$?
-      else
+      if wait "$codex_pid"; then
         exit_code=0
+      else
+        exit_code=$?
       fi
       inactivity_triggered=1
       break
@@ -118,14 +161,29 @@ run_codex_with_watchdog() {
     return 124
   fi
 
-  return "$exit_code"
+  if [[ $exit_code -ne 0 ]]; then
+    return "$exit_code"
+  fi
+
+  if (( worktree_check_enabled )); then
+    end_fingerprint=$(compute_worktree_fingerprint)
+    if [[ "$end_fingerprint" == "$start_fingerprint" ]]; then
+      echo "[codex-monitor] command exited 0 but worktree fingerprint is unchanged." >&2
+      return 125
+    fi
+  fi
+
+  return 0
 }
+
+no_change_streak=0
 
 while true; do
   echo "[codex-monitor] starting run at $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   print_current_command
 
   if run_codex_with_watchdog "$inactivity_timeout"; then
+    no_change_streak=0
     echo "[codex-monitor] codex exec completed successfully (exit 0)."
     echo "[codex-monitor] waiting ${pause_seconds}s before the next run..."
     sleep "$pause_seconds"
@@ -138,6 +196,18 @@ while true; do
       continue
     fi
 
+    if [[ $exit_code -eq 125 ]]; then
+      no_change_streak=$((no_change_streak + 1))
+      echo "[codex-monitor] no-op run detected (no worktree change)."
+      echo "[codex-monitor] no-op streak: ${no_change_streak}/${max_no_change_runs}."
+      if (( no_change_streak >= max_no_change_runs )); then
+        echo "[codex-monitor] reached max no-op streak; exiting with code 125."
+        exit 125
+      fi
+      continue
+    fi
+
+    no_change_streak=0
     echo "[codex-monitor] codex exec exited with errors (exit $exit_code)."
     echo "[codex-monitor] waiting ${pause_seconds}s before the next run..."
     sleep "$pause_seconds"

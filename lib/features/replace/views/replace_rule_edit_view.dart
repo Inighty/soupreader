@@ -9,6 +9,7 @@ import '../models/replace_rule.dart';
 import '../services/replace_rule_engine.dart';
 
 enum _ReplaceRuleEditMenuAction {
+  copyRule,
   pasteRule,
 }
 
@@ -177,6 +178,11 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
         actions: [
           CupertinoActionSheetAction(
             onPressed: () => Navigator.pop(
+                sheetContext, _ReplaceRuleEditMenuAction.copyRule),
+            child: const Text('复制规则'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(
               sheetContext,
               _ReplaceRuleEditMenuAction.pasteRule,
             ),
@@ -191,9 +197,22 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
     );
     if (selected == null) return;
     switch (selected) {
+      case _ReplaceRuleEditMenuAction.copyRule:
+        await _copyRuleToClipboard();
+        return;
       case _ReplaceRuleEditMenuAction.pasteRule:
         await _pasteRuleFromClipboard();
         return;
+    }
+  }
+
+  Future<void> _copyRuleToClipboard() async {
+    try {
+      final jsonText = json.encode(_buildRuleForSave().toJson());
+      await Clipboard.setData(ClipboardData(text: jsonText));
+    } catch (error, stackTrace) {
+      debugPrint('CopyReplaceRuleError:$error\n$stackTrace');
+      await _showMessage('copy error, ${_resolveSaveError(error)}');
     }
   }
 

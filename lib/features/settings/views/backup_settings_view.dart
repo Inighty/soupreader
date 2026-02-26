@@ -1,9 +1,14 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../core/models/backup_restore_ignore_config.dart';
 import '../../../core/services/backup_service.dart';
+import '../../../core/services/backup_restore_ignore_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/services/webdav_service.dart';
+import 'app_help_dialog.dart';
+import 'app_log_dialog.dart';
 
 class BackupSettingsView extends StatefulWidget {
   const BackupSettingsView({super.key});
@@ -14,12 +19,18 @@ class BackupSettingsView extends StatefulWidget {
 
 class _BackupSettingsViewState extends State<BackupSettingsView> {
   final BackupService _backupService = BackupService();
+  final BackupRestoreIgnoreService _backupRestoreIgnoreService =
+      BackupRestoreIgnoreService();
   final SettingsService _settingsService = SettingsService();
   final WebDavService _webDavService = WebDavService();
+  bool _loadingHelp = false;
+  BackupRestoreIgnoreConfig _restoreIgnoreConfig =
+      const BackupRestoreIgnoreConfig();
 
   @override
   void initState() {
     super.initState();
+    _restoreIgnoreConfig = _backupRestoreIgnoreService.load();
     _settingsService.appSettingsListenable.addListener(_onSettingsChanged);
   }
 
@@ -36,8 +47,10 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = _settingsService.appSettings;
     return AppCupertinoPageScaffold(
       title: '备份与恢复',
+      trailing: _buildTrailingActions(),
       child: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
@@ -79,30 +92,15 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
             header: const Text('WebDav 同步'),
             children: [
               CupertinoListTile.notched(
-                title: const Text('同步阅读进度'),
-                additionalInfo: const Text('进入退出阅读界面时同步阅读进度'),
-                trailing: CupertinoSwitch(
-                  value: _settingsService.appSettings.syncBookProgress,
-                  onChanged: (value) async {
-                    await _settingsService.saveAppSettings(
-                      _settingsService.appSettings
-                          .copyWith(syncBookProgress: value),
-                    );
-                    if (!mounted) return;
-                    setState(() {});
-                  },
-                ),
-              ),
-              CupertinoListTile.notched(
                 title: const Text('服务器地址'),
                 additionalInfo: Text(
-                  _brief(_settingsService.appSettings.webDavUrl),
+                  _brief(settings.webDavUrl),
                 ),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => _editWebDavField(
                   title: '服务器地址',
                   placeholder: 'https://dav.example.com/dav/',
-                  initialValue: _settingsService.appSettings.webDavUrl,
+                  initialValue: settings.webDavUrl,
                   onSave: (value) async {
                     await _settingsService.saveAppSettings(
                       _settingsService.appSettings.copyWith(webDavUrl: value),
@@ -113,13 +111,13 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
               CupertinoListTile.notched(
                 title: const Text('账号'),
                 additionalInfo: Text(
-                  _brief(_settingsService.appSettings.webDavAccount),
+                  _brief(settings.webDavAccount),
                 ),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => _editWebDavField(
                   title: 'WebDav 账号',
                   placeholder: '请输入账号',
-                  initialValue: _settingsService.appSettings.webDavAccount,
+                  initialValue: settings.webDavAccount,
                   onSave: (value) async {
                     await _settingsService.saveAppSettings(
                       _settingsService.appSettings
@@ -131,13 +129,13 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
               CupertinoListTile.notched(
                 title: const Text('密码'),
                 additionalInfo: Text(
-                  _maskSecret(_settingsService.appSettings.webDavPassword),
+                  _maskSecret(settings.webDavPassword),
                 ),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => _editWebDavField(
                   title: 'WebDav 密码',
                   placeholder: '请输入密码',
-                  initialValue: _settingsService.appSettings.webDavPassword,
+                  initialValue: settings.webDavPassword,
                   obscureText: true,
                   onSave: (value) async {
                     await _settingsService.saveAppSettings(
@@ -150,13 +148,13 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
               CupertinoListTile.notched(
                 title: const Text('同步目录'),
                 additionalInfo: Text(
-                  _brief(_settingsService.appSettings.webDavDir, fallback: '/'),
+                  _brief(settings.webDavDir, fallback: 'legado'),
                 ),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => _editWebDavField(
                   title: '同步目录',
                   placeholder: '可留空，例如 booksync',
-                  initialValue: _settingsService.appSettings.webDavDir,
+                  initialValue: settings.webDavDir,
                   onSave: (value) async {
                     await _settingsService.saveAppSettings(
                       _settingsService.appSettings.copyWith(webDavDir: value),
@@ -165,10 +163,88 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                 ),
               ),
               CupertinoListTile.notched(
+                title: const Text('设备名称'),
+                additionalInfo: Text(_brief(settings.webDavDeviceName)),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => _editWebDavField(
+                  title: '设备名称',
+                  placeholder: '可留空，用于区分备份来源设备',
+                  initialValue: settings.webDavDeviceName,
+                  onSave: _settingsService.saveWebDavDeviceName,
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('同步阅读进度'),
+                additionalInfo: const Text('进入退出阅读界面时同步阅读进度'),
+                trailing: CupertinoSwitch(
+                  value: settings.syncBookProgress,
+                  onChanged: _settingsService.saveSyncBookProgress,
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('同步增强'),
+                additionalInfo: const Text(
+                  '重新进入页面（息屏、后台返回等）或者网络变为可用时同步云端进度',
+                ),
+                trailing: CupertinoSwitch(
+                  value: settings.syncBookProgressPlus,
+                  onChanged: settings.syncBookProgress
+                      ? _settingsService.saveSyncBookProgressPlus
+                      : null,
+                ),
+              ),
+              CupertinoListTile.notched(
                 title: const Text('测试连接'),
                 additionalInfo: const Text('检查授权并准备 books 目录'),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _testWebDavConnection,
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('备份恢复'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('备份路径'),
+                additionalInfo: Text(
+                  _brief(settings.backupPath, fallback: '请选择备份路径'),
+                ),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _editBackupPath,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('备份到 WebDav'),
+                additionalInfo: const Text('上传当前备份到云端'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _backupToWebDav,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('从 WebDav 恢复'),
+                additionalInfo: const Text('选择云端备份恢复，失败可回退本地恢复'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _restoreFromWebDav,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('恢复时忽略'),
+                additionalInfo: Text(_brief(_restoreIgnoreConfig.summary())),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _editRestoreIgnore,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('仅保留最新备份'),
+                additionalInfo: const Text('本地备份仅保留最新备份文件'),
+                trailing: CupertinoSwitch(
+                  value: settings.onlyLatestBackup,
+                  onChanged: _settingsService.saveOnlyLatestBackup,
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('自动检查新备份'),
+                additionalInfo: const Text('打开软件时检查是否有新备份，有新备份时提示是否更新'),
+                trailing: CupertinoSwitch(
+                  value: settings.autoCheckNewBackup,
+                  onChanged: _settingsService.saveAutoCheckNewBackup,
+                ),
               ),
             ],
           ),
@@ -184,6 +260,86 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
         ],
       ),
     );
+  }
+
+  Widget _buildTrailingActions() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_loadingHelp)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: CupertinoActivityIndicator(radius: 9),
+          )
+        else
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minSize: 30,
+            onPressed: _openWebDavHelp,
+            child: const Icon(CupertinoIcons.question_circle, size: 22),
+          ),
+        CupertinoButton(
+          padding: EdgeInsets.zero,
+          minSize: 30,
+          onPressed: _showMoreActions,
+          child: const Icon(CupertinoIcons.ellipsis_circle, size: 22),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openWebDavHelp() async {
+    if (_loadingHelp) return;
+    setState(() => _loadingHelp = true);
+    try {
+      final markdownText =
+          await rootBundle.loadString('assets/web/help/md/webDavBookHelp.md');
+      if (!mounted) return;
+      await showAppHelpDialog(
+        context,
+        markdownText: markdownText,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('帮助'),
+          content: Text('帮助文档加载失败：$error'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() => _loadingHelp = false);
+    }
+  }
+
+  Future<void> _showMoreActions() async {
+    final selected = await showCupertinoModalPopup<_BackupMoreAction>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () =>
+                Navigator.of(sheetContext).pop(_BackupMoreAction.logs),
+            child: const Text('日志'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(sheetContext).pop(),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (selected == _BackupMoreAction.logs && mounted) {
+      await showAppLogDialog(context);
+    }
   }
 
   Future<void> _export({required bool includeOnlineCache}) async {
@@ -202,6 +358,13 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
   }
 
   Future<void> _import({required bool overwrite}) async {
+    final ignoreConfig = _backupRestoreIgnoreService.load();
+    if (mounted) {
+      setState(() {
+        _restoreIgnoreConfig = ignoreConfig;
+      });
+    }
+
     if (overwrite) {
       final confirmed = await showCupertinoDialog<bool>(
         context: context,
@@ -230,7 +393,10 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
       barrierDismissible: false,
       builder: (context) => const Center(child: CupertinoActivityIndicator()),
     );
-    final result = await _backupService.importFromFile(overwrite: overwrite);
+    final result = await _backupService.importFromFile(
+      overwrite: overwrite,
+      ignoreConfig: ignoreConfig,
+    );
     if (!mounted) return;
     Navigator.pop(context);
     if (result.cancelled) return;
@@ -238,8 +404,302 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
       _showMessage(result.errorMessage ?? '导入失败');
       return;
     }
-    _showMessage(
-      '导入完成：书源 ${result.sourcesImported} 条，书籍 ${result.booksImported} 本，章节 ${result.chaptersImported} 章',
+    _showImportResult(
+      result,
+      prefix:
+          '导入完成：书源 ${result.sourcesImported} 条，书籍 ${result.booksImported} 本，章节 ${result.chaptersImported} 章',
+    );
+  }
+
+  Future<void> _backupToWebDav() async {
+    final settings = _settingsService.appSettings;
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CupertinoActivityIndicator()),
+    );
+    String message;
+    try {
+      final payload = _backupService.buildUploadPayload(
+        onlyLatestBackup: settings.onlyLatestBackup,
+        deviceName: settings.webDavDeviceName,
+      );
+      final remoteUrl = await _webDavService.uploadBackupBytes(
+        settings: settings,
+        fileName: payload.fileName,
+        bytes: payload.bytes,
+      );
+      message = 'WebDav 备份成功\n文件：${payload.fileName}\n远端：$remoteUrl';
+    } catch (error) {
+      message = 'WebDav 备份失败\n$error';
+    }
+    if (!mounted) return;
+    Navigator.pop(context);
+    _showMessage(message);
+  }
+
+  Future<void> _restoreFromWebDav() async {
+    final settings = _settingsService.appSettings;
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CupertinoActivityIndicator()),
+    );
+
+    List<WebDavRemoteEntry> backups = const <WebDavRemoteEntry>[];
+    try {
+      backups = await _webDavService.listBackupFiles(settings: settings);
+    } catch (error) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      await _showWebDavRestoreFallback(error.toString());
+      return;
+    }
+    if (!mounted) return;
+    Navigator.pop(context);
+
+    if (backups.isEmpty) {
+      await _showWebDavRestoreFallback('WebDav 无可用备份文件');
+      return;
+    }
+
+    final selected = await _pickWebDavBackupFile(backups);
+    if (selected == null) return;
+    await _restoreSelectedWebDavBackup(selected);
+  }
+
+  Future<WebDavRemoteEntry?> _pickWebDavBackupFile(
+    List<WebDavRemoteEntry> backups,
+  ) async {
+    return showCupertinoDialog<WebDavRemoteEntry>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('选择恢复文件'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 320),
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final entry in backups)
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minSize: 44,
+                    onPressed: () => Navigator.pop(dialogContext, entry),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          entry.displayName,
+                          style: CupertinoTheme.of(context)
+                              .textTheme
+                              .textStyle
+                              .copyWith(fontSize: 16),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _backupEntrySummary(entry),
+                          style: CupertinoTheme.of(context)
+                              .textTheme
+                              .tabLabelTextStyle
+                              .copyWith(
+                                fontSize: 12,
+                                color: CupertinoColors.systemGrey,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('取消'),
+            onPressed: () => Navigator.pop(dialogContext),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _restoreSelectedWebDavBackup(WebDavRemoteEntry entry) async {
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CupertinoActivityIndicator()),
+    );
+
+    try {
+      final bytes = await _webDavService.downloadFileBytes(
+        settings: _settingsService.appSettings,
+        remoteUrl: entry.path,
+      );
+      final result = await _backupService.importFromBytesWithStoredIgnore(bytes);
+      if (!mounted) return;
+      Navigator.pop(context);
+      if (!result.success) {
+        await _showWebDavRestoreFallback(result.errorMessage ?? 'WebDav 恢复失败');
+        return;
+      }
+      _showImportResult(
+        result,
+        prefix:
+            'WebDav 恢复完成：书源 ${result.sourcesImported} 条，书籍 ${result.booksImported} 本，章节 ${result.chaptersImported} 章',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      await _showWebDavRestoreFallback(error.toString());
+    }
+  }
+
+  Future<void> _showWebDavRestoreFallback(String errorMessage) async {
+    if (!mounted) return;
+    final shouldFallback = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('恢复'),
+        content: Text(
+          'WebDavError\n$errorMessage\n将从本地备份恢复。',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('取消'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+          ),
+          CupertinoDialogAction(
+            child: const Text('回退本地恢复'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+          ),
+        ],
+      ),
+    );
+    if (shouldFallback == true) {
+      await _import(overwrite: false);
+    }
+  }
+
+  void _showImportResult(
+    BackupImportResult result, {
+    required String prefix,
+  }) {
+    final lines = <String>[prefix];
+    if (result.ignoredOptions.isNotEmpty) {
+      lines.add('恢复时忽略：${result.ignoredOptions.join('、')}');
+    }
+    if (result.ignoredLocalBooks > 0) {
+      lines.add('已跳过本地书籍 ${result.ignoredLocalBooks} 本');
+    }
+    _showMessage(lines.join('\n'));
+  }
+
+  String _backupEntrySummary(WebDavRemoteEntry entry) {
+    final size = _formatFileSize(entry.size);
+    final time = entry.lastModify > 0 ? _formatDateTime(entry.lastModify) : '时间未知';
+    return '$time · $size';
+  }
+
+  String _formatDateTime(int millis) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(millis).toLocal();
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${dt.year}-${two(dt.month)}-${two(dt.day)} ${two(dt.hour)}:${two(dt.minute)}';
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes <= 0) return '0 B';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  Future<void> _editRestoreIgnore() async {
+    final current = _backupRestoreIgnoreService.load();
+    final selected = <String>{};
+    for (final option in BackupRestoreIgnoreConfig.options) {
+      if (!current.isIgnored(option.key)) continue;
+      selected.add(option.key);
+    }
+    final result = await showCupertinoDialog<Set<String>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => CupertinoAlertDialog(
+          title: const Text('恢复时忽略'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 280),
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (final option in BackupRestoreIgnoreConfig.options)
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minSize: 34,
+                      onPressed: () {
+                        setDialogState(() {
+                          if (!selected.add(option.key)) {
+                            selected.remove(option.key);
+                          }
+                        });
+                      },
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              option.title,
+                              style: CupertinoTheme.of(context)
+                                  .textTheme
+                                  .textStyle
+                                  .copyWith(fontSize: 16),
+                            ),
+                          ),
+                          if (selected.contains(option.key))
+                            const Icon(
+                              CupertinoIcons.check_mark,
+                              size: 18,
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              child: const Text('取消'),
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
+            CupertinoDialogAction(
+              child: const Text('保存'),
+              onPressed: () =>
+                  Navigator.pop(dialogContext, Set<String>.from(selected)),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null) return;
+    await _backupRestoreIgnoreService.saveSelectedKeys(result);
+    final next = _backupRestoreIgnoreService.load();
+    if (!mounted) return;
+    setState(() {
+      _restoreIgnoreConfig = next;
+    });
+    _showMessage('已保存：${next.summary(maxItems: 3)}');
+  }
+
+  Future<void> _editBackupPath() async {
+    await _editWebDavField(
+      title: '备份路径',
+      placeholder: '请输入备份目录路径',
+      initialValue: _settingsService.appSettings.backupPath,
+      onSave: _settingsService.saveBackupPath,
     );
   }
 
@@ -334,4 +794,8 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
       ),
     );
   }
+}
+
+enum _BackupMoreAction {
+  logs,
 }

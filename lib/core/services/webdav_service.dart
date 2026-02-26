@@ -22,6 +22,22 @@ class WebDavUploadResult {
   const WebDavUploadResult({required this.remoteUrl});
 }
 
+class WebDavRemoteEntry {
+  final String displayName;
+  final String path;
+  final bool isDirectory;
+  final int size;
+  final int lastModify;
+
+  const WebDavRemoteEntry({
+    required this.displayName,
+    required this.path,
+    required this.isDirectory,
+    required this.size,
+    required this.lastModify,
+  });
+}
+
 /// 与 legado `BookProgress` 字段保持兼容，并补充 soupreader 侧进度字段。
 class WebDavBookProgress {
   final String name;
@@ -120,6 +136,22 @@ class WebDavService {
             );
 
   final Dio _dio;
+
+  static final RegExp _responseRegex = RegExp(
+    r'<(?:\w+:)?response\b[\s\S]*?<\/(?:\w+:)?response>',
+    caseSensitive: false,
+  );
+
+  static const String _propfindBody = '''<?xml version="1.0"?>
+<a:propfind xmlns:a="DAV:">
+  <a:prop>
+    <a:displayname/>
+    <a:resourcetype/>
+    <a:getcontentlength/>
+    <a:getlastmodified/>
+    <a:creationdate/>
+  </a:prop>
+</a:propfind>''';
 
   bool hasValidConfig(AppSettings settings) {
     final account = settings.webDavAccount.trim();
@@ -335,6 +367,129 @@ class WebDavService {
     return WebDavBookProgress.fromJson(jsonMap);
   }
 
+  Future<List<WebDavRemoteEntry>> listDirectory({
+    required AppSettings settings,
+    String? directoryUrl,
+  }) async {
+    await validateConfig(settings);
+    final requestedUrl = (directoryUrl ?? buildRootUrl(settings)).trim();
+    final requestUri = Uri.tryParse(requestedUrl);
+    if (requestUri == null ||
+        (requestUri.scheme != 'http' && requestUri.scheme != 'https')) {
+      throw const WebDavOperationException('WebDav 地址无效，请使用 http/https');
+    }
+    final response = await _request(
+      method: 'PROPFIND',
+      uri: requestUri,
+      settings: settings,
+      data: utf8.encode(_propfindBody),
+      extraHeaders: const <String, String>{
+        'Depth': '1',
+        'Content-Type': 'text/xml; charset=utf-8',
+      },
+    );
+    final code = response.statusCode ?? 0;
+    if (!_isSuccessStatus(code) && code != 207) {
+      throw _buildStatusException(
+        action: '读取目录',
+        uri: requestUri,
+        response: response,
+      );
+    }
+    final xml = utf8.decode(_responseBytes(response.data) ?? const <int>[]);
+    final entries = _parseDirectoryEntries(
+      body: xml,
+      requestUri: requestUri,
+      currentDirectoryUrl: requestedUrl,
+    );
+    entries.sort((a, b) {
+      if (a.isDirectory != b.isDirectory) {
+        return a.isDirectory ? -1 : 1;
+      }
+      return b.lastModify.compareTo(a.lastModify);
+    });
+    return entries;
+  }
+
+  Future<List<WebDavRemoteEntry>> listBackupFiles({
+    required AppSettings settings,
+  }) async {
+    final entries = await listDirectory(
+      settings: settings,
+      directoryUrl: buildRootUrl(settings),
+    );
+    final backups = entries.where((entry) {
+      if (entry.isDirectory) return false;
+      final name = entry.displayName.toLowerCase();
+      return name.startsWith('backup') && name.endsWith('.json');
+    }).toList(growable: false);
+    backups.sort((a, b) => b.lastModify.compareTo(a.lastModify));
+    return backups;
+  }
+
+  Future<String> uploadBackupBytes({
+    required AppSettings settings,
+    required String fileName,
+    required List<int> bytes,
+  }) async {
+    await validateConfig(settings);
+    final normalizedName = fileName.trim();
+    if (normalizedName.isEmpty) {
+      throw const WebDavOperationException('备份文件名为空');
+    }
+    final rootUri = Uri.parse(buildRootUrl(settings));
+    await _ensureDirectory(rootUri, settings);
+    final uploadUri = Uri.parse(
+      '${buildRootUrl(settings)}${Uri.encodeComponent(normalizedName)}',
+    );
+    final response = await _request(
+      method: 'PUT',
+      uri: uploadUri,
+      settings: settings,
+      data: bytes,
+      extraHeaders: const <String, String>{
+        'Content-Type': 'application/json',
+      },
+    );
+    if (_isSuccessStatus(response.statusCode)) {
+      return uploadUri.toString();
+    }
+    throw _buildStatusException(
+      action: '上传备份',
+      uri: uploadUri,
+      response: response,
+    );
+  }
+
+  Future<List<int>> downloadFileBytes({
+    required AppSettings settings,
+    required String remoteUrl,
+  }) async {
+    await validateConfig(settings);
+    final uri = Uri.tryParse(remoteUrl.trim());
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      throw const WebDavOperationException('备份文件地址无效');
+    }
+    final response = await _request(
+      method: 'GET',
+      uri: uri,
+      settings: settings,
+    );
+    final code = response.statusCode ?? 0;
+    if (!_isSuccessStatus(code)) {
+      throw _buildStatusException(
+        action: '下载备份',
+        uri: uri,
+        response: response,
+      );
+    }
+    final bytes = _responseBytes(response.data);
+    if (bytes == null || bytes.isEmpty) {
+      throw const WebDavOperationException('备份文件为空');
+    }
+    return bytes;
+  }
+
   Future<void> _ensureDirectory(Uri uri, AppSettings settings) async {
     final response = await _request(
       method: 'MKCOL',
@@ -385,6 +540,144 @@ class WebDavService {
     } on DioException catch (e) {
       throw WebDavOperationException(
           _formatDioError(method: method, uri: uri, error: e));
+    }
+  }
+
+  List<WebDavRemoteEntry> _parseDirectoryEntries({
+    required String body,
+    required Uri requestUri,
+    required String currentDirectoryUrl,
+  }) {
+    final normalizedCurrent = _normalizeUrl(currentDirectoryUrl);
+    final entries = <WebDavRemoteEntry>[];
+    for (final match in _responseRegex.allMatches(body)) {
+      final responseXml = match.group(0) ?? '';
+      if (responseXml.trim().isEmpty) continue;
+      final href = _extractTagText(responseXml, 'href');
+      if (href.isEmpty) continue;
+      final hrefDecoded = Uri.decodeFull(_decodeXmlText(href));
+      final fullUrl = _resolveHref(requestUri, hrefDecoded);
+      if (fullUrl == null) continue;
+      final resourceType = _extractTagInnerXml(responseXml, 'resourcetype');
+      final contentType = _extractTagText(responseXml, 'getcontenttype');
+      final isDirectory = _isDirectory(
+        contentType: contentType,
+        resourceTypeXml: resourceType,
+      );
+      final normalizedPath =
+          isDirectory && !fullUrl.endsWith('/') ? '$fullUrl/' : fullUrl;
+      if (_normalizeUrl(normalizedPath) == normalizedCurrent) {
+        continue;
+      }
+      final displayNameRaw = _extractTagText(responseXml, 'displayname').trim();
+      final fallbackName = _extractFileName(hrefDecoded);
+      final displayName = _decodeXmlText(
+        displayNameRaw.isEmpty ? fallbackName : displayNameRaw,
+      );
+      final size = int.tryParse(
+            _extractTagText(responseXml, 'getcontentlength').trim(),
+          ) ??
+          0;
+      final lastModify =
+          _parseLastModify(_extractTagText(responseXml, 'getlastmodified'));
+      entries.add(
+        WebDavRemoteEntry(
+          displayName: displayName,
+          path: normalizedPath,
+          isDirectory: isDirectory,
+          size: size,
+          lastModify: lastModify,
+        ),
+      );
+    }
+    return entries;
+  }
+
+  bool _isDirectory({
+    required String contentType,
+    required String resourceTypeXml,
+  }) {
+    final normalizedType = contentType.trim().toLowerCase();
+    if (normalizedType == 'httpd/unix-directory') return true;
+    return resourceTypeXml.toLowerCase().contains('collection');
+  }
+
+  String _extractTagText(String source, String tag) {
+    final exp = RegExp(
+      '<(?:\\w+:)?$tag\\b[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?$tag>',
+      caseSensitive: false,
+    );
+    final raw = exp.firstMatch(source)?.group(1) ?? '';
+    return raw.replaceAll(RegExp(r'<[^>]+>'), '').trim();
+  }
+
+  String _extractTagInnerXml(String source, String tag) {
+    final exp = RegExp(
+      '<(?:\\w+:)?$tag\\b[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?$tag>',
+      caseSensitive: false,
+    );
+    return exp.firstMatch(source)?.group(1)?.trim() ?? '';
+  }
+
+  String _decodeXmlText(String value) {
+    return value
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&apos;', "'")
+        .trim();
+  }
+
+  String _normalizeUrl(String value) {
+    var normalized = value.trim();
+    while (normalized.length > 1 && normalized.endsWith('/')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized;
+  }
+
+  String _extractFileName(String decodedHref) {
+    final trimmed = decodedHref.trim();
+    if (trimmed.isEmpty) return '';
+    final clean = trimmed.endsWith('/')
+        ? trimmed.substring(0, trimmed.length - 1)
+        : trimmed;
+    final slashIndex = clean.lastIndexOf('/');
+    if (slashIndex < 0 || slashIndex == clean.length - 1) {
+      return clean;
+    }
+    return clean.substring(slashIndex + 1);
+  }
+
+  String? _resolveHref(Uri requestUri, String href) {
+    final raw = href.trim();
+    if (raw.isEmpty) return null;
+    final uri = Uri.tryParse(raw);
+    if (uri != null && uri.hasScheme) {
+      if (uri.scheme == 'http' || uri.scheme == 'https') {
+        return uri.toString();
+      }
+      if (uri.scheme == 'dav') {
+        return uri.replace(scheme: 'http').toString();
+      }
+      if (uri.scheme == 'davs') {
+        return uri.replace(scheme: 'https').toString();
+      }
+    }
+    if (raw.startsWith('/')) {
+      return '${requestUri.scheme}://${requestUri.authority}$raw';
+    }
+    return requestUri.resolve(raw).toString();
+  }
+
+  int _parseLastModify(String rawValue) {
+    final value = rawValue.trim();
+    if (value.isEmpty) return 0;
+    try {
+      return HttpDate.parse(value).millisecondsSinceEpoch;
+    } catch (_) {
+      return 0;
     }
   }
 

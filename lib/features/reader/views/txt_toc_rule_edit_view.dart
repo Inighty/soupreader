@@ -7,6 +7,7 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../models/txt_toc_rule.dart';
 
 enum _TxtTocRuleEditMenuAction {
+  copyRule,
   pasteRule,
 }
 
@@ -52,6 +53,11 @@ class _TxtTocRuleEditViewState extends State<TxtTocRuleEditView> {
         title: const Text('TXT 目录规则'),
         actions: [
           CupertinoActionSheetAction(
+            onPressed: () =>
+                Navigator.pop(sheetContext, _TxtTocRuleEditMenuAction.copyRule),
+            child: const Text('复制规则'),
+          ),
+          CupertinoActionSheetAction(
             onPressed: () => Navigator.pop(
               sheetContext,
               _TxtTocRuleEditMenuAction.pasteRule,
@@ -67,10 +73,18 @@ class _TxtTocRuleEditViewState extends State<TxtTocRuleEditView> {
     );
     if (selected == null) return;
     switch (selected) {
+      case _TxtTocRuleEditMenuAction.copyRule:
+        await _copyRuleToClipboard();
+        return;
       case _TxtTocRuleEditMenuAction.pasteRule:
         await _pasteRuleFromClipboard();
         return;
     }
+  }
+
+  Future<void> _copyRuleToClipboard() async {
+    final jsonText = json.encode(_buildRuleFromInputs().toJson());
+    await Clipboard.setData(ClipboardData(text: jsonText));
   }
 
   Future<void> _pasteRuleFromClipboard() async {
@@ -131,17 +145,21 @@ class _TxtTocRuleEditViewState extends State<TxtTocRuleEditView> {
   }
 
   Future<void> _saveRule() async {
-    final exampleText = _exampleController.text;
-    final savedRule = widget.initialRule.copyWith(
-      name: _nameController.text,
-      rule: _ruleController.text,
-      example: exampleText,
-    );
+    final savedRule = _buildRuleFromInputs();
     if (!await _checkValid(savedRule)) {
       return;
     }
     if (!mounted) return;
     Navigator.of(context).pop(savedRule);
+  }
+
+  TxtTocRule _buildRuleFromInputs() {
+    final exampleText = _exampleController.text;
+    return widget.initialRule.copyWith(
+      name: _nameController.text,
+      rule: _ruleController.text,
+      example: exampleText,
+    );
   }
 
   @override

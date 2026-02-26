@@ -7,6 +7,7 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../models/dict_rule.dart';
 
 enum _DictRuleEditMenuAction {
+  copyRule,
   pasteRule,
 }
 
@@ -54,6 +55,13 @@ class _DictRuleEditViewState extends State<DictRuleEditView> {
           CupertinoActionSheetAction(
             onPressed: () => Navigator.pop(
               sheetContext,
+              _DictRuleEditMenuAction.copyRule,
+            ),
+            child: const Text('复制规则'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(
+              sheetContext,
               _DictRuleEditMenuAction.pasteRule,
             ),
             child: const Text('粘贴规则'),
@@ -67,10 +75,18 @@ class _DictRuleEditViewState extends State<DictRuleEditView> {
     );
     if (selected == null) return;
     switch (selected) {
+      case _DictRuleEditMenuAction.copyRule:
+        await _copyRuleToClipboard();
+        return;
       case _DictRuleEditMenuAction.pasteRule:
         await _pasteRuleFromClipboard();
         return;
     }
+  }
+
+  Future<void> _copyRuleToClipboard() async {
+    final text = json.encode(_currentEditingRule().toJson());
+    await Clipboard.setData(ClipboardData(text: text));
   }
 
   Future<void> _pasteRuleFromClipboard() async {
@@ -115,12 +131,15 @@ class _DictRuleEditViewState extends State<DictRuleEditView> {
   }
 
   void _saveRule() {
-    final savedRule = widget.initialRule.copyWith(
+    Navigator.of(context).pop(_currentEditingRule());
+  }
+
+  DictRule _currentEditingRule() {
+    return widget.initialRule.copyWith(
       name: _nameController.text,
       urlRule: _urlRuleController.text,
       showRule: _showRuleController.text,
     );
-    Navigator.of(context).pop(savedRule);
   }
 
   @override

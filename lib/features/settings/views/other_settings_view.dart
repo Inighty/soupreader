@@ -1,17 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
+import '../services/check_source_settings_service.dart';
 import '../services/direct_link_upload_config_service.dart';
+import '../services/other_source_settings_service.dart';
+import 'check_source_settings_view.dart';
 import 'direct_link_upload_config_view.dart';
-import 'developer_tools_view.dart';
-import 'settings_placeholders.dart';
-import 'settings_ui_tokens.dart';
 import 'storage_settings_view.dart';
 
 class OtherSettingsView extends StatefulWidget {
@@ -25,8 +26,21 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
   final SettingsService _settingsService = SettingsService();
   final DirectLinkUploadConfigService _directLinkUploadConfigService =
       DirectLinkUploadConfigService();
+  final OtherSourceSettingsService _otherSourceSettingsService =
+      OtherSourceSettingsService();
+  final CheckSourceSettingsService _checkSourceSettingsService =
+      CheckSourceSettingsService();
   late AppSettings _appSettings;
   String _directLinkUploadSummary = '未设置';
+  String _userAgentSummary = OtherSourceSettingsService.defaultUserAgent;
+  String _defaultBookTreeUriSummary = '从其它应用打开的书籍保存位置';
+  String _sourceEditMaxLineSummary = OtherSourceSettingsService()
+      .sourceEditMaxLineSummary(
+          OtherSourceSettingsService.defaultSourceEditMaxLine);
+  String _checkSourceSummary = _fallbackCheckSourceSummary;
+
+  static const String _fallbackCheckSourceSummary =
+      '校验超时：180秒\n校验项目： 搜索 发现 详情 目录 正文';
 
   @override
   void initState() {
@@ -34,6 +48,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     _appSettings = _settingsService.appSettings;
     _settingsService.appSettingsListenable.addListener(_onChanged);
     unawaited(_loadDirectLinkUploadSummary());
+    unawaited(_reloadSourceSettingsSummaries());
   }
 
   @override
@@ -56,6 +71,28 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     });
   }
 
+  Future<void> _reloadSourceSettingsSummaries() async {
+    final userAgent = _otherSourceSettingsService.getUserAgent();
+    final defaultBookTreeUri =
+        _otherSourceSettingsService.getDefaultBookTreeUri();
+    final sourceEditMaxLine =
+        _otherSourceSettingsService.getSourceEditMaxLine();
+    final sourceEditSummary =
+        _otherSourceSettingsService.sourceEditMaxLineSummary(sourceEditMaxLine);
+    final checkSourceSummary = _checkSourceSettingsService.loadSummary();
+    if (!mounted) return;
+    setState(() {
+      _userAgentSummary = userAgent;
+      _defaultBookTreeUriSummary = defaultBookTreeUri?.trim().isNotEmpty == true
+          ? defaultBookTreeUri!.trim()
+          : '从其它应用打开的书籍保存位置';
+      _sourceEditMaxLineSummary = sourceEditSummary;
+      _checkSourceSummary = checkSourceSummary.trim().isEmpty
+          ? _fallbackCheckSourceSummary
+          : checkSourceSummary.trim();
+    });
+  }
+
   Future<void> _openDirectLinkUploadConfig() async {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
@@ -66,64 +103,217 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     await _loadDirectLinkUploadSummary();
   }
 
-  Future<void> _pickBookshelfViewMode() async {
-    final selected = await showOptionPickerSheet<BookshelfViewMode>(
+  Future<void> _editUserAgent() async {
+    final controller = TextEditingController(
+      text: _otherSourceSettingsService.getUserAgent(),
+    );
+    final value = await showCupertinoDialog<String>(
       context: context,
-      title: '书架显示方式',
-      currentValue: _appSettings.bookshelfViewMode,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('用户代理'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            placeholder: '用户代理',
+            maxLines: 5,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null) return;
+    await _otherSourceSettingsService.saveUserAgent(value);
+    await _reloadSourceSettingsSummaries();
+  }
+
+  Future<void> _selectDefaultBookTreeUri() async {
+    try {
+      final selected = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: '选择保存书籍的文件夹',
+      );
+      if (selected == null || selected.trim().isEmpty) return;
+      await _otherSourceSettingsService.saveDefaultBookTreeUri(selected);
+      await _reloadSourceSettingsSummaries();
+    } catch (error) {
+      _showMessage('选择保存书籍的文件夹失败：$error');
+    }
+  }
+
+  Future<void> _editSourceEditMaxLine() async {
+    final controller = TextEditingController(
+      text: _otherSourceSettingsService.getSourceEditMaxLine().toString(),
+    );
+    final value = await showCupertinoDialog<String>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('源编辑框最大行数'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            placeholder: '请输入大于等于 10 的整数',
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null) return;
+    final parsed = int.tryParse(value.trim()) ?? 0;
+    if (parsed < OtherSourceSettingsService.minSourceEditMaxLine) {
+      _showMessage('源编辑框最大行数不能小于 10');
+      return;
+    }
+    await _otherSourceSettingsService.saveSourceEditMaxLine(parsed);
+    await _reloadSourceSettingsSummaries();
+  }
+
+  Future<void> _openCheckSourceSettings() async {
+    final updated = await Navigator.of(context).push<bool>(
+      CupertinoPageRoute<bool>(
+        builder: (context) => const CheckSourceSettingsView(),
+      ),
+    );
+    if (updated != true || !mounted) return;
+    await _reloadSourceSettingsSummaries();
+  }
+
+  Future<void> _pickDefaultHomePage() async {
+    final selected = await showOptionPickerSheet<MainDefaultHomePage>(
+      context: context,
+      title: '默认主页',
+      currentValue: _appSettings.defaultHomePage,
       accentColor: AppDesignTokens.brandPrimary,
       items: const [
-        OptionPickerItem<BookshelfViewMode>(
-          value: BookshelfViewMode.grid,
-          label: '网格',
+        OptionPickerItem<MainDefaultHomePage>(
+          value: MainDefaultHomePage.bookshelf,
+          label: '书架',
         ),
-        OptionPickerItem<BookshelfViewMode>(
-          value: BookshelfViewMode.list,
-          label: '列表',
+        OptionPickerItem<MainDefaultHomePage>(
+          value: MainDefaultHomePage.explore,
+          label: '发现',
+        ),
+        OptionPickerItem<MainDefaultHomePage>(
+          value: MainDefaultHomePage.rss,
+          label: '订阅',
+        ),
+        OptionPickerItem<MainDefaultHomePage>(
+          value: MainDefaultHomePage.my,
+          label: '我的',
         ),
       ],
     );
     if (selected == null) return;
-    await _settingsService.saveAppSettings(
-      _appSettings.copyWith(
-        bookshelfViewMode: selected,
-        bookshelfLayoutIndex: bookshelfLayoutIndexFromViewMode(selected),
-      ),
+    await _settingsService.saveDefaultHomePage(selected);
+  }
+
+  Future<void> _editPreDownloadNum() async {
+    await _editBoundedIntSetting(
+      title: '预下载',
+      currentValue: _appSettings.preDownloadNum,
+      min: 0,
+      max: 9999,
+      placeholder: '请输入 0 到 9999 之间的整数',
+      save: _settingsService.savePreDownloadNum,
     );
   }
 
-  Future<void> _pickBookshelfSortMode() async {
-    final selected = await showOptionPickerSheet<BookshelfSortMode>(
-      context: context,
-      title: '新书默认排序',
-      currentValue: _appSettings.bookshelfSortMode,
-      accentColor: AppDesignTokens.brandPrimary,
-      items: const [
-        OptionPickerItem<BookshelfSortMode>(
-          value: BookshelfSortMode.recentRead,
-          label: '最近阅读',
-        ),
-        OptionPickerItem<BookshelfSortMode>(
-          value: BookshelfSortMode.recentAdded,
-          label: '最近加入',
-        ),
-        OptionPickerItem<BookshelfSortMode>(
-          value: BookshelfSortMode.title,
-          label: '书名',
-        ),
-        OptionPickerItem<BookshelfSortMode>(
-          value: BookshelfSortMode.author,
-          label: '作者',
-        ),
-      ],
+  Future<void> _editThreadCount() async {
+    await _editBoundedIntSetting(
+      title: '线程数量',
+      currentValue: _appSettings.threadCount,
+      min: 1,
+      max: 999,
+      placeholder: '请输入 1 到 999 之间的整数',
+      save: _settingsService.saveThreadCount,
     );
-    if (selected == null) return;
-    await _settingsService.saveAppSettings(
-      _appSettings.copyWith(
-        bookshelfSortMode: selected,
-        bookshelfSortIndex: bookshelfLegacySortIndexFromMode(selected),
+  }
+
+  Future<void> _editBitmapCacheSize() async {
+    await _editBoundedIntSetting(
+      title: '图片绘制缓存',
+      currentValue: _appSettings.bitmapCacheSize,
+      min: 1,
+      max: 2047,
+      placeholder: '请输入 1 到 2047 之间的整数（MB）',
+      save: _settingsService.saveBitmapCacheSize,
+    );
+  }
+
+  Future<void> _editImageRetainNum() async {
+    await _editBoundedIntSetting(
+      title: '漫画保留数量',
+      currentValue: _appSettings.imageRetainNum,
+      min: 0,
+      max: 999,
+      placeholder: '请输入 0 到 999 之间的整数',
+      save: _settingsService.saveImageRetainNum,
+    );
+  }
+
+  Future<void> _editBoundedIntSetting({
+    required String title,
+    required int currentValue,
+    required int min,
+    required int max,
+    required String placeholder,
+    required Future<void> Function(int value) save,
+  }) async {
+    final controller = TextEditingController(text: currentValue.toString());
+    final value = await showCupertinoDialog<String>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: CupertinoTextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            placeholder: placeholder,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('确定'),
+          ),
+        ],
       ),
     );
+    controller.dispose();
+    if (value == null) return;
+
+    final parsed = int.tryParse(value.trim());
+    if (parsed == null || parsed < min || parsed > max) {
+      _showMessage('$title 需要在 $min 到 $max 之间');
+      return;
+    }
+    await save(parsed);
   }
 
   @override
@@ -137,40 +327,54 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             header: const Text('基本设置'),
             children: [
               CupertinoListTile.notched(
-                title: const Text('主页面'),
-                additionalInfo: _plannedInfo(),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '主页面（底部导航栏顺序/显示）暂未实现',
-                ),
-              ),
-              CupertinoListTile.notched(
-                title: const Text('更换图标'),
-                additionalInfo: _plannedInfo(),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '更换图标暂未实现',
-                ),
-              ),
-              CupertinoListTile.notched(
                 title: const Text('自动刷新'),
-                additionalInfo: _plannedInfo(),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '自动刷新暂未实现',
+                additionalInfo: const Text('打开软件时自动更新书籍'),
+                trailing: CupertinoSwitch(
+                  value: _appSettings.autoRefresh,
+                  onChanged: _settingsService.saveAutoRefresh,
+                ),
+                onTap: () => _settingsService.saveAutoRefresh(
+                  !_appSettings.autoRefresh,
                 ),
               ),
               CupertinoListTile.notched(
-                title: const Text('竖屏锁定'),
-                additionalInfo: _plannedInfo(),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '竖屏锁定暂未实现',
+                title: const Text('自动跳转最近阅读'),
+                additionalInfo: const Text('默认打开书架'),
+                trailing: CupertinoSwitch(
+                  value: _appSettings.defaultToRead,
+                  onChanged: _settingsService.saveDefaultToRead,
                 ),
+                onTap: () => _settingsService.saveDefaultToRead(
+                  !_appSettings.defaultToRead,
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('显示发现'),
+                trailing: CupertinoSwitch(
+                  value: _appSettings.showDiscovery,
+                  onChanged: _settingsService.saveShowDiscovery,
+                ),
+                onTap: () => _settingsService.saveShowDiscovery(
+                  !_appSettings.showDiscovery,
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('显示订阅'),
+                trailing: CupertinoSwitch(
+                  value: _appSettings.showRss,
+                  onChanged: _settingsService.saveShowRss,
+                ),
+                onTap: () => _settingsService.saveShowRss(
+                  !_appSettings.showRss,
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('默认主页'),
+                additionalInfo: Text(
+                  _defaultHomePageLabel(_appSettings.defaultHomePage),
+                ),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _pickDefaultHomePage,
               ),
             ],
           ),
@@ -178,95 +382,84 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             header: const Text('源设置'),
             children: [
               CupertinoListTile.notched(
+                title: const Text('用户代理'),
+                additionalInfo: Text(_brief(_userAgentSummary)),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _editUserAgent,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('书籍保存位置'),
+                additionalInfo: Text(
+                  _brief(
+                    _defaultBookTreeUriSummary,
+                    fallback: '从其它应用打开的书籍保存位置',
+                  ),
+                ),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _selectDefaultBookTreeUri,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('源编辑框最大行数'),
+                additionalInfo: Text(_brief(_sourceEditMaxLineSummary)),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _editSourceEditMaxLine,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('校验设置'),
+                additionalInfo: Text(_brief(_checkSourceSummary)),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _openCheckSourceSettings,
+              ),
+              CupertinoListTile.notched(
                 title: const Text('直链上传规则'),
-                additionalInfo: Text(_directLinkUploadSummary),
+                additionalInfo: Text(_brief(_directLinkUploadSummary)),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _openDirectLinkUploadConfig,
               ),
-              CupertinoListTile.notched(
-                title: const Text('服务器证书验证'),
-                additionalInfo: _plannedInfo(),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '服务器证书验证开关暂未实现（需要对 Dio/HttpClient 做统一配置）',
-                ),
-              ),
-              CupertinoListTile.notched(
-                title: const Text('开启 18+ 网址检测'),
-                additionalInfo: _plannedInfo(),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '18+ 网址检测暂未实现',
-                ),
-              ),
-              CupertinoListTile.notched(
-                title: const Text('高级搜索'),
-                additionalInfo: _plannedInfo(),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '高级搜索设置暂未实现',
-                ),
-              ),
-              CupertinoListTile.notched(
-                title: const Text('智能评估'),
-                additionalInfo: _plannedInfo(),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '智能评估暂未实现',
-                ),
-              ),
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('书籍设置'),
+            header: const Text('缓存与净化'),
             children: [
               CupertinoListTile.notched(
-                title: const Text('书架显示方式'),
-                additionalInfo: Text(
-                  _appSettings.bookshelfViewMode == BookshelfViewMode.grid
-                      ? '网格'
-                      : '列表',
-                ),
+                title: const Text('预下载'),
+                additionalInfo: Text('预先下载 ${_appSettings.preDownloadNum} 章正文'),
                 trailing: const CupertinoListTileChevron(),
-                onTap: _pickBookshelfViewMode,
+                onTap: _editPreDownloadNum,
               ),
               CupertinoListTile.notched(
-                title: const Text('新书默认排序'),
+                title: const Text('线程数量'),
+                additionalInfo: Text('当前线程数 ${_appSettings.threadCount}'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _editThreadCount,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('图片绘制缓存'),
                 additionalInfo:
-                    Text(_bookshelfSortLabel(_appSettings.bookshelfSortMode)),
+                    Text('当前最大缓存 ${_appSettings.bitmapCacheSize} MB'),
                 trailing: const CupertinoListTileChevron(),
-                onTap: _pickBookshelfSortMode,
+                onTap: _editBitmapCacheSize,
               ),
               CupertinoListTile.notched(
-                title: const Text('启动自动跳转之前阅读'),
-                additionalInfo: _plannedInfo(),
+                title: const Text('漫画保留数量'),
+                additionalInfo: Text('保留已读章节数量 ${_appSettings.imageRetainNum}'),
                 trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '启动自动跳转之前阅读暂未实现',
-                ),
+                onTap: _editImageRetainNum,
               ),
               CupertinoListTile.notched(
-                title: const Text('新书默认开启净化替换'),
-                additionalInfo: _plannedInfo(),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '新书默认开启净化替换暂未实现',
+                title: const Text('默认启用替换净化'),
+                additionalInfo: const Text('新加入书架的书是否启用替换净化'),
+                trailing: CupertinoSwitch(
+                  value: _appSettings.replaceEnableDefault,
+                  onChanged: _settingsService.saveReplaceEnableDefault,
+                ),
+                onTap: () => _settingsService.saveReplaceEnableDefault(
+                  !_appSettings.replaceEnableDefault,
                 ),
               ),
-            ],
-          ),
-          CupertinoListSection.insetGrouped(
-            header: const Text('下载与缓存'),
-            children: [
               CupertinoListTile.notched(
                 title: const Text('下载与缓存'),
-                additionalInfo: const Text('仅 Wi‑Fi · 清理'),
+                additionalInfo: const Text('缓存清理、WebView 数据、数据库维护'),
                 trailing: const CupertinoListTileChevron(),
                 onTap: () => Navigator.of(context).push(
                   CupertinoPageRoute<void>(
@@ -277,31 +470,53 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('订阅设置'),
+            header: const Text('调试与系统'),
             children: [
               CupertinoListTile.notched(
-                title: const Text('订阅设置'),
-                additionalInfo: _plannedInfo(),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => SettingsPlaceholders.showNotImplemented(
-                  context,
-                  title: '订阅设置暂未实现',
+                title: const Text('文字操作显示搜索'),
+                additionalInfo: const Text('长按文字在操作菜单中显示阅读·搜索'),
+                trailing: CupertinoSwitch(
+                  value: _appSettings.processText,
+                  onChanged: _settingsService.saveProcessText,
+                ),
+                onTap: () => _settingsService.saveProcessText(
+                  !_appSettings.processText,
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('记录日志'),
+                additionalInfo: const Text('记录调试日志'),
+                trailing: CupertinoSwitch(
+                  value: _appSettings.recordLog,
+                  onChanged: _settingsService.saveRecordLog,
+                ),
+                onTap: () =>
+                    _settingsService.saveRecordLog(!_appSettings.recordLog),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('记录堆转储'),
+                additionalInfo: const Text('当应用发生 OOM 崩溃时保存堆转储'),
+                trailing: CupertinoSwitch(
+                  value: _appSettings.recordHeapDump,
+                  onChanged: _settingsService.saveRecordHeapDump,
+                ),
+                onTap: () => _settingsService.saveRecordHeapDump(
+                  !_appSettings.recordHeapDump,
                 ),
               ),
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('开发工具'),
-            children: [
+            header: const Text('Web 服务（未启用）'),
+            footer: const Text('当前构建排除了 Web 服务，以下配置仅保留说明，不可操作。'),
+            children: const [
               CupertinoListTile.notched(
-                title: const Text('异常日志'),
-                additionalInfo: const Text('查看/清空'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => Navigator.of(context).push(
-                  CupertinoPageRoute<void>(
-                    builder: (context) => const DeveloperToolsView(),
-                  ),
-                ),
+                title: Text('Web 端口'),
+                additionalInfo: Text('未启用'),
+              ),
+              CupertinoListTile.notched(
+                title: Text('WebService 唤醒锁'),
+                additionalInfo: Text('未启用'),
               ),
             ],
           ),
@@ -311,23 +526,39 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     );
   }
 
-  String _bookshelfSortLabel(BookshelfSortMode mode) {
-    switch (mode) {
-      case BookshelfSortMode.recentRead:
-        return '最近阅读';
-      case BookshelfSortMode.recentAdded:
-        return '最近加入';
-      case BookshelfSortMode.title:
-        return '书名';
-      case BookshelfSortMode.author:
-        return '作者';
+  String _defaultHomePageLabel(MainDefaultHomePage page) {
+    switch (page) {
+      case MainDefaultHomePage.bookshelf:
+        return '书架';
+      case MainDefaultHomePage.explore:
+        return '发现';
+      case MainDefaultHomePage.rss:
+        return '订阅';
+      case MainDefaultHomePage.my:
+        return '我的';
     }
   }
 
-  Widget _plannedInfo() {
-    return const Text(
-      SettingsUiTokens.plannedLabel,
-      style: TextStyle(color: CupertinoColors.secondaryLabel),
+  String _brief(String value, {String fallback = '未设置'}) {
+    final normalized = value.trim();
+    if (normalized.isEmpty) return fallback;
+    final singleLine = normalized.replaceAll('\n', ' ').replaceAll('\r', ' ');
+    if (singleLine.length <= 24) return singleLine;
+    return '${singleLine.substring(0, 24)}…';
+  }
+
+  void _showMessage(String message) {
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        content: Text(message),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('好'),
+          ),
+        ],
+      ),
     );
   }
 }

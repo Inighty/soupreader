@@ -7,7 +7,14 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/exception_log_service.dart';
 
 class ExceptionLogsView extends StatefulWidget {
-  const ExceptionLogsView({super.key});
+  final String title;
+  final String emptyHint;
+
+  const ExceptionLogsView({
+    super.key,
+    this.title = '异常日志',
+    this.emptyHint = '暂无异常日志',
+  });
 
   @override
   State<ExceptionLogsView> createState() => _ExceptionLogsViewState();
@@ -17,7 +24,50 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
   final ExceptionLogService _service = ExceptionLogService();
 
   Future<void> _clearLogs() async {
-    await _service.clear();
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('清空日志'),
+        content: const Text('\n确定清空全部日志吗？'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('清空'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await _service.clear();
+      if (!mounted) return;
+      await _showMessage('日志已清空');
+    } catch (error) {
+      if (!mounted) return;
+      await _showMessage('清空失败：$error');
+    }
+  }
+
+  Future<void> _showMessage(String message) async {
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('提示'),
+        content: Text('\n$message'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('好'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _openDetail(ExceptionLogEntry entry) {
@@ -31,7 +81,7 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
   @override
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
-      title: '异常日志',
+      title: widget.title,
       trailing: CupertinoButton(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         minSize: 30,
@@ -42,7 +92,15 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
         valueListenable: _service.listenable,
         builder: (context, logs, _) {
           if (logs.isEmpty) {
-            return const SizedBox.shrink();
+            return Center(
+              child: Text(
+                widget.emptyHint,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                ),
+              ),
+            );
           }
 
           return ListView.separated(
@@ -165,7 +223,7 @@ class ExceptionLogDetailView extends StatelessWidget {
   Future<void> _copy(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: _fullText()));
     if (!context.mounted) return;
-    showCupertinoDialog(
+    showCupertinoDialog<void>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('已复制'),

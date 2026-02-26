@@ -84,6 +84,24 @@ class TxtTocRuleStore {
     await saveRules(_sortRules(filtered));
   }
 
+  Future<void> deleteRulesByIds(Iterable<int> ruleIds) async {
+    final targetIds = ruleIds.toSet();
+    if (targetIds.isEmpty) {
+      return;
+    }
+    final rules = await loadRules();
+    if (rules.isEmpty) {
+      return;
+    }
+    final filtered = rules
+        .where((rule) => !targetIds.contains(rule.id))
+        .toList(growable: false);
+    if (filtered.length == rules.length) {
+      return;
+    }
+    await saveRules(_sortRules(filtered));
+  }
+
   Future<void> moveRuleToTop(TxtTocRule rule) async {
     final rules = await loadRules();
     if (rules.isEmpty) return;

@@ -62,12 +62,12 @@ class _ReadingInterfaceSettingsHubViewState
     final scheme = theme.colorScheme;
 
     return AppCupertinoPageScaffold(
-      title: '界面（样式）',
+      title: '阅读界面样式',
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
         children: [
           Text(
-            '阅读视觉与排版',
+            '阅读样式与排版',
             style: theme.textTheme.small.copyWith(
               color: scheme.mutedForeground,
               fontWeight: FontWeight.w600,
@@ -80,7 +80,7 @@ class _ReadingInterfaceSettingsHubViewState
               children: [
                 _buildItem(
                   title: '样式与排版',
-                  info: '主题 / 字体 / 排版',
+                  info: '字体 / 排版',
                   onTap: _openPreferences,
                 ),
                 const ShadSeparator.horizontal(
@@ -96,7 +96,7 @@ class _ReadingInterfaceSettingsHubViewState
           ),
           const SizedBox(height: 14),
           Text(
-            '高级',
+            '排版细项',
             style: theme.textTheme.small.copyWith(
               color: scheme.mutedForeground,
               fontWeight: FontWeight.w600,

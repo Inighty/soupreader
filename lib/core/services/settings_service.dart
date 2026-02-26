@@ -57,6 +57,22 @@ class SettingsService {
   static const String _keyReadRecordSort = 'readRecordSort';
   static const String _keyBookReadRecordDurationMap =
       'book_read_record_duration_map';
+  static const String _keyLoadCoverOnlyWifi = 'loadCoverOnlyWifi';
+  static const String _keyCoverRule = 'coverRule';
+  static const String _keyUseDefaultCover = 'useDefaultCover';
+  static const String _keyDefaultCoverPath = 'defaultCover';
+  static const String _keyDefaultCoverDarkPath = 'defaultCoverDark';
+  static const String _keyCoverShowName = 'coverShowName';
+  static const String _keyCoverShowAuthor = 'coverShowAuthor';
+  static const String _keyCoverShowNameNight = 'coverShowNameN';
+  static const String _keyCoverShowAuthorNight = 'coverShowAuthorN';
+  static const String _keyCustomWelcome = 'customWelcome';
+  static const String _keyWelcomeImagePath = 'welcomeImagePath';
+  static const String _keyWelcomeImageDarkPath = 'welcomeImagePathDark';
+  static const String _keyWelcomeShowText = 'welcomeShowText';
+  static const String _keyWelcomeShowIcon = 'welcomeShowIcon';
+  static const String _keyWelcomeShowTextDark = 'welcomeShowTextDark';
+  static const String _keyWelcomeShowIconDark = 'welcomeShowIconDark';
   static const String _defaultImageStyle = 'DEFAULT';
   static const Set<String> _validImageStyles = <String>{
     'DEFAULT',
@@ -103,6 +119,43 @@ class SettingsService {
       _prefs.getBool(_keyReaderChapterUrlOpenInBrowser) ?? false;
   bool get enableReadRecord =>
       !_isInitialized ? true : _prefs.getBool(_keyEnableReadRecord) ?? true;
+  bool get coverLoadOnlyWifi =>
+      !_isInitialized ? false : _prefs.getBool(_keyLoadCoverOnlyWifi) ?? false;
+  bool get useDefaultCover =>
+      !_isInitialized ? false : _prefs.getBool(_keyUseDefaultCover) ?? false;
+  bool get coverShowName =>
+      !_isInitialized ? true : _prefs.getBool(_keyCoverShowName) ?? true;
+  bool get coverShowAuthor =>
+      !_isInitialized ? true : _prefs.getBool(_keyCoverShowAuthor) ?? true;
+  bool get coverShowNameNight =>
+      !_isInitialized ? true : _prefs.getBool(_keyCoverShowNameNight) ?? true;
+  bool get coverShowAuthorNight =>
+      !_isInitialized ? true : _prefs.getBool(_keyCoverShowAuthorNight) ?? true;
+  bool get customWelcome =>
+      !_isInitialized ? false : _prefs.getBool(_keyCustomWelcome) ?? false;
+  bool get welcomeShowText =>
+      !_isInitialized ? true : _prefs.getBool(_keyWelcomeShowText) ?? true;
+  bool get welcomeShowIcon =>
+      !_isInitialized ? true : _prefs.getBool(_keyWelcomeShowIcon) ?? true;
+  bool get welcomeShowTextDark =>
+      !_isInitialized ? true : _prefs.getBool(_keyWelcomeShowTextDark) ?? true;
+  bool get welcomeShowIconDark =>
+      !_isInitialized ? true : _prefs.getBool(_keyWelcomeShowIconDark) ?? true;
+
+  String get coverRule =>
+      !_isInitialized ? '' : (_prefs.getString(_keyCoverRule) ?? '').trim();
+  String get defaultCoverPath => !_isInitialized
+      ? ''
+      : (_prefs.getString(_keyDefaultCoverPath) ?? '').trim();
+  String get defaultCoverDarkPath => !_isInitialized
+      ? ''
+      : (_prefs.getString(_keyDefaultCoverDarkPath) ?? '').trim();
+  String get welcomeImagePath => !_isInitialized
+      ? ''
+      : (_prefs.getString(_keyWelcomeImagePath) ?? '').trim();
+  String get welcomeImageDarkPath => !_isInitialized
+      ? ''
+      : (_prefs.getString(_keyWelcomeImageDarkPath) ?? '').trim();
 
   String? getReaderFontFolderPath() {
     if (!_isInitialized) return null;
@@ -604,6 +657,18 @@ class SettingsService {
     return Map<String, int>.unmodifiable(_bookReadRecordDurationMap);
   }
 
+  int getTotalBookReadRecordDurationMs() {
+    if (!_isInitialized || _bookReadRecordDurationMap.isEmpty) {
+      return 0;
+    }
+    var total = 0;
+    for (final value in _bookReadRecordDurationMap.values) {
+      if (value <= 0) continue;
+      total += value;
+    }
+    return total;
+  }
+
   Future<void> addBookReadRecordDurationMs(
     String bookId,
     int durationMs,
@@ -634,6 +699,12 @@ class SettingsService {
       _keyBookReadRecordDurationMap,
       _bookReadRecordDurationMap,
     );
+  }
+
+  Future<void> clearAllBookReadRecordDuration() async {
+    if (!_isInitialized) return;
+    _bookReadRecordDurationMap = <String, int>{};
+    await _prefs.remove(_keyBookReadRecordDurationMap);
   }
 
   bool getBookReSegment(String bookId, {bool fallback = false}) {
@@ -1016,6 +1087,233 @@ class SettingsService {
     _appSettings = settings;
     _appSettingsNotifier.value = settings;
     await _prefs.setString(_keyAppSettings, json.encode(settings.toJson()));
+  }
+
+  Future<void> _saveAppSettingsPatch(
+    AppSettings Function(AppSettings current) patch,
+  ) async {
+    if (!_isInitialized) return;
+    final next = patch(_appSettings);
+    await saveAppSettings(next);
+  }
+
+  Future<void> saveAutoRefresh(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(autoRefresh: enabled),
+    );
+  }
+
+  Future<void> saveDefaultToRead(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(defaultToRead: enabled),
+    );
+  }
+
+  Future<void> saveShowDiscovery(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(showDiscovery: enabled),
+    );
+  }
+
+  Future<void> saveShowRss(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(showRss: enabled),
+    );
+  }
+
+  Future<void> saveDefaultHomePage(MainDefaultHomePage value) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(defaultHomePage: value),
+    );
+  }
+
+  Future<void> savePreDownloadNum(int value) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(preDownloadNum: value),
+    );
+  }
+
+  Future<void> saveThreadCount(int value) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(threadCount: value),
+    );
+  }
+
+  Future<void> saveBitmapCacheSize(int value) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(bitmapCacheSize: value),
+    );
+  }
+
+  Future<void> saveImageRetainNum(int value) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(imageRetainNum: value),
+    );
+  }
+
+  Future<void> saveReplaceEnableDefault(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(replaceEnableDefault: enabled),
+    );
+  }
+
+  Future<void> saveProcessText(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(processText: enabled),
+    );
+  }
+
+  Future<void> saveRecordLog(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(recordLog: enabled),
+    );
+  }
+
+  Future<void> saveRecordHeapDump(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(recordHeapDump: enabled),
+    );
+  }
+
+  Future<void> saveSyncBookProgress(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(syncBookProgress: enabled),
+    );
+  }
+
+  Future<void> saveSyncBookProgressPlus(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(syncBookProgressPlus: enabled),
+    );
+  }
+
+  Future<void> saveWebDavDeviceName(String value) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(webDavDeviceName: value.trim()),
+    );
+  }
+
+  Future<void> saveBackupPath(String path) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(backupPath: path.trim()),
+    );
+  }
+
+  Future<void> saveOnlyLatestBackup(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(onlyLatestBackup: enabled),
+    );
+  }
+
+  Future<void> saveAutoCheckNewBackup(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(autoCheckNewBackup: enabled),
+    );
+  }
+
+  Future<void> saveCoverLoadOnlyWifi(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyLoadCoverOnlyWifi, enabled);
+  }
+
+  Future<void> saveUseDefaultCover(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyUseDefaultCover, enabled);
+  }
+
+  Future<void> saveCoverRule(String value) async {
+    if (!_isInitialized) return;
+    final normalized = value.trim();
+    if (normalized.isEmpty) {
+      await _prefs.remove(_keyCoverRule);
+      return;
+    }
+    await _prefs.setString(_keyCoverRule, normalized);
+  }
+
+  Future<void> saveDefaultCoverPath(String? path) async {
+    if (!_isInitialized) return;
+    final normalized = (path ?? '').trim();
+    if (normalized.isEmpty) {
+      await _prefs.remove(_keyDefaultCoverPath);
+      return;
+    }
+    await _prefs.setString(_keyDefaultCoverPath, normalized);
+  }
+
+  Future<void> saveDefaultCoverDarkPath(String? path) async {
+    if (!_isInitialized) return;
+    final normalized = (path ?? '').trim();
+    if (normalized.isEmpty) {
+      await _prefs.remove(_keyDefaultCoverDarkPath);
+      return;
+    }
+    await _prefs.setString(_keyDefaultCoverDarkPath, normalized);
+  }
+
+  Future<void> saveCoverShowName(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyCoverShowName, enabled);
+  }
+
+  Future<void> saveCoverShowAuthor(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyCoverShowAuthor, enabled);
+  }
+
+  Future<void> saveCoverShowNameNight(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyCoverShowNameNight, enabled);
+  }
+
+  Future<void> saveCoverShowAuthorNight(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyCoverShowAuthorNight, enabled);
+  }
+
+  Future<void> saveCustomWelcome(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyCustomWelcome, enabled);
+  }
+
+  Future<void> saveWelcomeImagePath(String? path) async {
+    if (!_isInitialized) return;
+    final normalized = (path ?? '').trim();
+    if (normalized.isEmpty) {
+      await _prefs.remove(_keyWelcomeImagePath);
+      return;
+    }
+    await _prefs.setString(_keyWelcomeImagePath, normalized);
+  }
+
+  Future<void> saveWelcomeImageDarkPath(String? path) async {
+    if (!_isInitialized) return;
+    final normalized = (path ?? '').trim();
+    if (normalized.isEmpty) {
+      await _prefs.remove(_keyWelcomeImageDarkPath);
+      return;
+    }
+    await _prefs.setString(_keyWelcomeImageDarkPath, normalized);
+  }
+
+  Future<void> saveWelcomeShowText(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyWelcomeShowText, enabled);
+  }
+
+  Future<void> saveWelcomeShowIcon(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyWelcomeShowIcon, enabled);
+  }
+
+  Future<void> saveWelcomeShowTextDark(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyWelcomeShowTextDark, enabled);
+  }
+
+  Future<void> saveWelcomeShowIconDark(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyWelcomeShowIconDark, enabled);
   }
 
   Future<void> saveReaderChapterUrlOpenInBrowser(bool value) async {

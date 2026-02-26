@@ -87,9 +87,19 @@ class AppSettings {
   final AppAppearanceMode appearanceMode;
   final bool wifiOnlyDownload;
   final bool autoUpdateSources;
+  final bool autoRefresh;
+  final bool defaultToRead;
   final bool showDiscovery;
   final bool showRss;
   final MainDefaultHomePage defaultHomePage;
+  final int preDownloadNum;
+  final int threadCount;
+  final int bitmapCacheSize;
+  final int imageRetainNum;
+  final bool replaceEnableDefault;
+  final bool processText;
+  final bool recordLog;
+  final bool recordHeapDump;
 
   final BookshelfViewMode bookshelfViewMode;
   final BookshelfSortMode bookshelfSortMode;
@@ -108,18 +118,33 @@ class AppSettings {
   final bool searchShowCover;
   final bool bookInfoDeleteAlert;
   final bool syncBookProgress;
+  final bool syncBookProgressPlus;
   final String webDavUrl;
   final String webDavAccount;
   final String webDavPassword;
   final String webDavDir;
+  final String webDavDeviceName;
+  final bool onlyLatestBackup;
+  final bool autoCheckNewBackup;
+  final String backupPath;
 
   const AppSettings({
     this.appearanceMode = AppAppearanceMode.followSystem,
     this.wifiOnlyDownload = true,
     this.autoUpdateSources = true,
+    this.autoRefresh = false,
+    this.defaultToRead = false,
     this.showDiscovery = true,
     this.showRss = true,
     this.defaultHomePage = MainDefaultHomePage.bookshelf,
+    this.preDownloadNum = 10,
+    this.threadCount = 16,
+    this.bitmapCacheSize = 50,
+    this.imageRetainNum = 0,
+    this.replaceEnableDefault = true,
+    this.processText = true,
+    this.recordLog = false,
+    this.recordHeapDump = false,
     this.bookshelfViewMode = BookshelfViewMode.grid,
     this.bookshelfSortMode = BookshelfSortMode.recentRead,
     this.bookshelfGroupStyle = 0,
@@ -137,10 +162,15 @@ class AppSettings {
     this.searchShowCover = true,
     this.bookInfoDeleteAlert = true,
     this.syncBookProgress = true,
+    this.syncBookProgressPlus = false,
     this.webDavUrl = defaultWebDavUrl,
     this.webDavAccount = '',
     this.webDavPassword = '',
     this.webDavDir = '',
+    this.webDavDeviceName = '',
+    this.onlyLatestBackup = true,
+    this.autoCheckNewBackup = true,
+    this.backupPath = '',
   });
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -284,12 +314,35 @@ class AppSettings {
       appearanceMode: parseAppearanceMode(json['appearanceMode']),
       wifiOnlyDownload: json['wifiOnlyDownload'] as bool? ?? true,
       autoUpdateSources: json['autoUpdateSources'] as bool? ?? true,
+      autoRefresh: parseBoolWithDefault(
+        json['autoRefresh'] ?? json['auto_refresh'],
+        false,
+      ),
+      defaultToRead: parseBoolWithDefault(
+        json['defaultToRead'],
+        false,
+      ),
       showDiscovery: parseBoolWithDefault(json['showDiscovery'], true),
       showRss: parseBoolWithDefault(
         json['showRss'] ?? json['showRSS'],
         true,
       ),
       defaultHomePage: parseDefaultHomePage(json['defaultHomePage']),
+      preDownloadNum:
+          parseIntWithDefault(json['preDownloadNum'], 10).clamp(0, 9999),
+      threadCount: parseIntWithDefault(json['threadCount'], 16).clamp(1, 999),
+      bitmapCacheSize:
+          parseIntWithDefault(json['bitmapCacheSize'], 50).clamp(1, 2047),
+      imageRetainNum:
+          parseIntWithDefault(json['imageRetainNum'], 0).clamp(0, 999),
+      replaceEnableDefault:
+          parseBoolWithDefault(json['replaceEnableDefault'], true),
+      processText: parseBoolWithDefault(
+        json['processText'] ?? json['process_text'],
+        true,
+      ),
+      recordLog: parseBoolWithDefault(json['recordLog'], false),
+      recordHeapDump: parseBoolWithDefault(json['recordHeapDump'], false),
       bookshelfViewMode: hasLegacyLayoutIndex
           ? bookshelfViewModeFromLayoutIndex(parsedLayoutIndex)
           : parseViewMode(json['bookshelfViewMode']),
@@ -334,6 +387,10 @@ class AppSettings {
         json['syncBookProgress'] ?? json['sync_book_progress'],
         true,
       ),
+      syncBookProgressPlus: parseBoolWithDefault(
+        json['syncBookProgressPlus'] ?? json['sync_book_progress_plus'],
+        false,
+      ),
       webDavUrl: parseString(
         json['webDavUrl'] ?? json['webdavUrl'] ?? defaultWebDavUrl,
       ),
@@ -344,6 +401,18 @@ class AppSettings {
         json['webDavPassword'] ?? json['webdavPassword'],
       ),
       webDavDir: parseString(json['webDavDir'] ?? json['webdavDir']),
+      webDavDeviceName: parseString(
+        json['webDavDeviceName'] ?? json['webdavDeviceName'],
+      ),
+      onlyLatestBackup: parseBoolWithDefault(
+        json['onlyLatestBackup'] ?? json['only_latest_backup'],
+        true,
+      ),
+      autoCheckNewBackup: parseBoolWithDefault(
+        json['autoCheckNewBackup'] ?? json['auto_check_new_backup'],
+        true,
+      ),
+      backupPath: parseString(json['backupPath'] ?? json['backupUri']),
     );
   }
 
@@ -352,9 +421,21 @@ class AppSettings {
       'appearanceMode': appearanceMode.index,
       'wifiOnlyDownload': wifiOnlyDownload,
       'autoUpdateSources': autoUpdateSources,
+      'autoRefresh': autoRefresh,
+      'auto_refresh': autoRefresh,
+      'defaultToRead': defaultToRead,
       'showDiscovery': showDiscovery,
       'showRss': showRss,
       'defaultHomePage': defaultHomePage.name,
+      'preDownloadNum': preDownloadNum,
+      'threadCount': threadCount,
+      'bitmapCacheSize': bitmapCacheSize,
+      'imageRetainNum': imageRetainNum,
+      'replaceEnableDefault': replaceEnableDefault,
+      'processText': processText,
+      'process_text': processText,
+      'recordLog': recordLog,
+      'recordHeapDump': recordHeapDump,
       'bookshelfViewMode': bookshelfViewMode.index,
       'bookshelfSortMode': bookshelfSortMode.index,
       'bookshelfGroupStyle': bookshelfGroupStyle,
@@ -379,10 +460,21 @@ class AppSettings {
       'searchShowCover': searchShowCover,
       'bookInfoDeleteAlert': bookInfoDeleteAlert,
       'syncBookProgress': syncBookProgress,
+      'sync_book_progress': syncBookProgress,
+      'syncBookProgressPlus': syncBookProgressPlus,
+      'sync_book_progress_plus': syncBookProgressPlus,
       'webDavUrl': webDavUrl,
       'webDavAccount': webDavAccount,
       'webDavPassword': webDavPassword,
       'webDavDir': webDavDir,
+      'webDavDeviceName': webDavDeviceName,
+      'webdavDeviceName': webDavDeviceName,
+      'onlyLatestBackup': onlyLatestBackup,
+      'only_latest_backup': onlyLatestBackup,
+      'autoCheckNewBackup': autoCheckNewBackup,
+      'auto_check_new_backup': autoCheckNewBackup,
+      'backupPath': backupPath,
+      'backupUri': backupPath,
     };
   }
 
@@ -390,9 +482,19 @@ class AppSettings {
     AppAppearanceMode? appearanceMode,
     bool? wifiOnlyDownload,
     bool? autoUpdateSources,
+    bool? autoRefresh,
+    bool? defaultToRead,
     bool? showDiscovery,
     bool? showRss,
     MainDefaultHomePage? defaultHomePage,
+    int? preDownloadNum,
+    int? threadCount,
+    int? bitmapCacheSize,
+    int? imageRetainNum,
+    bool? replaceEnableDefault,
+    bool? processText,
+    bool? recordLog,
+    bool? recordHeapDump,
     BookshelfViewMode? bookshelfViewMode,
     BookshelfSortMode? bookshelfSortMode,
     int? bookshelfGroupStyle,
@@ -410,18 +512,36 @@ class AppSettings {
     bool? searchShowCover,
     bool? bookInfoDeleteAlert,
     bool? syncBookProgress,
+    bool? syncBookProgressPlus,
     String? webDavUrl,
     String? webDavAccount,
     String? webDavPassword,
     String? webDavDir,
+    String? webDavDeviceName,
+    bool? onlyLatestBackup,
+    bool? autoCheckNewBackup,
+    String? backupPath,
   }) {
     return AppSettings(
       appearanceMode: appearanceMode ?? this.appearanceMode,
       wifiOnlyDownload: wifiOnlyDownload ?? this.wifiOnlyDownload,
       autoUpdateSources: autoUpdateSources ?? this.autoUpdateSources,
+      autoRefresh: autoRefresh ?? this.autoRefresh,
+      defaultToRead: defaultToRead ?? this.defaultToRead,
       showDiscovery: showDiscovery ?? this.showDiscovery,
       showRss: showRss ?? this.showRss,
       defaultHomePage: defaultHomePage ?? this.defaultHomePage,
+      preDownloadNum:
+          (preDownloadNum ?? this.preDownloadNum).clamp(0, 9999).toInt(),
+      threadCount: (threadCount ?? this.threadCount).clamp(1, 999).toInt(),
+      bitmapCacheSize:
+          (bitmapCacheSize ?? this.bitmapCacheSize).clamp(1, 2047).toInt(),
+      imageRetainNum:
+          (imageRetainNum ?? this.imageRetainNum).clamp(0, 999).toInt(),
+      replaceEnableDefault: replaceEnableDefault ?? this.replaceEnableDefault,
+      processText: processText ?? this.processText,
+      recordLog: recordLog ?? this.recordLog,
+      recordHeapDump: recordHeapDump ?? this.recordHeapDump,
       bookshelfViewMode: bookshelfViewMode ?? this.bookshelfViewMode,
       bookshelfSortMode: bookshelfSortMode ?? this.bookshelfSortMode,
       bookshelfGroupStyle: bookshelfGroupStyle ?? this.bookshelfGroupStyle,
@@ -444,10 +564,15 @@ class AppSettings {
       searchShowCover: searchShowCover ?? this.searchShowCover,
       bookInfoDeleteAlert: bookInfoDeleteAlert ?? this.bookInfoDeleteAlert,
       syncBookProgress: syncBookProgress ?? this.syncBookProgress,
+      syncBookProgressPlus: syncBookProgressPlus ?? this.syncBookProgressPlus,
       webDavUrl: webDavUrl ?? this.webDavUrl,
       webDavAccount: webDavAccount ?? this.webDavAccount,
       webDavPassword: webDavPassword ?? this.webDavPassword,
       webDavDir: webDavDir ?? this.webDavDir,
+      webDavDeviceName: webDavDeviceName ?? this.webDavDeviceName,
+      onlyLatestBackup: onlyLatestBackup ?? this.onlyLatestBackup,
+      autoCheckNewBackup: autoCheckNewBackup ?? this.autoCheckNewBackup,
+      backupPath: backupPath ?? this.backupPath,
     );
   }
 }

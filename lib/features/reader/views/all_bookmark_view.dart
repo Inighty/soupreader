@@ -3,10 +3,15 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../core/database/database_service.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
+import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/services/exception_log_service.dart';
+import '../../../core/services/settings_service.dart';
+import '../../bookshelf/models/book.dart';
 import '../services/reader_bookmark_export_service.dart';
+import 'simple_reader_view.dart';
 
 /// 所有书签（对齐 legado `AllBookmarkActivity`）
 class AllBookmarkView extends StatefulWidget {
@@ -20,6 +25,8 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
   final BookmarkRepository _bookmarkRepo = BookmarkRepository();
   final ReaderBookmarkExportService _bookmarkExportService =
       ReaderBookmarkExportService();
+  final SettingsService _settingsService = SettingsService();
+  late final BookRepository _bookRepo;
 
   List<BookmarkEntity> _bookmarks = <BookmarkEntity>[];
   bool _loading = true;
@@ -28,6 +35,7 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
   @override
   void initState() {
     super.initState();
+    _bookRepo = BookRepository(DatabaseService());
     unawaited(_loadBookmarks());
   }
 
@@ -58,6 +66,8 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
     setState(() => _exporting = true);
     try {
       final bookmarks = _bookmarkRepo.getAllBookmarksByLegacyOrder();
+      final node =
+          markdown ? 'all_bookmark.menu_export_md' : 'all_bookmark.menu_export';
       final result = markdown
           ? await _bookmarkExportService.exportAllMarkdown(
               bookmarks: bookmarks,
@@ -69,11 +79,19 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
       if (result.cancelled) {
         return;
       }
-      if (!result.success) {
+      if (result.success) {
         ExceptionLogService().record(
-          node: markdown
-              ? 'all_bookmark.menu_export_md'
-              : 'all_bookmark.menu_export',
+          node: node,
+          message: '导出成功',
+          context: <String, dynamic>{
+            'bookmarkCount': bookmarks.length,
+            'format': markdown ? 'md' : 'json',
+            if (result.outputPath != null) 'outputPath': result.outputPath,
+          },
+        );
+      } else {
+        ExceptionLogService().record(
+          node: node,
           message: result.message ?? '导出失败',
           context: <String, dynamic>{
             'bookmarkCount': bookmarks.length,
@@ -133,6 +151,127 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
           onPressed: () => Navigator.of(sheetContext).pop(),
           child: const Text('取消'),
         ),
+      ),
+    );
+  }
+
+  Future<Book?> _resolveBookForBookmark(BookmarkEntity bookmark) async {
+    await _bookRepo.watchAllBooks().first;
+    final bookId = bookmark.bookId.trim();
+    if (bookId.isNotEmpty) {
+      final byId = _bookRepo.getBookById(bookId);
+      if (byId != null) {
+        return byId;
+      }
+    }
+    final allBooks = _bookRepo.getAllBooks();
+    for (final book in allBooks) {
+      if (book.title == bookmark.bookName &&
+          book.author == bookmark.bookAuthor) {
+        return book;
+      }
+    }
+    return null;
+  }
+
+  double _decodeBookmarkChapterProgress(int chapterPos) {
+    return (chapterPos / 10000.0).clamp(0.0, 1.0).toDouble();
+  }
+
+  Future<void> _openBookmarkInReader(BookmarkEntity bookmark) async {
+    try {
+      final book = await _resolveBookForBookmark(bookmark);
+      if (book == null) {
+        _showToast('书籍不存在，无法定位阅读');
+        return;
+      }
+      final chapterIndex =
+          bookmark.chapterIndex < 0 ? 0 : bookmark.chapterIndex;
+      final progress = _decodeBookmarkChapterProgress(bookmark.chapterPos);
+      await _settingsService.saveChapterPageProgress(
+        book.id,
+        chapterIndex: chapterIndex,
+        progress: progress,
+      );
+      if (!mounted) return;
+      await Navigator.of(context, rootNavigator: true).push(
+        CupertinoPageRoute<void>(
+          builder: (_) => SimpleReaderView(
+            bookId: book.id,
+            bookTitle: book.title,
+            initialChapter: chapterIndex,
+          ),
+        ),
+      );
+      if (!mounted) return;
+      await _loadBookmarks();
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'all_bookmark.item_open_reader',
+        message: '定位阅读失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'bookmarkId': bookmark.id,
+          'bookId': bookmark.bookId,
+          'chapterIndex': bookmark.chapterIndex,
+          'chapterPos': bookmark.chapterPos,
+        },
+      );
+      if (!mounted) return;
+      _showToast('定位阅读失败：$error');
+    }
+  }
+
+  Future<void> _openBookmarkDetail(BookmarkEntity bookmark) async {
+    final chapter = bookmark.chapterTitle.trim().isEmpty
+        ? '第 ${bookmark.chapterIndex + 1} 章'
+        : bookmark.chapterTitle.trim();
+    final excerpt =
+        bookmark.content.trim().isEmpty ? '（无）' : bookmark.content.trim();
+    final progressPercent =
+        (_decodeBookmarkChapterProgress(bookmark.chapterPos) * 100)
+            .toStringAsFixed(1);
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: Text(chapter),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 6),
+            Text(
+              '${bookmark.bookName} · ${bookmark.bookAuthor}',
+              style: const TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '章节进度 $progressPercent%',
+              style: const TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              excerpt,
+              maxLines: 6,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('关闭'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              unawaited(_openBookmarkInReader(bookmark));
+            },
+            child: const Text('定位阅读'),
+          ),
+        ],
       ),
     );
   }
@@ -238,6 +377,8 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
             overflow: TextOverflow.ellipsis,
           ),
           additionalInfo: Text(_formatTime(bookmark.createdTime)),
+          trailing: const CupertinoListTileChevron(),
+          onTap: () => unawaited(_openBookmarkDetail(bookmark)),
         );
       },
     );

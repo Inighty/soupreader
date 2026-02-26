@@ -7,6 +7,7 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/utils/format_utils.dart';
+import '../services/other_maintenance_service.dart';
 import 'settings_ui_tokens.dart';
 
 class StorageSettingsView extends StatefulWidget {
@@ -18,6 +19,7 @@ class StorageSettingsView extends StatefulWidget {
 
 class _StorageSettingsViewState extends State<StorageSettingsView> {
   final SettingsService _settingsService = SettingsService();
+  final OtherMaintenanceService _maintenanceService = OtherMaintenanceService();
   late final BookRepository _bookRepo;
   late final ChapterRepository _chapterRepo;
 
@@ -33,8 +35,11 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
   }
 
   void _refreshCacheInfo() {
-    final localBookIds =
-        _bookRepo.getAllBooks().where((b) => b.isLocal).map((b) => b.id).toSet();
+    final localBookIds = _bookRepo
+        .getAllBooks()
+        .where((b) => b.isLocal)
+        .map((b) => b.id)
+        .toSet();
     final info =
         _chapterRepo.getDownloadedCacheInfo(protectBookIds: localBookIds);
     if (!mounted) return;
@@ -80,9 +85,27 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
                     Text(SettingsUiTokens.status(cacheText, chapterText)),
               ),
               CupertinoListTile.notched(
-                title: const Text('清理章节缓存（在线书籍）'),
+                title: const Text('清理缓存'),
+                additionalInfo: const Text('清除已下载书籍和字体缓存'),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _confirmClearCache,
+              ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('维护'),
+            children: [
+              CupertinoListTile.notched(
+                title: const Text('清除 WebView 数据'),
+                additionalInfo: const Text('清除内置浏览器所有数据'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _confirmClearWebViewData,
+              ),
+              CupertinoListTile.notched(
+                title: const Text('压缩数据库'),
+                additionalInfo: const Text('减小数据库文件的大小'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _confirmShrinkDatabase,
               ),
             ],
           ),
@@ -90,7 +113,7 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
             header: const Text('说明'),
             children: const [
               CupertinoListTile(
-                title: Text('清理缓存不会影响书架与阅读进度；本地导入书籍的正文不会被清理。'),
+                title: Text('清理缓存不会影响书架与阅读进度；本地导入书籍正文不会被清理。'),
               ),
             ],
           ),
@@ -108,9 +131,9 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
-        title: const Text('清理章节缓存？'),
-        content: Text(
-            '\n当前缓存 $sizeText（$chapterText）\n\n将删除在线书籍已缓存的章节内容，本地导入书籍不受影响。'),
+        title: const Text('清理缓存'),
+        content:
+            Text('\n当前章节缓存 $sizeText（$chapterText）\n\n将删除在线书籍缓存与应用缓存目录，是否继续？'),
         actions: [
           CupertinoDialogAction(
             child: const Text('取消'),
@@ -125,45 +148,121 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
       ),
     );
     if (confirmed != true) return;
-    await _clearCache();
+    await _runMaintenanceAction(
+      loadingMessage: '正在清理缓存...',
+      action: _maintenanceService.cleanCache,
+      refreshCacheInfo: true,
+    );
   }
 
-  Future<void> _clearCache() async {
+  Future<void> _confirmClearWebViewData() async {
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('清除 WebView 数据'),
+        content: const Text('\n将清除内置浏览器所有数据，是否继续？'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('取消'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            child: const Text('清除'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _runMaintenanceAction(
+      loadingMessage: '正在清除 WebView 数据...',
+      action: _maintenanceService.clearWebViewData,
+      refreshCacheInfo: false,
+    );
+  }
+
+  Future<void> _confirmShrinkDatabase() async {
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('压缩数据库'),
+        content: const Text('\n将执行数据库压缩，是否继续？'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('取消'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            child: const Text('确定'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _runMaintenanceAction(
+      loadingMessage: '正在压缩数据库...',
+      action: _maintenanceService.shrinkDatabase,
+      refreshCacheInfo: false,
+    );
+  }
+
+  Future<void> _runMaintenanceAction({
+    required String loadingMessage,
+    required Future<MaintenanceActionResult> Function() action,
+    required bool refreshCacheInfo,
+  }) async {
     showCupertinoDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CupertinoActivityIndicator()),
+      builder: (context) => CupertinoAlertDialog(
+        content: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CupertinoActivityIndicator(),
+              const SizedBox(height: 12),
+              Text(loadingMessage),
+            ],
+          ),
+        ),
+      ),
     );
 
+    MaintenanceActionResult result;
     try {
-      final localBookIds = _bookRepo
-          .getAllBooks()
-          .where((b) => b.isLocal)
-          .map((b) => b.id)
-          .toSet();
-      final result =
-          await _chapterRepo.clearDownloadedCache(protectBookIds: localBookIds);
-
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      _refreshCacheInfo();
-      _showMessage(result.chapters == 0
-          ? '没有可清理的缓存'
-          : '已清理 ${FormatUtils.formatBytes(result.bytes)}（${result.chapters} 章）');
-    } catch (_) {
-      if (!mounted) return;
-      Navigator.pop(context);
-      _showMessage('清理失败');
+      result = await action();
+    } catch (error) {
+      result = MaintenanceActionResult(
+        success: false,
+        message: '执行失败',
+        detail: '$error',
+      );
     }
+
+    if (!mounted) return;
+    Navigator.pop(context);
+
+    if (refreshCacheInfo) {
+      _refreshCacheInfo();
+    }
+    _showMessage(result.message, detail: result.success ? null : result.detail);
   }
 
-  void _showMessage(String message) {
+  void _showMessage(String message, {String? detail}) {
+    final normalizedDetail = (detail ?? '').trim();
     showCupertinoDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),
-        content: Text('\n$message'),
+        content: Text(
+          normalizedDetail.isEmpty
+              ? '\n$message'
+              : '\n$message\n\n$normalizedDetail',
+        ),
         actions: [
           CupertinoDialogAction(
             child: const Text('好'),

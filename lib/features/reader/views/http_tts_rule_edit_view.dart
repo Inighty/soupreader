@@ -2,7 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/source_login_store.dart';
+import '../../../core/utils/legado_json.dart';
 import '../../source/models/book_source.dart';
 import '../../source/services/source_login_script_service.dart';
 import '../../source/services/source_login_ui_helper.dart';
@@ -16,6 +18,7 @@ enum _HttpTtsRuleEditMenuAction {
   login,
   showLoginHeader,
   deleteLoginHeader,
+  copySource,
   pasteSource,
 }
 
@@ -208,6 +211,13 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
           CupertinoActionSheetAction(
             onPressed: () => Navigator.pop(
               sheetContext,
+              _HttpTtsRuleEditMenuAction.copySource,
+            ),
+            child: const Text('拷贝源'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(
+              sheetContext,
               _HttpTtsRuleEditMenuAction.pasteSource,
             ),
             child: const Text('粘贴源'),
@@ -230,10 +240,36 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
       case _HttpTtsRuleEditMenuAction.deleteLoginHeader:
         await _deleteLoginHeader();
         return;
+      case _HttpTtsRuleEditMenuAction.copySource:
+        await _copySourceToClipboard();
+        return;
       case _HttpTtsRuleEditMenuAction.pasteSource:
         await _pasteSourceFromClipboard();
         return;
     }
+  }
+
+  Future<void> _copySourceToClipboard() async {
+    final draftRule = _buildRuleFromForm();
+    final payload = LegadoJson.encode(draftRule.toJson());
+    try {
+      await Clipboard.setData(ClipboardData(text: payload));
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'reader.menu.speak_engine_edit.copy_source.failed',
+        message: '拷贝朗读源失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'ruleId': draftRule.id,
+          'ruleName': draftRule.name,
+          'payloadLength': payload.length,
+        },
+      );
+      return;
+    }
+    if (!mounted) return;
+    _showToastMessage('已拷贝');
   }
 
   Future<void> _pasteSourceFromClipboard() async {
