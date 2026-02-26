@@ -2041,6 +2041,586 @@ class RssArticleRecordsCompanion extends UpdateCompanion<RssArticleRecord> {
   }
 }
 
+class $RssStarRecordsTable extends RssStarRecords
+    with TableInfo<$RssStarRecordsTable, RssStarRecord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RssStarRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _originMeta = const VerificationMeta('origin');
+  @override
+  late final GeneratedColumn<String> origin = GeneratedColumn<String>(
+      'origin', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _linkMeta = const VerificationMeta('link');
+  @override
+  late final GeneratedColumn<String> link = GeneratedColumn<String>(
+      'link', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _sortMeta = const VerificationMeta('sort');
+  @override
+  late final GeneratedColumn<String> sort = GeneratedColumn<String>(
+      'sort', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _starTimeMeta =
+      const VerificationMeta('starTime');
+  @override
+  late final GeneratedColumn<int> starTime = GeneratedColumn<int>(
+      'star_time', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _pubDateMeta =
+      const VerificationMeta('pubDate');
+  @override
+  late final GeneratedColumn<String> pubDate = GeneratedColumn<String>(
+      'pub_date', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _descriptionMeta =
+      const VerificationMeta('description');
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+      'description', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _contentMeta =
+      const VerificationMeta('content');
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+      'content', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _imageMeta = const VerificationMeta('image');
+  @override
+  late final GeneratedColumn<String> image = GeneratedColumn<String>(
+      'image', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _groupNameMeta =
+      const VerificationMeta('groupName');
+  @override
+  late final GeneratedColumn<String> groupName = GeneratedColumn<String>(
+      'group_name', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('默认分组'));
+  static const VerificationMeta _variableMeta =
+      const VerificationMeta('variable');
+  @override
+  late final GeneratedColumn<String> variable = GeneratedColumn<String>(
+      'variable', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  @override
+  List<GeneratedColumn> get $columns => [
+        origin,
+        link,
+        sort,
+        title,
+        starTime,
+        pubDate,
+        description,
+        content,
+        image,
+        groupName,
+        variable,
+        updatedAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'rss_star_records';
+  @override
+  VerificationContext validateIntegrity(Insertable<RssStarRecord> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('origin')) {
+      context.handle(_originMeta,
+          origin.isAcceptableOrUnknown(data['origin']!, _originMeta));
+    } else if (isInserting) {
+      context.missing(_originMeta);
+    }
+    if (data.containsKey('link')) {
+      context.handle(
+          _linkMeta, link.isAcceptableOrUnknown(data['link']!, _linkMeta));
+    } else if (isInserting) {
+      context.missing(_linkMeta);
+    }
+    if (data.containsKey('sort')) {
+      context.handle(
+          _sortMeta, sort.isAcceptableOrUnknown(data['sort']!, _sortMeta));
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    }
+    if (data.containsKey('star_time')) {
+      context.handle(_starTimeMeta,
+          starTime.isAcceptableOrUnknown(data['star_time']!, _starTimeMeta));
+    }
+    if (data.containsKey('pub_date')) {
+      context.handle(_pubDateMeta,
+          pubDate.isAcceptableOrUnknown(data['pub_date']!, _pubDateMeta));
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+          _descriptionMeta,
+          description.isAcceptableOrUnknown(
+              data['description']!, _descriptionMeta));
+    }
+    if (data.containsKey('content')) {
+      context.handle(_contentMeta,
+          content.isAcceptableOrUnknown(data['content']!, _contentMeta));
+    }
+    if (data.containsKey('image')) {
+      context.handle(
+          _imageMeta, image.isAcceptableOrUnknown(data['image']!, _imageMeta));
+    }
+    if (data.containsKey('group_name')) {
+      context.handle(_groupNameMeta,
+          groupName.isAcceptableOrUnknown(data['group_name']!, _groupNameMeta));
+    }
+    if (data.containsKey('variable')) {
+      context.handle(_variableMeta,
+          variable.isAcceptableOrUnknown(data['variable']!, _variableMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {origin, link};
+  @override
+  RssStarRecord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RssStarRecord(
+      origin: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}origin'])!,
+      link: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}link'])!,
+      sort: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sort'])!,
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
+      starTime: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}star_time'])!,
+      pubDate: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pub_date']),
+      description: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}description']),
+      content: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}content']),
+      image: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}image']),
+      groupName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}group_name'])!,
+      variable: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}variable']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $RssStarRecordsTable createAlias(String alias) {
+    return $RssStarRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class RssStarRecord extends DataClass implements Insertable<RssStarRecord> {
+  final String origin;
+  final String link;
+  final String sort;
+  final String title;
+  final int starTime;
+  final String? pubDate;
+  final String? description;
+  final String? content;
+  final String? image;
+  final String groupName;
+  final String? variable;
+  final int updatedAt;
+  const RssStarRecord(
+      {required this.origin,
+      required this.link,
+      required this.sort,
+      required this.title,
+      required this.starTime,
+      this.pubDate,
+      this.description,
+      this.content,
+      this.image,
+      required this.groupName,
+      this.variable,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['origin'] = Variable<String>(origin);
+    map['link'] = Variable<String>(link);
+    map['sort'] = Variable<String>(sort);
+    map['title'] = Variable<String>(title);
+    map['star_time'] = Variable<int>(starTime);
+    if (!nullToAbsent || pubDate != null) {
+      map['pub_date'] = Variable<String>(pubDate);
+    }
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    if (!nullToAbsent || content != null) {
+      map['content'] = Variable<String>(content);
+    }
+    if (!nullToAbsent || image != null) {
+      map['image'] = Variable<String>(image);
+    }
+    map['group_name'] = Variable<String>(groupName);
+    if (!nullToAbsent || variable != null) {
+      map['variable'] = Variable<String>(variable);
+    }
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  RssStarRecordsCompanion toCompanion(bool nullToAbsent) {
+    return RssStarRecordsCompanion(
+      origin: Value(origin),
+      link: Value(link),
+      sort: Value(sort),
+      title: Value(title),
+      starTime: Value(starTime),
+      pubDate: pubDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pubDate),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      content: content == null && nullToAbsent
+          ? const Value.absent()
+          : Value(content),
+      image:
+          image == null && nullToAbsent ? const Value.absent() : Value(image),
+      groupName: Value(groupName),
+      variable: variable == null && nullToAbsent
+          ? const Value.absent()
+          : Value(variable),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory RssStarRecord.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RssStarRecord(
+      origin: serializer.fromJson<String>(json['origin']),
+      link: serializer.fromJson<String>(json['link']),
+      sort: serializer.fromJson<String>(json['sort']),
+      title: serializer.fromJson<String>(json['title']),
+      starTime: serializer.fromJson<int>(json['starTime']),
+      pubDate: serializer.fromJson<String?>(json['pubDate']),
+      description: serializer.fromJson<String?>(json['description']),
+      content: serializer.fromJson<String?>(json['content']),
+      image: serializer.fromJson<String?>(json['image']),
+      groupName: serializer.fromJson<String>(json['groupName']),
+      variable: serializer.fromJson<String?>(json['variable']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'origin': serializer.toJson<String>(origin),
+      'link': serializer.toJson<String>(link),
+      'sort': serializer.toJson<String>(sort),
+      'title': serializer.toJson<String>(title),
+      'starTime': serializer.toJson<int>(starTime),
+      'pubDate': serializer.toJson<String?>(pubDate),
+      'description': serializer.toJson<String?>(description),
+      'content': serializer.toJson<String?>(content),
+      'image': serializer.toJson<String?>(image),
+      'groupName': serializer.toJson<String>(groupName),
+      'variable': serializer.toJson<String?>(variable),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  RssStarRecord copyWith(
+          {String? origin,
+          String? link,
+          String? sort,
+          String? title,
+          int? starTime,
+          Value<String?> pubDate = const Value.absent(),
+          Value<String?> description = const Value.absent(),
+          Value<String?> content = const Value.absent(),
+          Value<String?> image = const Value.absent(),
+          String? groupName,
+          Value<String?> variable = const Value.absent(),
+          int? updatedAt}) =>
+      RssStarRecord(
+        origin: origin ?? this.origin,
+        link: link ?? this.link,
+        sort: sort ?? this.sort,
+        title: title ?? this.title,
+        starTime: starTime ?? this.starTime,
+        pubDate: pubDate.present ? pubDate.value : this.pubDate,
+        description: description.present ? description.value : this.description,
+        content: content.present ? content.value : this.content,
+        image: image.present ? image.value : this.image,
+        groupName: groupName ?? this.groupName,
+        variable: variable.present ? variable.value : this.variable,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  RssStarRecord copyWithCompanion(RssStarRecordsCompanion data) {
+    return RssStarRecord(
+      origin: data.origin.present ? data.origin.value : this.origin,
+      link: data.link.present ? data.link.value : this.link,
+      sort: data.sort.present ? data.sort.value : this.sort,
+      title: data.title.present ? data.title.value : this.title,
+      starTime: data.starTime.present ? data.starTime.value : this.starTime,
+      pubDate: data.pubDate.present ? data.pubDate.value : this.pubDate,
+      description:
+          data.description.present ? data.description.value : this.description,
+      content: data.content.present ? data.content.value : this.content,
+      image: data.image.present ? data.image.value : this.image,
+      groupName: data.groupName.present ? data.groupName.value : this.groupName,
+      variable: data.variable.present ? data.variable.value : this.variable,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RssStarRecord(')
+          ..write('origin: $origin, ')
+          ..write('link: $link, ')
+          ..write('sort: $sort, ')
+          ..write('title: $title, ')
+          ..write('starTime: $starTime, ')
+          ..write('pubDate: $pubDate, ')
+          ..write('description: $description, ')
+          ..write('content: $content, ')
+          ..write('image: $image, ')
+          ..write('groupName: $groupName, ')
+          ..write('variable: $variable, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(origin, link, sort, title, starTime, pubDate,
+      description, content, image, groupName, variable, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RssStarRecord &&
+          other.origin == this.origin &&
+          other.link == this.link &&
+          other.sort == this.sort &&
+          other.title == this.title &&
+          other.starTime == this.starTime &&
+          other.pubDate == this.pubDate &&
+          other.description == this.description &&
+          other.content == this.content &&
+          other.image == this.image &&
+          other.groupName == this.groupName &&
+          other.variable == this.variable &&
+          other.updatedAt == this.updatedAt);
+}
+
+class RssStarRecordsCompanion extends UpdateCompanion<RssStarRecord> {
+  final Value<String> origin;
+  final Value<String> link;
+  final Value<String> sort;
+  final Value<String> title;
+  final Value<int> starTime;
+  final Value<String?> pubDate;
+  final Value<String?> description;
+  final Value<String?> content;
+  final Value<String?> image;
+  final Value<String> groupName;
+  final Value<String?> variable;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const RssStarRecordsCompanion({
+    this.origin = const Value.absent(),
+    this.link = const Value.absent(),
+    this.sort = const Value.absent(),
+    this.title = const Value.absent(),
+    this.starTime = const Value.absent(),
+    this.pubDate = const Value.absent(),
+    this.description = const Value.absent(),
+    this.content = const Value.absent(),
+    this.image = const Value.absent(),
+    this.groupName = const Value.absent(),
+    this.variable = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RssStarRecordsCompanion.insert({
+    required String origin,
+    required String link,
+    this.sort = const Value.absent(),
+    this.title = const Value.absent(),
+    this.starTime = const Value.absent(),
+    this.pubDate = const Value.absent(),
+    this.description = const Value.absent(),
+    this.content = const Value.absent(),
+    this.image = const Value.absent(),
+    this.groupName = const Value.absent(),
+    this.variable = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : origin = Value(origin),
+        link = Value(link);
+  static Insertable<RssStarRecord> custom({
+    Expression<String>? origin,
+    Expression<String>? link,
+    Expression<String>? sort,
+    Expression<String>? title,
+    Expression<int>? starTime,
+    Expression<String>? pubDate,
+    Expression<String>? description,
+    Expression<String>? content,
+    Expression<String>? image,
+    Expression<String>? groupName,
+    Expression<String>? variable,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (origin != null) 'origin': origin,
+      if (link != null) 'link': link,
+      if (sort != null) 'sort': sort,
+      if (title != null) 'title': title,
+      if (starTime != null) 'star_time': starTime,
+      if (pubDate != null) 'pub_date': pubDate,
+      if (description != null) 'description': description,
+      if (content != null) 'content': content,
+      if (image != null) 'image': image,
+      if (groupName != null) 'group_name': groupName,
+      if (variable != null) 'variable': variable,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RssStarRecordsCompanion copyWith(
+      {Value<String>? origin,
+      Value<String>? link,
+      Value<String>? sort,
+      Value<String>? title,
+      Value<int>? starTime,
+      Value<String?>? pubDate,
+      Value<String?>? description,
+      Value<String?>? content,
+      Value<String?>? image,
+      Value<String>? groupName,
+      Value<String?>? variable,
+      Value<int>? updatedAt,
+      Value<int>? rowid}) {
+    return RssStarRecordsCompanion(
+      origin: origin ?? this.origin,
+      link: link ?? this.link,
+      sort: sort ?? this.sort,
+      title: title ?? this.title,
+      starTime: starTime ?? this.starTime,
+      pubDate: pubDate ?? this.pubDate,
+      description: description ?? this.description,
+      content: content ?? this.content,
+      image: image ?? this.image,
+      groupName: groupName ?? this.groupName,
+      variable: variable ?? this.variable,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (origin.present) {
+      map['origin'] = Variable<String>(origin.value);
+    }
+    if (link.present) {
+      map['link'] = Variable<String>(link.value);
+    }
+    if (sort.present) {
+      map['sort'] = Variable<String>(sort.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (starTime.present) {
+      map['star_time'] = Variable<int>(starTime.value);
+    }
+    if (pubDate.present) {
+      map['pub_date'] = Variable<String>(pubDate.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (image.present) {
+      map['image'] = Variable<String>(image.value);
+    }
+    if (groupName.present) {
+      map['group_name'] = Variable<String>(groupName.value);
+    }
+    if (variable.present) {
+      map['variable'] = Variable<String>(variable.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RssStarRecordsCompanion(')
+          ..write('origin: $origin, ')
+          ..write('link: $link, ')
+          ..write('sort: $sort, ')
+          ..write('title: $title, ')
+          ..write('starTime: $starTime, ')
+          ..write('pubDate: $pubDate, ')
+          ..write('description: $description, ')
+          ..write('content: $content, ')
+          ..write('image: $image, ')
+          ..write('groupName: $groupName, ')
+          ..write('variable: $variable, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $RssReadRecordRecordsTable extends RssReadRecordRecords
     with TableInfo<$RssReadRecordRecordsTable, RssReadRecordRecord> {
   @override
@@ -5017,6 +5597,7 @@ abstract class _$SourceDriftDatabase extends GeneratedDatabase {
       $RssSourceRecordsTable(this);
   late final $RssArticleRecordsTable rssArticleRecords =
       $RssArticleRecordsTable(this);
+  late final $RssStarRecordsTable rssStarRecords = $RssStarRecordsTable(this);
   late final $RssReadRecordRecordsTable rssReadRecordRecords =
       $RssReadRecordRecordsTable(this);
   late final $BookRecordsTable bookRecords = $BookRecordsTable(this);
@@ -5035,6 +5616,7 @@ abstract class _$SourceDriftDatabase extends GeneratedDatabase {
         sourceRecords,
         rssSourceRecords,
         rssArticleRecords,
+        rssStarRecords,
         rssReadRecordRecords,
         bookRecords,
         chapterRecords,
@@ -5978,6 +6560,285 @@ typedef $$RssArticleRecordsTableProcessedTableManager = ProcessedTableManager<
           RssArticleRecord>
     ),
     RssArticleRecord,
+    PrefetchHooks Function()>;
+typedef $$RssStarRecordsTableCreateCompanionBuilder = RssStarRecordsCompanion
+    Function({
+  required String origin,
+  required String link,
+  Value<String> sort,
+  Value<String> title,
+  Value<int> starTime,
+  Value<String?> pubDate,
+  Value<String?> description,
+  Value<String?> content,
+  Value<String?> image,
+  Value<String> groupName,
+  Value<String?> variable,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+typedef $$RssStarRecordsTableUpdateCompanionBuilder = RssStarRecordsCompanion
+    Function({
+  Value<String> origin,
+  Value<String> link,
+  Value<String> sort,
+  Value<String> title,
+  Value<int> starTime,
+  Value<String?> pubDate,
+  Value<String?> description,
+  Value<String?> content,
+  Value<String?> image,
+  Value<String> groupName,
+  Value<String?> variable,
+  Value<int> updatedAt,
+  Value<int> rowid,
+});
+
+class $$RssStarRecordsTableFilterComposer
+    extends Composer<_$SourceDriftDatabase, $RssStarRecordsTable> {
+  $$RssStarRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get origin => $composableBuilder(
+      column: $table.origin, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get link => $composableBuilder(
+      column: $table.link, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sort => $composableBuilder(
+      column: $table.sort, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get starTime => $composableBuilder(
+      column: $table.starTime, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pubDate => $composableBuilder(
+      column: $table.pubDate, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get content => $composableBuilder(
+      column: $table.content, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get image => $composableBuilder(
+      column: $table.image, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get groupName => $composableBuilder(
+      column: $table.groupName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get variable => $composableBuilder(
+      column: $table.variable, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$RssStarRecordsTableOrderingComposer
+    extends Composer<_$SourceDriftDatabase, $RssStarRecordsTable> {
+  $$RssStarRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get origin => $composableBuilder(
+      column: $table.origin, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get link => $composableBuilder(
+      column: $table.link, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sort => $composableBuilder(
+      column: $table.sort, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get starTime => $composableBuilder(
+      column: $table.starTime, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pubDate => $composableBuilder(
+      column: $table.pubDate, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get content => $composableBuilder(
+      column: $table.content, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get image => $composableBuilder(
+      column: $table.image, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get groupName => $composableBuilder(
+      column: $table.groupName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get variable => $composableBuilder(
+      column: $table.variable, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$RssStarRecordsTableAnnotationComposer
+    extends Composer<_$SourceDriftDatabase, $RssStarRecordsTable> {
+  $$RssStarRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get origin =>
+      $composableBuilder(column: $table.origin, builder: (column) => column);
+
+  GeneratedColumn<String> get link =>
+      $composableBuilder(column: $table.link, builder: (column) => column);
+
+  GeneratedColumn<String> get sort =>
+      $composableBuilder(column: $table.sort, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<int> get starTime =>
+      $composableBuilder(column: $table.starTime, builder: (column) => column);
+
+  GeneratedColumn<String> get pubDate =>
+      $composableBuilder(column: $table.pubDate, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<String> get image =>
+      $composableBuilder(column: $table.image, builder: (column) => column);
+
+  GeneratedColumn<String> get groupName =>
+      $composableBuilder(column: $table.groupName, builder: (column) => column);
+
+  GeneratedColumn<String> get variable =>
+      $composableBuilder(column: $table.variable, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$RssStarRecordsTableTableManager extends RootTableManager<
+    _$SourceDriftDatabase,
+    $RssStarRecordsTable,
+    RssStarRecord,
+    $$RssStarRecordsTableFilterComposer,
+    $$RssStarRecordsTableOrderingComposer,
+    $$RssStarRecordsTableAnnotationComposer,
+    $$RssStarRecordsTableCreateCompanionBuilder,
+    $$RssStarRecordsTableUpdateCompanionBuilder,
+    (
+      RssStarRecord,
+      BaseReferences<_$SourceDriftDatabase, $RssStarRecordsTable, RssStarRecord>
+    ),
+    RssStarRecord,
+    PrefetchHooks Function()> {
+  $$RssStarRecordsTableTableManager(
+      _$SourceDriftDatabase db, $RssStarRecordsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RssStarRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RssStarRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RssStarRecordsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> origin = const Value.absent(),
+            Value<String> link = const Value.absent(),
+            Value<String> sort = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<int> starTime = const Value.absent(),
+            Value<String?> pubDate = const Value.absent(),
+            Value<String?> description = const Value.absent(),
+            Value<String?> content = const Value.absent(),
+            Value<String?> image = const Value.absent(),
+            Value<String> groupName = const Value.absent(),
+            Value<String?> variable = const Value.absent(),
+            Value<int> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              RssStarRecordsCompanion(
+            origin: origin,
+            link: link,
+            sort: sort,
+            title: title,
+            starTime: starTime,
+            pubDate: pubDate,
+            description: description,
+            content: content,
+            image: image,
+            groupName: groupName,
+            variable: variable,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String origin,
+            required String link,
+            Value<String> sort = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<int> starTime = const Value.absent(),
+            Value<String?> pubDate = const Value.absent(),
+            Value<String?> description = const Value.absent(),
+            Value<String?> content = const Value.absent(),
+            Value<String?> image = const Value.absent(),
+            Value<String> groupName = const Value.absent(),
+            Value<String?> variable = const Value.absent(),
+            Value<int> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              RssStarRecordsCompanion.insert(
+            origin: origin,
+            link: link,
+            sort: sort,
+            title: title,
+            starTime: starTime,
+            pubDate: pubDate,
+            description: description,
+            content: content,
+            image: image,
+            groupName: groupName,
+            variable: variable,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$RssStarRecordsTableProcessedTableManager = ProcessedTableManager<
+    _$SourceDriftDatabase,
+    $RssStarRecordsTable,
+    RssStarRecord,
+    $$RssStarRecordsTableFilterComposer,
+    $$RssStarRecordsTableOrderingComposer,
+    $$RssStarRecordsTableAnnotationComposer,
+    $$RssStarRecordsTableCreateCompanionBuilder,
+    $$RssStarRecordsTableUpdateCompanionBuilder,
+    (
+      RssStarRecord,
+      BaseReferences<_$SourceDriftDatabase, $RssStarRecordsTable, RssStarRecord>
+    ),
+    RssStarRecord,
     PrefetchHooks Function()>;
 typedef $$RssReadRecordRecordsTableCreateCompanionBuilder
     = RssReadRecordRecordsCompanion Function({
@@ -7459,6 +8320,8 @@ class $SourceDriftDatabaseManager {
       $$RssSourceRecordsTableTableManager(_db, _db.rssSourceRecords);
   $$RssArticleRecordsTableTableManager get rssArticleRecords =>
       $$RssArticleRecordsTableTableManager(_db, _db.rssArticleRecords);
+  $$RssStarRecordsTableTableManager get rssStarRecords =>
+      $$RssStarRecordsTableTableManager(_db, _db.rssStarRecords);
   $$RssReadRecordRecordsTableTableManager get rssReadRecordRecords =>
       $$RssReadRecordRecordsTableTableManager(_db, _db.rssReadRecordRecords);
   $$BookRecordsTableTableManager get bookRecords =>

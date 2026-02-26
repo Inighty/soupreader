@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_article_repository.dart';
+import '../../../core/services/exception_log_service.dart';
 import '../models/rss_read_record.dart';
 
 class RssReadRecordView extends StatefulWidget {
@@ -39,30 +40,53 @@ class _RssReadRecordViewState extends State<RssReadRecordView> {
   }
 
   Future<void> _clearAllRecords() async {
-    final count = await _repo.countRecords();
+    int count = 0;
+    try {
+      count = await _repo.countRecords();
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'rss_read_record.menu_clear',
+        message: '统计 RSS 阅读记录数量失败',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return;
+    }
     if (!mounted) return;
     final shouldClear = await showCupertinoDialog<bool>(
           context: context,
           builder: (ctx) => CupertinoAlertDialog(
-            title: const Text('清空阅读记录'),
-            content: Text('\n确定删除 $count 条阅读记录吗？'),
+            title: const Text('提醒'),
+            content: Text('确定删除\n$count 阅读记录'),
             actions: [
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () => Navigator.of(ctx).pop(true),
-                child: const Text('清空'),
-              ),
               CupertinoDialogAction(
                 onPressed: () => Navigator.of(ctx).pop(false),
                 child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                isDestructiveAction: true,
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('确定'),
               ),
             ],
           ),
         ) ??
         false;
     if (!shouldClear) return;
-    await _repo.deleteAllRecord();
-    await _reload();
+    try {
+      await _repo.deleteAllRecord();
+      await _reload();
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'rss_read_record.menu_clear',
+        message: '清除 RSS 阅读记录失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'count': count,
+        },
+      );
+    }
   }
 
   Widget _buildEmptyState() {
@@ -119,8 +143,7 @@ class _RssReadRecordViewState extends State<RssReadRecordView> {
       title: '阅读记录',
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
-        onPressed:
-            _loading || _records.isEmpty ? null : () => _clearAllRecords(),
+        onPressed: _clearAllRecords,
         child: const Text('清空'),
       ),
       child: _loading

@@ -33,10 +33,14 @@ class RssSourceManageHelper {
 
   static RssSourceQueryIntent parseQueryIntent(
     String? query, {
-    String enabledLabel = '启用',
-    String disabledLabel = '禁用',
-    String needLoginLabel = '需登录',
+    String enabledLabel = '已启用',
+    String legacyEnabledLabel = '启用',
+    String disabledLabel = '已禁用',
+    String legacyDisabledLabel = '禁用',
+    String needLoginLabel = '需要登录',
+    String legacyNeedLoginLabel = '需登录',
     String noGroupLabel = '未分组',
+    String legacyNoGroupLabel = '无分组',
   }) {
     final normalized = (query ?? '').trim();
     if (normalized.isEmpty) {
@@ -45,25 +49,25 @@ class RssSourceManageHelper {
         rawQuery: '',
       );
     }
-    if (normalized == enabledLabel) {
+    if (normalized == enabledLabel || normalized == legacyEnabledLabel) {
       return RssSourceQueryIntent(
         mode: RssSourceQueryMode.enabled,
         rawQuery: normalized,
       );
     }
-    if (normalized == disabledLabel) {
+    if (normalized == disabledLabel || normalized == legacyDisabledLabel) {
       return RssSourceQueryIntent(
         mode: RssSourceQueryMode.disabled,
         rawQuery: normalized,
       );
     }
-    if (normalized == needLoginLabel) {
+    if (normalized == needLoginLabel || normalized == legacyNeedLoginLabel) {
       return RssSourceQueryIntent(
         mode: RssSourceQueryMode.login,
         rawQuery: normalized,
       );
     }
-    if (normalized == noGroupLabel) {
+    if (normalized == noGroupLabel || normalized == legacyNoGroupLabel) {
       return RssSourceQueryIntent(
         mode: RssSourceQueryMode.noGroup,
         rawQuery: normalized,

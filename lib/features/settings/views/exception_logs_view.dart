@@ -17,26 +17,6 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
   final ExceptionLogService _service = ExceptionLogService();
 
   Future<void> _clearLogs() async {
-    final confirm = await showCupertinoDialog<bool>(
-          context: context,
-          builder: (ctx) => CupertinoAlertDialog(
-            title: const Text('清空异常日志'),
-            content: const Text('\n确定清空所有异常日志吗？'),
-            actions: [
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('清空'),
-              ),
-              CupertinoDialogAction(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('取消'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!confirm) return;
     await _service.clear();
   }
 
@@ -53,34 +33,16 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
     return AppCupertinoPageScaffold(
       title: '异常日志',
       trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size(30, 30),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        minSize: 30,
         onPressed: _clearLogs,
-        child: const Icon(CupertinoIcons.trash),
+        child: const Text('清除'),
       ),
       child: ValueListenableBuilder<List<ExceptionLogEntry>>(
         valueListenable: _service.listenable,
         builder: (context, logs, _) {
           if (logs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    CupertinoIcons.exclamationmark_triangle,
-                    size: 42,
-                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '暂无异常日志',
-                    style: TextStyle(
-                      color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                    ),
-                  ),
-                ],
-              ),
-            );
+            return const SizedBox.shrink();
           }
 
           return ListView.separated(
@@ -93,7 +55,8 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
                 onTap: () => _openDetail(entry),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: CupertinoColors.systemBackground.resolveFrom(context),
+                    color:
+                        CupertinoColors.systemBackground.resolveFrom(context),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: CupertinoColors.separator.resolveFrom(context),

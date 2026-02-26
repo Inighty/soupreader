@@ -29,6 +29,7 @@ import 'reading_theme_settings_view.dart';
 import 'settings_placeholders.dart';
 import 'settings_ui_tokens.dart';
 import 'text_rules_settings_view.dart';
+import 'theme_config_list_view.dart';
 
 /// 设置首页（扁平化分组）
 class SettingsView extends StatefulWidget {
@@ -280,6 +281,15 @@ class _SettingsViewState extends State<SettingsView> {
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
                   title: '白天/黑夜主题（自动切换两套阅读主题）暂未实现',
+                ),
+              ),
+              CupertinoListTile.notched(
+                title: const Text('主题列表'),
+                additionalInfo: const Text('导入/应用'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: () => _open(
+                  context,
+                  const ThemeConfigListView(),
                 ),
               ),
               CupertinoListTile.notched(

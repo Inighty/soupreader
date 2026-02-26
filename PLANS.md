@@ -1,5 +1,15 @@
 # SoupReader ExecPlans（重建版）
 
+## 快速定位入口（先读）
+
+- 快照文件：`docs/plans/ACTIVE_CONTEXT.md`
+- 读取顺序：
+  1. 先读 `docs/plans/ACTIVE_CONTEXT.md`（全文）
+  2. 再读 `PLANS.md` 前置索引区（本节到 `Todo`）
+  3. 仅按快照指针定向读取主 ExecPlan/台账对应小节
+- 深读触发：仅当快照信息与主计划不一致、任务 `blocked`、Phase 切换、或需求方明确要求全量审阅时，才读取完整历史进度。
+- 维护要求：每次可交付点必须同步更新 `ACTIVE_CONTEXT.md` 的“当前任务/下一任务/阻塞项/最近交付”。
+
 ## 当前主计划
 
 - 计划名称：`legado 全功能逐项迁移（One-by-One）`
@@ -7,6 +17,7 @@
 - 主执行文档：`docs/plans/2026-02-21-legado-all-features-one-by-one-execplan.md`
 - 逐项跟踪台账：`docs/plans/2026-02-21-legado-feature-item-tracker.csv`
 - 功能项优先级队列：`docs/plans/2026-02-21-legado-feature-priority-queue.csv`
+- 快速上下文：`docs/plans/ACTIVE_CONTEXT.md`
 - 执行口径：以 `seq=1..410` 为最小执行单元，一项一处理、一项一验收、一项一回填。
 
 ## 执行原则
@@ -62,6 +73,46 @@
 
 ## Progress（动态）
 
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq176`（`bookshelf_manage.xml / @+id/menu_open_book_info_by_click_title / 点击书名打开详情`）后，主计划保持 `active`。
+  - 完成 `P6-seq176`：书架管理页右上角“更多”菜单补齐 checkable 动作“点击书名打开详情”；开关状态持久化到 legado 同名键 `openBookInfoByClickTitle`。开启时点击书名进入书籍详情，关闭时书名点击回落为勾选切换。
+  - 差异点清单与逐项对照：已同步回填 `docs/plans/2026-02-21-legado-all-features-one-by-one-execplan.md`（含入口/状态/异常/文案/排版/交互触发/验证）。
+  - 验证：`dart format lib/core/services/settings_service.dart lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 更多 -> 点击书名打开详情`（校验勾选态切换与重进回显），`开关开启后点击书名`（校验进入书籍详情），`开关关闭后点击书名`（校验仅切换勾选）。开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_open_book_info_by_click_title` 开关与点击分流语义，不改动 `menu_del_selection/menu_update_enable/menu_update_disable/menu_add_to_group` 后续动作。
+  - 下一项：继续推进 `P6-seq177`（`bookshelf_menage_sel.xml / @+id/menu_del_selection / 删除`）；`P8-seq227(menu_copy_rule)` 继续按 `detail_later` 全局后置。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq174`（`bookshelf_manage.xml / @+id/menu_group_manage / 分组管理`）后，主计划保持 `active`。
+  - 完成 `P6-seq174`：书架管理页“分组”弹层补齐首项“分组管理”；点击后打开分组管理弹窗，关闭后回刷分组上下文并保持当前分组回显/无效分组回退。
+  - 差异点清单与逐项对照：已同步回填 `docs/plans/2026-02-21-legado-all-features-one-by-one-execplan.md`（含入口/状态/异常/文案/排版/交互触发/验证）。
+  - 验证：`dart format lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 顶栏分组 -> 分组管理`（校验可打开分组管理弹窗并关闭返回），`分组管理中调整分组后关闭弹窗`（校验分组筛选列表回刷与选中态兜底）。开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_group_manage` 入口触发与回刷语义，不改动批量换源/清理缓存等已收敛链路。
+  - 下一项：继续推进 `P6-seq176`（`bookshelf_manage.xml / @+id/menu_open_book_info_by_click_title / 点击书名打开详情`）；`P8-seq227(menu_copy_rule)` 继续按 `detail_later` 全局后置。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq173`（`bookshelf_manage.xml / @+id/menu_book_group / 分组`）后，主计划保持 `active`。
+  - 完成 `P6-seq173`：书架管理页顶栏补齐一级“分组”入口；分组按书架分组顺序动态展示并回显当前选中项；切换后按分组即时重算当前列表，搜索提示同步“筛选 • 分组名”。
+  - 差异点清单与逐项对照：已同步回填 `docs/plans/2026-02-21-legado-all-features-one-by-one-execplan.md`（含入口/状态/异常/文案/排版/交互触发/验证）。
+  - 验证：`dart format lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 顶栏分组 -> 切换分组`（校验列表即时切换与选中态回显），`切组后勾选 -> 批量换源/清理缓存`（校验动作仅作用于当前分组可见选中项）。开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；保留差异：当前 `Book` 模型未迁移 `audio/updateError` 类型位，且书籍分组位写入链路待 `P6-seq180` 回补。
+  - 下一项：继续推进 `P6-seq174`（`bookshelf_manage.xml / @+id/menu_group_manage / 分组管理`）；`P8-seq227(menu_copy_rule)` 继续按 `detail_later` 全局后置。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq182`（`bookshelf_menage_sel.xml / @+id/menu_clear_cache / 清理缓存`）后，主计划保持 `active`。
+  - 完成 `P6-seq182`：书架管理页选中态补齐一级动作“清理缓存”；点击后按选中书籍集合批量清理章节缓存并统一提示“成功清理缓存”。
+  - 差异点清单与逐项对照：已同步回填 `docs/plans/2026-02-21-legado-all-features-one-by-one-execplan.md`（含入口/状态/异常/文案/排版/交互触发/验证）。
+  - 验证：`dart format lib/core/database/repositories/book_repository.dart lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 勾选多本书 -> 清理缓存`（校验提示“成功清理缓存”且仅影响选中书籍缓存）。开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_clear_cache` 触发与批量清理语义，不改动书源解析、目录抓取与正文渲染链路。
+  - 下一项：继续推进 `P6-seq173`（`bookshelf_manage.xml / @+id/menu_book_group / 分组`）；`P8-seq227(menu_copy_rule)` 继续按 `detail_later` 全局后置。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq181`（`bookshelf_menage_sel.xml / @+id/menu_change_source / 批量换源`）后，主计划保持 `active`。
+  - 完成 `P6-seq181`：书架管理页补齐“多选批量换源”闭环，新增选中态一级动作“批量换源”、书源选择页（搜索过滤 + 顶栏换源间隔 `0~9999` 秒配置）以及执行中 `current / total` 进度回显与取消中断。
+  - 差异点清单与逐项对照：已同步回填 `docs/plans/2026-02-21-legado-all-features-one-by-one-execplan.md`（含入口/状态/异常/文案/排版/交互触发/验证）。
+  - 验证：`dart format lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 勾选多本书 -> 批量换源 -> 选择书源 -> 确定`（校验执行中进度回显与可取消），`选择书源页 -> 更多 -> 换源间隔`（校验 `0~9999` 秒可配置并持久化）。开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_change_source` 触发与等待态，不改动书源规则、目录匹配与正文抓取链路。
+  - 下一项：继续推进 `P6-seq182`（`bookshelf_menage_sel.xml / @+id/menu_clear_cache / 清理缓存`）；`P8-seq227(menu_copy_rule)` 继续按 `detail_later` 全局后置。
+- `2026-02-25`
+  - 流程优化：新增计划轻量快照文件 `docs/plans/ACTIVE_CONTEXT.md`，并在 `AGENTS.md` 固化“增量读取协议”（先读快照，再按需深读），用于避免每次任务定位都全量扫描超大计划文件。
+  - 为什么：`PLANS.md` 与主 ExecPlan 体量持续增长，模型在“定位下一步”阶段重复读取全文导致额外耗时。
+  - 如何验证：检查 `docs/plans/ACTIVE_CONTEXT.md` 已包含 `当前任务/下一任务/阻塞项/最近交付`；检查 `AGENTS.md` 已新增“6.6 任务快速定位与增量读取”。
+  - 兼容影响：无旧书源兼容性影响；仅优化计划读取与协作流程，不改动业务功能语义。
 - `2026-02-25`
   - 问题修复：恢复缺失文件 `lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`（按提交 `85da07b` 的实现回补），修复 `bookshelf_view.dart` 与 `test/widget_test.dart` 的 `uri_does_not_exist / undefined_identifier`。
   - 问题修复：`tool/_tmp_html_test.dart` 的调试输出由 `print` 收敛为 `stdout.writeln`，消除 `avoid_print` 信息项。

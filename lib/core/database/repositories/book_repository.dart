@@ -347,6 +347,25 @@ class ChapterRepository {
     );
   }
 
+  Future<ChapterCacheInfo> clearDownloadedCacheForBooks(
+    Iterable<String> bookIds,
+  ) async {
+    final targetBookIds =
+        bookIds.map((id) => id.trim()).where((id) => id.isNotEmpty).toSet();
+    if (targetBookIds.isEmpty) {
+      return const ChapterCacheInfo(bytes: 0, chapters: 0);
+    }
+    if (!_cacheReady) {
+      await _reloadCacheFromDb();
+    }
+    return clearDownloadedCache(
+      protectBookIds: _cacheById.values
+          .where((entity) => !targetBookIds.contains(entity.bookId))
+          .map((entity) => entity.bookId)
+          .toSet(),
+    );
+  }
+
   List<Chapter> getChaptersForBook(String bookId) {
     return _cacheById.values
         .where((c) => c.bookId == bookId)

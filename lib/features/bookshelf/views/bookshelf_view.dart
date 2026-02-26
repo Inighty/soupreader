@@ -31,6 +31,11 @@ import '../services/bookshelf_catalog_update_service.dart';
 import '../services/bookshelf_import_export_service.dart';
 import '../models/book.dart';
 
+enum _ImportFolderAction {
+  select,
+  create,
+}
+
 /// 书架页面 - 纯 iOS 原生风格
 class BookshelfView extends StatefulWidget {
   final ValueListenable<int>? reselectSignal;
@@ -239,23 +244,157 @@ class _BookshelfViewState extends State<BookshelfView> {
       return;
     }
 
-    setState(() => _isSelectingImportFolder = true);
+    final action = await showCupertinoModalPopup<_ImportFolderAction>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('选择文件夹'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () =>
+                Navigator.pop(sheetContext, _ImportFolderAction.select),
+            child: const Text('选择文件夹'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () =>
+                Navigator.pop(sheetContext, _ImportFolderAction.create),
+            child: const Text('创建文件夹'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
 
-    try {
-      final result = await _importService.selectImportDirectory();
-      if (!mounted) return;
-      if (result.success && result.directoryPath != null) {
-        _showMessage('已选择文件夹：${result.directoryPath}');
-        return;
+    if (action == _ImportFolderAction.select) {
+      setState(() => _isSelectingImportFolder = true);
+      try {
+        final result = await _importService.selectImportDirectory();
+        if (!mounted) return;
+        if (result.success && result.directoryPath != null) {
+          _showMessage('已选择文件夹：${result.directoryPath}');
+          return;
+        }
+        if (!result.cancelled && result.errorMessage != null) {
+          _showMessage('选择文件夹失败：${result.errorMessage}');
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isSelectingImportFolder = false);
+        }
       }
-      if (!result.cancelled && result.errorMessage != null) {
-        _showMessage('选择文件夹失败：${result.errorMessage}');
+      return;
+    }
+
+    setState(() => _isSelectingImportFolder = true);
+    String? parentDirectoryPath;
+    try {
+      parentDirectoryPath = _importService.getSavedImportDirectory();
+      if (parentDirectoryPath == null || parentDirectoryPath.trim().isEmpty) {
+        final parentResult = await _importService.selectImportDirectory();
+        if (!mounted) return;
+        if (parentResult.success && parentResult.directoryPath != null) {
+          parentDirectoryPath = parentResult.directoryPath!;
+        } else {
+          if (!parentResult.cancelled && parentResult.errorMessage != null) {
+            _showMessage('选择文件夹失败：${parentResult.errorMessage}');
+          }
+          return;
+        }
       }
     } finally {
       if (mounted) {
         setState(() => _isSelectingImportFolder = false);
       }
     }
+    if (!mounted) return;
+
+    final folderName = await _showCreateFolderNameDialog();
+    if (!mounted || folderName == null) return;
+
+    setState(() => _isSelectingImportFolder = true);
+    try {
+      final result = await _importService.createImportDirectory(
+        parentDirectoryPath: parentDirectoryPath,
+        folderName: folderName,
+      );
+      if (!mounted) return;
+      if (result.success && result.directoryPath != null) {
+        _showMessage('已选择文件夹：${result.directoryPath}');
+      } else if (result.errorMessage != null &&
+          result.errorMessage!.isNotEmpty) {
+        _showMessage('创建文件夹失败：${result.errorMessage}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSelectingImportFolder = false);
+      }
+    }
+  }
+
+  Future<String?> _showCreateFolderNameDialog() async {
+    final controller = TextEditingController();
+    String? name;
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        String? errorText;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return CupertinoAlertDialog(
+              title: const Text('创建文件夹'),
+              content: Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CupertinoTextField(
+                      controller: controller,
+                      placeholder: '文件夹名',
+                    ),
+                    if (errorText != null && errorText!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        errorText!,
+                        style: TextStyle(
+                          color: CupertinoColors.systemRed.resolveFrom(context),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                CupertinoDialogAction(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('取消'),
+                ),
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  onPressed: () {
+                    final value = controller.text.trim();
+                    if (value.isEmpty) {
+                      setDialogState(() {
+                        errorText = '文件夹名不能为空';
+                      });
+                      return;
+                    }
+                    name = value;
+                    Navigator.pop(dialogContext);
+                  },
+                  child: const Text('确定'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+    return name;
   }
 
   Future<void> _scanImportFolder() async {
@@ -341,66 +480,101 @@ class _BookshelfViewState extends State<BookshelfView> {
                               selectedPaths.contains(candidate.filePath);
                           final relativePath =
                               _formatScanCandidatePath(candidate, rootPath);
-                          return CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            onPressed: () {
-                              setDialogState(() {
-                                if (isSelected) {
-                                  selectedPaths.remove(candidate.filePath);
-                                } else {
-                                  selectedPaths.add(candidate.filePath);
-                                }
-                              });
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          candidate.fileName,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: isSelected
-                                                ? CupertinoColors.activeBlue
-                                                : CupertinoColors.label
-                                                    .resolveFrom(context),
+                          return GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onLongPress: deletingSelection
+                                ? null
+                                : () async {
+                                    final shouldDelete =
+                                        await _showScanCandidateLongPressMenu(
+                                      context: context,
+                                    );
+                                    if (!context.mounted || !shouldDelete) {
+                                      return;
+                                    }
+                                    setDialogState(
+                                      () => deletingSelection = true,
+                                    );
+                                    final deleteResult = await _importService
+                                        .deleteLocalBooksByPaths(
+                                      <String>[candidate.filePath],
+                                    );
+                                    if (!context.mounted) return;
+                                    setDialogState(() {
+                                      if (deleteResult.deletedCount > 0) {
+                                        candidates.removeWhere(
+                                          (entry) =>
+                                              entry.filePath ==
+                                              candidate.filePath,
+                                        );
+                                        selectedPaths
+                                            .remove(candidate.filePath);
+                                      }
+                                      deletingSelection = false;
+                                    });
+                                  },
+                            child: CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              onPressed: () {
+                                setDialogState(() {
+                                  if (isSelected) {
+                                    selectedPaths.remove(candidate.filePath);
+                                  } else {
+                                    selectedPaths.add(candidate.filePath);
+                                  }
+                                });
+                              },
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 6),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            candidate.fileName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: isSelected
+                                                  ? CupertinoColors.activeBlue
+                                                  : CupertinoColors.label
+                                                      .resolveFrom(context),
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          relativePath,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: CupertinoColors.systemGrey
-                                                .resolveFrom(context),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            relativePath,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: CupertinoColors.systemGrey
+                                                  .resolveFrom(context),
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Icon(
-                                    isSelected
-                                        ? CupertinoIcons
-                                            .check_mark_circled_solid
-                                        : CupertinoIcons.circle,
-                                    size: 18,
-                                    color: isSelected
-                                        ? CupertinoColors.activeBlue
-                                        : CupertinoColors.systemGrey,
-                                  ),
-                                ],
+                                    const SizedBox(width: 8),
+                                    Icon(
+                                      isSelected
+                                          ? CupertinoIcons
+                                              .check_mark_circled_solid
+                                          : CupertinoIcons.circle,
+                                      size: 18,
+                                      color: isSelected
+                                          ? CupertinoColors.activeBlue
+                                          : CupertinoColors.systemGrey,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           );
@@ -482,6 +656,28 @@ class _BookshelfViewState extends State<BookshelfView> {
         );
       },
     );
+  }
+
+  Future<bool> _showScanCandidateLongPressMenu({
+    required BuildContext context,
+  }) async {
+    final result = await showCupertinoModalPopup<bool>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(sheetContext).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(sheetContext).pop(false),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    return result ?? false;
   }
 
   String _formatScanCandidatePath(

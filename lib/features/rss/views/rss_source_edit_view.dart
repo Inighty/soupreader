@@ -7,6 +7,7 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
 import '../../../core/utils/legado_json.dart';
 import '../models/rss_source.dart';
+import 'rss_source_debug_view.dart';
 
 class RssSourceEditView extends StatefulWidget {
   const RssSourceEditView({
@@ -117,17 +118,15 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
     return value;
   }
 
-  Future<void> _save() async {
-    if (_saving) return;
+  Map<String, dynamic>? _buildSourceRawData() {
     final sourceUrl = _urlController.text.trim();
     if (sourceUrl.isEmpty) {
-      await _showMessage('sourceUrl 不能为空');
-      return;
+      return null;
     }
     final customOrder = int.tryParse(_customOrderController.text.trim()) ?? 0;
     final sourceName = _nameController.text.trim();
 
-    final data = <String, dynamic>{
+    return <String, dynamic>{
       ..._rawJsonMap,
       'sourceUrl': sourceUrl,
       'sourceName': sourceName,
@@ -139,6 +138,15 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
       'singleUrl': _singleUrl,
       'customOrder': customOrder,
     };
+  }
+
+  Future<RssSource?> _persistSourceDraft() async {
+    if (_saving) return null;
+    final data = _buildSourceRawData();
+    if (data == null) {
+      await _showMessage('sourceUrl 不能为空');
+      return null;
+    }
 
     setState(() {
       _saving = true;
@@ -148,16 +156,36 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
         originalUrl: _originalUrl,
         rawJson: LegadoJson.encode(data),
       );
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
+      final source = RssSource.fromJson(data);
+      _rawJsonMap = data;
+      _originalUrl = source.sourceUrl;
+      return source;
     } catch (e) {
       await _showMessage('保存失败：$e');
+      return null;
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _saving = false;
-      });
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+      }
     }
+  }
+
+  Future<void> _save() async {
+    final source = await _persistSourceDraft();
+    if (source == null || !mounted) return;
+    Navigator.of(context).pop(true);
+  }
+
+  Future<void> _openDebugSource() async {
+    final source = await _persistSourceDraft();
+    if (source == null || !mounted) return;
+    await Navigator.of(context).push<void>(
+      CupertinoPageRoute<void>(
+        builder: (_) => RssSourceDebugView(source: source),
+      ),
+    );
   }
 
   Future<void> _showMessage(String message) async {
@@ -182,15 +210,26 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
     final title = _isEditing ? '编辑订阅源' : '新增订阅源';
     return AppCupertinoPageScaffold(
       title: title,
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        onPressed: _saving || _loading ? null : _save,
-        child: _saving
-            ? const CupertinoActivityIndicator()
-            : const Text(
-                '保存',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
+            onPressed: _saving || _loading ? null : _openDebugSource,
+            child: const Icon(CupertinoIcons.ant),
+          ),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: _saving || _loading ? null : _save,
+            child: _saving
+                ? const CupertinoActivityIndicator()
+                : const Text(
+                    '保存',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+          ),
+        ],
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())

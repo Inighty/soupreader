@@ -102,6 +102,35 @@ class RssArticleRecords extends Table {
   Set<Column<Object>> get primaryKey => {origin, link};
 }
 
+class RssStarRecords extends Table {
+  TextColumn get origin => text()();
+
+  TextColumn get link => text()();
+
+  TextColumn get sort => text().withDefault(const Constant(''))();
+
+  TextColumn get title => text().withDefault(const Constant(''))();
+
+  IntColumn get starTime => integer().withDefault(const Constant(0))();
+
+  TextColumn get pubDate => text().nullable()();
+
+  TextColumn get description => text().nullable()();
+
+  TextColumn get content => text().nullable()();
+
+  TextColumn get image => text().nullable()();
+
+  TextColumn get groupName => text().withDefault(const Constant('默认分组'))();
+
+  TextColumn get variable => text().nullable()();
+
+  IntColumn get updatedAt => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {origin, link};
+}
+
 class RssReadRecordRecords extends Table {
   TextColumn get record => text()();
 
@@ -253,6 +282,7 @@ class BookmarkRecords extends Table {
     SourceRecords,
     RssSourceRecords,
     RssArticleRecords,
+    RssStarRecords,
     RssReadRecordRecords,
     BookRecords,
     ChapterRecords,
@@ -265,7 +295,7 @@ class SourceDriftDatabase extends _$SourceDriftDatabase {
   SourceDriftDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -289,6 +319,9 @@ class SourceDriftDatabase extends _$SourceDriftDatabase {
           if (from < 5) {
             await m.createTable(rssArticleRecords);
             await m.createTable(rssReadRecordRecords);
+          }
+          if (from < 6) {
+            await m.createTable(rssStarRecords);
           }
         },
       );

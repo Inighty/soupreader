@@ -63,6 +63,16 @@ class _ImportSelectionDecision {
   final SourceImportSelectionPolicy policy;
 }
 
+class _ImportCustomGroupInput {
+  const _ImportCustomGroupInput({
+    required this.groupName,
+    required this.appendGroup,
+  });
+
+  final String groupName;
+  final bool appendGroup;
+}
+
 class _CheckSettings {
   const _CheckSettings({
     required this.timeoutMs,
@@ -2789,144 +2799,170 @@ class _SourceListViewState extends State<SourceListView> {
     var keepEnable =
         _settingsGetBool(_prefImportKeepEnable, defaultValue: false);
     var appendCustomGroup = false;
-    final groupController = TextEditingController();
+    var customGroupName = '';
 
-    try {
-      return await showCupertinoModalPopup<_ImportSelectionDecision>(
-        context: context,
-        builder: (popupContext) {
-          return CupertinoPopupSurface(
-            isSurfacePainted: true,
-            child: StatefulBuilder(
-              builder: (context, setDialogState) {
-                final selectedCount = selectedIndexes.length;
-                final totalCount = dialogCandidates.length;
-                return SizedBox(
-                  height: math.min(
-                    MediaQuery.of(context).size.height * 0.86,
-                    680,
-                  ),
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
-                        child: Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                '导入书源',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
+    return showCupertinoModalPopup<_ImportSelectionDecision>(
+      context: context,
+      builder: (popupContext) {
+        return CupertinoPopupSurface(
+          isSurfacePainted: true,
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              final selectedCount = selectedIndexes.length;
+              final totalCount = dialogCandidates.length;
+              return SizedBox(
+                height: math.min(
+                  MediaQuery.of(context).size.height * 0.86,
+                  680,
+                ),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              '导入书源',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                            CupertinoButton(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 8),
-                              onPressed: () => Navigator.pop(popupContext),
-                              child: const Text('取消'),
-                            ),
-                            CupertinoButton.filled(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              onPressed: selectedCount == 0
-                                  ? null
-                                  : () async {
-                                      await Future.wait([
-                                        _settingsPut(
-                                          _prefImportKeepName,
-                                          keepName,
+                          ),
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            onPressed: () => Navigator.pop(popupContext),
+                            child: const Text('取消'),
+                          ),
+                          CupertinoButton.filled(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            onPressed: selectedCount == 0
+                                ? null
+                                : () async {
+                                    await Future.wait([
+                                      _settingsPut(
+                                        _prefImportKeepName,
+                                        keepName,
+                                      ),
+                                      _settingsPut(
+                                        _prefImportKeepGroup,
+                                        keepGroup,
+                                      ),
+                                      _settingsPut(
+                                        _prefImportKeepEnable,
+                                        keepEnable,
+                                      ),
+                                    ]);
+                                    if (!context.mounted) return;
+                                    Navigator.pop(
+                                      context,
+                                      _ImportSelectionDecision(
+                                        candidates: dialogCandidates.toList(
+                                            growable: false),
+                                        policy: SourceImportSelectionPolicy(
+                                          selectedUrls: selectedIndexes
+                                              .map((index) =>
+                                                  dialogCandidates[index].url)
+                                              .toSet(),
+                                          selectedIndexes:
+                                              selectedIndexes.toSet(),
+                                          keepName: keepName,
+                                          keepGroup: keepGroup,
+                                          keepEnabled: keepEnable,
+                                          customGroup: customGroupName,
+                                          appendCustomGroup: appendCustomGroup,
                                         ),
-                                        _settingsPut(
-                                          _prefImportKeepGroup,
-                                          keepGroup,
-                                        ),
-                                        _settingsPut(
-                                          _prefImportKeepEnable,
-                                          keepEnable,
-                                        ),
-                                      ]);
-                                      if (!context.mounted) return;
-                                      Navigator.pop(
-                                        context,
-                                        _ImportSelectionDecision(
-                                          candidates: dialogCandidates.toList(
-                                              growable: false),
-                                          policy: SourceImportSelectionPolicy(
-                                            selectedUrls: selectedIndexes
-                                                .map((index) =>
-                                                    dialogCandidates[index].url)
-                                                .toSet(),
-                                            selectedIndexes:
-                                                selectedIndexes.toSet(),
-                                            keepName: keepName,
-                                            keepGroup: keepGroup,
-                                            keepEnabled: keepEnable,
-                                            customGroup: groupController.text,
-                                            appendCustomGroup:
-                                                appendCustomGroup,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                              child: Text('导入($selectedCount)'),
-                            ),
-                          ],
-                        ),
+                                      ),
+                                    );
+                                  },
+                            child: Text('导入($selectedCount)'),
+                          ),
+                        ],
                       ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            CupertinoButton(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              color: CupertinoColors.systemGrey5
-                                  .resolveFrom(context),
-                              onPressed: () {
-                                setDialogState(() {
-                                  if (selectedIndexes.length ==
-                                      dialogCandidates.length) {
-                                    selectedIndexes.clear();
-                                  } else {
-                                    selectedIndexes
-                                      ..clear()
-                                      ..addAll(
-                                        List<int>.generate(
-                                          dialogCandidates.length,
-                                          (index) => index,
-                                        ),
-                                      );
-                                  }
-                                });
-                              },
-                              child: Text(
-                                selectedIndexes.length ==
-                                        dialogCandidates.length
-                                    ? '取消全选'
-                                    : '全选',
-                              ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
                             ),
-                            CupertinoButton(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              color: CupertinoColors.systemGrey5
-                                  .resolveFrom(context),
-                              onPressed: () {
-                                setDialogState(() {
+                            color: CupertinoColors.systemGrey5
+                                .resolveFrom(context),
+                            onPressed: () {
+                              setDialogState(() {
+                                if (selectedIndexes.length ==
+                                    dialogCandidates.length) {
+                                  selectedIndexes.clear();
+                                } else {
+                                  selectedIndexes
+                                    ..clear()
+                                    ..addAll(
+                                      List<int>.generate(
+                                        dialogCandidates.length,
+                                        (index) => index,
+                                      ),
+                                    );
+                                }
+                              });
+                            },
+                            child: Text(
+                              selectedIndexes.length == dialogCandidates.length
+                                  ? '取消全选'
+                                  : '全选',
+                            ),
+                          ),
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            color: CupertinoColors.systemGrey5
+                                .resolveFrom(context),
+                            onPressed: () {
+                              setDialogState(() {
+                                final targetIndexes = <int>{
+                                  for (var index = 0;
+                                      index < dialogCandidates.length;
+                                      index++)
+                                    if (dialogCandidates[index].state ==
+                                        SourceImportCandidateState.newSource)
+                                      index,
+                                };
+                                final allTargetSelected = targetIndexes
+                                    .every(selectedIndexes.contains);
+                                if (allTargetSelected) {
+                                  selectedIndexes.removeWhere(
+                                    targetIndexes.contains,
+                                  );
+                                } else {
+                                  selectedIndexes.addAll(targetIndexes);
+                                }
+                              });
+                            },
+                            child: const Text('选中新增源'),
+                          ),
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            color: CupertinoColors.systemGrey5
+                                .resolveFrom(context),
+                            onPressed: () {
+                              setDialogState(
+                                () {
                                   final targetIndexes = <int>{
                                     for (var index = 0;
                                         index < dialogCandidates.length;
                                         index++)
                                       if (dialogCandidates[index].state ==
-                                          SourceImportCandidateState.newSource)
+                                          SourceImportCandidateState.update)
                                         index,
                                   };
                                   final allTargetSelected = targetIndexes
@@ -2938,226 +2974,199 @@ class _SourceListViewState extends State<SourceListView> {
                                   } else {
                                     selectedIndexes.addAll(targetIndexes);
                                   }
-                                });
-                              },
-                              child: const Text('选择新增'),
-                            ),
-                            CupertinoButton(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              color: CupertinoColors.systemGrey5
-                                  .resolveFrom(context),
-                              onPressed: () {
-                                setDialogState(
-                                  () {
-                                    final targetIndexes = <int>{
-                                      for (var index = 0;
-                                          index < dialogCandidates.length;
-                                          index++)
-                                        if (dialogCandidates[index].state ==
-                                            SourceImportCandidateState.update)
-                                          index,
-                                    };
-                                    final allTargetSelected = targetIndexes
-                                        .every(selectedIndexes.contains);
-                                    if (allTargetSelected) {
-                                      selectedIndexes.removeWhere(
-                                        targetIndexes.contains,
-                                      );
-                                    } else {
-                                      selectedIndexes.addAll(targetIndexes);
-                                    }
-                                  },
-                                );
-                              },
-                              child: const Text('选择更新'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 12),
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-                        decoration: BoxDecoration(
-                          color:
-                              CupertinoColors.systemGrey6.resolveFrom(context),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                          children: [
-                            _buildPolicySwitchRow(
-                              title: '保留本地名称',
-                              value: keepName,
-                              onChanged: (value) {
-                                setDialogState(() => keepName = value);
-                              },
-                            ),
-                            _buildPolicySwitchRow(
-                              title: '保留本地分组',
-                              value: keepGroup,
-                              onChanged: (value) {
-                                setDialogState(() => keepGroup = value);
-                              },
-                            ),
-                            _buildPolicySwitchRow(
-                              title: '保留启用状态',
-                              value: keepEnable,
-                              onChanged: (value) {
-                                setDialogState(() => keepEnable = value);
-                              },
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: CupertinoTextField(
-                                    controller: groupController,
-                                    placeholder: '自定义分组（可选）',
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                CupertinoButton(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  onPressed: () {
-                                    setDialogState(() {
-                                      appendCustomGroup = !appendCustomGroup;
-                                    });
-                                  },
-                                  child: Text(
-                                    appendCustomGroup ? '追加' : '覆盖',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-                        child: Row(
-                          children: [
-                            Text(
-                              '待导入：$selectedCount/$totalCount',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: CupertinoColors.secondaryLabel
-                                    .resolveFrom(context),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                          itemCount: dialogCandidates.length,
-                          separatorBuilder: (_, __) => Container(
-                            height: 0.5,
-                            color: CupertinoColors.systemGrey4
-                                .resolveFrom(context),
+                                },
+                              );
+                            },
+                            child: const Text('选中更新源'),
                           ),
-                          itemBuilder: (context, index) {
-                            final candidate = dialogCandidates[index];
-                            final selected = selectedIndexes.contains(index);
-                            final stateColor =
-                                _importStateColor(candidate.state);
-                            return GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () {
-                                setDialogState(() {
-                                  if (selected) {
-                                    selectedIndexes.remove(index);
-                                  } else {
-                                    selectedIndexes.add(index);
-                                  }
-                                });
-                              },
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                          top: 2, right: 8),
-                                      child: Icon(
-                                        selected
-                                            ? CupertinoIcons
-                                                .check_mark_circled_solid
-                                            : CupertinoIcons.circle,
-                                        color: selected
-                                            ? CupertinoTheme.of(context)
-                                                .primaryColor
-                                            : CupertinoColors.systemGrey,
-                                        size: 20,
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Text(
-                                        candidate.incoming.bookSourceName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        left: 8,
-                                        top: 2,
-                                      ),
-                                      child: Text(
-                                        _importStateLabel(candidate.state),
-                                        style: TextStyle(
-                                          color: stateColor,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                    CupertinoButton(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 0,
-                                      ),
-                                      minimumSize: const Size(40, 28),
-                                      onPressed: () async {
-                                        final updated =
-                                            await _editImportCandidateRawJson(
-                                          candidate: candidate,
-                                        );
-                                        if (updated == null) return;
-                                        if (!context.mounted) return;
-                                        setDialogState(() {
-                                          dialogCandidates[index] = updated;
-                                        });
-                                      },
-                                      child: const Text('打开'),
-                                    ),
-                                  ],
-                                ),
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            color: CupertinoColors.systemGrey5
+                                .resolveFrom(context),
+                            onPressed: () async {
+                              final input = await _showImportCustomGroupDialog(
+                                initialGroupName: customGroupName,
+                                initialAppendGroup: appendCustomGroup,
+                              );
+                              if (input == null || !popupContext.mounted) {
+                                return;
+                              }
+                              setDialogState(() {
+                                customGroupName = input.groupName;
+                                appendCustomGroup = input.appendGroup;
+                              });
+                            },
+                            child: Text(
+                              _buildImportCustomGroupActionLabel(
+                                groupName: customGroupName,
+                                appendGroup: appendCustomGroup,
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      );
-    } finally {
-      groupController.dispose();
-    }
+                    ),
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.systemGrey6.resolveFrom(context),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildPolicySwitchRow(
+                            title: '保留原名',
+                            value: keepName,
+                            onChanged: (value) {
+                              setDialogState(() => keepName = value);
+                              unawaited(
+                                _settingsPut(_prefImportKeepName, value),
+                              );
+                            },
+                          ),
+                          _buildPolicySwitchRow(
+                            title: '保留分组',
+                            value: keepGroup,
+                            onChanged: (value) {
+                              setDialogState(() => keepGroup = value);
+                              unawaited(
+                                _settingsPut(_prefImportKeepGroup, value),
+                              );
+                            },
+                          ),
+                          _buildPolicySwitchRow(
+                            title: '保留启用状态',
+                            value: keepEnable,
+                            onChanged: (value) {
+                              setDialogState(() => keepEnable = value);
+                              unawaited(
+                                _settingsPut(_prefImportKeepEnable, value),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                      child: Row(
+                        children: [
+                          Text(
+                            '待导入：$selectedCount/$totalCount',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: CupertinoColors.secondaryLabel
+                                  .resolveFrom(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        itemCount: dialogCandidates.length,
+                        separatorBuilder: (_, __) => Container(
+                          height: 0.5,
+                          color:
+                              CupertinoColors.systemGrey4.resolveFrom(context),
+                        ),
+                        itemBuilder: (context, index) {
+                          final candidate = dialogCandidates[index];
+                          final selected = selectedIndexes.contains(index);
+                          final stateColor = _importStateColor(candidate.state);
+                          return GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              setDialogState(() {
+                                if (selected) {
+                                  selectedIndexes.remove(index);
+                                } else {
+                                  selectedIndexes.add(index);
+                                }
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding:
+                                        const EdgeInsets.only(top: 2, right: 8),
+                                    child: Icon(
+                                      selected
+                                          ? CupertinoIcons
+                                              .check_mark_circled_solid
+                                          : CupertinoIcons.circle,
+                                      color: selected
+                                          ? CupertinoTheme.of(context)
+                                              .primaryColor
+                                          : CupertinoColors.systemGrey,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      candidate.incoming.bookSourceName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 8,
+                                      top: 2,
+                                    ),
+                                    child: Text(
+                                      _importStateLabel(candidate.state),
+                                      style: TextStyle(
+                                        color: stateColor,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  CupertinoButton(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 0,
+                                    ),
+                                    minimumSize: const Size(40, 28),
+                                    onPressed: () async {
+                                      final updated =
+                                          await _editImportCandidateRawJson(
+                                        candidate: candidate,
+                                      );
+                                      if (updated == null) return;
+                                      if (!context.mounted) return;
+                                      setDialogState(() {
+                                        dialogCandidates[index] = updated;
+                                      });
+                                    },
+                                    child: const Text('打开'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildPolicySwitchRow({
@@ -3184,11 +3193,140 @@ class _SourceListViewState extends State<SourceListView> {
     );
   }
 
+  String _buildImportCustomGroupActionLabel({
+    required String groupName,
+    required bool appendGroup,
+  }) {
+    final normalized = groupName.trim();
+    if (normalized.isEmpty) {
+      return '自定义源分组';
+    }
+    final title = '【$normalized】';
+    if (appendGroup) {
+      return '+$title';
+    }
+    return title;
+  }
+
+  Future<_ImportCustomGroupInput?> _showImportCustomGroupDialog({
+    required String initialGroupName,
+    required bool initialAppendGroup,
+  }) async {
+    final controller = TextEditingController(text: initialGroupName.trim());
+    final allGroups =
+        _buildGroups(_normalizeSources(_sourceRepo.getAllSources()));
+    var appendGroup = initialAppendGroup;
+    try {
+      return showCupertinoDialog<_ImportCustomGroupInput>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              final query = controller.text.trim().toLowerCase();
+              final quickGroups = allGroups
+                  .where((group) {
+                    if (query.isEmpty) return true;
+                    return group.toLowerCase().contains(query);
+                  })
+                  .take(12)
+                  .toList(growable: false);
+              return CupertinoAlertDialog(
+                title: const Text('输入自定义源分组名称'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 12),
+                    CupertinoTextField(
+                      controller: controller,
+                      placeholder: '分组名',
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    if (quickGroups.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: math.min(quickGroups.length * 34.0, 118),
+                          child: SingleChildScrollView(
+                            child: Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: quickGroups.map((group) {
+                                return CupertinoButton(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  minimumSize: const Size(0, 26),
+                                  onPressed: () {
+                                    controller.value = TextEditingValue(
+                                      text: group,
+                                      selection: TextSelection.collapsed(
+                                        offset: group.length,
+                                      ),
+                                    );
+                                    setDialogState(() {});
+                                  },
+                                  child: Text(
+                                    group,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                );
+                              }).toList(growable: false),
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            '追加分组',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                        ),
+                        CupertinoSwitch(
+                          value: appendGroup,
+                          onChanged: (value) {
+                            setDialogState(() => appendGroup = value);
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                actions: [
+                  CupertinoDialogAction(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('取消'),
+                  ),
+                  CupertinoDialogAction(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop(
+                        _ImportCustomGroupInput(
+                          groupName: controller.text.trim(),
+                          appendGroup: appendGroup,
+                        ),
+                      );
+                    },
+                    child: const Text('确定'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
   Future<SourceImportCandidate?> _editImportCandidateRawJson({
     required SourceImportCandidate candidate,
   }) async {
     final editedText = await _editImportRawJsonText(
-      title: candidate.incoming.bookSourceName,
       initialText: candidate.rawJson,
     );
     if (editedText == null) return null;
@@ -3200,7 +3338,6 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Future<String?> _editImportRawJsonText({
-    required String title,
     required String initialText,
   }) async {
     final controller = TextEditingController(text: initialText);
@@ -3223,14 +3360,9 @@ class _SourceListViewState extends State<SourceListView> {
                       padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
                       child: Row(
                         children: [
-                          CupertinoButton(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            onPressed: () => Navigator.pop(popupContext),
-                            child: const Text('取消'),
-                          ),
                           Expanded(
                             child: Text(
-                              title.trim().isEmpty ? '编辑书源' : title,
+                              'edit',
                               maxLines: 1,
                               textAlign: TextAlign.center,
                               overflow: TextOverflow.ellipsis,
@@ -3246,7 +3378,10 @@ class _SourceListViewState extends State<SourceListView> {
                               popupContext,
                               controller.text,
                             ),
-                            child: const Text('保存'),
+                            child: const Icon(
+                              CupertinoIcons.floppy_disk,
+                              size: 20,
+                            ),
                           ),
                         ],
                       ),
@@ -3264,8 +3399,14 @@ class _SourceListViewState extends State<SourceListView> {
                           minLines: null,
                           maxLines: null,
                           expands: true,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          keyboardType: TextInputType.multiline,
                           textAlignVertical: TextAlignVertical.top,
                           placeholder: '输入书源 JSON',
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                          ),
                         ),
                       ),
                     ),

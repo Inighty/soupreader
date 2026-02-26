@@ -8,11 +8,14 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
+import '../../../core/services/exception_log_service.dart';
+import '../../../core/services/settings_service.dart';
+import '../../../core/services/source_variable_store.dart';
+import '../../search/models/search_scope.dart';
 import '../../search/models/search_scope_group_helper.dart';
 import '../../search/views/search_view.dart';
 import '../../source/models/book_source.dart';
 import '../../source/services/source_explore_kinds_service.dart';
-import '../../source/services/source_login_ui_helper.dart';
 import '../../source/services/source_login_url_resolver.dart';
 import '../../source/views/source_edit_legacy_view.dart';
 import '../../source/views/source_login_form_view.dart';
@@ -39,6 +42,7 @@ class DiscoveryView extends StatefulWidget {
 class _DiscoveryViewState extends State<DiscoveryView> {
   late final SourceRepository _sourceRepo;
   late final SourceExploreKindsService _exploreKindsService;
+  final SettingsService _settingsService = SettingsService();
   StreamSubscription<List<BookSource>>? _sourceSub;
 
   final TextEditingController _searchController = TextEditingController();
@@ -260,17 +264,17 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         message: Text(source.bookSourceUrl),
         actions: [
           CupertinoActionSheetAction(
-            child: const Text('编辑书源'),
+            child: const Text('编辑'),
             onPressed: () {
               Navigator.pop(ctx);
-              _openEditor(source);
+              _openEditor(source.bookSourceUrl);
             },
           ),
           CupertinoActionSheetAction(
             child: const Text('置顶'),
             onPressed: () {
               Navigator.pop(ctx);
-              _toTop(source);
+              _toTop(source.bookSourceUrl);
             },
           ),
           if ((source.loginUrl ?? '').trim().isNotEmpty)
@@ -289,7 +293,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('刷新发现缓存'),
+            child: const Text('刷新'),
             onPressed: () {
               Navigator.pop(ctx);
               _refreshSourceKinds(source);
@@ -297,7 +301,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
           ),
           CupertinoActionSheetAction(
             isDestructiveAction: true,
-            child: const Text('删除书源'),
+            child: const Text('删除'),
             onPressed: () {
               Navigator.pop(ctx);
               _confirmDeleteSource(source);
@@ -312,41 +316,66 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     );
   }
 
-  Future<void> _openEditor(BookSource source) async {
+  Future<void> _openEditor(String sourceUrl) async {
+    final key = sourceUrl.trim();
+    if (key.isEmpty || !mounted) return;
+    final current = _sourceRepo.getSourceByUrl(key);
+    if (current == null) {
+      await Navigator.of(context).push(
+        CupertinoPageRoute<void>(
+          builder: (_) => const SourceEditLegacyView(initialRawJson: '{}'),
+        ),
+      );
+      return;
+    }
+
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
         builder: (_) => SourceEditLegacyView.fromSource(
-          source,
-          rawJson: _sourceRepo.getRawJsonByUrl(source.bookSourceUrl),
+          current,
+          rawJson: _sourceRepo.getRawJsonByUrl(current.bookSourceUrl),
         ),
       ),
     );
   }
 
-  Future<void> _toTop(BookSource source) async {
+  Future<void> _toTop(String sourceUrl) async {
+    final key = sourceUrl.trim();
+    if (key.isEmpty) return;
+
+    final currentSource = _sourceRepo.getSourceByUrl(key);
+    if (currentSource == null) return;
+
     final all = _sourceRepo.getAllSources();
-    var minOrder = 0;
-    for (final item in all) {
-      minOrder = math.min(minOrder, item.customOrder);
-    }
+    final minOrder = all.isEmpty
+        ? currentSource.customOrder
+        : all.map((item) => item.customOrder).reduce(math.min);
+
     await _sourceRepo.updateSource(
-      source.copyWith(customOrder: minOrder - 1),
+      currentSource.copyWith(customOrder: minOrder - 1),
     );
   }
 
   Future<void> _openSourceLogin(BookSource source) async {
-    if (SourceLoginUiHelper.hasLoginUi(source.loginUi)) {
+    final currentSource = _sourceRepo.getSourceByUrl(source.bookSourceUrl);
+    if (currentSource == null) {
+      _showMessage('未找到书源');
+      return;
+    }
+
+    final hasLoginUi = (currentSource.loginUi ?? '').trim().isNotEmpty;
+    if (hasLoginUi) {
       await Navigator.of(context).push(
         CupertinoPageRoute<void>(
-          builder: (_) => SourceLoginFormView(source: source),
+          builder: (_) => SourceLoginFormView(source: currentSource),
         ),
       );
       return;
     }
 
     final resolvedUrl = SourceLoginUrlResolver.resolve(
-      baseUrl: source.bookSourceUrl,
-      loginUrl: source.loginUrl ?? '',
+      baseUrl: currentSource.bookSourceUrl,
+      loginUrl: currentSource.loginUrl ?? '',
     );
     if (resolvedUrl.isEmpty) {
       _showMessage('当前书源未配置登录地址');
@@ -362,7 +391,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
         builder: (_) => SourceLoginWebViewView(
-          source: source,
+          source: currentSource,
           initialUrl: resolvedUrl,
         ),
       ),
@@ -370,11 +399,18 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   Future<void> _searchInSource(BookSource source) async {
+    final nextScope = SearchScope.fromSource(source);
+    final currentSettings = _settingsService.appSettings;
+    if (currentSettings.searchScope != nextScope) {
+      await _settingsService.saveAppSettings(
+        currentSettings.copyWith(searchScope: nextScope),
+      );
+    }
+    if (!mounted) return;
+
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SearchView.scoped(
-          sourceUrls: <String>[source.bookSourceUrl],
-        ),
+        builder: (_) => const SearchView(),
       ),
     );
   }
@@ -396,17 +432,17 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     final ok = await showCupertinoDialog<bool>(
           context: context,
           builder: (ctx) => CupertinoAlertDialog(
-            title: const Text('删除书源'),
-            content: Text('\n确定删除 ${source.bookSourceName} ？'),
+            title: const Text('提醒'),
+            content: Text('是否确认删除？\n${source.bookSourceName}'),
             actions: [
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('删除'),
-              ),
               CupertinoDialogAction(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                isDestructiveAction: true,
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('确定'),
               ),
             ],
           ),
@@ -414,7 +450,28 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         false;
 
     if (!ok) return;
-    await _sourceRepo.deleteSource(source.bookSourceUrl);
+    await _deleteSourceByLegacyRule(source);
+  }
+
+  Future<void> _deleteSourceByLegacyRule(BookSource source) async {
+    final sourceUrl = source.bookSourceUrl.trim();
+    if (sourceUrl.isEmpty) return;
+
+    try {
+      await _sourceRepo.deleteSource(sourceUrl);
+      await SourceVariableStore.removeVariable(sourceUrl);
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'explore_item.menu_del',
+        message: '删除书源失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'sourceKey': sourceUrl,
+          'sourceName': source.bookSourceName,
+        },
+      );
+    }
   }
 
   void _showMessage(String message, {String title = '提示'}) {

@@ -1525,7 +1525,11 @@ class _SourceEditViewState extends State<SourceEditView> {
     final url = _resolveWebVerifyUrl(source: source, key: key);
     Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceWebVerifyView(initialUrl: url),
+        builder: (_) => SourceWebVerifyView(
+          initialUrl: url,
+          sourceOrigin: source.bookSourceUrl,
+          sourceName: source.bookSourceName,
+        ),
       ),
     );
   }

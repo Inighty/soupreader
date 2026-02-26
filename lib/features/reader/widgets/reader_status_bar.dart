@@ -81,6 +81,12 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
     if (!widget.settings.shouldShowFooter()) {
       return const SizedBox.shrink();
     }
+    final mediaQuery = MediaQuery.of(context);
+    final bottomInset = widget.settings.hideNavigationBar
+        ? (widget.settings.paddingDisplayCutouts
+            ? mediaQuery.viewPadding.bottom
+            : 0.0)
+        : mediaQuery.padding.bottom;
 
     return Positioned(
       bottom: 0,
@@ -92,7 +98,7 @@ class _ReaderStatusBarState extends State<ReaderStatusBar> {
             left: widget.settings.footerPaddingLeft,
             right: widget.settings.footerPaddingRight,
             top: widget.settings.footerPaddingTop,
-            bottom: MediaQuery.of(context).padding.bottom +
+            bottom: bottomInset +
                 widget.settings.footerPaddingBottom +
                 _legacyTipEdgeInset,
           ),
@@ -303,6 +309,12 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
     )) {
       return const SizedBox.shrink();
     }
+    final mediaQuery = MediaQuery.of(context);
+    final topInset = widget.settings.showStatusBar
+        ? mediaQuery.padding.top
+        : (widget.settings.paddingDisplayCutouts
+            ? mediaQuery.viewPadding.top
+            : 0.0);
 
     return Positioned(
       top: 0,
@@ -311,7 +323,7 @@ class _ReaderHeaderBarState extends State<ReaderHeaderBar> {
       child: IgnorePointer(
         child: Padding(
           padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top +
+            top: topInset +
                 widget.settings.headerPaddingTop +
                 _legacyTipEdgeInset,
             bottom: widget.settings.headerPaddingBottom,

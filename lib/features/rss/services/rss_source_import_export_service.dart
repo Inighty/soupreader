@@ -204,8 +204,8 @@ class RssSourceImportExportService {
           sourceByUrl.remove(url);
         }
         sourceByUrl[url] = source;
-        sourceRawJsonByUrl[url] =
-            result.rawJsonForSourceUrl(url) ?? LegadoJson.encode(source.toJson());
+        sourceRawJsonByUrl[url] = result.rawJsonForSourceUrl(url) ??
+            LegadoJson.encode(source.toJson());
       }
     }
 
@@ -563,17 +563,25 @@ class RssSourceImportExportService {
 
   /// 导出订阅源为 JSON
   String exportToJson(List<RssSource> sources) {
-    final jsonList = sources.map((source) => source.toJson()).toList(growable: false);
+    final jsonList =
+        sources.map((source) => source.toJson()).toList(growable: false);
     return LegadoJson.encode(jsonList);
   }
 
   /// 导出订阅源到文件
-  Future<RssSourceExportFileResult> exportToFile(List<RssSource> sources) async {
+  Future<RssSourceExportFileResult> exportToFile(
+    List<RssSource> sources, {
+    String? defaultFileName,
+  }) async {
     try {
       final jsonString = exportToJson(sources);
+      final normalizedDefaultFileName = (defaultFileName ?? '').trim();
+      final outputFileName = normalizedDefaultFileName.isNotEmpty
+          ? normalizedDefaultFileName
+          : 'soupreader_rss_${DateTime.now().millisecondsSinceEpoch}.json';
       final outputPath = await FilePicker.platform.saveFile(
         dialogTitle: '导出订阅源',
-        fileName: 'soupreader_rss_${DateTime.now().millisecondsSinceEpoch}.json',
+        fileName: outputFileName,
         allowedExtensions: ['json'],
         type: FileType.custom,
       );

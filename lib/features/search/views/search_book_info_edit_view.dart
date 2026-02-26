@@ -3,6 +3,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../services/search_book_info_edit_helper.dart';
+import 'search_book_cover_change_view.dart';
 
 class SearchBookInfoEditView extends StatefulWidget {
   final SearchBookInfoEditDraft initialDraft;
@@ -50,6 +51,19 @@ class _SearchBookInfoEditViewState extends State<SearchBookInfoEditView> {
         intro: _introController.text,
       ),
     );
+  }
+
+  Future<void> _openChangeCover() async {
+    final selected = await Navigator.of(context).push<String>(
+      CupertinoPageRoute<String>(
+        builder: (_) => SearchBookCoverChangeView(
+          name: _nameController.text,
+          author: _authorController.text,
+        ),
+      ),
+    );
+    if (selected == null) return;
+    _coverController.text = selected;
   }
 
   Widget _buildField({
@@ -128,6 +142,15 @@ class _SearchBookInfoEditViewState extends State<SearchBookInfoEditView> {
                   controller: _coverController,
                   placeholder: '输入封面 URL 或本地路径',
                   keyboardType: TextInputType.url,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: _openChangeCover,
+                    child: const Text('封面换源'),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _buildField(

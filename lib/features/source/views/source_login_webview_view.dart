@@ -8,7 +8,10 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../core/database/database_service.dart';
+import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
+import '../../../core/services/source_variable_store.dart';
 import '../../../core/services/webview_cookie_bridge.dart';
 import '../models/book_source.dart';
 import '../services/rule_parser_engine.dart';
@@ -42,6 +45,7 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
   late final WebViewController _controller;
   late final Map<String, String> _headerMap;
   late final String _initialUrl;
+  final SourceRepository _sourceRepo = SourceRepository(DatabaseService());
 
   bool _checking = false;
   bool _closing = false;
@@ -117,24 +121,131 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
 
   Future<bool> _confirmOpenExternalApp(Uri uri) async {
     if (!mounted) return false;
-    final result = await showCupertinoDialog<bool>(
+    final result = await showCupertinoDialog<_OpenUrlConfirmDecision>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('跳转其它应用'),
         content: Text('\n${uri.toString()}'),
         actions: [
           CupertinoDialogAction(
+            onPressed: () => Navigator.pop(
+              dialogContext,
+              _OpenUrlConfirmDecision.cancel,
+            ),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(
+              dialogContext,
+              _OpenUrlConfirmDecision.confirm,
+            ),
+            child: const Text('确认'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.pop(
+              dialogContext,
+              _OpenUrlConfirmDecision.disableSource,
+            ),
+            child: const Text('禁用源'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.pop(
+              dialogContext,
+              _OpenUrlConfirmDecision.deleteSource,
+            ),
+            child: const Text('删除源'),
+          ),
+        ],
+      ),
+    );
+    if (result == _OpenUrlConfirmDecision.disableSource) {
+      await _disableCurrentSourceForOpenUrlConfirm();
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      return false;
+    }
+    if (result == _OpenUrlConfirmDecision.deleteSource) {
+      final confirmed = await _confirmDeleteCurrentSourceForOpenUrlConfirm();
+      if (!confirmed) {
+        return false;
+      }
+      await _deleteCurrentSourceForOpenUrlConfirm();
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      return false;
+    }
+    return result == _OpenUrlConfirmDecision.confirm;
+  }
+
+  Future<bool> _confirmDeleteCurrentSourceForOpenUrlConfirm() async {
+    if (!mounted) return false;
+    final sourceName = widget.source.bookSourceName.trim();
+    final result = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('提醒'),
+        content: Text('是否确认删除？\n$sourceName'),
+        actions: [
+          CupertinoDialogAction(
             onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('取消'),
           ),
           CupertinoDialogAction(
+            isDestructiveAction: true,
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('确认'),
+            child: const Text('确定'),
           ),
         ],
       ),
     );
     return result ?? false;
+  }
+
+  Future<void> _disableCurrentSourceForOpenUrlConfirm() async {
+    final sourceUrl = widget.source.bookSourceUrl.trim();
+    if (sourceUrl.isEmpty) return;
+
+    try {
+      final current = _sourceRepo.getSourceByUrl(sourceUrl);
+      if (current == null) return;
+      await _sourceRepo.updateSource(current.copyWith(enabled: false));
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'source.webview_login.open_url_confirm.menu_disable_source',
+        message: '禁用书源失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'sourceKey': sourceUrl,
+          'sourceName': widget.source.bookSourceName,
+        },
+      );
+    }
+  }
+
+  Future<void> _deleteCurrentSourceForOpenUrlConfirm() async {
+    final sourceUrl = widget.source.bookSourceUrl.trim();
+    if (sourceUrl.isEmpty) return;
+
+    try {
+      await _sourceRepo.deleteSource(sourceUrl);
+      await SourceVariableStore.removeVariable(sourceUrl);
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'source.webview_login.open_url_confirm.menu_delete_source',
+        message: '删除书源失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'sourceKey': sourceUrl,
+          'sourceName': widget.source.bookSourceName,
+        },
+      );
+    }
   }
 
   Map<String, String> _buildHeaderMap(String? rawHeader) {
@@ -344,4 +455,11 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
       ),
     );
   }
+}
+
+enum _OpenUrlConfirmDecision {
+  cancel,
+  confirm,
+  disableSource,
+  deleteSource,
 }

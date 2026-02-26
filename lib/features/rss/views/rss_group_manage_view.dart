@@ -9,9 +9,11 @@ class RssGroupManageView extends StatefulWidget {
   const RssGroupManageView({
     super.key,
     this.repository,
+    this.embedded = false,
   });
 
   final RssSourceRepository? repository;
+  final bool embedded;
 
   @override
   State<RssGroupManageView> createState() => _RssGroupManageViewState();
@@ -28,6 +30,9 @@ class _RssGroupManageViewState extends State<RssGroupManageView> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.embedded) {
+      return _buildEmbeddedView(context);
+    }
     return AppCupertinoPageScaffold(
       title: '分组管理',
       trailing: CupertinoButton(
@@ -35,68 +40,112 @@ class _RssGroupManageViewState extends State<RssGroupManageView> {
         onPressed: _addGroup,
         child: const Icon(CupertinoIcons.add),
       ),
-      child: StreamBuilder<List<String>>(
-        stream: _repo.flowGroups(),
-        builder: (context, snapshot) {
-          final groups = snapshot.data ?? _repo.allGroups();
-          if (groups.isEmpty) {
-            return const Center(
-              child: Text(
-                '暂无分组',
-                style: TextStyle(color: CupertinoColors.secondaryLabel),
-              ),
-            );
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.only(top: 12, bottom: 20),
-            itemCount: groups.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final group = groups[index];
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: CupertinoColors.secondarySystemGroupedBackground
-                      .resolveFrom(context),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: CupertinoListTile.notched(
-                  title: Text(group),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(28, 28),
-                        onPressed: () => _editGroup(group),
-                        child: const Icon(
-                          CupertinoIcons.pencil,
-                          size: 18,
-                        ),
-                      ),
-                      CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(28, 28),
-                        onPressed: () => _removeGroup(group),
-                        child: const Icon(
-                          CupertinoIcons.delete,
-                          color: CupertinoColors.systemRed,
-                          size: 18,
-                        ),
-                      ),
-                    ],
+      child: _buildGroupList(),
+    );
+  }
+
+  Widget _buildEmbeddedView(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '分组管理',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              );
-            },
+              ),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(32, 32),
+                onPressed: _addGroup,
+                child: const Icon(CupertinoIcons.add_circled),
+              ),
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                minimumSize: const Size(40, 32),
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('完成'),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          height: 0.5,
+          color: CupertinoColors.systemGrey4.resolveFrom(context),
+        ),
+        Expanded(child: _buildGroupList()),
+      ],
+    );
+  }
+
+  Widget _buildGroupList() {
+    return StreamBuilder<List<String>>(
+      stream: _repo.flowGroups(),
+      builder: (context, snapshot) {
+        final groups = snapshot.data ?? _repo.allGroups();
+        if (groups.isEmpty) {
+          return const Center(
+            child: Text(
+              '暂无分组',
+              style: TextStyle(color: CupertinoColors.secondaryLabel),
+            ),
           );
-        },
-      ),
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.only(top: 12, bottom: 20),
+          itemCount: groups.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (context, index) {
+            final group = groups[index];
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: CupertinoColors.secondarySystemGroupedBackground
+                    .resolveFrom(context),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: CupertinoListTile.notched(
+                title: Text(group),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(28, 28),
+                      onPressed: () => _editGroup(group),
+                      child: const Icon(
+                        CupertinoIcons.pencil,
+                        size: 18,
+                      ),
+                    ),
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(28, 28),
+                      onPressed: () => _removeGroup(group),
+                      child: const Icon(
+                        CupertinoIcons.delete,
+                        color: CupertinoColors.systemRed,
+                        size: 18,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
   Future<void> _addGroup() async {
-    final group = await _showGroupInputDialog(title: '新增分组');
+    final group = await _showGroupInputDialog(title: '添加分组');
     if (!mounted || group == null || group.isEmpty) return;
     final updates = RssSourceManageHelper.addGroupToNoGroupSources(
       allSources: _repo.getAllSources(),

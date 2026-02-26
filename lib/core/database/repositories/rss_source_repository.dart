@@ -45,7 +45,9 @@ class RssSourceRepository {
     if (raw.isEmpty) return <String, dynamic>{};
     try {
       final decoded = json.decode(raw);
-      if (decoded is Map<String, dynamic>) return Map<String, dynamic>.of(decoded);
+      if (decoded is Map<String, dynamic>) {
+        return Map<String, dynamic>.of(decoded);
+      }
       if (decoded is Map) {
         return decoded.map(
           (key, value) => MapEntry(key.toString(), value),
@@ -182,9 +184,7 @@ class RssSourceRepository {
       source: normalizedSource,
       existingRawJson: _rawJsonByUrl[url],
     );
-    await _driftDb
-        .into(_driftDb.rssSourceRecords)
-        .insertOnConflictUpdate(
+    await _driftDb.into(_driftDb.rssSourceRecords).insertOnConflictUpdate(
           _modelToCompanion(
             normalizedSource,
             rawJsonOverride: mergedRawJson,
@@ -293,6 +293,23 @@ class RssSourceRepository {
     _emitCacheSnapshot();
   }
 
+  /// 删除 RSS 源并同步清理该源文章（对齐 legado `SourceHelp.deleteRssSourceInternal`）
+  Future<void> deleteSourceWithArticles(String sourceUrl) async {
+    final normalized = _normalizeUrlKey(sourceUrl);
+    if (normalized.isEmpty) return;
+    await _driftDb.transaction(() async {
+      await (_driftDb.delete(_driftDb.rssSourceRecords)
+            ..where((tbl) => tbl.sourceUrl.equals(normalized)))
+          .go();
+      await (_driftDb.delete(_driftDb.rssArticleRecords)
+            ..where((tbl) => tbl.origin.equals(normalized)))
+          .go();
+    });
+    _cacheByUrl.remove(normalized);
+    _rawJsonByUrl.remove(normalized);
+    _emitCacheSnapshot();
+  }
+
   Future<void> deleteSources(Iterable<String> sourceUrls) async {
     final normalized =
         sourceUrls.map(_normalizeUrlKey).where((url) => url.isNotEmpty).toSet();
@@ -325,9 +342,7 @@ class RssSourceRepository {
       source: updated,
       existingRawJson: _rawJsonByUrl[normalized],
     );
-    await _driftDb
-        .into(_driftDb.rssSourceRecords)
-        .insertOnConflictUpdate(
+    await _driftDb.into(_driftDb.rssSourceRecords).insertOnConflictUpdate(
           _modelToCompanion(
             updated,
             rawJsonOverride: mergedRawJson,

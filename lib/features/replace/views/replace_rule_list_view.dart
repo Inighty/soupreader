@@ -1250,19 +1250,25 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       return;
     }
     if (!mounted) return;
-    final selectedIndexes = await _showImportSelectionSheet(candidates);
-    if (selectedIndexes == null || selectedIndexes.isEmpty) {
+    final selectionDecision = await _showImportSelectionSheet(candidates);
+    if (selectionDecision == null ||
+        selectionDecision.selectedIndexes.isEmpty) {
       return;
     }
     if (!mounted) return;
     await _runImportingTask(() async {
       final selectedRules = <ReplaceRule>[];
-      final sortedIndexes = selectedIndexes.toList()..sort();
+      final sortedIndexes = selectionDecision.selectedIndexes.toList()..sort();
       for (final index in sortedIndexes) {
         if (index < 0 || index >= candidates.length) {
           continue;
         }
-        selectedRules.add(candidates[index].rule);
+        selectedRules.add(
+          _applyImportGroupPolicy(
+            rule: candidates[index].rule,
+            policy: selectionDecision.groupPolicy,
+          ),
+        );
       }
       await _repo.addRules(selectedRules);
     });
@@ -1652,14 +1658,16 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     return _ReplaceRuleImportCandidateState.existing;
   }
 
-  Future<Set<int>?> _showImportSelectionSheet(
+  Future<_ReplaceRuleImportSelectionDecision?> _showImportSelectionSheet(
     List<_ReplaceRuleImportCandidate> candidates,
   ) async {
     final selectedIndexes = <int>{
       for (var index = 0; index < candidates.length; index++)
         if (candidates[index].selectedByDefault) index,
     };
-    return showCupertinoModalPopup<Set<int>>(
+    var customGroupName = '';
+    var appendCustomGroup = false;
+    return showCupertinoModalPopup<_ReplaceRuleImportSelectionDecision>(
       context: context,
       builder: (popupContext) {
         return CupertinoPopupSurface(
@@ -1703,43 +1711,82 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                                 ? null
                                 : () => Navigator.pop(
                                       popupContext,
-                                      selectedIndexes.toSet(),
+                                      _ReplaceRuleImportSelectionDecision(
+                                        selectedIndexes:
+                                            selectedIndexes.toSet(),
+                                        groupPolicy:
+                                            _ReplaceRuleImportGroupPolicy(
+                                          groupName: customGroupName,
+                                          appendGroup: appendCustomGroup,
+                                        ),
+                                      ),
                                     ),
                             child: Text('导入($selectedCount)'),
                           ),
                         ],
                       ),
                     ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                        child: CupertinoButton(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            color: CupertinoColors.systemGrey5.resolveFrom(
+                              context,
+                            ),
+                            onPressed: () {
+                              setDialogState(() {
+                                if (allSelected) {
+                                  selectedIndexes.clear();
+                                } else {
+                                  selectedIndexes
+                                    ..clear()
+                                    ..addAll(
+                                      List<int>.generate(
+                                        candidates.length,
+                                        (index) => index,
+                                      ),
+                                    );
+                                }
+                              });
+                            },
+                            child: Text(toggleAllLabel),
                           ),
-                          color: CupertinoColors.systemGrey5.resolveFrom(
-                            context,
-                          ),
-                          onPressed: () {
-                            setDialogState(() {
-                              if (allSelected) {
-                                selectedIndexes.clear();
-                              } else {
-                                selectedIndexes
-                                  ..clear()
-                                  ..addAll(
-                                    List<int>.generate(
-                                      candidates.length,
-                                      (index) => index,
-                                    ),
-                                  );
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            color: CupertinoColors.systemGrey5.resolveFrom(
+                              context,
+                            ),
+                            onPressed: () async {
+                              final input = await _showImportCustomGroupDialog(
+                                initialGroupName: customGroupName,
+                                initialAppendGroup: appendCustomGroup,
+                              );
+                              if (input == null || !popupContext.mounted) {
+                                return;
                               }
-                            });
-                          },
-                          child: Text(toggleAllLabel),
-                        ),
+                              setDialogState(() {
+                                customGroupName = input.groupName;
+                                appendCustomGroup = input.appendGroup;
+                              });
+                            },
+                            child: Text(
+                              _buildImportGroupActionLabel(
+                                groupName: customGroupName,
+                                appendGroup: appendCustomGroup,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     Expanded(
@@ -1775,6 +1822,113 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
         );
       },
     );
+  }
+
+  ReplaceRule _applyImportGroupPolicy({
+    required ReplaceRule rule,
+    required _ReplaceRuleImportGroupPolicy policy,
+  }) {
+    final groupName = policy.groupName.trim();
+    if (groupName.isEmpty) {
+      return rule;
+    }
+    if (!policy.appendGroup) {
+      return rule.copyWith(group: groupName);
+    }
+    final groups = <String>{};
+    final rawGroup = rule.group;
+    if (rawGroup != null && rawGroup.isNotEmpty) {
+      for (final part in rawGroup.split(_groupSplitPattern)) {
+        final normalized = part.trim();
+        if (normalized.isEmpty) continue;
+        groups.add(normalized);
+      }
+    }
+    groups.add(groupName);
+    return rule.copyWith(group: groups.join(','));
+  }
+
+  String _buildImportGroupActionLabel({
+    required String groupName,
+    required bool appendGroup,
+  }) {
+    final normalized = groupName.trim();
+    if (normalized.isEmpty) {
+      return '自定义源分组';
+    }
+    final title = '【$normalized】';
+    if (appendGroup) {
+      return '+$title';
+    }
+    return title;
+  }
+
+  Future<_ReplaceRuleImportGroupInput?> _showImportCustomGroupDialog({
+    required String initialGroupName,
+    required bool initialAppendGroup,
+  }) async {
+    final controller = TextEditingController(text: initialGroupName.trim());
+    var appendGroup = initialAppendGroup;
+    try {
+      return showCupertinoDialog<_ReplaceRuleImportGroupInput>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return CupertinoAlertDialog(
+                title: const Text('输入自定义源分组名称'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 12),
+                    CupertinoTextField(
+                      controller: controller,
+                      placeholder: '分组名',
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            '追加分组',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                        ),
+                        CupertinoSwitch(
+                          value: appendGroup,
+                          onChanged: (value) {
+                            setDialogState(() => appendGroup = value);
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                actions: [
+                  CupertinoDialogAction(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('取消'),
+                  ),
+                  CupertinoDialogAction(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop(
+                        _ReplaceRuleImportGroupInput(
+                          groupName: controller.text.trim(),
+                          appendGroup: appendGroup,
+                        ),
+                      );
+                    },
+                    child: const Text('确定'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
   Future<void> _runImportingTask(Future<void> Function() task) async {
@@ -1870,6 +2024,36 @@ enum _ReplaceRuleImportCandidateState {
   newRule,
   update,
   existing,
+}
+
+class _ReplaceRuleImportSelectionDecision {
+  const _ReplaceRuleImportSelectionDecision({
+    required this.selectedIndexes,
+    required this.groupPolicy,
+  });
+
+  final Set<int> selectedIndexes;
+  final _ReplaceRuleImportGroupPolicy groupPolicy;
+}
+
+class _ReplaceRuleImportGroupPolicy {
+  const _ReplaceRuleImportGroupPolicy({
+    required this.groupName,
+    required this.appendGroup,
+  });
+
+  final String groupName;
+  final bool appendGroup;
+}
+
+class _ReplaceRuleImportGroupInput {
+  const _ReplaceRuleImportGroupInput({
+    required this.groupName,
+    required this.appendGroup,
+  });
+
+  final String groupName;
+  final bool appendGroup;
 }
 
 enum _ReplaceRuleItemMenuAction {

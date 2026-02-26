@@ -41,7 +41,7 @@ class _AppHelpDialog extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
                     child: Row(
                       children: [
-                        const SizedBox(width: 34),
+                        const SizedBox(width: 48),
                         const Expanded(
                           child: Text(
                             '帮助',
@@ -53,10 +53,10 @@ class _AppHelpDialog extends StatelessWidget {
                           ),
                         ),
                         CupertinoButton(
-                          padding: const EdgeInsets.all(4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           minSize: 30,
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const Icon(CupertinoIcons.xmark),
+                          child: const Text('关闭'),
                         ),
                       ],
                     ),

@@ -18,9 +18,13 @@ class ReadingHistoryView extends StatefulWidget {
 }
 
 class _ReadingHistoryViewState extends State<ReadingHistoryView> {
+  static const int _readRecordSortByReadLong = 1;
+  static const int _readRecordSortByReadTime = 2;
+
   late final BookRepository _bookRepo;
   late final SettingsService _settingsService;
   bool _enableReadRecord = true;
+  int _readRecordSort = _readRecordSortByReadTime;
 
   @override
   void initState() {
@@ -28,6 +32,9 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
     _bookRepo = BookRepository(DatabaseService());
     _settingsService = SettingsService();
     _enableReadRecord = _settingsService.enableReadRecord;
+    _readRecordSort = _settingsService.getReadRecordSort(
+      fallback: _readRecordSortByReadTime,
+    );
   }
 
   @override
@@ -44,13 +51,13 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
         stream: _bookRepo.watchAllBooks(),
         builder: (context, snapshot) {
           final books = snapshot.data ?? _bookRepo.getAllBooks();
+          final readRecordDurationByBookId =
+              _settingsService.getBookReadRecordDurationSnapshot();
           final history =
-              books.where((b) => b.lastReadTime != null && b.isReading).toList()
-                ..sort((a, b) {
-                  final at = a.lastReadTime ?? DateTime(2000);
-                  final bt = b.lastReadTime ?? DateTime(2000);
-                  return bt.compareTo(at);
-                });
+              books.where((b) => b.lastReadTime != null && b.isReading).toList(
+                    growable: false,
+                  );
+          _sortHistory(history, readRecordDurationByBookId);
 
           if (history.isEmpty) {
             return _buildEmptyState(context);
@@ -110,11 +117,51 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
 
   String _two(int v) => v.toString().padLeft(2, '0');
 
+  void _sortHistory(
+    List<Book> books,
+    Map<String, int> readRecordDurationByBookId,
+  ) {
+    if (_readRecordSort == _readRecordSortByReadLong) {
+      books.sort((left, right) {
+        final leftDuration = readRecordDurationByBookId[left.id] ?? 0;
+        final rightDuration = readRecordDurationByBookId[right.id] ?? 0;
+        final byDuration = rightDuration.compareTo(leftDuration);
+        if (byDuration != 0) return byDuration;
+        return _compareByReadTimeDescThenTitle(left, right);
+      });
+      return;
+    }
+    books.sort(_compareByReadTimeDescThenTitle);
+  }
+
+  int _compareByReadTimeDescThenTitle(Book left, Book right) {
+    final leftTime =
+        left.lastReadTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final rightTime =
+        right.lastReadTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final byReadTime = rightTime.compareTo(leftTime);
+    if (byReadTime != 0) return byReadTime;
+    return left.title.compareTo(right.title);
+  }
+
   void _showTopActions() {
     showCupertinoModalPopup<void>(
       context: context,
       builder: (context) => CupertinoActionSheet(
         actions: [
+          CupertinoActionSheetAction(
+            child: Text(
+              '${_readRecordSort == _readRecordSortByReadLong ? '✓ ' : ''}阅读时长排序',
+            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _settingsService.saveReadRecordSort(
+                _readRecordSortByReadLong,
+              );
+              if (!mounted) return;
+              setState(() => _readRecordSort = _readRecordSortByReadLong);
+            },
+          ),
           CupertinoActionSheetAction(
             child: Text('${_enableReadRecord ? '✓ ' : ''}开启记录'),
             onPressed: () async {
@@ -164,6 +211,7 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
             onPressed: () async {
               Navigator.pop(context);
               await _bookRepo.clearReadingRecord(book.id);
+              await _settingsService.clearBookReadRecordDuration(book.id);
             },
           ),
           CupertinoActionSheetAction(
@@ -171,6 +219,7 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
             child: const Text('从书架移除'),
             onPressed: () async {
               Navigator.pop(context);
+              await _settingsService.clearBookReadRecordDuration(book.id);
               await _bookRepo.deleteBook(book.id);
             },
           ),

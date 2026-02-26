@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 
@@ -38,24 +37,9 @@ class _SourceDebugTextViewState extends State<SourceDebugTextView> {
       title: widget.title,
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
-        onPressed: () async {
-          await Clipboard.setData(ClipboardData(text: widget.text));
-          if (!context.mounted) return;
-          showCupertinoDialog(
-            context: context,
-            builder: (dialogContext) => CupertinoAlertDialog(
-              title: const Text('提示'),
-              content: const Text('\n已复制到剪贴板'),
-              actions: [
-                CupertinoDialogAction(
-                  child: const Text('好'),
-                  onPressed: () => Navigator.pop(dialogContext),
-                ),
-              ],
-            ),
-          );
-        },
-        child: const Text('复制'),
+        minSize: 30,
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('关闭'),
       ),
       child: CupertinoScrollbar(
         child: SingleChildScrollView(

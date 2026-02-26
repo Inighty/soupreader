@@ -7,6 +7,7 @@ import '../../../core/services/exception_log_service.dart';
 Future<void> showAppLogDialog(BuildContext context) {
   return showCupertinoDialog<void>(
     context: context,
+    barrierDismissible: true,
     builder: (_) => const _AppLogDialog(),
   );
 }
@@ -38,12 +39,7 @@ class _AppLogDialog extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
                     child: Row(
                       children: [
-                        CupertinoButton(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          minSize: 30,
-                          onPressed: service.clear,
-                          child: const Text('清空'),
-                        ),
+                        const SizedBox(width: 48),
                         const Expanded(
                           child: Text(
                             '日志',
@@ -55,10 +51,10 @@ class _AppLogDialog extends StatelessWidget {
                           ),
                         ),
                         CupertinoButton(
-                          padding: const EdgeInsets.all(4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           minSize: 30,
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Icon(CupertinoIcons.xmark),
+                          onPressed: service.clear,
+                          child: const Text('清除'),
                         ),
                       ],
                     ),
@@ -69,15 +65,7 @@ class _AppLogDialog extends StatelessWidget {
                       valueListenable: service.listenable,
                       builder: (context, logs, _) {
                         if (logs.isEmpty) {
-                          return Center(
-                            child: Text(
-                              '暂无日志',
-                              style: TextStyle(
-                                color: CupertinoColors.secondaryLabel
-                                    .resolveFrom(context),
-                              ),
-                            ),
-                          );
+                          return const SizedBox.shrink();
                         }
                         return ListView.separated(
                           padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
@@ -137,7 +125,6 @@ class _AppLogTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final message = entry.message.trim().isEmpty ? '未知日志' : entry.message;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _showStackTrace(context),
@@ -155,7 +142,7 @@ class _AppLogTile extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              message,
+              entry.message,
               style: const TextStyle(fontSize: 14),
             ),
           ],

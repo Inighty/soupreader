@@ -2,6 +2,17 @@
 
 状态：`active`
 
+## 快速运行快照（先读）
+
+- 快照文件：`docs/plans/ACTIVE_CONTEXT.md`
+- 当前任务：`P3-seq91（book_read_record.xml / @+id/menu_sort_read_long / 阅读时长排序）`
+- 下一任务：`完成 P3-seq91 后，按全局 detail_later 队列继续推进 P3-seq92（book_read_record/menu_sort_read_time）`
+- 默认读取顺序：
+  1. 先读 `docs/plans/ACTIVE_CONTEXT.md`；
+  2. 再读 `PLANS.md` 顶部索引与 Todo；
+  3. 仅在需要证据明细时，定向读取本文件对应 `Progress` 条目。
+- 深读触发：快照与计划不一致、任务 `blocked`、Phase 切换、或需求方要求全量审阅。
+
 ## 背景与目标
 
 ### 背景
@@ -149,12 +160,2406 @@
 
 ## Progress（动态）
 
+- `2026-02-26`
+  - 状态变更：完成 `P3-seq86`（`book_read.xml / @+id/menu_help / 帮助`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P3-seq86`：对照 legado `book_read.xml`、`ReadBookActivity.onCompatOptionsItemSelected(menu_help)`、`ReadBookActivity.showHelp` 与 `ActivityExtensions.showHelp(fileName)`，在阅读页“阅读操作”菜单收敛“帮助”动作语义。Flutter 侧在 `SimpleReaderView._executeLegacyReadMenuAction` 的 `ReaderLegacyReadMenuAction.help` 分支改为读取 `assets/web/help/md/readMenuHelp.md` 并调用 `showAppHelpDialog` 展示帮助文档；失败分支收敛为 legacy 同域帮助弹窗提示“帮助文档加载失败：<error>”。
+  - `P3-seq86` 差异点清单（实施前）：
+    - legado `book_read.xml` 已定义 `menu_help(@string/help)` 为阅读菜单一级动作；Flutter 阅读菜单虽有“帮助”文案入口，但点击链路仅 `_showToast(...)`，没有文档承载与帮助弹层。
+    - legado `ReadBookActivity.menu_help` 直接执行 `showHelp()`，并由 `showHelp("readMenuHelp")` 读取 `assets/web/help/md/readMenuHelp.md` 展示 Markdown 文档；Flutter 此前未接入对应资产与加载链路。
+    - Flutter 资产目录此前缺少 `assets/web/help/md/readMenuHelp.md`，即便切到文档弹层也无法等价读取 legacy 同源文档。
+    - 按序号约束，本序号仅收敛 `menu_help` 单项，不提前并入 `P3-seq91`（`book_read_record/menu_sort_read_long`）。
+  - `P3-seq86` 逐项检查清单（实施前）：
+    - 入口：阅读操作菜单是否保留常驻一级“帮助”动作。
+    - 状态：点击后是否展示 legacy 同源帮助文档弹层，关闭后返回当前阅读页。
+    - 异常：帮助文档读取失败是否可观测，且不新增扩展流程。
+    - 文案：动作文案与弹层标题/关闭动作是否保持“帮助/关闭”语义。
+    - 排版：是否沿用现有 `CupertinoActionSheet` 菜单承载，不改变菜单层级与热区。
+    - 交互触发：是否仅处理 `menu_help`，不跨序号并入后续阅读记录排序项。
+  - `P3-seq86` 逐项对照清单（实施后）：
+    - 入口：已同义（阅读操作菜单动作列表保持“帮助”一级入口不变）。
+    - 状态：已同义（点击后读取 `readMenuHelp.md` 并通过 `showAppHelpDialog` 弹出帮助文档；关闭后保持当前阅读会话状态不变）。
+    - 异常：已同义（加载失败弹 `CupertinoAlertDialog`，提示“帮助文档加载失败：<error>”，无额外扩展分支）。
+    - 文案：已同义（菜单文案保持“帮助”；帮助弹层标题与关闭动作保持“帮助/关闭”）。
+    - 排版：已同义（阅读菜单继续沿用 `CupertinoActionSheet` 承载，仅替换帮助动作触发链路；帮助正文沿用现有统一帮助弹层承载）。
+    - 交互触发：已同义（本序号仅处理 `menu_help`；未并入 `P3-seq91` 及其它后续动作）。
+    - 验证：命令 `dart format lib/features/reader/views/simple_reader_view.dart`；手工路径（待回归）`阅读页 -> 阅读操作 -> 帮助`（校验点击后展示 `readMenuHelp.md` 内容并可关闭，关闭后停留阅读页）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `book_read/menu_help` 文档承载语义，不改动目录、正文加载与书源动作链路。
+  - 下一项：按全局 `detail_later` 队列继续推进 `P3-seq91`（`book_read_record.xml / @+id/menu_sort_read_long / 阅读时长排序`）。
+
+- `2026-02-26`
+  - 状态变更：完成 `P3-seq85`（`book_read.xml / @+id/menu_log / 日志`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P3-seq85`：对照 legado `book_read.xml` 与 `ReadBookActivity.onCompatOptionsItemSelected(menu_log)`，在阅读页“阅读操作”菜单收敛“日志”动作语义。Flutter 侧在 `SimpleReaderView._executeLegacyReadMenuAction` 的 `ReaderLegacyReadMenuAction.log` 分支改为直接触发 `showAppLogDialog(context)`，保持无前置校验、关闭后停留当前阅读会话边界。
+  - `P3-seq85` 差异点清单（实施前）：
+    - legado `book_read.xml` 已定义 `menu_log(@string/log)` 为阅读菜单一级动作；Flutter 阅读菜单虽有“日志”文案入口，但点击链路接入的是 `_openExceptionLogsFromReader()`，会跳转 `ExceptionLogsView` 页面，承载层级与 legacy 不一致。
+    - legado `ReadBookActivity.menu_log` 直接执行 `showDialogFragment<AppLogDialog>()`，动作为弹层承载且无前置限制；Flutter 此前“日志”动作为整页路由跳转，关闭路径与状态恢复语义偏离。
+    - 按序号约束，本序号仅收敛 `menu_log` 单项，不提前并入 `P3-seq86`（`menu_help`）。
+  - `P3-seq85` 逐项检查清单（实施前）：
+    - 入口：阅读操作菜单是否保留常驻一级“日志”动作。
+    - 状态：点击后是否直接弹出日志弹层并支持关闭回到当前阅读页。
+    - 异常：日志入口触发是否保持 legacy 同义轻量边界，不新增额外校验与扩展提示。
+    - 文案：动作文案是否保持 legacy 同义“日志”。
+    - 排版：是否沿用现有 `CupertinoActionSheet` 菜单承载，不改变菜单层级与热区。
+    - 交互触发：是否仅处理 `menu_log`，不跨序号并入 `menu_help`。
+  - `P3-seq85` 逐项对照清单（实施后）：
+    - 入口：已同义（阅读操作菜单动作列表保持“日志”一级入口不变）。
+    - 状态：已同义（点击后直接 `showAppLogDialog(context)`，关闭后保持阅读页与当前章节状态不变）。
+    - 异常：已同义（入口动作无前置校验，不新增成功提示与扩展分支）。
+    - 文案：已同义（动作文案保持“日志”）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 承载，未改动菜单结构与排序）。
+    - 交互触发：已同义（本序号仅处理 `menu_log`；`menu_help` 继续保持下一序号推进）。
+    - 验证：命令 `dart format lib/features/reader/views/simple_reader_view.dart`；手工路径（待回归）`阅读页 -> 阅读操作 -> 日志`（校验点击后直接打开日志弹层并可关闭，阅读页保持停留）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `book_read/menu_log` 触发承载，不改动目录、正文加载与书源动作链路。
+  - 下一项：按全局 `detail_later` 队列继续推进 `P3-seq86`（`book_read.xml / @+id/menu_help / 帮助`）。
+
+- `2026-02-26`
+  - 状态变更：完成 `P2-seq170`（`book_toc.xml / @+id/menu_log / 日志`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P2-seq170`：对照 legado `book_toc.xml` 与 `TocActivity.onCompatOptionsItemSelected(menu_log)`，在目录页“更多”菜单补齐常驻“日志”入口。Flutter 侧在 `SearchBookInfoView` 的 `_SearchBookTocView` 菜单补齐一级动作“日志”，点击后直接触发 `showAppLogDialog(context)`，保持无前置条件与静默返回边界。
+  - `P2-seq170` 差异点清单（实施前）：
+    - legado `book_toc.xml` 将 `menu_log(@string/log)` 定义在分组外层，目录页无论目录/书签分组切换都可见；Flutter `_SearchBookTocView._showTocMenu` 此前仅有目录规则、反转、替换、字数、导出动作，缺少“日志”入口。
+    - legado `TocActivity.onCompatOptionsItemSelected(menu_log)` 直接执行 `showDialogFragment<AppLogDialog>()`，动作无前置校验且不改变当前目录页状态；Flutter 目录页此前无对应日志触发链路。
+    - 按序号约束，本序号仅收敛 `menu_log` 单项，不提前并入 `P3-seq85`（`book_read/menu_log`）与后续 `menu_help`。
+  - `P2-seq170` 逐项检查清单（实施前）：
+    - 入口：目录页“更多”菜单是否新增常驻一级“日志”动作。
+    - 状态：点击后是否直接打开日志弹层并支持关闭返回当前目录页。
+    - 异常：日志入口触发是否保持 legacy 同义轻量边界，不新增额外校验与扩展提示。
+    - 文案：动作文案是否收敛为 legacy 同义“日志”。
+    - 排版：是否沿用现有 `CupertinoActionSheet` 承载，保持菜单结构与热区节奏一致。
+    - 交互触发：是否仅处理 `menu_log` 单项，不跨序号并项。
+  - `P2-seq170` 逐项对照清单（实施后）：
+    - 入口：已同义（`_SearchBookTocMenuAction` 新增 `log` 动作；`_showTocMenu` 在导出项后补齐常驻“日志”入口）。
+    - 状态：已同义（点击后直接 `showAppLogDialog(context)`，关闭弹层后返回当前目录页并保持目录状态）。
+    - 异常：已同义（日志入口保持轻量触发，不新增前置校验与扩展提示）。
+    - 文案：已同义（动作文案固定为“日志”）。
+    - 排版：已同义（沿用 `CupertinoActionSheet`，仅新增单项动作，不改动其它菜单层级）。
+    - 交互触发：已同义（本序号仅处理 `menu_log`，未并入 `P3-seq85/P3-seq86`）。
+    - 验证：命令 `dart format lib/features/search/views/search_book_info_view.dart`；命令 `dart analyze lib/features/search/views/search_book_info_view.dart`；手工路径（待回归）`书籍详情页 -> 查看目录 -> 更多 -> 日志`（校验点击后直接打开日志弹层并可关闭）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `book_toc/menu_log` 入口触发语义，不改动目录检索、替换、导出与正文链路。
+  - 下一项：按全局 `detail_later` 队列继续推进 `P3-seq85`（`book_read.xml / @+id/menu_log / 日志`）。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq407`（`web_view.xml / @+id/menu_copy_url / 拷贝 URL`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq407`：对照 legado `web_view.xml`、`WebViewActivity.onCompatOptionsItemSelected(menu_copy_url)` 与 `Context.sendToClip`，在网页承载语义补齐“更多菜单一级拷贝 URL”动作。Flutter 侧在 `SourceWebVerifyView` 更多菜单补齐一级动作“拷贝 URL”，点击后复制 `initialUrl(baseUrl)` 到剪贴板并提示“复制完成”，成功路径保持静默停留当前网页承载页。
+  - `P10-seq407` 差异点清单（实施前）：
+    - legado `web_view.xml` 将 `menu_copy_url(@string/copy_url)` 定义为网页承载页 overflow 一级动作；Flutter `SourceWebVerifyView._showMoreMenu` 此前缺少“拷贝 URL”入口，菜单集合与 legacy 不一致。
+    - legado `WebViewActivity.menu_copy_url` 固定执行 `sendToClip(viewModel.baseUrl)`，且 `sendToClip` 会提示 `copy_complete`；Flutter 网页承载此前无“复制 baseUrl 并反馈”闭环。
+    - 按序号约束，本序号仅收敛 `menu_copy_url`，不得并入全局后续 `detail_later` 项（当前下一项为 `P2-seq170/book_toc/menu_log`）。
+  - `P10-seq407` 逐项检查清单（实施前）：
+    - 入口：网页承载页“更多”菜单是否补齐一级“拷贝 URL”动作。
+    - 状态：点击后是否复制 `initialUrl(baseUrl)` 并保持当前网页承载页停留。
+    - 异常：复制链路是否保持 legacy 同义轻量反馈边界，不新增额外流程。
+    - 文案：动作文案与反馈文案是否收敛为 legacy 同义“拷贝 URL / 复制完成”。
+    - 排版：动作面板是否沿用现有 `CupertinoActionSheet` 承载，不改变既有菜单结构层级。
+    - 交互触发：是否仅处理 `menu_copy_url` 单项，不跨序号并项。
+  - `P10-seq407` 逐项对照清单（实施后）：
+    - 入口：已同义（`SourceWebVerifyView._showMoreMenu` 新增一级动作“拷贝 URL”，位置位于“浏览器打开”后、“全屏”前）。
+    - 状态：已同义（点击后执行 `_copyBaseUrl`，复制 `widget.initialUrl` 到剪贴板并保持当前承载页不关闭）。
+    - 异常：已同义（复制链路保持轻量反馈，不新增扩展流程）。
+    - 文案：已同义（动作文案“拷贝 URL”；反馈文案“复制完成”）。
+    - 排版：已同义（沿用现有 `CupertinoActionSheet` 承载，仅新增单项动作，不改动其它菜单层级与热区）。
+    - 交互触发：已同义（本序号仅处理 `menu_copy_url`，未并入后续 `detail_later` 项）。
+    - 验证：命令 `dart format lib/features/source/views/source_web_verify_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 任一书源 -> 编辑 -> 调试面板 -> 高级工具 -> 网页验证（Cloudflare） -> 右上角更多 -> 拷贝 URL`（校验复制内容为 `initialUrl(baseUrl)` 且提示“复制完成”）；手工路径（待回归）`阅读页 -> 菜单 -> 章节链接 -> 应用内网页打开 -> 右上角更多 -> 拷贝 URL`（校验行为同义且页面保持停留）；手工路径（待回归）`阅读页 -> 章节购买触发 payAction 网页 -> 右上角更多 -> 拷贝 URL`（校验行为同义）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `web_view/menu_copy_url` 单项语义，不改动网页验证其余动作与五段链路。
+  - 下一项：回到全局 `detail_later` 队列，继续推进 `P2-seq170`（`book_toc.xml / @+id/menu_log / 日志`）。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq410`（`web_view.xml / @+id/menu_delete_source / 删除源`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq410`：对照 legado `web_view.xml`、`WebViewActivity.onCompatOptionsItemSelected(menu_delete_source)`、`WebViewModel.deleteSource` 与 `SourceHelp.deleteSource`，在网页承载语义补齐“更多菜单一级删除源”动作。Flutter 侧在 `SourceWebVerifyView` 更多菜单补齐 destructive 动作“删除源”（仅 `sourceOrigin` 非空时显示）；点击后先弹 legacy 同义二次确认框“提醒/是否确认删除？\n<书源名>”，确认后按 `sourceUrl` 执行“删库 + 清理 `sourceVariable_*`”，成功后关闭当前网页承载页，不追加成功提示。
+  - `P10-seq410` 差异点清单（实施前）：
+    - legado `web_view.xml` 将 `menu_delete_source(@string/delete_source)` 定义为网页承载页 overflow 一级动作，并默认 `visible=false`；`WebViewActivity.onPrepareOptionsMenu` 仅在 `sourceOrigin` 非空时显示。Flutter `SourceWebVerifyView._showMoreMenu` 此前仅补齐“禁用源”，缺少“删除源”入口与条件显隐对齐。
+    - legado `WebViewActivity.menu_delete_source` 触发后会先弹 `draw + sure_del + sourceName` 二次确认，再执行 `WebViewModel.deleteSource -> SourceHelp.deleteSource`，成功后 `finish()`；Flutter 网页承载此前缺少确认弹窗与“删库 + 清理 `sourceVariable_*` + 关闭承载页”闭环。
+    - 同菜单内 `menu_copy_url` 属后续序号（`seq407`，`detail_later`）；本序号必须保持单项收敛，不跨序号并项。
+  - `P10-seq410` 逐项检查清单（实施前）：
+    - 入口：网页承载页“更多”菜单是否补齐一级“删除源” destructive 动作且仅 `sourceOrigin` 非空显示。
+    - 状态：点击后是否先弹 legacy 同义二次确认框；确认后是否执行删库并清理 `sourceVariable_*`，随后关闭当前承载页。
+    - 异常：删除失败是否仅保留节点级可观测日志，不新增扩展提示。
+    - 文案：动作文案与确认弹窗文案是否收敛为 legacy 同义“删除源 / 提醒 / 是否确认删除？”。
+    - 排版：动作面板与确认弹窗是否沿用现有 `Cupertino` 承载，不新增跨序号入口。
+    - 交互触发：是否仅处理 `menu_delete_source`，不提前并入 `menu_copy_url`。
+  - `P10-seq410` 逐项对照清单（实施后）：
+    - 入口：已同义（`SourceWebVerifyView._showMoreMenu` 补齐“删除源” destructive 动作，并按 `sourceOrigin` 非空闸门显示）。
+    - 状态：已同义（点击后执行 `_confirmDeleteCurrentSource`；确认后执行 `_deleteCurrentSource`，按 `sourceUrl` 删库并清理 `sourceVariable_*`，完成后关闭当前网页承载页）。
+    - 异常：已同义（失败分支仅记录 `ExceptionLogService(node=source.web_view.menu_delete_source)`）。
+    - 文案：已同义（动作文案“删除源”；确认弹窗文案“提醒/是否确认删除？\n<书源名>”）。
+    - 排版：已同义（沿用现有 `CupertinoActionSheet + CupertinoAlertDialog` 承载，仅新增单项 destructive 动作与确认流程）。
+    - 交互触发：已同义（本序号仅处理 `menu_delete_source`；`menu_copy_url` 保持后续序号推进）。
+    - 验证：命令 `dart format lib/features/source/views/source_web_verify_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 任一书源 -> 编辑 -> 调试面板 -> 高级工具 -> 网页验证（Cloudflare） -> 右上角更多 -> 删除源 -> 取消/确定`（校验先弹“提醒/是否确认删除？\n<书源名>”，取消不删库；确认后删库并清理 `sourceVariable_*` 且关闭当前页）；手工路径（待回归）`阅读页 -> 菜单 -> 章节链接 -> 应用内网页打开 -> 右上角更多 -> 删除源 -> 取消/确定`（校验行为同义）；手工路径（待回归）`阅读页 -> 章节购买触发 payAction 网页 -> 右上角更多 -> 删除源 -> 取消/确定`（校验行为同义）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `web_view/menu_delete_source` 单项语义，不改动 `menu_copy_url` 与网页验证其它既有动作。
+  - 下一项：按优先级继续推进 `P10-seq407`（`web_view.xml / @+id/menu_copy_url / 拷贝 URL`）；完成后回到全局 `detail_later` 队列继续推进 `P2-seq170`（`book_toc/menu_log`）。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq409`（`web_view.xml / @+id/menu_disable_source / 禁用源`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq409`：对照 legado `web_view.xml`、`WebViewActivity.onCompatOptionsItemSelected(menu_disable_source)`、`WebViewModel.disableSource` 与 `SourceHelp.enableSource`，在网页承载语义补齐“更多菜单一级禁用源”动作。Flutter 侧在 `SourceWebVerifyView` 更多菜单补齐 destructive 动作“禁用源”（仅 `sourceOrigin` 非空时显示）；点击后按 `sourceUrl` 回查并静默写库 `enabled=false`，随后关闭当前网页承载页，不追加确认弹窗与成功提示。
+  - `P10-seq409` 差异点清单（实施前）：
+    - legado `web_view.xml` 将 `menu_disable_source(@string/disable_source)` 定义为网页承载页 overflow 一级动作，并默认 `visible=false`；`WebViewActivity.onPrepareOptionsMenu` 仅在 `sourceOrigin` 非空时显示。Flutter `SourceWebVerifyView._showMoreMenu` 此前缺少“禁用源”入口与显示闸门，菜单集合不完整。
+    - legado `WebViewActivity.menu_disable_source` 触发 `WebViewModel.disableSource -> SourceHelp.enableSource(..., false)`，成功回调后 `finish()`；Flutter 网页承载此前没有“禁用后关闭当前页”的状态流转。
+    - 网页承载在 Flutter 有多入口（书源编辑调试、阅读章节链接、章节付费跳转），若不透传 `sourceOrigin`，即使补菜单也无法满足 legacy 的显示与写库边界。
+    - 同菜单内 `menu_delete_source` 属后续序号（`seq410`）；本序号必须保持单项收敛，不跨序号并项。
+  - `P10-seq409` 逐项检查清单（实施前）：
+    - 入口：网页承载页“更多”菜单是否补齐一级“禁用源” destructive 动作。
+    - 状态：点击后是否按 `sourceUrl` 回查并写库 `enabled=false`，随后关闭当前承载页。
+    - 异常：写库失败是否仅保留节点级可观测日志，不新增扩展提示。
+    - 文案：用户可见动作文案是否收敛为 legacy 同义“禁用源”。
+    - 排版：动作面板是否继续沿用现有 `CupertinoActionSheet` 承载，不新增跨序号入口。
+    - 交互触发：是否仅处理 `menu_disable_source`，不提前并入 `menu_delete_source`。
+  - `P10-seq409` 逐项对照清单（实施后）：
+    - 入口：已同义（`SourceWebVerifyView._showMoreMenu` 补齐“禁用源” destructive 动作，并按 `sourceOrigin` 非空闸门显示）。
+    - 状态：已同义（点击后执行 `_disableCurrentSource`，按 `sourceUrl` 回查并静默写库 `enabled=false`，完成后关闭当前网页承载页）。
+    - 异常：已同义（失败分支仅记录 `ExceptionLogService(node=source.web_view.menu_disable_source)`）。
+    - 文案：已同义（动作文案固定为“禁用源”）。
+    - 排版：已同义（沿用现有 `CupertinoActionSheet` 承载，仅新增单项 destructive 动作）。
+    - 交互触发：已同义（本序号仅处理 `menu_disable_source`；`menu_delete_source` 保持后续序号推进）。
+    - 验证：命令 `dart format lib/features/source/views/source_web_verify_view.dart lib/features/source/views/source_edit_view.dart lib/features/reader/views/simple_reader_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 任一书源 -> 编辑 -> 调试面板 -> 高级工具 -> 网页验证（Cloudflare） -> 右上角更多 -> 禁用源`（校验点击后目标书源 `enabled=false` 且当前页关闭，无确认弹窗与成功提示）；手工路径（待回归）`阅读页 -> 菜单 -> 章节链接 -> 应用内网页打开 -> 右上角更多 -> 禁用源`（校验点击后关闭当前页并返回阅读承载）；手工路径（待回归）`阅读页 -> 章节购买触发 payAction 网页 -> 右上角更多 -> 禁用源`（校验同义）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `web_view/menu_disable_source` 单项语义，不改动 Cookie 导入流程、全屏链路与后续删除动作。
+  - 下一项：按优先级继续推进 `P10-seq410`（`web_view.xml / @+id/menu_delete_source / 删除源`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq408`（`web_view.xml / @+id/menu_full_screen / 全屏`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq408`：对照 legado `web_view.xml`、`WebViewActivity.onCompatOptionsItemSelected(menu_full_screen)` 与 `WebViewActivity.toggleFullScreen`，在网页承载语义补齐“更多菜单一级全屏切换”动作。Flutter 侧在 `SourceWebVerifyView` 更多菜单补齐“全屏”；点击后切换全屏态并隐藏顶栏与系统栏，返回键优先退出全屏再回到页面返回路径。
+  - `P10-seq408` 差异点清单（实施前）：
+    - legado `web_view.xml` 将 `menu_full_screen(@string/full_screen)` 定义为网页承载页 overflow 一级动作；Flutter `SourceWebVerifyView._showMoreMenu` 此前缺少“全屏”入口，菜单集合不完整。
+    - legado `WebViewActivity.toggleFullScreen` 通过 `isFullScreen` 状态切换系统栏显示与顶栏显隐，且返回键在全屏态下优先退出全屏；Flutter 网页承载页此前缺少对应状态机与返回优先级分流。
+    - legacy 同菜单内 `menu_disable_source/menu_delete_source` 属后续序号（`seq409/410`）；本序号必须保持单项收敛，不跨序号并项。
+  - `P10-seq408` 逐项检查清单（实施前）：
+    - 入口：网页承载页“更多”菜单是否补齐一级“全屏”动作。
+    - 状态：点击后是否进入无顶栏全屏态；返回键是否先退出全屏再触发页面返回。
+    - 异常：全屏切换链路是否保持静默，不新增扩展提示与异常分支。
+    - 文案：用户可见动作文案是否收敛为 legacy 同义“全屏”。
+    - 排版：全屏态是否隐藏顶部导航并保持 WebView 主体占满视区。
+    - 交互触发：是否仅处理 `menu_full_screen`，不提前并入 `menu_disable_source/menu_delete_source`。
+  - `P10-seq408` 逐项对照清单（实施后）：
+    - 入口：已同义（`SourceWebVerifyView._showMoreMenu` 补齐“全屏”一级动作）。
+    - 状态：已同义（点击后 `_isFullScreen` 进入全屏态并隐藏系统栏与顶栏；`PopScope` 在全屏态拦截返回并优先执行退出全屏）。
+    - 异常：已同义（全屏切换全程静默，不新增成功提示与异常弹窗）。
+    - 文案：已同义（动作文案固定为“全屏”）。
+    - 排版：已同义（普通态保留 `AppCupertinoPageScaffold`；全屏态切换为无导航栏 `CupertinoPageScaffold + SafeArea(top:false,bottom:false)` 承载 WebView）。
+    - 交互触发：已同义（本序号仅处理 `menu_full_screen`；`menu_disable_source/menu_delete_source` 保持后续序号推进）。
+    - 验证：命令 `dart format lib/features/source/views/source_web_verify_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 任一书源 -> 编辑 -> 调试面板 -> 高级工具 -> 网页验证（Cloudflare） -> 右上角更多 -> 全屏 -> 返回`（校验点击后进入无顶栏全屏态，返回键先退出全屏且页面保持停留）；手工路径（待回归）`阅读页 -> 菜单 -> 章节链接 -> 应用内网页打开 -> 右上角更多 -> 全屏 -> 返回`（校验行为同义且退出全屏后仍停留当前网页承载页）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `web_view/menu_full_screen` 单项语义，不改动 Cookie 导入流程与 `web_view` 其它菜单动作。
+  - 下一项：按优先级继续推进 `P10-seq409`（`web_view.xml / @+id/menu_disable_source / 禁用源`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq406`（`web_view.xml / @+id/menu_open_in_browser / 浏览器打开`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq406`：对照 legado `web_view.xml`、`WebViewActivity.onCompatOptionsItemSelected(menu_open_in_browser)` 与 `Context.openUrl`，在网页承载语义补齐“更多菜单一级浏览器打开”动作。Flutter 侧在 `SourceWebVerifyView` 更多菜单补齐“浏览器打开”；点击后按当前承载初始链接拉起系统外部浏览器，成功路径保持静默且不关闭当前网页承载页。
+  - `P10-seq406` 差异点清单（实施前）：
+    - legado `web_view.xml` 将 `menu_open_in_browser(@string/open_in_browser)` 定义为网页承载页 overflow 一级动作；Flutter `SourceWebVerifyView._showMoreMenu` 此前缺少“浏览器打开”入口，交互路径不完整。
+    - legado `WebViewActivity.menu_open_in_browser` 触发 `openUrl(viewModel.baseUrl)`，语义是按承载初始 URL 拉起外部浏览器；Flutter 若按当前跳转 URL 打开会与 legacy `baseUrl` 边界漂移。
+    - legado 同菜单内 `menu_copy_url/menu_full_screen/menu_disable_source/menu_delete_source` 属后续序号（`seq407/408/409/410`）；本序号必须保持单项收敛，不跨序号并项。
+  - `P10-seq406` 逐项检查清单（实施前）：
+    - 入口：网页承载页“更多”菜单是否补齐一级“浏览器打开”动作。
+    - 状态：点击后是否拉起系统外部浏览器且当前网页承载页保持停留。
+    - 异常：URL 解析失败或外部拉起失败是否保留节点级可观测输出。
+    - 文案：用户可见动作文案是否收敛为 legacy 同义“浏览器打开”。
+    - 排版：动作面板层级是否继续使用现有 `CupertinoActionSheet` 承载，不新增跨序号入口。
+    - 交互触发：是否仅处理 `menu_open_in_browser`，不提前并入 `menu_copy_url/menu_full_screen/menu_disable_source/menu_delete_source`。
+  - `P10-seq406` 逐项对照清单（实施后）：
+    - 入口：已同义（`SourceWebVerifyView._showMoreMenu` 补齐“浏览器打开”一级动作）。
+    - 状态：已同义（点击后调用 `_openInBrowser` 拉起外部浏览器，当前网页承载页保持不关闭）。
+    - 异常：已同义（失败分支统一记录 `ExceptionLogService(node=source.web_view.menu_open_in_browser)`，并提示 `open url error`）。
+    - 文案：已同义（动作文案固定为“浏览器打开”）。
+    - 排版：已同义（沿用现有 `CupertinoActionSheet` 承载，仅新增单项动作）。
+    - 交互触发：已同义（本序号仅处理 `menu_open_in_browser`；`menu_copy_url/menu_full_screen/menu_disable_source/menu_delete_source` 保持后续序号推进）。
+    - 验证：命令 `dart format lib/features/source/views/source_web_verify_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 任一书源 -> 编辑 -> 调试面板 -> 高级工具 -> 网页验证（Cloudflare） -> 右上角更多 -> 浏览器打开`（校验外部浏览器被拉起且当前网页承载页保持停留）；手工路径（待回归）`阅读页 -> 菜单 -> 章节链接 -> 应用内网页打开 -> 右上角更多 -> 浏览器打开`（校验外部浏览器按初始章节链接拉起且当前页不关闭）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `web_view/menu_open_in_browser` 单项语义，不改动 Cookie 导入流程与 `web_view` 其它菜单动作。
+  - 下一项：按优先级继续推进 `P10-seq408`（`web_view.xml / @+id/menu_full_screen / 全屏`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq405`（`web_view.xml / @+id/menu_ok / 确认`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq405`：对照 legado `web_view.xml`、`WebViewActivity.onCompatOptionsItemSelected(menu_ok)` 与 `WebViewModel.saveVerificationResult`，在网页承载语义补齐“顶栏一级确认关闭”动作。Flutter 侧在 `SourceWebVerifyView` 顶栏补齐 check 图标一级动作；点击后执行当前网页承载页关闭并返回上级，保持现有“更多”菜单与 Cookie 导入链路不变。
+  - `P10-seq405` 差异点清单（实施前）：
+    - legado `web_view.xml` 将 `menu_ok(@string/ok)` 定义为顶栏常驻一级动作（`showAsAction="always"`）；Flutter `SourceWebVerifyView` 顶栏此前仅有“更多”按钮，缺少显式确认入口。
+    - legado `WebViewActivity.menu_ok` 语义是“确认后结束当前 WebView 承载（验证模式下先保存结果再关闭）”；Flutter `SourceWebVerifyView` 此前只能通过系统返回路径退出，交互热区与 legacy 不同义。
+    - legado 同菜单内 `menu_open_in_browser/menu_copy_url/menu_full_screen/menu_disable_source/menu_delete_source` 属后续序号（`seq406/407/408/409/410`）；本序号必须保持单项收敛，不跨序号并项。
+  - `P10-seq405` 逐项检查清单（实施前）：
+    - 入口：网页承载页顶栏是否补齐一级“确认”动作。
+    - 状态：点击确认后是否关闭当前网页承载并返回上级页面。
+    - 异常：关闭路径是否保持静默，不新增扩展提示或异常分支副作用。
+    - 文案：用户可见动作语义是否保持 legacy 同义“确认”。
+    - 排版：顶栏布局是否维持现有 `Cupertino` 承载，不新增跨序号入口。
+    - 交互触发：是否仅处理 `menu_ok`，不提前并入 `menu_open_in_browser/menu_full_screen/menu_disable_source/menu_delete_source`。
+  - `P10-seq405` 逐项对照清单（实施后）：
+    - 入口：已同义（`SourceWebVerifyView` 顶栏新增一级 check 确认动作）。
+    - 状态：已同义（点击确认执行 `_confirmAndClose`，关闭当前网页承载页并返回上级）。
+    - 异常：已同义（关闭路径保持静默，不新增成功提示与扩展错误分支）。
+    - 文案：已同义（顶栏动作为 check 图标，语义收敛为 legacy `menu_ok` 的“确认”）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold` 顶栏结构，仅补齐单项确认动作并保留既有“更多”入口）。
+    - 交互触发：已同义（本序号仅处理 `menu_ok`；`menu_open_in_browser/menu_copy_url/menu_full_screen/menu_disable_source/menu_delete_source` 保持后续序号推进）。
+    - 验证：命令 `dart format lib/features/source/views/source_web_verify_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 任一书源 -> 编辑 -> 调试面板 -> 高级工具 -> 网页验证（Cloudflare） -> 顶栏确认`（校验点击后关闭当前网页承载页并返回上级）；手工路径（待回归）`阅读页 -> 菜单 -> 章节链接 -> 应用内网页打开 -> 顶栏确认`（校验同样关闭并返回阅读页）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `web_view/menu_ok` 单项语义，不改动 Cookie 导入流程与 `web_view` 其它菜单动作。
+  - 下一项：按优先级继续推进 `P10-seq406`（`web_view.xml / @+id/menu_open_in_browser / 浏览器打开`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq404`（`verification_code.xml / @+id/menu_delete_source / 删除源`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq404`：对照 legado `verification_code.xml`、`VerificationCodeDialog.onMenuItemClick(menu_delete_source)`、`VerificationCodeViewModel.deleteSource` 与 `SourceHelp.deleteSource`，在验证码输入承载语义补齐“删除源”一级动作。Flutter 侧在 `SourceDebugLegacyView` 的“更多”菜单补齐 legacy 同义“删除源”；点击后先弹 legacy 同义二次确认框“提醒/是否确认删除？\n<书源名>”，确认后按 `sourceUrl` 执行“删库 + 清理 `sourceVariable_*`”，成功后关闭当前调试承载页；不追加成功提示。
+  - `P10-seq404` 差异点清单（实施前）：
+    - legado `verification_code.xml` 将 `menu_delete_source(@string/delete_source)` 定义为验证码承载的 overflow 动作；Flutter `SourceDebugLegacyView._showMoreMenu` 此前仅补齐到“禁用源”，缺少“删除源”入口。
+    - legado `VerificationCodeDialog.onMenuItemClick(menu_delete_source)` 触发后会先弹“提醒/是否确认删除？\n<sourceName>”二次确认，再调用 `VerificationCodeViewModel.deleteSource -> SourceHelp.deleteSource`；Flutter 调试承载此前没有确认弹窗与删除动作，存在交互路径偏差。
+    - legado 删除链路是“删库 + 清理源变量 + 成功关闭承载页 + 无成功提示”；Flutter 调试承载此前尚未补齐 `sourceVariable_*` 清理与删除失败节点可观测，边界不完整。
+  - `P10-seq404` 逐项检查清单（实施前）：
+    - 入口：调试承载“更多”菜单是否补齐一级“删除源”动作。
+    - 状态：点击后是否先弹二次确认，确认后按 `sourceUrl` 执行删库并清理 `sourceVariable_*`。
+    - 异常：删除失败是否仅保留节点级可观测日志，不新增扩展提示。
+    - 文案：动作与确认文案是否收敛为 legacy 同义“删除源”“提醒/是否确认删除？”。
+    - 排版：动作面板与确认弹窗是否继续使用现有 `Cupertino` 承载，不新增跨序号入口。
+    - 交互触发：本序号是否仅处理 `menu_delete_source`，不提前并入 `web_view` 后续动作。
+  - `P10-seq404` 逐项对照清单（实施后）：
+    - 入口：已同义（`SourceDebugLegacyView._showMoreMenu` 补齐“删除源” destructive 动作）。
+    - 状态：已同义（点击后先弹“提醒/是否确认删除？\n<书源名>”确认框，确认后执行删库与 `sourceVariable_*` 清理并关闭当前调试页）。
+    - 异常：已同义（失败分支仅记录 `ExceptionLogService(node=source.debug.verification_code.menu_delete_source)`）。
+    - 文案：已同义（动作文案固定为“删除源”，确认文案固定为“提醒/是否确认删除？”）。
+    - 排版：已同义（沿用现有 `CupertinoActionSheet + CupertinoAlertDialog` 承载，仅新增单项 destructive 动作）。
+    - 交互触发：已同义（本序号仅处理 `menu_delete_source`；`web_view/menu_ok` 保持下一序号推进）。
+    - 验证：命令 `dart format lib/features/source/views/source_debug_legacy_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 任一书源 -> 调试 -> 右上角更多 -> 删除源 -> 取消/确定`（校验先弹“提醒/是否确认删除？\n<书源名>”，取消不删库；确认后当前调试页关闭且目标书源被删除并清理 `sourceVariable_*`，无成功提示）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `verification_code/menu_delete_source` 单项语义，不改动调试执行链路与 `web_view` 后续动作。
+  - 下一项：按优先级继续推进 `P10-seq405`（`web_view.xml / @+id/menu_ok / 确认`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq403`（`verification_code.xml / @+id/menu_disable_source / 禁用源`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq403`：对照 legado `verification_code.xml`、`VerificationCodeDialog.onMenuItemClick(menu_disable_source)`、`VerificationCodeViewModel.disableSource` 与 `SourceHelp.enableSource`，在验证码输入承载语义补齐“禁用源”一级动作。Flutter 侧在 `SourceDebugLegacyView` 的“更多”菜单补齐 legacy 同义“禁用源”；点击后按 `sourceUrl` 实时回查当前书源并静默写库 `enabled=false`，成功后关闭当前调试承载页；不追加确认弹窗与成功提示。
+  - `P10-seq403` 差异点清单（实施前）：
+    - legado `verification_code.xml` 将 `menu_disable_source(@string/disable_source)` 定义为验证码承载的 overflow 动作；Flutter `SourceDebugLegacyView._showMoreMenu` 此前仅有源码/刷新发现/帮助，缺少“禁用源”入口。
+    - legado `VerificationCodeDialog.onMenuItemClick(menu_disable_source)` 触发 `VerificationCodeViewModel.disableSource -> SourceHelp.enableSource(..., false)` 并在成功回调后 `dismiss`；Flutter 调试承载此前没有“禁用并关闭当前页”的状态流转。
+    - legado 在该动作下无确认弹窗、无成功提示；`menu_delete_source` 属于后续序号（`seq404`），本序号必须保持单项收敛。
+  - `P10-seq403` 逐项检查清单（实施前）：
+    - 入口：调试承载“更多”菜单是否补齐一级“禁用源”动作。
+    - 状态：点击后是否按 `sourceUrl` 回查当前书源并写库 `enabled=false`，成功后关闭当前页。
+    - 异常：写库失败是否仅保留节点级可观测日志，不新增扩展提示。
+    - 文案：用户可见动作文案是否收敛为 legacy 同义“禁用源”。
+    - 排版：菜单层级与现有 `CupertinoActionSheet` 承载是否保持一致。
+    - 交互触发：是否保持“点击即执行”，不弹确认且不提前并入 `menu_delete_source`。
+  - `P10-seq403` 逐项对照清单（实施后）：
+    - 入口：已同义（`SourceDebugLegacyView._showMoreMenu` 补齐“禁用源”动作）。
+    - 状态：已同义（点击后按 `sourceUrl` 回查并静默写库 `enabled=false`，成功路径关闭当前调试页）。
+    - 异常：已同义（失败分支仅记录 `ExceptionLogService(node=source.debug.verification_code.menu_disable_source)`）。
+    - 文案：已同义（动作文案固定为“禁用源”）。
+    - 排版：已同义（沿用现有 `CupertinoActionSheet` 承载，仅新增单项 destructive 动作）。
+    - 交互触发：已同义（本序号仅处理 `menu_disable_source`；`menu_delete_source` 保持下一序号推进）。
+    - 验证：命令 `dart format lib/features/source/views/source_debug_legacy_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 任一书源 -> 调试 -> 右上角更多 -> 禁用源`（校验点击后当前调试页关闭且目标书源 `enabled=false`，无确认弹窗与成功提示）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `verification_code/menu_disable_source` 单项语义，不改动调试执行链路与后续删除动作。
+  - 下一项：按优先级继续推进 `P10-seq404`（`verification_code.xml / @+id/menu_delete_source / 删除源`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq402`（`verification_code.xml / @+id/menu_ok / 确认`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq402`：对照 legado `verification_code.xml`、`VerificationCodeDialog.onMenuItemClick(menu_ok)` 与 `dialog_verification_code_view.xml`，在验证码输入承载语义补齐“输入后确认提交”一级动作。Flutter 侧在 `SourceDebugLegacyView` 顶栏补齐 check 图标动作；点击后按当前输入 key 执行同义提交（复用 `_runCurrentKeyIfNotEmpty -> _runDebug`），并进入既有“调试运行中...”状态流。
+  - `P10-seq402` 差异点清单（实施前）：
+    - legado `verification_code.xml` 明确定义 `menu_ok(@string/ok)` 为顶栏常驻一级动作；Flutter `SourceDebugLegacyView` 顶栏此前仅有“扫码/更多”，缺失显式“确认提交”入口。
+    - legado `VerificationCodeDialog.menu_ok` 语义是“读取输入 -> 提交结果 -> 关闭承载”；Flutter 调试承载此前仅支持回车提交，缺少点击型确认触发，交互热区不对齐。
+    - legado 同菜单内 `menu_disable_source/menu_delete_source` 属于后续序号（`seq403/404`）；Flutter 本序号需保持单项收敛，避免跨序号并项。
+  - `P10-seq402` 逐项检查清单（实施前）：
+    - 入口：验证码/调试输入承载是否补齐顶栏一级“确认”动作。
+    - 状态：点击确认后是否触发当前输入 key 的提交执行并进入运行态。
+    - 异常：提交失败是否沿用既有调试错误输出，不新增扩展成功提示。
+    - 文案：用户可见动作语义是否保持 legacy 同义“确认提交”。
+    - 排版：顶栏布局是否维持现有 `Cupertino` 承载，不引入跨序号菜单项。
+    - 交互触发：是否仅处理 `menu_ok`，不提前并入 `menu_disable_source/menu_delete_source`。
+  - `P10-seq402` 逐项对照清单（实施后）：
+    - 入口：已同义（`SourceDebugLegacyView` 顶栏新增一级 check 确认动作）。
+    - 状态：已同义（点击确认触发当前输入 key 提交，进入既有“调试运行中...”流程）。
+    - 异常：已同义（提交异常继续复用 `_runDebug` 原有失败日志/事件输出链路）。
+    - 文案：已同义（顶栏动作语义收敛为“确认提交”，与 legacy `menu_ok` 一致）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold` 顶栏结构，仅新增单项确认动作）。
+    - 交互触发：已同义（本序号仅处理 `menu_ok`；`menu_disable_source/menu_delete_source` 保持下一序号推进）。
+    - 验证：命令 `dart format lib/features/source/views/source_debug_legacy_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 任一书源 -> 调试 -> 输入 key -> 顶栏确认`（校验点击后进入“调试运行中...”并开始输出调试日志）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `verification_code/menu_ok` 点击确认入口，不改动调试执行链路与后续禁用/删除动作。
+  - 下一项：按优先级继续推进 `P10-seq403`（`verification_code.xml / @+id/menu_disable_source / 禁用源`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq280`（`qr_code_scan.xml / @+id/action_choose_from_gallery / 图库`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq280`：对照 legado `qr_code_scan.xml`、`QrCodeActivity.onCompatOptionsItemSelected(action_choose_from_gallery)`、`HandleFileContract(IMAGE)`、`SelectImageContract` 与 `QRCodeUtils.parseCodeResult`，在扫码页收敛“顶栏图库动作 -> 选图解析 -> 返回扫码结果”语义。Flutter 侧在 `QrScanView` 顶栏补齐一级“图库”动作，触发后拉起系统图片选择并以 `MobileScannerController.analyzeImage` 解析二维码；命中则回传文本并关闭扫码页，未命中/解析异常回传空结果并关闭扫码页，取消选图保持扫码页不退出。
+  - `P10-seq280` 差异点清单（实施前）：
+    - legado `qr_code_scan.xml` 明确定义 `action_choose_from_gallery(@string/gallery)` 顶栏动作；Flutter `QrScanView` 此前仅有“取消”，缺失“图库”入口。
+    - legado `QrCodeActivity` 通过 `HandleFileContract(IMAGE)` 选图后调用 `QRCodeUtils.parseCodeResult(bitmap)` 并回传结果；Flutter 此前仅支持摄像头实时扫码，缺少图库图片解析分支。
+    - legado 失败链路可观测（`HandleFileActivity/AppLog`）；Flutter 此前没有 `qr_code_scan` 节点级日志，图库分支异常不可追踪。
+  - `P10-seq280` 逐项检查清单（实施前）：
+    - 入口：扫码页顶栏是否补齐一级“图库”动作。
+    - 状态：选图后是否执行二维码解析并返回文本/空结果。
+    - 异常：图库读取失败或解析异常是否保留可观测日志。
+    - 文案：动作文案是否收敛为 legacy 同义“图库”。
+    - 排版：顶栏结构是否保持 `Cupertino` 承载，不新增跨序号入口。
+    - 交互触发：取消选图是否静默返回扫码页，不提前并入 `verification_code` 后续动作。
+  - `P10-seq280` 逐项对照清单（实施后）：
+    - 入口：已同义（`QrScanView` 顶栏补齐一级“图库”动作）。
+    - 状态：已同义（选图后执行 `analyzeImage`，命中返回文本并关闭，未命中返回空结果并关闭）。
+    - 异常：已同义（图库读取失败/解析异常统一记录 `ExceptionLogService(node=qr_code_scan.action_choose_from_gallery)`）。
+    - 文案：已同义（顶栏动作文案固定为“图库”）。
+    - 排版：已同义（继续沿用 `AppCupertinoPageScaffold` 顶栏承载，仅补齐单项动作）。
+    - 交互触发：已同义（取消选图保持扫码页不退出；本序号仅处理 `action_choose_from_gallery`）。
+    - 验证：命令 `dart format lib/features/common/views/qr_scan_view.dart`；手工路径（待回归）`任一支持扫码入口 -> 进入扫码页 -> 右上角图库 -> 选择含二维码图片`（校验返回文本并关闭扫码页）；手工路径（待回归）`同入口 -> 右上角图库 -> 选择无二维码图片`（校验回传空结果并关闭扫码页）；手工路径（待回归）`同入口 -> 右上角图库 -> 取消选图`（校验扫码页保持当前态）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐扫码页 `action_choose_from_gallery` 单项语义，不改动摄像头扫码主链路与导入解析流程。
+  - 下一项：按优先级继续推进 `P10-seq402`（`verification_code.xml / @+id/menu_ok / 确认`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq235`（`explore_item.xml / @+id/menu_del / 删除`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq235`：对照 legado `explore_item.xml`、`ExploreAdapter.showMenu(menu_del)`、`ExploreFragment.deleteSource`、`ExploreViewModel.deleteSource` 与 `SourceHelp.deleteBookSource`，在 `发现 -> 长按书源条目 -> 删除` 链路收敛“确认后按 `sourceUrl` 删除书源并静默返回”语义。Flutter 侧 `DiscoveryView` 将长按动作文案从“删除书源”收敛为 legacy 同义“删除”，并将确认弹窗收敛为“提醒 / 是否确认删除？\n<书源名>”；确认后统一执行“删库 + 清理 `sourceVariable_*`”，失败分支仅记录 `ExceptionLogService(node=explore_item.menu_del)`。
+  - `P10-seq235` 差异点清单（实施前）：
+    - legado `explore_item.xml` 的 `menu_del` 文案为 `@string/delete`（删除）；Flutter `DiscoveryView._showSourceActions` 此前文案为“删除书源”，用户可见语义漂移。
+    - legado `ExploreFragment.deleteSource` 的确认弹窗文案为“提醒 / 是否确认删除？\n<书源名>”；Flutter 此前使用“删除书源 / 确定删除 <书源名> ？ / 删除”文案组合，确认语义不一致。
+    - legado `ExploreViewModel.deleteSource -> SourceHelp.deleteBookSource` 会同时执行“删库 + 清理 `sourceVariable_*`”；Flutter `DiscoveryView` 此前仅调用 `_sourceRepo.deleteSource`，未清理书源变量且缺少节点级失败日志。
+  - `P10-seq235` 逐项检查清单（实施前）：
+    - 入口：发现页长按菜单是否保留一级“删除”动作。
+    - 状态：确认后是否按 `sourceUrl` 删除书源并清理 `sourceVariable_*`。
+    - 异常：删除失败是否仅保留可观测日志，不新增成功提示。
+    - 文案：动作与确认文案是否收敛为 legacy 同义“删除”“提醒/是否确认删除？”。
+    - 排版：动作面板与确认弹窗是否继续使用现有 `Cupertino` 承载，不新增跨序号入口。
+    - 交互触发：本序号是否仅处理 `menu_del`，不提前并入 `qr_code_scan` 后续动作。
+  - `P10-seq235` 逐项对照清单（实施后）：
+    - 入口：已同义（长按动作面板保留一级“删除”入口并常驻可触发）。
+    - 状态：已同义（确认后按 `sourceUrl` 执行删库并清理 `sourceVariable_*`）。
+    - 异常：已同义（失败分支仅记录 `ExceptionLogService(node=explore_item.menu_del)`，不新增成功提示）。
+    - 文案：已同义（动作文案收敛为“删除”；确认文案收敛为“提醒/是否确认删除？”）。
+    - 排版：已同义（沿用 `CupertinoActionSheet + CupertinoAlertDialog` 承载，仅收敛 `menu_del` 单项语义）。
+    - 交互触发：已同义（仅处理 `menu_del`；`qr_code_scan/action_choose_from_gallery` 保持后续序号独立推进）。
+    - 验证：命令 `dart format lib/features/discovery/views/discovery_view.dart`；手工路径（待回归）`发现 -> 长按任一书源 -> 删除 -> 取消/确定`（校验菜单文案为“删除”，确认弹窗文案为“提醒/是否确认删除？\n<书源名>”，取消静默返回且确认后书源移除且无成功提示）；手工路径（待回归）`发现 -> 长按菜单打开后在其他入口删除该书源 -> 返回点击删除并确认`（校验流程静默无崩溃且不会重建已删书源）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `explore_item/menu_del` 单项语义，不提前并入 `qr_code_scan/action_choose_from_gallery`（`seq280`）后续动作。
+  - 下一项：按优先级继续推进 `P10-seq280`（`qr_code_scan.xml / @+id/action_choose_from_gallery / 图库`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq231`（`explore_item.xml / @+id/menu_top / 置顶`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq231`：对照 legado `explore_item.xml`、`ExploreAdapter.showMenu(menu_top)`、`ExploreFragment.toTop`、`ExploreViewModel.topSource` 与 `BookSourceDao.minOrder/upOrder`，在 `发现 -> 长按书源条目 -> 置顶` 链路收敛“按当前库实体置顶并静默返回”语义。Flutter 侧 `DiscoveryView` 将置顶触发从“直接写长按快照”改为“按 `sourceUrl` 实时回查当前书源后写入 `customOrder=minOrder-1`”；源缺失时静默返回且不重插记录。
+  - `P10-seq231` 差异点清单（实施前）：
+    - legado `ExploreAdapter.menu_top -> ExploreFragment.toTop -> ExploreViewModel.topSource` 仅处理当前库内实体；若条目在菜单弹出后被删除，后续 `dao.upOrder` 仅更新已有行且流程静默。
+    - Flutter `DiscoveryView._toTop` 此前直接用长按快照调用 `SourceRepository.updateSource(upsert)`，在源已删除场景会把旧快照重新写回，状态流偏离 legacy。
+    - Flutter `DiscoveryView._toTop` 此前以 `minOrder=0` 起算最小序号，不等价于 legacy `BookSourceDao.minOrder` 的数据库最小值语义，在全正序号场景会产生额外偏移。
+  - `P10-seq231` 逐项检查清单（实施前）：
+    - 入口：发现页长按菜单是否保留一级“置顶”动作。
+    - 状态：点击后是否按 `sourceUrl` 回查当前书源并执行 `customOrder=minOrder-1`。
+    - 异常：源被并发删除时是否静默返回且不重插记录。
+    - 文案：动作文案是否保持 legacy 同义“置顶”。
+    - 排版：动作面板是否保持 `CupertinoActionSheet` 同层承载，不新增跨序号入口。
+    - 交互触发：置顶动作是否只收敛 `menu_top` 单项，不提前并入 `menu_del`。
+  - `P10-seq231` 逐项对照清单（实施后）：
+    - 入口：已同义（长按动作面板保留一级“置顶”入口并常驻可触发）。
+    - 状态：已同义（点击后按 `sourceUrl` 实时回查当前书源，再写入 `customOrder=minOrder-1`）。
+    - 异常：已同义（回查未命中时静默返回，已删除源不再被重插）。
+    - 文案：已同义（动作文案保持“置顶”）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 结构，仅收敛 `menu_top` 触发语义）。
+    - 交互触发：已同义（仅处理 `menu_top`；`menu_del` 保持后续序号独立推进）。
+    - 验证：命令 `dart format lib/features/discovery/views/discovery_view.dart`；手工路径（待回归）`发现 -> 长按任一书源 -> 置顶`（校验目标书源移动到发现列表首位且流程静默无提示）；手工路径（待回归）`发现 -> 长按菜单打开后在其他入口删除该书源 -> 返回点击置顶`（校验流程静默返回且已删除书源不会被重新写回）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `explore_item/menu_top` 单项语义，不提前并入 `menu_del`（`seq235`）后续动作。
+  - 下一项：按优先级继续推进 `P10-seq235`（`explore_item.xml / @+id/menu_del / 删除`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq230`（`explore_item.xml / @+id/menu_edit / 编辑`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq230`：对照 legado `explore_item.xml`、`ExploreAdapter.showMenu(menu_edit)`、`ExploreFragment.editSource` 与 `BookSourceEditActivity.initData`，在 `发现 -> 长按书源条目 -> 编辑` 链路收敛“编辑入口常驻 + 按 `sourceUrl` 触发编辑承载”语义。Flutter 侧 `DiscoveryView` 将动作文案从“编辑书源”收敛为 legacy 同义“编辑”，并将触发参数由条目快照改为 `sourceUrl` 实时取数；若源在菜单打开后被删除，保持 legacy 同义空白编辑承载边界。
+  - `P10-seq230` 差异点清单（实施前）：
+    - legado `explore_item.xml` 的 `menu_edit` 文案为 `@string/edit`（编辑）；Flutter `DiscoveryView._showSourceActions` 此前文案为“编辑书源”，存在用户可见语义漂移。
+    - legado `ExploreAdapter.menu_edit` 仅传 `source.bookSourceUrl`，`ExploreFragment.editSource` 仅以 `sourceUrl` 打开编辑承载；Flutter 此前直接把长按快照 `BookSource` 传入编辑页，存在“菜单打开后源已变化/被删时仍用旧快照”偏差。
+    - 当前优先级队列包含 `seq230/seq231`，但 `feature-item-tracker` 仅有 `seq232~235`，若不补齐映射行会造成逐项证据断层。
+  - `P10-seq230` 逐项检查清单（实施前）：
+    - 入口：发现页长按菜单是否保留一级“编辑”动作。
+    - 状态：点击后是否按 `sourceUrl` 打开编辑承载，不依赖长按快照。
+    - 异常：源被并发删除时是否保持可达且流程无崩溃。
+    - 文案：动作文案是否收敛为 legacy 同义“编辑”。
+    - 排版：动作面板结构是否保持 `CupertinoActionSheet` 同层承载，不新增跨序号入口。
+    - 交互触发：编辑动作是否只收敛 `menu_edit` 单项，不提前并入 `menu_top/menu_del`。
+  - `P10-seq230` 逐项对照清单（实施后）：
+    - 入口：已同义（长按动作面板保留一级“编辑”入口并常驻可触发）。
+    - 状态：已同义（点击后按 `sourceUrl` 实时回查书源并打开编辑承载）。
+    - 异常：已同义（源缺失场景进入空白编辑承载，流程无额外提示且无崩溃）。
+    - 文案：已同义（动作文案由“编辑书源”收敛为“编辑”）。
+    - 排版：已同义（继续沿用 `CupertinoActionSheet` 结构，仅收敛单项文案与触发参数）。
+    - 交互触发：已同义（仅处理 `menu_edit`；`menu_top/menu_del` 保持后续序号独立推进）。
+    - 验证：命令 `dart format lib/features/discovery/views/discovery_view.dart`；手工路径（待回归）`发现 -> 长按任一书源 -> 编辑`（校验文案为“编辑”且可进入书源编辑页）；手工路径（待回归）`发现 -> 长按菜单打开后在其他入口删除该书源 -> 返回点击编辑`（校验进入空白编辑承载且流程无异常）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `explore_item/menu_edit` 单项语义，不提前并入 `menu_top`（`seq231`）与 `menu_del`（`seq235`）后续动作。
+  - 下一项：按优先级继续推进 `P10-seq231`（`explore_item.xml / @+id/menu_top / 置顶`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq214`（`dialog_text.xml / @+id/menu_close / 关闭`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq214`：对照 legado `dialog_text.xml` 与 `TextDialog.onMenuItemClick(menu_close)`，在通用文本承载链路收敛“顶栏单项关闭动作”语义。Flutter 侧将 `SourceDebugTextView` 顶栏动作由“复制”收敛为单项“关闭”，点击后仅执行 `pop`；同时将 `showAppHelpDialog` 顶栏关闭入口从图标收敛为文案“关闭”，保持与 legacy `menu_close` 的用户可见语义一致。
+  - `P10-seq214` 差异点清单（实施前）：
+    - legado `dialog_text.xml` 仅定义 `menu_close`（`showAsAction=always`）单项动作；Flutter `SourceDebugTextView` 此前顶栏为“复制”动作，保留了 non-legacy 扩展入口。
+    - legado `TextDialog.onMenuItemClick(menu_close)` 点击后仅执行 `dismissAllowingStateLoss()`；Flutter `SourceDebugTextView` 此前点击顶栏会触发“复制到剪贴板 + 成功提示”，存在额外副作用。
+    - legado 文本弹层顶部动作文案固定为“关闭”；Flutter `app_help_dialog` 此前使用 `x` 图标关闭，用户可见文案语义缺口。
+  - `P10-seq214` 逐项检查清单（实施前）：
+    - 入口：通用文本承载顶栏是否仅保留“关闭”一级动作。
+    - 状态：点击后是否直接关闭当前承载，不触发其它流程。
+    - 异常：关闭流程是否保持静默，无成功/失败提示。
+    - 文案：顶栏动作是否收敛为 legacy 同义“关闭”。
+    - 排版：文本承载页与帮助弹层顶栏结构是否保持 `Cupertino` 同层承载，不新增扩展入口。
+    - 交互触发：关闭动作是否只执行 `dismiss/pop`，不附带复制、保存等副作用。
+  - `P10-seq214` 逐项对照清单（实施后）：
+    - 入口：已同义（`SourceDebugTextView` 与帮助弹层顶栏均收敛为单项“关闭”动作）。
+    - 状态：已同义（点击后直接 `Navigator.pop` 关闭承载）。
+    - 异常：已同义（关闭流程静默，无复制成功提示或额外弹窗）。
+    - 文案：已同义（动作文案统一为“关闭”）。
+    - 排版：已同义（保留 `AppCupertinoPageScaffold` / `CupertinoPageScaffold` 顶栏结构，平台视觉差异属于允许范围）。
+    - 交互触发：已同义（关闭动作仅 `dismiss/pop`，不附带扩展副作用）。
+    - 验证：命令 `dart format lib/features/source/views/source_debug_text_view.dart lib/features/settings/views/app_help_dialog.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源调试 -> 更多 -> 列表源码/正文源码 -> 右上角关闭`（校验点击后仅关闭文本承载，不弹复制提示）；手工路径（待回归）`设置 -> 帮助文档弹层 -> 右上角关闭`（校验关闭动作文案为“关闭”且点击后直接 dismiss）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `dialog_text/menu_close` 单项语义，不提前并入 `explore_item/menu_edit`（`seq230`）后续动作。
+  - 下一项：按优先级继续推进 `P10-seq230`（`explore_item.xml / @+id/menu_edit / 编辑`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq213`（`crash_log.xml / @+id/menu_clear / 清除`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq213`：对照 legado `crash_log.xml`、`CrashLogsDialog.onMenuItemClick(menu_clear)` 与 `CrashViewModel.clearCrashLog`，在 `设置 -> 开发工具 -> 异常日志` 链路收敛“清除异常日志”语义。Flutter 侧 `ExceptionLogsView` 将顶栏动作收敛为单项“清除”文本按钮；点击后直接执行日志清空并即时刷新列表，全流程无确认弹窗、无成功提示，清空后页面保持留白态。
+  - `P10-seq213` 差异点清单（实施前）：
+    - legado `crash_log.xml` 仅定义 `menu_clear`（`showAsAction=always`）；Flutter `ExceptionLogsView` 此前顶栏使用“垃圾桶图标”动作并保留确认弹窗，入口文案与触发层级存在偏差。
+    - legado `CrashLogsDialog.menu_clear` 点击后直接调用 `clearCrashLog -> initData`，无确认弹窗、无成功提示；Flutter 此前执行“确认后清空”双阶段流程，状态机偏离 legacy。
+    - legado 清空后列表为空时保持留白；Flutter 此前空态展示“暂无异常日志”扩展文案与图标，会造成用户可见语义漂移。
+  - `P10-seq213` 逐项检查清单（实施前）：
+    - 入口：异常日志页顶栏是否保留一级“清除”动作。
+    - 状态：点击后是否立即清空日志并刷新列表。
+    - 异常：流程是否保持静默，不弹确认与成功提示。
+    - 文案：动作文案是否收敛为 legacy 同义“清除”。
+    - 排版：顶栏与列表承载是否保持 `Cupertino` 结构，不引入跨序号扩展入口。
+    - 交互触发：清空后是否保持空列表留白态，不追加扩展空态文案。
+  - `P10-seq213` 逐项对照清单（实施后）：
+    - 入口：已同义（顶栏保留一级“清除”动作并常驻可触发）。
+    - 状态：已同义（点击后直接 `clear` 并即时刷新异常日志列表）。
+    - 异常：已同义（无确认弹窗、无成功提示，流程静默完成）。
+    - 文案：已同义（动作文案收敛为“清除”）。
+    - 排版：已同义（保留 `AppCupertinoPageScaffold` 顶栏 + 列表结构，不新增跨序号动作）。
+    - 交互触发：已同义（清空后列表留白，不再展示“暂无异常日志”扩展文案）。
+    - 验证：命令 `dart format lib/features/settings/views/exception_logs_view.dart`；手工路径（待回归）`设置 -> 开发工具 -> 异常日志 -> 清除`（校验顶栏“清除”点击后无确认弹窗无成功提示且列表立即清空）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `crash_log/menu_clear` 单项语义，不提前并入 `dialog_text/menu_close`（`seq214`）后续动作。
+  - 下一项：按优先级继续推进 `P10-seq214`（`dialog_text.xml / @+id/menu_close / 关闭`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq200`（`code_edit.xml / @+id/menu_save / 保存`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq200`：对照 legado `code_edit.xml`、`CodeDialog.initMenu/onMenuItemClick(menu_save)` 与 `ImportBookSourceDialog.onCodeSave`，在 `设置 -> 源管理 -> 书源管理 -> 导入候选 -> 打开` 链路收敛“代码编辑承载仅保留一级保存动作”语义。Flutter 侧在 `SourceListView._editImportRawJsonText` 将编辑承载顶栏收敛为固定标题 `edit` + 单一保存图标动作，移除额外“取消”并保留“保存后回传文本并关闭承载”边界；保存后的 JSON 解析回写继续复用 `SourceImportSelectionHelper.tryReplaceCandidateRawJson`，解析失败保持静默不落盘。
+  - `P10-seq200` 差异点清单（实施前）：
+    - legado `code_edit.xml` 仅定义 `menu_save`（`showAsAction=always`）单项动作；Flutter 导入候选编辑承载此前额外提供“取消 + 保存”双动作，入口层级多于 legacy。
+    - legado `CodeDialog` 编辑态标题固定为 `edit`，并由 `menu_save` 触发回传；Flutter 此前标题按书源名动态变化，存在用户可见语义偏移。
+    - 当前序号范围仅 `code_edit/menu_save`，不得提前并入 `crash_log/menu_clear`（`seq213`）后续动作。
+  - `P10-seq200` 逐项检查清单（实施前）：
+    - 入口：导入候选列表“打开”是否仍为代码编辑承载唯一进入路径。
+    - 状态：编辑态顶栏是否仅保留一级保存动作，点击后关闭承载并回传文本。
+    - 异常：无效 JSON 保存后是否保持静默不落盘。
+    - 文案：编辑承载标题是否收敛为 legacy 同义 `edit`。
+    - 排版：是否保持顶栏 + 全屏多行编辑区承载，不引入额外确认弹窗。
+    - 交互触发：是否不新增二级取消流程与成功提示。
+  - `P10-seq200` 逐项对照清单（实施后）：
+    - 入口：已同义（导入候选“打开”继续直达代码编辑承载）。
+    - 状态：已同义（顶栏仅保留一级保存图标动作，点击后回传文本并关闭承载）。
+    - 异常：已同义（JSON 解析失败场景保持静默，候选不被覆盖）。
+    - 文案：已同义（编辑承载标题固定为 `edit`）。
+    - 排版：已同义（维持顶部动作区 + 多行编辑区结构，仅收敛顶栏动作层级）。
+    - 交互触发：已同义（移除额外取消按钮，不新增成功提示与确认流程）。
+    - 验证：命令 `dart format lib/features/source/views/source_list_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 更多 -> 本地导入或网络导入 -> 导入候选列表 -> 打开 -> 右上角保存`（校验承载标题为 `edit` 且仅保留保存图标动作，点击后候选 JSON 按新内容回写）；手工路径（待回归）`同路径将 JSON 改为非法后保存`（校验承载关闭但候选保持原值且无额外提示）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `code_edit/menu_save` 单项语义，不提前并入 `crash_log/menu_clear`（`seq213`）后续动作。
+  - 下一项：按优先级继续推进 `P10-seq213`（`crash_log.xml / @+id/menu_clear / 清除`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq184`（`change_cover.xml / @+id/menu_start_stop / 停止`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq184`：对照 legado `change_cover.xml`、`ChangeCoverDialog.onMenuItemClick(menu_start_stop)` 与 `ChangeCoverViewModel.startOrStopSearch`，在 `书籍详情 -> 编辑书籍信息 -> 封面换源` 链路收敛“刷新/停止同入口状态机”语义。Flutter 侧 `SearchBookCoverChangeView` 将顶栏动作收敛为“图标+文案”同步切换，并将搜索启动态前移为“点击刷新后立即进入停止态”；停止时可即时取消进行中的封面换源搜索并回落刷新态。
+  - `P10-seq184` 差异点清单（实施前）：
+    - legado `change_cover.xml` 将 `menu_start_stop` 定义为顶栏一级动作，并在搜索状态变化时同步切换 `refresh/stop` 图标与文案；Flutter 侧此前仅用纯文本按钮承载，状态表达不完整。
+    - legado `ChangeCoverViewModel.startOrStopSearch` 触发后会立即进入 `searchState=true`，同入口可直接转为“停止”；Flutter 侧此前在加载书源列表后才切换到搜索中态，存在短暂可重复触发窗口。
+    - 当前序号范围仅 `menu_start_stop`，不得提前并入 `code_edit/menu_save`（`seq200`）后续动作。
+  - `P10-seq184` 逐项检查清单（实施前）：
+    - 入口：封面换源页顶栏是否保留同一入口承载“刷新/停止”动作。
+    - 状态：点击刷新后是否立即进入搜索中态并回显停止动作；停止后是否回落刷新态。
+    - 异常：停止动作是否取消进行中的请求并保持流程静默。
+    - 文案：动作文案是否与 legacy 同义为“刷新/停止”。
+    - 排版：顶栏动作是否继续位于 `AppCupertinoPageScaffold.trailing`，不改动卡片网格承载。
+    - 交互触发：是否保持同入口 start/stop 切换，不新增并行动作入口。
+  - `P10-seq184` 逐项对照清单（实施后）：
+    - 入口：已同义（顶栏保留同一入口，统一承载“刷新/停止”动作）。
+    - 状态：已同义（触发刷新后立即进入“停止”态；停止后即时回落“刷新”态）。
+    - 异常：已同义（停止动作会取消当前 `CancelToken`，流程无成功提示、无新增弹窗）。
+    - 文案：已同义（动作文案保持“刷新/停止”，并与图标同步切换）。
+    - 排版：已同义（仅收敛顶栏动作表现与状态切换时机，网格布局与热区不变）。
+    - 交互触发：已同义（继续使用同入口 `start/stop` 切换，不新增跨序号入口）。
+    - 验证：命令 `dart format lib/features/search/views/search_book_cover_change_view.dart`；手工路径（待回归）`书籍详情 -> 编辑书籍信息 -> 封面换源 -> 右上角刷新/停止`（校验刷新后立即进入停止态，点击停止后请求取消并回落刷新态）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `change_cover/menu_start_stop` 单项语义，不提前并入 `code_edit/menu_save`（`seq200`）后续动作。
+  - 下一项：按优先级继续推进 `P10-seq200`（`code_edit.xml / @+id/menu_save / 保存`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq3`（`app_log.xml / @+id/menu_clear / 清除`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq3`：对照 legado `app_log.xml`、`AppLogDialog.onMenuItemClick(menu_clear)` 与 `AppLog.clear`，在 `设置 -> 关于与诊断 -> 异常日志` 链路收敛“日志弹层清除”语义。Flutter 侧 `app_log_dialog` 顶栏动作文案收敛为“清除”并保持单项一级动作；点击后直接执行日志集合清空并即时刷新列表，全流程无确认弹窗、无成功提示。
+  - `P10-seq3` 差异点清单（实施前）：
+    - legado `app_log.xml` 仅定义 `menu_clear`（`showAsAction=always`）；Flutter 日志弹层此前动作为“清空”，与 legacy 文案“清除”不一致。
+    - legado `AppLogDialog.menu_clear` 只有单项顶栏动作且点击即清空；Flutter 此前额外包含关闭图标与空态扩展文案（“暂无日志/未知日志”），存在用户可见扩展差异。
+    - legado 清空后列表保持空白态且流程静默；Flutter 若保留扩展空态文案会造成业务语义偏移。
+  - `P10-seq3` 逐项检查清单（实施前）：
+    - 入口：日志弹层顶栏是否保留一级“清除”动作。
+    - 状态：点击后是否立即清空日志并刷新列表。
+    - 异常：是否保持静默流程，不弹确认与成功提示。
+    - 文案：动作文案是否收敛为 legacy 同义“清除”。
+    - 排版：顶栏布局与列表承载是否保持 `Cupertino` 结构，不引入跨序号扩展入口。
+    - 交互触发：弹层关闭路径是否不依赖新增按钮流程，保持轻量退出。
+  - `P10-seq3` 逐项对照清单（实施后）：
+    - 入口：已同义（顶栏保留一级“清除”动作，点击直接触发清空）。
+    - 状态：已同义（执行 `service.clear` 后日志列表即时清空刷新）。
+    - 异常：已同义（无确认弹窗、无成功提示，保持静默完成）。
+    - 文案：已同义（动作文案由“清空”收敛为“清除”）。
+    - 排版：已同义（保留弹层顶栏 + 列表结构，移除“暂无日志/未知日志”扩展文案）。
+    - 交互触发：已同义（去除额外关闭图标并允许点击弹层外区域关闭，不新增中间流程）。
+    - 验证：命令 `dart format lib/features/settings/views/app_log_dialog.dart`；手工路径（待回归）`设置 -> 关于与诊断 -> 异常日志 -> 清除`（校验顶栏仅保留“清除”动作，点击后无确认弹窗无成功提示且日志列表立即清空）；手工路径（待回归）`日志弹层 -> 点击遮罩区域`（校验弹层可直接关闭）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `app_log/menu_clear` 单项语义，不提前并入 `about/menu_scoring`（`seq2`）与 `change_cover/menu_start_stop`（`seq184`）后续动作。
+  - 下一项：按优先级继续推进 `P10-seq184`（`change_cover.xml / @+id/menu_start_stop / 停止`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq1`（`about.xml / @+id/menu_share_it / 分享`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq1`：对照 legado `about.xml`、`AboutActivity.onCompatOptionsItemSelected(menu_share_it)` 与 `Context.share(text,title)`，在 `设置 -> 关于与诊断` 链路补齐 legacy 同义“顶栏分享”动作。Flutter 侧在 `AboutSettingsView` 顶栏新增一级分享图标，点击后直接触发系统分享，分享文本固定为应用发布链接，分享主题取应用名；异常分支保持静默吞掉，不追加成功或失败提示。
+  - `P10-seq1` 差异点清单（实施前）：
+    - legado `about.xml` 将 `menu_share_it` 定义为顶栏一级动作（`showAsAction=always`）；Flutter `AboutSettingsView` 此前缺少同层级分享入口，触发路径不一致。
+    - legado `AboutActivity.menu_share_it` 触发 `share(app_share_description, app_name)`；Flutter 侧此前没有应用级分享文案与主题映射。
+    - legado `Context.share(text,title)` 在异常时静默吞掉；Flutter 若直接复用占位弹窗会引入额外提示，行为偏离。
+  - `P10-seq1` 逐项检查清单（实施前）：
+    - 入口：关于页顶栏是否存在一级“分享”动作，位置与层级是否同义。
+    - 状态：点击后是否直接拉起系统分享面板，不增加中间确认流程。
+    - 异常：分享触发异常时是否保持静默，无额外提示。
+    - 文案：分享文本是否承载应用下载链接，主题是否为应用名。
+    - 排版：是否维持 `AppCupertinoPageScaffold` 顶栏结构，不改动现有列表布局。
+    - 交互触发：是否仅收敛 `menu_share_it` 单项，不提前并入 `menu_scoring(seq2)`。
+  - `P10-seq1` 逐项对照清单（实施后）：
+    - 入口：已同义（`AboutSettingsView` 顶栏补齐一级分享图标动作）。
+    - 状态：已同义（点击后直接 `SharePlus.instance.share` 拉起系统分享）。
+    - 异常：已同义（分享异常静默吞掉，不追加提示）。
+    - 文案：已同义（分享文本为应用发布链接，主题使用应用名）。
+    - 排版：已同义（仅补顶栏 `trailing` 动作，列表排版与热区不变）。
+    - 交互触发：已同义（仅实现 `menu_share_it`，`menu_scoring(seq2)` 保持后续序号独立推进）。
+    - 验证：命令 `dart format lib/features/settings/views/about_settings_view.dart`；手工路径（待回归）`设置 -> 关于与诊断 -> 右上角分享`（校验可直接拉起系统分享，分享主题为应用名且文本含发布链接；模拟分享异常时保持静默）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `about/menu_share_it` 顶栏入口与触发语义，不改动 `menu_scoring`（`seq2`）与 `app_log/menu_clear`（`seq3`）后续动作。
+  - 下一项：按优先级继续推进 `P10-seq3`（`app_log.xml / @+id/menu_clear / 清除`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P9-seq386`（`theme_list.xml / @+id/menu_import / 剪贴板导入`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P9-seq386`：对照 legado `theme_list.xml`、`ThemeListDialog.onMenuItemClick(menu_import)`、`Context.getClipText()` 与 `ThemeConfig.addConfig`，在 `设置 -> 主题 -> 主题列表` 链路补齐 legacy 同义“剪贴板导入”动作。Flutter 侧新增 `ThemeConfigListView` 顶栏动作“剪贴板导入”，点击后读取剪贴板文本并按单对象 `Config` 解析；解析成功按 `themeName` 同名覆盖写入并刷新列表，解析失败提示固定口径“格式不对,添加失败”，剪贴板无内容保持静默返回。
+  - `P9-seq386` 差异点清单（实施前）：
+    - legado `theme_list.xml` 顶栏仅定义 `menu_import`（文案“剪贴板导入”）；Flutter 设置链路此前缺少“主题列表”承载与对应顶栏动作，入口不可达。
+    - legado `ThemeListDialog.menu_import` 固定读取剪贴板首条文本并调用 `ThemeConfig.addConfig(json)`；成功仅刷新列表，失败提示“格式不对,添加失败”，剪贴板为空时静默返回。
+    - legado `ThemeConfig.addConfig` 仅接受单对象 `Config` JSON，且按颜色字段合法性校验并按 `themeName` 同名覆盖；Flutter 侧此前缺少等价存储结构与覆盖写入边界。
+  - `P9-seq386` 逐项检查清单（实施前）：
+    - 入口：设置页主题分组是否补齐“主题列表”并可进入承载页。
+    - 状态：主题列表页顶栏是否存在“剪贴板导入”且点击后触发导入链路。
+    - 异常：剪贴板为空是否静默返回；非法 JSON 或字段不合法是否提示固定口径。
+    - 文案：动作文案与失败提示文案是否与 legacy 同义。
+    - 排版：承载是否维持 `Cupertino` 顶栏 + 列表结构，不引入跨序号扩展入口。
+    - 交互触发：导入成功是否仅刷新列表并按 `themeName` 覆盖，不插入额外流程。
+  - `P9-seq386` 逐项对照清单（实施后）：
+    - 入口：已同义（设置页主题分组补齐“主题列表”，可直达主题列表承载）。
+    - 状态：已同义（主题列表页顶栏新增“剪贴板导入”单项动作并可触发导入）。
+    - 异常：已同义（剪贴板为空静默返回；解析失败提示“格式不对,添加失败”）。
+    - 文案：已同义（菜单动作文案收敛为“剪贴板导入”；失败提示口径对齐）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold + CupertinoListSection`，不新增跨序号菜单扩展）。
+    - 交互触发：已同义（成功仅写入并刷新列表；按 `themeName` 同名覆盖，不追加成功提示）。
+    - 验证：命令 `dart format lib/features/settings/models/theme_config_entry.dart lib/features/settings/services/theme_config_service.dart lib/features/settings/views/theme_config_list_view.dart lib/features/settings/views/settings_view.dart`；手工路径（待回归）`设置 -> 主题 -> 主题列表 -> 剪贴板导入`（校验空剪贴板静默、非法 JSON 提示“格式不对,添加失败”、合法 Config JSON 导入后同名覆盖并刷新列表）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `theme_list/menu_import` 单项语义与承载入口，不提前并入 `theme_config/menu_theme_mode`（`seq385`）后续能力。
+  - 下一项：按优先级继续推进 `P10-seq1`（`about.xml / @+id/menu_share_it / 分享`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq234`（`explore_item.xml / @+id/menu_refresh / 刷新`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq234`：对照 legado `explore_item.xml`、`ExploreAdapter.showMenu(menu_refresh)` 与 `clearExploreKindsCache`，在 `发现 -> 长按书源条目 -> 刷新` 链路收敛“刷新”动作语义。Flutter 侧 `DiscoveryView` 保持“点击后仅清理发现缓存，展开态即时重拉入口，流程静默无成功提示”不变，仅将菜单文案从“刷新发现缓存”收敛为 legacy 同义“刷新”，避免动作语义外溢。
+  - `P10-seq234` 差异点清单（实施前）：
+    - legado `explore_item.xml` 的 `menu_refresh` 文案为 `@string/refresh`（刷新）；Flutter `DiscoveryView._showSourceActions` 此前文案为“刷新发现缓存”，存在用户可见语义漂移。
+    - legado `ExploreAdapter.showMenu(menu_refresh)` 点击后仅执行 `source.clearExploreKindsCache()` 并 `notifyItemChanged(position)`，不弹成功提示；Flutter 侧虽已采用“清缓存 + 展开态重载 + 静默完成”链路，但需保持该边界不被文案扩展带偏。
+    - tracker 缺少 `seq234/seq235` 映射行，若仅改代码不补台账会导致本序号验收证据断层。
+  - `P10-seq234` 逐项检查清单（实施前）：
+    - 入口：发现页长按菜单是否保留“刷新”同层级入口与原触发位置。
+    - 状态：点击后是否仅清理当前书源发现缓存，展开态立即重载，收起态下次展开再重载。
+    - 异常：缓存清理失败是否保持静默返回且不破坏后续展开加载。
+    - 文案：菜单文案是否与 legacy 同义为“刷新”。
+    - 排版：动作承载是否继续使用 `CupertinoActionSheet`，不改动其他动作顺序。
+    - 交互触发：点击后是否不插入中间弹层与成功提示。
+  - `P10-seq234` 逐项对照清单（实施后）：
+    - 入口：已同义（发现页长按菜单保留“刷新”入口，层级与触发位置不变）。
+    - 状态：已同义（点击后执行 `clearExploreKindsCache` 并移除本地缓存；展开态立即 `forceRefresh` 重载，收起态下次展开重载）。
+    - 异常：已同义（刷新流程保持静默，不新增成功提示与扩展弹窗）。
+    - 文案：已同义（菜单文案收敛为“刷新”）。
+    - 排版：已同义（继续使用 `CupertinoActionSheet` 承载，未改动其余动作热区与顺序）。
+    - 交互触发：已同义（点击后仅执行缓存清理与条目刷新，不插入额外流程）。
+    - 验证：命令 `dart format lib/features/discovery/views/discovery_view.dart`；手工路径（待回归）`发现 -> 长按任一书源 -> 刷新`（校验文案为“刷新”，展开态立即重载发现入口且无成功提示）；手工路径（待回归）`发现 -> 长按任一收起书源 -> 刷新 -> 展开`（校验重新展开按新缓存状态拉取入口）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `explore_item/menu_refresh` 文案与单项证据，不改动 `menu_del` 后续动作。
+  - 下一项：按优先级继续推进 `P9-seq386`（`theme_list.xml / @+id/menu_import / 剪贴板导入`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - analyze 收敛修复：针对最近一次全量静态检查的 3 项问题完成最小改动闭环：`about_settings_view.dart` 补齐 `SelectableText` 显式导入（消除 `undefined_method`）、`bookshelf_view.dart` 移除恒为假的空判断（消除 `unnecessary_null_comparison`）、`rss_source_repository.dart` 给单行 `if` 补齐花括号（消除 `curly_braces_in_flow_control_structures`）。
+  - 原因：`flutter analyze` 报告上述 `error/warning/info`，阻塞静态检查收敛。
+  - 验证：`dart analyze lib/features/settings/views/about_settings_view.dart lib/features/bookshelf/views/bookshelf_view.dart lib/core/database/repositories/rss_source_repository.dart`（`No issues found!`）。
+  - 兼容影响：无旧书源兼容性破坏；仅静态检查层修复，不改变书源解析、阅读状态流转与导出行为。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq233`（`explore_item.xml / @+id/menu_search / 搜索`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq233`：对照 legado `explore_item.xml`、`ExploreAdapter.showMenu(menu_search)`、`ExploreFragment.searchBook` 与 `SearchScope`，在 `发现 -> 长按书源条目 -> 搜索` 链路收敛“搜索”动作语义。Flutter 侧 `DiscoveryView` 将搜索触发从 `SearchView.scoped(sourceUrls)` 收敛为“先按当前长按条目快照写入 `SearchScope(name::url)`，再直达搜索页”，确保与 legacy 的入口侧显式 scope 传递同义。
+  - `P10-seq233` 差异点清单（实施前）：
+    - legado `ExploreAdapter.showMenu(menu_search)` 固定调用 `callBack.searchBook(source)`，随后 `ExploreFragment.searchBook` 直接 `startActivity<SearchActivity>` 并写入 `searchScope=SearchScope(bookSource).toString()`；scope 来源是当前菜单条目快照，不依赖再次查库。
+    - Flutter `DiscoveryView._searchInSource` 此前走 `SearchView.scoped(sourceUrls:[url])`，scope 写入发生在搜索页 `initState` 内，且依赖 `sourceUrl` 回查与异步设置落盘；当书源在菜单打开后被删除或写入未及时生效时，存在继承旧 scope 的状态漂移风险。
+    - 当前序号范围仅 `menu_search`，不得提前并入 `menu_refresh/menu_del`（`seq234/235`）后续动作。
+  - `P10-seq233` 逐项检查清单（实施前）：
+    - 入口：发现页长按菜单是否保留“搜索”同层级入口与原触发路径。
+    - 状态：点击后是否由入口侧显式写入当前书源 scope，再进入搜索承载页。
+    - 异常：书源在菜单期间被删除时是否保持搜索页可达并稳定回退范围。
+    - 文案：菜单文案是否保持“搜索”，无扩展文案漂移。
+    - 排版：长按菜单是否继续采用 `CupertinoActionSheet` 承载，不改动其余动作层级。
+    - 交互触发：点击后是否直接进入搜索页，不插入额外中间弹层。
+  - `P10-seq233` 逐项对照清单（实施后）：
+    - 入口：已同义（发现页长按菜单保留“搜索”入口，层级与触发位置不变）。
+    - 状态：已同义（点击后先以当前条目快照写入 `SearchScope.fromSource(source)`，随后直达 `SearchView`）。
+    - 异常：已同义（源被删除场景仍可进入搜索页，范围解析回退到全部书源且无崩溃）。
+    - 文案：已同义（动作文案保持“搜索”，未新增扩展提示）。
+    - 排版：已同义（长按动作承载继续使用 `CupertinoActionSheet`，仅收敛 `menu_search` 单项语义）。
+    - 交互触发：已同义（点击“搜索”后直接进入搜索承载页，等价 legacy `menu_search -> SearchActivity(searchScope=SearchScope(bookSource))`）。
+    - 验证：命令 `dart format lib/features/discovery/views/discovery_view.dart`；手工路径（待回归）`发现 -> 长按任一书源 -> 搜索`（校验进入搜索页后范围显示为当前书源）；手工路径（待回归）`长按菜单打开后在其它入口删除该书源再点击搜索`（校验搜索页范围回退到全部书源且流程稳定）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `explore_item/menu_search` scope 触发语义，不改动刷新/删除后续动作。
+  - 下一项：按优先级继续推进 `P10-seq234`（`explore_item.xml / @+id/menu_refresh / 刷新`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq232`（`explore_item.xml / @+id/menu_login / 登录`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq232`：对照 legado `explore_item.xml`、`ExploreAdapter.showMenu(menu_login)` 与 `SourceLoginActivity`，在 `发现 -> 长按书源条目 -> 登录` 链路收敛“登录”动作语义。Flutter 侧 `DiscoveryView` 保持菜单显隐规则“`loginUrl` 非空才展示”不变，仅收敛点击动作为“先按 `sourceUrl` 回查当前书源，再进入统一登录承载”；登录分流判定改为与 legacy 同义的 `loginUi` 原始非空/空值双分支（非空走表单登录，空值走网页登录）。
+  - `P10-seq232` 差异点清单（实施前）：
+    - legado `ExploreAdapter.showMenu` 点击 `menu_login` 固定以 `type=bookSource` + `key=bookSourceUrl` 触发 `SourceLoginActivity`，实际登录源由目标页按 key 回查；Flutter `DiscoveryView` 此前直接使用长按时的 `BookSource` 快照，缺少回查边界。
+    - legado `SourceLoginActivity.initView` 以 `source.loginUi.isNullOrEmpty()` 判定分流；Flutter 侧此前使用 `SourceLoginUiHelper.hasLoginUi`（需 JSON 可解析）判定，和 legacy “原始字符串非空即表单登录”存在偏差。
+    - 当前序号范围仅 `menu_login`，不得提前并入 `menu_search/menu_refresh/menu_del`（`seq233/234/235`）后续动作。
+  - `P10-seq232` 逐项检查清单（实施前）：
+    - 入口：发现页长按菜单是否保留“登录”同层级入口，显隐是否仅受 `loginUrl` 非空控制。
+    - 状态：点击登录后是否先按 `sourceUrl` 回查当前书源，再按 `loginUi` 原始非空/空值分流。
+    - 异常：目标书源不存在时是否提示“未找到书源”并安全返回。
+    - 文案：菜单文案是否保持“登录”，无扩展文案漂移。
+    - 排版：长按菜单是否继续采用 `CupertinoActionSheet` 承载，不改动其余动作层级。
+    - 交互触发：点击后是否直接进入登录承载，不插入额外中间流程。
+  - `P10-seq232` 逐项对照清单（实施后）：
+    - 入口：已同义（发现页长按菜单保留“登录”入口，显隐继续按 `loginUrl` 非空控制）。
+    - 状态：已同义（点击后先按 `sourceUrl` 回查当前书源；`loginUi` 原始非空进入表单登录，空值进入网页登录）。
+    - 异常：已同义（源缺失时提示“未找到书源”并静默返回，不触发后续跳转）。
+    - 文案：已同义（动作文案保持“登录”，无额外扩展文案）。
+    - 排版：已同义（长按动作承载继续使用 `CupertinoActionSheet`，仅收敛 `menu_login` 单项语义）。
+    - 交互触发：已同义（点击“登录”后直达统一登录承载链路，等价 legado `menu_login -> SourceLoginActivity(type=bookSource,key=bookSourceUrl)`）。
+    - 验证：命令 `dart format lib/features/discovery/views/discovery_view.dart`；手工路径（待回归）`发现 -> 长按任一含 loginUrl 的书源 -> 登录`（校验 `loginUi` 非空走表单登录、空值走网页登录）；手工路径（待回归）`长按菜单打开后在其它入口删除该书源再点击登录`（校验提示“未找到书源”并安全返回）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `explore_item/menu_login` 触发边界与分流判定，不改动搜索/刷新/删除后续动作。
+  - 下一项：按优先级继续推进 `P10-seq233`（`explore_item.xml / @+id/menu_search / 搜索`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P10-seq4`（`app_update.xml / @+id/menu_download / 下载`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P10-seq4`：对照 legado `app_update.xml`、`UpdateDialog.onMenuItemClick(menu_download)`、`AboutFragment.checkUpdate` 与 `Download.start`，在 `设置 -> 关于与诊断 -> 检查更新` 链路收敛“更新弹层顶部下载动作”语义。Flutter 侧 `AboutSettingsView` 将检查更新成功弹层从普通 `CupertinoAlertDialog` 收敛为 `CupertinoPopupSurface` 更新承载（顶部版本标题 + 正文滚动区 + 右上角“下载”动作）；点击“下载”仅在 `downloadUrl/fileName` 有效时触发外部下载拉起并反馈“开始下载”，失败分支统一记录 `ExceptionLogService(node=app_update.menu_download)`，保持链路可观测。
+  - `P10-seq4` 差异点清单（实施前）：
+    - legado `app_update.xml` 仅定义一级动作 `menu_download(showAsAction=always)`，`UpdateDialog` 顶栏始终展示下载入口；Flutter 侧此前使用 `CupertinoAlertDialog` 双按钮承载，下载动作位于底部按钮区而非顶部动作位。
+    - legado `UpdateDialog.onMenuItemClick(menu_download)` 仅在 `url + name` 同时可用时触发 `Download.start(...)` 并提示 `download_start`；Flutter 侧此前未校验 `fileName`，且失败链路缺少节点级可观测输出。
+    - legado `updateBody` 为空时走“没有数据 + dismiss”边界；Flutter 侧此前以 `name/publishedAt` 拼接内容兜底，未显式保留“无正文时不进入更新弹层”语义。
+  - `P10-seq4` 逐项检查清单（实施前）：
+    - 入口：检查更新成功后是否进入带顶部“下载”动作的更新弹层承载。
+    - 状态：`downloadUrl/fileName` 不完整时是否禁止触发下载链路并保持页面状态稳定。
+    - 异常：下载链接无效或外部拉起失败是否可观测（提示 + 异常日志节点）。
+    - 文案：动作文案是否保持 legacy 同义“下载”，成功反馈是否为“开始下载”。
+    - 排版：更新弹层是否保持“标题 + 正文滚动区 + 顶部动作”层级，不回退到底部双按钮结构。
+    - 交互触发：点击“下载”后是否保持当前弹层不被强制关闭，并执行下载触发。
+  - `P10-seq4` 逐项对照清单（实施后）：
+    - 入口：已同义（`AboutSettingsView._showUpdateInfo` 改为 `CupertinoPopupSurface` 更新弹层，顶部保留下载动作）。
+    - 状态：已同义（`_handleDownloadAction` 仅在 `downloadUrl/fileName` 非空时触发下载，空值静默返回）。
+    - 异常：已同义（链接无效、外部拉起失败、触发异常均提示“下载启动失败”，并记录 `ExceptionLogService(node=app_update.menu_download)`；检查更新失败记录 `app_update.check_update`）。
+    - 文案：已同义（顶部动作文案收敛为“下载”，成功触发反馈“开始下载”）。
+    - 排版：已同义（更新弹层结构收敛为“版本标题 + 正文滚动区 + 顶部下载动作”，正文支持滚动与选择）。
+    - 交互触发：已同义（点击“下载”不强制关闭更新弹层，直接触发下载链路）。
+    - 验证：命令 `dart format lib/features/settings/views/about_settings_view.dart`；手工路径（待回归）`设置 -> 关于与诊断 -> 检查更新 -> 更新弹层 -> 下载`（校验顶部下载动作可触发并提示“开始下载”）；手工路径（待回归）`构造无效下载地址后再次点击下载`（校验提示“下载启动失败”且异常日志出现 `app_update.menu_download`）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `app_update/menu_download` 单项语义，不提前并入 `P10-seq232(menu_login)` 后续动作。
+  - 下一项：按优先级继续推进 `P10-seq232`（`explore_item.xml / @+id/menu_login / 登录`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq346`（`rss_source_sel.xml / @+id/menu_check_selected_interval / 选中所选区间`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq346`：对照 legado `rss_source_sel.xml`、`RssSourceActivity.onMenuItemClick(menu_check_selected_interval)` 与 `RssSourceAdapter.checkSelectedInterval`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“批量操作 -> 选中所选区间”动作语义。Flutter 侧 `RssSourceManageView` 在多选“批量操作”弹层补齐“选中所选区间”（位于“分享选中源”后），点击后仅按当前可见列表中已选项的最小/最大索引补齐连续选区并刷新底栏计数；不写库、不新增确认弹窗与成功提示。
+  - `P7-seq346` 差异点清单（实施前）：
+    - legado `rss_source_sel.xml` 固定定义 `menu_check_selected_interval`，顺序位于 `menu_share_source` 之后；Flutter `RssSourceManageView._showSelectionMoreActions` 此前缺少该入口。
+    - legado `RssSourceActivity.onMenuItemClick(menu_check_selected_interval)` 固定调用 `adapter.checkSelectedInterval()`，属于纯选中态扩展；Flutter 侧此前无等价触发链路。
+    - legado `RssSourceAdapter.checkSelectedInterval` 仅基于当前列表已选项最小/最大索引进行区间补选并回刷计数，不触发写库与提示；Flutter 侧此前未实现同义区间补选动作。
+  - `P7-seq346` 逐项检查清单（实施前）：
+    - 入口：多选“批量操作”弹层是否补齐“选中所选区间”并保持位于“分享选中源”后。
+    - 状态：点击后是否仅对当前可见列表执行区间补选并即时刷新底栏计数。
+    - 异常：无选中项/无可见项场景是否静默返回且不引入错误提示。
+    - 文案：动作文案是否与 legacy 同义为“选中所选区间”。
+    - 排版：弹层承载是否继续使用 `CupertinoActionSheet` 且动作顺序不跨序号漂移。
+    - 交互触发：点击动作是否先关闭弹层，再执行区间补选。
+  - `P7-seq346` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView._showSelectionMoreActions` 在“分享选中源”后补齐“选中所选区间”）。
+    - 状态：已同义（`_checkSelectedInterval` 仅按当前可见列表中已选项最小/最大索引补齐连续选区并刷新计数）。
+    - 异常：已同义（无选中项、无可见项、可见项中未命中选中 URL 时均静默返回，不追加提示）。
+    - 文案：已同义（动作文案收敛为“选中所选区间”）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 同层承载，仅收敛 `menu_check_selected_interval` 单项入口并保持 legacy 顺序）。
+    - 交互触发：已同义（点击后先 `Navigator.pop` 关闭弹层，再执行区间补选）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 勾选多条非连续订阅源 -> 底部更多 -> 选中所选区间`（校验当前可见列表最小/最大已选索引之间条目全部补选，底栏计数即时更新且无额外提示）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source_sel/menu_check_selected_interval` 单项语义，不提前并入 `P10-seq4(menu_download)` 后续动作。
+  - 下一项：按优先级继续推进 `P10-seq4`（`app_update.xml / @+id/menu_download / 下载`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq345`（`rss_source_sel.xml / @+id/menu_share_source / 分享选中源`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq345`：对照 legado `rss_source_sel.xml`、`RssSourceActivity.onMenuItemClick(menu_share_source)` 与 `RssSourceViewModel.saveToFile`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“批量操作 -> 分享选中源”动作语义。Flutter 侧 `RssSourceManageView` 在多选“批量操作”弹层补齐“分享选中源”（位于“导出所选”后），点击后仅取当前可见选中集合生成临时 JSON 并直接拉起系统分享；不新增确认弹窗、成功提示、失败复制兜底等扩展分支。
+  - `P7-seq345` 差异点清单（实施前）：
+    - legado `rss_source_sel.xml` 固定定义 `menu_share_source` 且顺序位于 `menu_export_selection` 之后、`menu_check_selected_interval` 之前；Flutter `RssSourceManageView._showSelectionMoreActions` 此前缺少“分享选中源”入口。
+    - legado `RssSourceActivity.onMenuItemClick(menu_share_source)` 固定调用 `viewModel.saveToFile(adapter.selection) { share(it) }`，分享集合与“导出所选”同源，随后直接系统分享；Flutter 侧此前无等价多选分享触发链路。
+    - legado `RssSourceViewModel.saveToFile` 失败仅走可观测错误提示，不追加复制兜底；Flutter 侧需避免新增“分享成功/失败回退复制”扩展状态流。
+  - `P7-seq345` 逐项检查清单（实施前）：
+    - 入口：多选“批量操作”弹层是否补齐“分享选中源”并保持位于“导出所选”后。
+    - 状态：点击后是否仅取当前可见选中集合生成分享文件并直接拉起系统分享。
+    - 异常：分享文件生成失败或系统分享异常是否静默返回且不追加兜底提示。
+    - 文案：动作文案是否与 legacy 同义为“分享选中源”。
+    - 排版：弹层承载是否继续使用 `CupertinoActionSheet` 且动作顺序不跨序号漂移。
+    - 交互触发：点击“分享选中源”后是否先关闭弹层，再执行分享链路。
+  - `P7-seq345` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView._showSelectionMoreActions` 在“导出所选”后补齐“分享选中源”）。
+    - 状态：已同义（`_shareSelection` 仅取当前可见选中集合，调用 `exportToShareFile` 生成临时 JSON 后直接系统分享）。
+    - 异常：已同义（分享文件生成失败或分享抛错均静默返回，不追加成功提示与复制兜底）。
+    - 文案：已同义（动作文案收敛为“分享选中源”）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 同层承载，仅收敛 `menu_share_source` 单项入口并保持 legacy 顺序）。
+    - 交互触发：已同义（点击后先 `Navigator.pop` 关闭弹层，再执行系统分享）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 勾选至少一条订阅源 -> 底部更多 -> 分享选中源`（校验可直接拉起系统分享面板且无额外提示）；手工路径（待回归）`关闭系统分享面板后返回管理页`（校验页面停留当前列表且无额外弹窗）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source_sel/menu_share_source` 单项语义，不提前并入 `menu_check_selected_interval`（`seq346`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq346`（`rss_source_sel.xml / @+id/menu_check_selected_interval / 选中所选区间`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq343`（`rss_source_sel.xml / @+id/menu_bottom_sel / 置底所选`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq343`：对照 legado `rss_source_sel.xml`、`RssSourceActivity.onMenuItemClick(menu_bottom_sel)` 与 `RssSourceViewModel.bottomSource`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“批量操作 -> 置底所选”动作语义。Flutter 侧 `RssSourceManageView` 在多选“批量操作”弹层补齐“置底所选”（位于“置顶所选”后、“导出所选”前），点击后仅对当前可见选中集合按 `sourceUrl` 回查库内当前源并按 `customOrder` 升序后批量写入 `customOrder=maxOrder+1+index`；源不存在时静默跳过，不新增确认弹窗与成功提示；失败分支统一记录 `ExceptionLogService(node=rss_source_sel.menu_bottom_sel)`。
+  - `P7-seq343` 差异点清单（实施前）：
+    - legado `rss_source_sel.xml` 固定定义 `menu_bottom_sel` 且顺序位于 `menu_top_sel` 之后、`menu_export_selection` 之前；Flutter `RssSourceManageView._showSelectionMoreActions` 此前缺少“置底所选”入口。
+    - legado `RssSourceActivity.onMenuItemClick(menu_bottom_sel)` 固定调用 `viewModel.bottomSource(*adapter.selection.toTypedArray())`，无确认弹窗与成功提示；Flutter 侧此前无等价多选触发链路。
+    - legado `RssSourceViewModel.bottomSource` 固定按 `customOrder` 升序排序后批量写入 `customOrder=maxOrder+1+index`；Flutter 侧此前仅有条目级置底，缺少多选批量置底与同序计算规则。
+    - Flutter `RssSourceRepository.updateSources` 为 upsert 语义，若直接写入过期选中快照，在并发删除场景存在“已删除源被回插”风险；需先按 `sourceUrl` 回查当前源再批量写库以贴齐 legacy `dao.update` 的“命中才更新”边界。
+    - Flutter 侧此前缺少 `rss_source_sel.menu_bottom_sel` 节点级异常可观测输出，不利于迁移阶段单项回归定位。
+  - `P7-seq343` 逐项检查清单（实施前）：
+    - 入口：多选“批量操作”弹层是否补齐“置底所选”并保持位于“置顶所选”后。
+    - 状态：点击后是否仅对当前可见选中源执行批量置底并即时回显顺序变化。
+    - 异常：并发删除后命中的空源是否静默跳过且不重建源记录。
+    - 文案：动作文案是否与 legacy 同义为“置底所选”且不新增成功提示。
+    - 排版：弹层承载是否继续使用 `CupertinoActionSheet` 且保持动作顺序不跨序号漂移。
+    - 交互触发：点击“置底所选”后是否先关闭弹层，再执行批量置底链路。
+  - `P7-seq343` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView._showSelectionMoreActions` 在“置顶所选”后补齐“置底所选”，并保留“导出所选”后项）。
+    - 状态：已同义（`_moveSelectionToBottom` 仅针对当前可见选中集合执行批量置底，按 `customOrder` 升序后批量写 `customOrder=maxOrder+1+index`）。
+    - 异常：已同义（按 `sourceUrl` 回查库内当前源，未命中静默跳过；批量写库失败仅记录 `ExceptionLogService(node=rss_source_sel.menu_bottom_sel)`）。
+    - 文案：已同义（动作文案“置底所选”，执行链路无确认弹窗与成功提示）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 同层承载，仅收敛 `menu_bottom_sel` 单项入口并保持 legacy 顺序）。
+    - 交互触发：已同义（点击后先 `Navigator.pop` 关闭弹层，再执行批量置底）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 勾选至少两条订阅源 -> 底部更多 -> 置底所选`（校验所选源按选中集合旧顺序整体下移且无成功提示）；手工路径（待回归）`在其它入口删除其中一条选中源后返回管理页继续触发置底所选`（校验已删除源静默跳过且不被回插）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source_sel/menu_bottom_sel` 单项语义，不提前并入 `menu_share_source`（`seq345`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq345`（`rss_source_sel.xml / @+id/menu_share_source / 分享选中源`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq342`（`rss_source_sel.xml / @+id/menu_top_sel / 置顶所选`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq342`：对照 legado `rss_source_sel.xml`、`RssSourceActivity.onMenuItemClick(menu_top_sel)` 与 `RssSourceViewModel.topSource`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“批量操作 -> 置顶所选”动作语义。Flutter 侧 `RssSourceManageView` 在多选“批量操作”弹层补齐“置顶所选”（位于“移除分组”后、“导出所选”前），点击后仅对当前可见选中集合按 `sourceUrl` 回查库内当前源并按 `customOrder` 升序后批量写入 `customOrder=minOrder-1-index`；源不存在时静默跳过，不新增确认弹窗与成功提示；失败分支统一记录 `ExceptionLogService(node=rss_source_sel.menu_top_sel)`。
+  - `P7-seq342` 差异点清单（实施前）：
+    - legado `rss_source_sel.xml` 固定定义 `menu_top_sel` 且顺序位于 `menu_remove_group` 之后、`menu_bottom_sel/menu_export_selection` 之前；Flutter `RssSourceManageView._showSelectionMoreActions` 此前缺少“置顶所选”入口。
+    - legado `RssSourceActivity.onMenuItemClick(menu_top_sel)` 固定调用 `viewModel.topSource(*adapter.selection.toTypedArray())`，无确认弹窗与成功提示；Flutter 侧此前无等价多选触发链路。
+    - legado `RssSourceViewModel.topSource` 固定按 `customOrder` 升序排序后批量写入 `customOrder=minOrder-1-index`；Flutter 侧此前仅有条目级置顶，缺少多选批量置顶与同序计算规则。
+    - Flutter `RssSourceRepository.updateSources` 为 upsert 语义，若直接写入过期选中快照，在并发删除场景存在“已删除源被回插”风险；需先按 `sourceUrl` 回查当前源再批量写库以贴齐 legacy `dao.update` 的“命中才更新”边界。
+  - `P7-seq342` 逐项检查清单（实施前）：
+    - 入口：多选“批量操作”弹层是否补齐“置顶所选”并保持位于“移除分组”后。
+    - 状态：点击后是否仅对当前可见选中源执行批量置顶并即时回显顺序变化。
+    - 异常：并发删除后命中的空源是否静默跳过且不重建源记录。
+    - 文案：动作文案是否与 legacy 同义为“置顶所选”且不新增成功提示。
+    - 排版：弹层承载是否继续使用 `CupertinoActionSheet` 且保持动作顺序不跨序号漂移。
+    - 交互触发：点击“置顶所选”后是否先关闭弹层，再执行批量置顶链路。
+  - `P7-seq342` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView._showSelectionMoreActions` 在“移除分组”后补齐“置顶所选”，并保留“导出所选”后项）。
+    - 状态：已同义（`_moveSelectionToTop` 仅针对当前可见选中集合执行批量置顶，按 `customOrder` 升序后批量写 `customOrder=minOrder-1-index`）。
+    - 异常：已同义（按 `sourceUrl` 回查库内当前源，未命中静默跳过；批量写库失败仅记录 `ExceptionLogService(node=rss_source_sel.menu_top_sel)`）。
+    - 文案：已同义（动作文案“置顶所选”，执行链路无确认弹窗与成功提示）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 同层承载，仅收敛 `menu_top_sel` 单项入口并保持 legacy 顺序）。
+    - 交互触发：已同义（点击后先 `Navigator.pop` 关闭弹层，再执行批量置顶）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 勾选至少两条订阅源 -> 底部更多 -> 置顶所选`（校验所选源按选中集合旧顺序整体上移且无成功提示）；手工路径（待回归）`在其它入口删除其中一条选中源后返回管理页继续触发置顶所选`（校验已删除源静默跳过且不被回插）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source_sel/menu_top_sel` 单项语义，不提前并入 `menu_bottom_sel`（`seq343`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq343`（`rss_source_sel.xml / @+id/menu_bottom_sel / 置底所选`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq341`（`rss_source_sel.xml / @+id/menu_remove_group / 移除分组`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq341`：对照 legado `rss_source_sel.xml`、`RssSourceActivity.selectionRemoveFromGroups` 与 `RssSourceViewModel.selectionRemoveFromGroups`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“批量操作 -> 移除分组”动作语义。Flutter 侧 `RssSourceManageView` 在多选“批量操作”弹层补齐“移除分组”（位于“添加分组”后、“导出所选”前），点击后弹出“移除分组”输入框并提供已有分组候选；仅输入非空时，对当前可见选中集合按 `sourceUrl` 回查库内当前源并执行 `removeGroup` 后批量写库；源不存在时静默跳过，不新增确认弹窗与成功提示；失败分支统一记录 `ExceptionLogService(node=rss_source_sel.menu_remove_group)`。
+  - `P7-seq341` 差异点清单（实施前）：
+    - legado `rss_source_sel.xml` 固定定义 `menu_remove_group` 且顺序位于 `menu_add_group` 之后；Flutter `RssSourceManageView._showSelectionMoreActions` 此前仅有“启用所选/禁用所选/添加分组/导出所选”，缺少“移除分组”入口。
+    - legado `RssSourceActivity.selectionRemoveFromGroups` 固定弹出“移除分组”输入框并挂接已有分组候选，确认仅在输入非空时调用 `selectionRemoveFromGroups`，无确认弹窗与成功提示；Flutter 侧此前无等价输入链路。
+    - Flutter `RssSourceRepository.updateSources` 为 upsert 语义，若直接写入过期选中快照，在并发删除场景存在“已删除源被回插”风险；需先按 `sourceUrl` 回查当前源再批量写库以贴齐 legacy `dao.update` 的“命中才更新”边界。
+    - Flutter 侧此前缺少 `rss_source_sel.menu_remove_group` 节点级异常可观测输出，不利于迁移阶段单项回归定位。
+  - `P7-seq341` 逐项检查清单（实施前）：
+    - 入口：多选“批量操作”弹层是否补齐“移除分组”并保持位于“添加分组”后。
+    - 状态：点击后是否先弹输入框，仅在输入非空时对当前可见选中源批量移除分组。
+    - 异常：并发删除后命中的空源是否静默跳过且不重建源记录。
+    - 文案：动作与弹窗标题是否保持 legacy 同义“移除分组”，且不新增成功提示。
+    - 排版：输入框与候选分组热区是否保持同层承载，不新增跨序号入口。
+    - 交互触发：点击“移除分组”后是否先关闭批量弹层，再进入输入并提交链路。
+  - `P7-seq341` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView._showSelectionMoreActions` 在“添加分组”后补齐“移除分组”，并保留“导出所选”后项）。
+    - 状态：已同义（`_removeGroupFromSelection` 先弹“移除分组”输入框，输入为空静默返回；输入非空时仅针对当前可见选中集合批量移除分组）。
+    - 异常：已同义（按 `sourceUrl` 回查库内当前源，未命中静默跳过；批量写库失败仅记录 `ExceptionLogService(node=rss_source_sel.menu_remove_group)`）。
+    - 文案：已同义（动作与弹窗标题均为“移除分组”，输入框占位为“分组名称”，执行链路无确认弹窗与成功提示）。
+    - 排版：已同义（沿用 `CupertinoActionSheet + CupertinoAlertDialog` 同层承载，输入弹窗补齐已有分组候选快捷选择）。
+    - 交互触发：已同义（点击后先 `Navigator.pop` 关闭批量弹层，再进入输入确认链路）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 勾选至少一条含分组订阅源 -> 底部更多 -> 移除分组 -> 输入分组名称 -> 确定`（校验仅所选源移除对应分组且无成功提示）；手工路径（待回归）`同入口在输入框输入关键字并点击候选分组后确定`（校验候选来自现有分组且可回填）；手工路径（待回归）`在其它入口删除其中一条选中源后返回管理页继续触发移除分组`（校验已删除源静默跳过且不被回插）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source_sel/menu_remove_group` 单项语义，不提前并入 `menu_top_sel`（`seq342`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq342`（`rss_source_sel.xml / @+id/menu_top_sel / 置顶所选`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq340`（`rss_source_sel.xml / @+id/menu_add_group / 添加分组`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq340`：对照 legado `rss_source_sel.xml`、`RssSourceActivity.selectionAddToGroups` 与 `RssSourceViewModel.selectionAddToGroups`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“批量操作 -> 添加分组”动作语义。Flutter 侧 `RssSourceManageView` 在多选“批量操作”弹层补齐“添加分组”（位于“禁用所选”后、“导出所选”前），点击后弹出“添加分组”输入框并提供已有分组候选；仅输入非空时，对当前可见选中集合按 `sourceUrl` 回查库内当前源并执行 `addGroup` 后批量写库；源不存在时静默跳过，不新增确认弹窗与成功提示；失败分支统一记录 `ExceptionLogService(node=rss_source_sel.menu_add_group)`。
+  - `P7-seq340` 差异点清单（实施前）：
+    - legado `rss_source_sel.xml` 固定定义 `menu_add_group` 且顺序位于 `menu_disable_selection` 之后；Flutter `RssSourceManageView._showSelectionMoreActions` 此前仅有“启用所选/禁用所选/导出所选”，缺少“添加分组”入口。
+    - legado `RssSourceActivity.selectionAddToGroups` 固定弹出“添加分组”输入框并挂接已有分组候选，确认仅在输入非空时调用 `selectionAddToGroups`，无确认弹窗与成功提示；Flutter 侧此前无等价输入链路。
+    - Flutter `RssSourceRepository.updateSources` 为 upsert 语义，若直接写入过期选中快照，在并发删除场景存在“已删除源被回插”风险；需先按 `sourceUrl` 回查当前源再批量写库以贴齐 legacy `dao.update` 的“命中才更新”边界。
+    - Flutter 侧此前缺少 `rss_source_sel.menu_add_group` 节点级异常可观测输出，不利于迁移阶段单项回归定位。
+  - `P7-seq340` 逐项检查清单（实施前）：
+    - 入口：多选“批量操作”弹层是否补齐“添加分组”并保持位于“禁用所选”后。
+    - 状态：点击后是否先弹输入框，仅在输入非空时对当前可见选中源批量追加分组。
+    - 异常：并发删除后命中的空源是否静默跳过且不重建源记录。
+    - 文案：动作与弹窗标题是否保持 legacy 同义“添加分组”，且不新增成功提示。
+    - 排版：输入框与候选分组热区是否保持同层承载，不新增跨序号入口。
+    - 交互触发：点击“添加分组”后是否先关闭批量弹层，再进入输入并提交链路。
+  - `P7-seq340` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView._showSelectionMoreActions` 在“禁用所选”后补齐“添加分组”，并保留“导出所选”后项）。
+    - 状态：已同义（`_addGroupToSelection` 先弹“添加分组”输入框，输入为空静默返回；输入非空时仅针对当前可见选中集合批量追加分组）。
+    - 异常：已同义（按 `sourceUrl` 回查库内当前源，未命中静默跳过；批量写库失败仅记录 `ExceptionLogService(node=rss_source_sel.menu_add_group)`）。
+    - 文案：已同义（动作与弹窗标题均为“添加分组”，输入框占位为“分组名称”，执行链路无确认弹窗与成功提示）。
+    - 排版：已同义（沿用 `CupertinoActionSheet + CupertinoAlertDialog` 同层承载，输入弹窗补齐已有分组候选快捷选择）。
+    - 交互触发：已同义（点击后先 `Navigator.pop` 关闭批量弹层，再进入输入确认链路）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 勾选至少一条订阅源 -> 底部更多 -> 添加分组 -> 输入分组名称 -> 确定`（校验仅所选源追加分组且无成功提示）；手工路径（待回归）`同入口在输入框输入关键字并点击候选分组后确定`（校验候选来自现有分组且可回填）；手工路径（待回归）`在其它入口删除其中一条选中源后返回管理页继续触发添加分组`（校验已删除源静默跳过且不被回插）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source_sel/menu_add_group` 单项语义，不提前并入 `menu_remove_group`（`seq341`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq341`（`rss_source_sel.xml / @+id/menu_remove_group / 移除分组`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq339`（`rss_source_sel.xml / @+id/menu_disable_selection / 禁用所选`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq339`：对照 legado `rss_source_sel.xml`、`RssSourceActivity.onMenuItemClick(menu_disable_selection)` 与 `RssSourceViewModel.disableSelection`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“批量操作 -> 禁用所选”动作语义。Flutter 侧 `RssSourceManageView` 在多选“批量操作”弹层补齐“禁用所选”（保持位于“启用所选”之后），点击后仅对当前可见选中集合按 `sourceUrl` 回查库内当前源并批量写入 `enabled=false`；源不存在时静默跳过，不新增确认弹窗与成功提示；失败分支统一记录 `ExceptionLogService(node=rss_source_sel.menu_disable_selection)`。
+  - `P7-seq339` 差异点清单（实施前）：
+    - legado `rss_source_sel.xml` 固定定义 `menu_disable_selection` 且顺序位于 `menu_enable_selection` 之后；Flutter `RssSourceManageView._showSelectionMoreActions` 此前仅有“启用所选/导出所选”，缺少“禁用所选”入口。
+    - legado `RssSourceActivity.onMenuItemClick(menu_disable_selection)` 固定调用 `viewModel.disableSelection(adapter.selection)`，`RssSourceViewModel.disableSelection` 仅批量写 `enabled=false`，无确认弹窗与成功提示；Flutter 侧此前无等价触发链路。
+    - Flutter `RssSourceRepository.updateSources` 为 upsert 语义，若直接写入过期选中快照，在并发删除场景存在“已删除源被回插”风险；需先按 `sourceUrl` 回查当前源再批量写库以贴齐 legacy `dao.update` 的“命中才更新”边界。
+    - Flutter 侧此前缺少 `rss_source_sel.menu_disable_selection` 节点级异常可观测输出，不利于迁移阶段单项回归定位。
+  - `P7-seq339` 逐项检查清单（实施前）：
+    - 入口：多选“批量操作”弹层是否补齐“禁用所选”并保持位于“启用所选”后。
+    - 状态：点击后是否仅将当前可见选中源批量写为 `enabled=false` 并即时回显。
+    - 异常：并发删除后命中的空源是否静默跳过且不重建源记录。
+    - 文案：动作文案是否与 legacy 同义为“禁用所选”且不新增成功提示。
+    - 排版：弹层承载是否继续使用 `CupertinoActionSheet`，不新增跨序号入口。
+    - 交互触发：点击“禁用所选”后是否先关闭弹层，再执行批量禁用链路。
+  - `P7-seq339` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView._showSelectionMoreActions` 在“启用所选”后补齐“禁用所选”，并保留“导出所选”后项）。
+    - 状态：已同义（`_disableSelection` 仅针对当前可见选中集合写入 `enabled=false`，空选中集合静默返回）。
+    - 异常：已同义（按 `sourceUrl` 回查库内当前源，未命中静默跳过；批量写库失败仅记录 `ExceptionLogService(node=rss_source_sel.menu_disable_selection)`）。
+    - 文案：已同义（动作文案“禁用所选”，执行链路无确认弹窗与成功提示）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 同层承载，仅收敛 `menu_disable_selection` 单项入口）。
+    - 交互触发：已同义（点击后先 `Navigator.pop` 关闭弹层，再执行批量禁用）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 勾选至少一条已启用订阅源 -> 底部更多 -> 禁用所选`（校验仅所选源 `enabled=false` 且无成功提示）；手工路径（待回归）`在其它入口删除其中一条选中源后返回管理页继续触发禁用所选`（校验已删除源静默跳过且不被回插）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source_sel/menu_disable_selection` 单项语义，不提前并入 `menu_add_group`（`seq340`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq340`（`rss_source_sel.xml / @+id/menu_add_group / 添加分组`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq338`（`rss_source_sel.xml / @+id/menu_enable_selection / 启用所选`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq338`：对照 legado `rss_source_sel.xml`、`RssSourceActivity.onMenuItemClick(menu_enable_selection)` 与 `RssSourceViewModel.enableSelection`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“批量操作 -> 启用所选”动作语义。Flutter 侧 `RssSourceManageView` 在多选“批量操作”弹层首项补齐“启用所选”，点击后仅对当前可见选中集合按 `sourceUrl` 回查库内当前源并批量写入 `enabled=true`；源不存在时静默跳过，不新增确认弹窗与成功提示；失败分支统一记录 `ExceptionLogService(node=rss_source_sel.menu_enable_selection)`。
+  - `P7-seq338` 差异点清单（实施前）：
+    - legado `rss_source_sel.xml` 固定定义 `menu_enable_selection` 且位于多选菜单首项；Flutter `RssSourceManageView._showSelectionMoreActions` 此前仅保留“导出所选”，缺少“启用所选”入口。
+    - legado `RssSourceActivity.onMenuItemClick(menu_enable_selection)` 固定调用 `viewModel.enableSelection(adapter.selection)`，`RssSourceViewModel.enableSelection` 仅批量写 `enabled=true`，无确认弹窗与成功提示；Flutter 侧此前无等价触发链路。
+    - Flutter `RssSourceRepository.updateSources` 为 upsert 语义，若直接写入过期选中快照，在并发删除场景存在“已删除源被回插”风险；需先按 `sourceUrl` 回查当前源再批量写库以贴齐 legacy `dao.update` 的“命中才更新”边界。
+    - Flutter 侧此前缺少 `rss_source_sel.menu_enable_selection` 节点级异常可观测输出，不利于迁移阶段单项回归定位。
+  - `P7-seq338` 逐项检查清单（实施前）：
+    - 入口：多选“批量操作”弹层是否补齐并保留“启用所选”首项。
+    - 状态：点击后是否仅将当前可见选中源批量写为 `enabled=true` 并即时回显。
+    - 异常：并发删除后命中的空源是否静默跳过且不重建源记录。
+    - 文案：动作文案是否与 legacy 同义为“启用所选”且不新增成功提示。
+    - 排版：弹层承载是否继续使用 `CupertinoActionSheet`，不新增跨序号入口。
+    - 交互触发：点击“启用所选”后是否先关闭弹层，再执行批量启用链路。
+  - `P7-seq338` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView._showSelectionMoreActions` 首项补齐“启用所选”，并保留“导出所选”后项）。
+    - 状态：已同义（`_enableSelection` 仅针对当前可见选中集合写入 `enabled=true`，空选中集合静默返回）。
+    - 异常：已同义（按 `sourceUrl` 回查库内当前源，未命中静默跳过；批量写库失败仅记录 `ExceptionLogService(node=rss_source_sel.menu_enable_selection)`）。
+    - 文案：已同义（动作文案“启用所选”，执行链路无确认弹窗与成功提示）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 同层承载，仅收敛 `menu_enable_selection` 单项入口）。
+    - 交互触发：已同义（点击后先 `Navigator.pop` 关闭弹层，再执行批量启用）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 勾选至少一条已禁用订阅源 -> 底部更多 -> 启用所选`（校验仅所选源 `enabled=true` 且无成功提示）；手工路径（待回归）`在其它入口删除其中一条选中源后返回管理页继续触发启用所选`（校验已删除源静默跳过且不被回插）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source_sel/menu_enable_selection` 单项语义，不提前并入 `menu_disable_selection`（`seq339`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq339`（`rss_source_sel.xml / @+id/menu_disable_selection / 禁用所选`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq337`（`rss_source_item.xml / @+id/menu_del / 删除`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq337`：对照 legado `rss_source_item.xml`、`RssSourceAdapter.showMenu(menu_del)`、`RssSourceActivity.del`、`RssSourceViewModel.del` 与 `SourceHelp.deleteRssSources`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“条目更多 -> 删除”动作语义。Flutter 侧 `RssSourceManageView` 保持条目更多菜单 `置顶/置底/删除` 结构不变，仅将删除触发收敛为“先移除当前条目选中态，再弹 legacy 同义确认文案 `提醒/确定删除\n<sourceName>`，仅确认后按 `sourceUrl` 回查当前源并执行删源 + 清理该源文章缓存 + 删除 `sourceVariable_*`，源不存在时静默返回”；失败分支统一记录 `ExceptionLogService(node=rss_source_item.menu_del)`。
+  - `P7-seq337` 差异点清单（实施前）：
+    - legado `RssSourceActivity.del` 固定弹 legacy 同义确认文案“提醒 / 确定删除\n<sourceName>”，Flutter `RssSourceManageView._deleteSource` 此前使用“删除订阅源 / 确定删除：<sourceName>”，文案与换行语义不一致。
+    - legado `RssSourceViewModel.del -> SourceHelp.deleteRssSources` 会级联清理 `rssSource + rssArticle(origin) + sourceVariable_*`；Flutter 侧此前仅调用 `deleteSource` 删除源记录，存在文章缓存与源变量残留。
+    - legado `RssSourceAdapter.showMenu(menu_del)` 在触发删除时会先移除当前条目选中态；Flutter 侧此前未对齐该时序。
+    - Flutter 侧此前缺少 `rss_source_item.menu_del` 节点级异常可观测输出，不利于迁移阶段单项回归定位。
+  - `P7-seq337` 逐项检查清单（实施前）：
+    - 入口：条目“更多”菜单是否保持 legacy 同义 `置顶/置底/删除` 三项结构且“删除”层级不变。
+    - 状态：点击“删除”后是否先移除当前条目选中态，再弹确认框。
+    - 异常：并发删除后再次触发删除时是否静默返回且不崩溃。
+    - 文案：确认弹窗标题与正文是否收敛为 legacy 同义“提醒 / 确定删除\n<源名>”。
+    - 排版：确认弹窗是否继续使用 `CupertinoAlertDialog` 同层承载，不新增扩展入口。
+    - 交互触发：点击“删除”后是否仅关闭动作表并进入确认分支，确认后执行删源级联清理且无成功提示。
+  - `P7-seq337` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView._showSourceActions` 保持 `置顶/置底/删除` 三项承载，未新增跨序号入口）。
+    - 状态：已同义（`_deleteSource` 触发时先移除当前条目选中态，再进入删除确认链路）。
+    - 异常：已同义（确认后先按 `sourceUrl` 回查当前源，未命中静默返回；失败分支仅记录 `ExceptionLogService(node=rss_source_item.menu_del)`）。
+    - 文案：已同义（确认弹窗收敛为“提醒 / 确定删除\n<sourceName>”，取消静默返回）。
+    - 排版：已同义（沿用 `CupertinoAlertDialog` 承载，仅收敛 `menu_del` 触发语义）。
+    - 交互触发：已同义（确认后执行 `deleteSourceWithArticles + SourceVariableStore.removeVariable` 级联清理，不追加成功提示）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 任一订阅源右侧更多 -> 删除 -> 取消/确定`（校验确认文案同义且取消不删）；手工路径（待回归）`同入口确认删除后返回管理页`（校验源记录删除、该源文章缓存与 `sourceVariable_<sourceUrl>` 已清理且无成功提示）；手工路径（待回归）`其它入口先删除目标源后回到管理页再次触发删除`（校验流程静默返回不崩溃）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source_item/menu_del` 单项语义，不提前并入 `menu_enable_selection`（`seq338`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq338`（`rss_source_sel.xml / @+id/menu_enable_selection / 启用所选`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq336`（`rss_source_item.xml / @+id/menu_bottom / 置底`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq336`：对照 legado `rss_source_item.xml`、`RssSourceAdapter.showMenu(menu_bottom)`、`RssSourceActivity.toBottom` 与 `RssSourceViewModel.bottomSource`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“条目更多 -> 置底”动作语义。Flutter 侧 `RssSourceManageView` 保持条目更多菜单 `置顶/置底/删除` 结构不变，仅将置底触发收敛为“先按 `sourceUrl` 回查当前源，命中后按 `maxOrder+1` 写库并依赖列表流刷新，未命中静默返回”；失败分支统一记录 `ExceptionLogService(node=rss_source_item.menu_bottom)`。
+  - `P7-seq336` 差异点清单（实施前）：
+    - legado `RssSourceViewModel.bottomSource` 固定走 `dao.update`，在“源已被并发删除”场景只会静默无更新；Flutter `RssSourceManageView._moveToBottom` 此前直接用条目快照调用 `updateSource(upsert)`，存在并发删除后被重新插入的状态漂移风险。
+    - Flutter 侧此前缺少 `rss_source_item.menu_bottom` 节点级异常可观测输出，不利于迁移阶段单项回归定位。
+  - `P7-seq336` 逐项检查清单（实施前）：
+    - 入口：条目“更多”菜单是否保持 legacy 同义 `置顶/置底/删除` 三项结构且“置底”层级不变。
+    - 状态：点击“置底”后是否按 `maxOrder+1` 写库并即时刷新到列表底部。
+    - 异常：并发删除后再次触发置底时是否静默返回且不重建源记录。
+    - 文案：动作文案是否与 legacy 同义为“置底”且不新增成功提示。
+    - 排版：菜单承载是否保持 `CupertinoActionSheet` 同层结构与既有顺序。
+    - 交互触发：点击“置底”后是否仅关闭动作表并执行置底链路，不跳转页面。
+  - `P7-seq336` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView._showSourceActions` 继续保持 `置顶/置底/删除` 三项承载，未新增跨序号入口）。
+    - 状态：已同义（`_moveToBottom` 改为基于库内当前源按 `maxOrder+1` 重写 `customOrder`，并由数据流刷新列表）。
+    - 异常：已同义（先按 `sourceUrl` 回查当前源，未命中静默返回；失败分支仅记录 `ExceptionLogService(node=rss_source_item.menu_bottom)`）。
+    - 文案：已同义（动作文案保持“置底”，执行链路无成功提示与确认弹窗）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 承载，仅收敛 `menu_bottom` 触发语义）。
+    - 交互触发：已同义（点击“置底”后先 `Navigator.pop` 关闭动作表，再执行置底写库）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`、`flutter test test/rss_source_manage_view_compile_test.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 任一订阅源右侧更多 -> 置底`（校验目标源移动到列表底部且无成功提示）；手工路径（待回归）`删除目标源后返回管理页继续触发置底`（校验流程静默返回且不发生已删除源被重插）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source_item/menu_bottom` 单项语义，不提前并入 `menu_del`（`seq337`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq337`（`rss_source_item.xml / @+id/menu_del / 删除`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq335`（`rss_source_item.xml / @+id/menu_top / 置顶`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq335`：对照 legado `rss_source_item.xml`、`RssSourceAdapter.showMenu(menu_top)`、`RssSourceActivity.toTop` 与 `RssSourceViewModel.topSource`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“条目更多 -> 置顶”动作语义。Flutter 侧 `RssSourceManageView` 将条目更多菜单收敛为 legacy 同义 `置顶/置底/删除` 三项并保持“置顶”首项；置顶触发改为先按 `sourceUrl` 回查当前源，未命中静默返回，命中后按 `minOrder-1` 写入 `customOrder` 并依赖列表流刷新；失败分支统一记录 `ExceptionLogService(node=rss_source_item.menu_top)`。
+  - `P7-seq335` 差异点清单（实施前）：
+    - legado `rss_source_item.xml` 固定仅定义 `menu_top/menu_bottom/menu_del` 三项且 `menu_top` 为首项；Flutter `RssSourceManageView` 条目更多此前额外保留“编辑”扩展入口，菜单结构与排序存在偏差。
+    - legado `RssSourceViewModel.topSource` 固定走 `dao.update`，在“源已被并发删除”场景只会静默无更新；Flutter 侧此前直接使用条目快照调用 `updateSource(upsert)`，存在并发删除后被重新插入的状态漂移风险。
+    - Flutter 侧此前缺少 `rss_source_item.menu_top` 节点级异常可观测输出，不利于迁移阶段单项回归定位。
+  - `P7-seq335` 逐项检查清单（实施前）：
+    - 入口：条目“更多”菜单是否将“置顶”保留为首项且不混入非 legacy 扩展入口。
+    - 状态：点击“置顶”后是否按 `minOrder-1` 写库并即时刷新到列表顶部。
+    - 异常：并发删除后再次触发置顶时是否静默返回且不重建源记录。
+    - 文案：动作文案是否与 legacy 同义为“置顶”且不新增成功提示。
+    - 排版：菜单承载是否保持 `CupertinoActionSheet` 同层结构并对齐三项动作顺序。
+    - 交互触发：点击“置顶”后是否仅关闭动作表并执行置顶链路，不跳转页面。
+  - `P7-seq335` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView._showSourceActions` 收敛为 `置顶/置底/删除` 三项，`置顶` 保持首项）。
+    - 状态：已同义（`_moveToTop` 基于当前库内源按 `minOrder-1` 重写 `customOrder` 并由数据流刷新列表）。
+    - 异常：已同义（先按 `sourceUrl` 回查当前源，未命中静默返回；失败分支仅记录 `ExceptionLogService(node=rss_source_item.menu_top)`）。
+    - 文案：已同义（动作文案保持“置顶”，执行链路无成功提示与确认弹窗）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 承载，仅收敛 `menu_top` 同层菜单结构）。
+    - 交互触发：已同义（点击“置顶”后先 `Navigator.pop` 关闭动作表，再执行置顶写库）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 任一订阅源右侧更多 -> 置顶`（校验目标源移动到列表顶部且无成功提示）；手工路径（待回归）`删除目标源后返回管理页继续触发置顶`（校验流程静默返回且不发生已删除源被重插）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source_item/menu_top` 单项语义，不提前并入 `menu_bottom/menu_del`（`seq336/337`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq336`（`rss_source_item.xml / @+id/menu_bottom / 置底`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq333`（`rss_source_debug.xml / @+id/menu_list_src / 列表源码`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq333`：对照 legado `rss_source_debug.xml`、`RssSourceDebugActivity.onCompatOptionsItemSelected(menu_list_src)` 与 `RssSourceDebugModel.printLog(state=10)`，在 `订阅 -> 规则订阅 -> 订阅源编辑 -> 调试源` 链路收敛“更多 -> 列表源码”动作语义。Flutter 侧 `RssSourceDebugView` 在“更多”菜单首项补齐“列表源码”，并新增 `listSrc` 快照承载；点击后固定打开 `SourceDebugTextView(title=Html)` 直接展示原始 `listSrc`，源码为空时同样直达承载页，不新增拦截提示。
+  - `P7-seq333` 差异点清单（实施前）：
+    - legado `rss_source_debug.xml` 固定定义 `menu_list_src` 且排在 `menu_content_src` 之前；Flutter `RssSourceDebugView` 此前仅保留“正文源码”，菜单结构缺项。
+    - legado `RssSourceDebugActivity` 点击 `menu_list_src` 直接执行 `TextDialog("Html", viewModel.listSrc)`；Flutter 侧此前未保存 `listSrc` 快照字段，无法对齐“列表源码直出”承载语义。
+    - legacy `menu_list_src` 无空值拦截分支，若 Flutter 增加“源码为空”提示将偏离触发语义并影响后续序号独立验收。
+  - `P7-seq333` 逐项检查清单（实施前）：
+    - 入口：调试页“更多”菜单是否补齐并保留“列表源码”首项。
+    - 状态：调试运行后是否写入 `listSrc` 并用于源码承载展示。
+    - 异常：列表源码为空时是否仍可打开承载页，不新增空源码拦截提示。
+    - 文案：动作文案是否与 legacy 同义为“列表源码”，承载标题是否固定 `Html`。
+    - 排版：是否保持现有 `CupertinoActionSheet` 承载，不新增跨序号入口。
+    - 交互触发：点击“列表源码”后是否先关闭动作表再进入源码承载页。
+  - `P7-seq333` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceDebugView` “更多”菜单首项新增“列表源码”，并保留“正文源码”后项）。
+    - 状态：已同义（调试快照新增 `_listSrcRaw` 承载并在 `_runDebug` 完成后回填 `snapshot.listSrc`）。
+    - 异常：已同义（列表源码为空时仍直接打开 `SourceDebugTextView`，无拦截提示分支）。
+    - 文案：已同义（动作文案“列表源码”，源码承载标题固定 `Html`）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 同层菜单承载，仅收敛 `menu_list_src` 单项）。
+    - 交互触发：已同义（点击后先 `Navigator.pop` 关闭动作表，再 push 源码承载页）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_debug_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 编辑任一订阅源 -> 右上角调试源 -> 订阅源调试 -> 右上角更多 -> 列表源码`（校验无论列表源码是否为空都直接打开源码承载页且标题固定 `Html`）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `rss_source_debug/menu_list_src` 入口与承载语义，不改动 `rss_source_item/menu_top`（`seq335`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq335`（`rss_source_item.xml / @+id/menu_top / 置顶`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq327`（`rss_source.xml / @+id/menu_add / 新建订阅源`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq327`：对照 legado `rss_source.xml`、`RssSourceActivity.onCompatOptionsItemSelected(menu_add)` 与 `startActivity<RssSourceEditActivity>()`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“新建订阅源”入口层级语义。Flutter 侧移除非 legacy 顶栏 `+` 直达入口，在“更多”菜单首项补齐“新建订阅源”一级动作；点击后固定触发 `_openAddSource()` 进入新增订阅源编辑承载。空态主动作文案同步收敛为“新建订阅源”，避免同链路文案漂移。
+  - `P7-seq327` 差异点清单（实施前）：
+    - legado `rss_source.xml` 将 `menu_add` 定义为 `showAsAction="never"`，入口层级属于顶栏“更多”菜单；Flutter `RssSourceManageView` 此前保留顶栏 `+` 直达入口，且“更多”菜单缺失“新建订阅源”，存在入口层级偏差。
+    - 若保留顶栏 `+` 并仅新增“更多->新建订阅源”，会形成重复触发路径与非 legacy 扩展入口，违反迁移级别“菜单结构与触发逻辑同义”约束。
+  - `P7-seq327` 逐项检查清单（实施前）：
+    - 入口：是否按 legacy 收敛为“右上角更多 -> 新建订阅源”一级入口。
+    - 状态：点击后是否固定进入新增订阅源编辑承载（`sourceUrl` 为空的新建态）。
+    - 异常：打开流程是否保持静默，不新增成功提示与扩展弹窗。
+    - 文案：入口文案与空态主动作文案是否统一为“新建订阅源”。
+    - 排版：是否移除非 legacy 顶栏 `+` 直达入口，保持顶栏动作集合收敛。
+    - 交互触发：点击“新建订阅源”后是否先关闭动作表再进入编辑承载，且不保留重复入口。
+  - `P7-seq327` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView._openMainOptions` 首项补齐“新建订阅源”，路径收敛为“更多 -> 新建订阅源”）。
+    - 状态：已同义（点击后调用 `_openAddSource()`，固定打开 `RssSourceEditView` 新建态）。
+    - 异常：已同义（流程保持静默承载，不新增成功提示与扩展弹窗）。
+    - 文案：已同义（菜单入口与空态主动作文案统一收敛为“新建订阅源”）。
+    - 排版：已同义（顶栏移除非 legacy `+` 直达入口，保留 legacy 同义动作集合）。
+    - 交互触发：已同义（动作表先关闭再导航至编辑承载，不保留重复入口）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`、`flutter test test/rss_source_manage_view_compile_test.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 右上角更多 -> 新建订阅源`（校验通过更多菜单进入新增编辑页且顶栏不再出现 `+` 直达）；手工路径（待回归）`订阅源管理空列表 -> 新建订阅源`（校验空态动作文案与触发路径同义）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source/menu_add` 入口层级与文案语义，不改动 `menu_list_src`（`seq333`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq333`（`rss_source_debug.xml / @+id/menu_list_src / 列表源码`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq326`（`rss_source.xml / @+id/menu_group_null / 未分组`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq326`：对照 legado `rss_source.xml`、`RssSourceActivity.onCompatOptionsItemSelected(menu_group_null)`、`RssSourceActivity.upSourceFlow(flowNoGroup)` 与 `RssSourceDao.flowNoGroup`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“未分组”筛选动作语义。Flutter 侧保持分组弹层固定动作“未分组”点击写入 legacy 同义查询词“未分组”并即时筛选；同时在 `RssSourceManageHelper.parseQueryIntent` 新增旧词“无分组”兼容，避免历史输入回退普通搜索。
+  - `P7-seq326` 差异点清单（实施前）：
+    - legado `menu_group_null` 固定执行 `searchView.setQuery(getString(R.string.no_group), true)` 并命中 `flowNoGroup`；Flutter 当前入口虽已写入“未分组”，但查询解析仅识别“未分组”单词，历史旧词“无分组”会回退到普通搜索，存在筛选行为漂移风险。
+    - `feature-priority-queue` 已包含 `seq326/seq327`，但 `feature-item-tracker` 在 `seq325` 后直接跳到 `seq328`，台账映射断层会导致“队列推进”与“逐项证据”无法一一对应。
+  - `P7-seq326` 逐项检查清单（实施前）：
+    - 入口：分组弹层是否保留 `menu_group_null` 同层级动作并展示“未分组”文案。
+    - 状态：点击“未分组”后是否写入查询词“未分组”并立即筛选 no-group 结果。
+    - 异常：筛选流程是否保持静默且不新增提示分支。
+    - 文案：查询词与动作文案是否与 legacy `@string/no_group` 同义。
+    - 排版：是否保持现有 `CupertinoActionSheet` 承载，不新增跨序号入口。
+    - 交互触发：手工输入旧词“无分组”是否仍映射到 no-group 筛选结果。
+  - `P7-seq326` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView` 分组弹层保留“未分组”固定动作）。
+    - 状态：已同义（点击后查询词写入“未分组”，并由 `RssSourceManageHelper` 命中 `noGroup` 模式即时筛选）。
+    - 异常：已同义（筛选触发保持静默，不新增成功或失败提示）。
+    - 文案：已同义（动作文案与查询词均保持 legacy 同义“未分组”）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 承载，仅收敛 `menu_group_null` 单项语义）。
+    - 交互触发：已同义（查询解析补齐旧词“无分组”兼容，历史输入不回退普通搜索）。
+    - 验证：命令 `dart format lib/features/rss/services/rss_source_manage_helper.dart`、`flutter test test/rss_source_manage_helper_test.dart`、`flutter test test/rss_source_manage_view_compile_test.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 右上角分组 -> 未分组`（校验写入“未分组”并仅展示 no-group 源）；手工路径（待回归）`搜索框输入“无分组”`（校验旧词兼容仍命中 no-group）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source/menu_group_null` 查询词兼容与台账映射，不改动 `menu_add`（`seq327`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq327`（`rss_source.xml / @+id/menu_add / 新建订阅源`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq324`（`rss_source.xml / @+id/menu_disabled_group / 已禁用`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq324`：对照 legado `rss_source.xml`、`RssSourceActivity.onCompatOptionsItemSelected(menu_disabled_group)` 与 `upSourceFlow(flowDisabled)`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“已禁用”筛选动作语义。Flutter 侧将 `RssSourceManageView` 分组弹层固定动作“禁用”收敛为 legacy 同义“已禁用”，点击后查询词写入“已禁用”并即时筛选禁用源；同时在 `RssSourceManageHelper.parseQueryIntent` 保留旧词“禁用”兼容，避免历史输入失效。
+  - `P7-seq324` 差异点清单（实施前）：
+    - legado `rss_source.xml` 将 `menu_disabled_group` 文案定义为 `@string/disabled`，中文语义为“已禁用”；Flutter `RssSourceManageView` 此前显示“禁用”，用户可见文案存在偏差。
+    - legado `RssSourceActivity` 点击 `menu_disabled_group` 固定写入 `getString(R.string.disabled)` 并命中 `upSourceFlow(flowDisabled)`；Flutter 侧此前菜单点击写入“禁用”，导致“已禁用”查询词不会命中禁用筛选分支。
+    - 历史版本与手工输入已存在“禁用”关键词，若直接切换到“已禁用”且不兼容旧词，会造成旧查询词回退为普通搜索，形成筛选行为回退。
+  - `P7-seq324` 逐项检查清单（实施前）：
+    - 入口：分组弹层是否保留 `menu_disabled_group` 同层级动作并展示“已禁用”文案。
+    - 状态：点击“已禁用”后是否将查询词写入“已禁用”并立即筛选 `enabled=false` 源。
+    - 异常：筛选流程是否保持静默且不新增额外提示。
+    - 文案：固定动作文案是否与 legacy 同义为“已禁用”。
+    - 排版：是否保持现有 `CupertinoActionSheet` 承载，不新增跨序号入口。
+    - 交互触发：手工输入旧词“禁用”是否仍命中禁用筛选结果。
+  - `P7-seq324` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView` 分组弹层固定动作文案收敛为“已禁用”）。
+    - 状态：已同义（点击后查询词写入“已禁用”，并由 `RssSourceManageHelper` 命中 `disabled` 模式即时筛选）。
+    - 异常：已同义（筛选触发保持静默，不新增提示分支）。
+    - 文案：已同义（动作文案与 legacy `@string/disabled` 中文语义一致）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 承载，仅收敛 `menu_disabled_group` 单项语义）。
+    - 交互触发：已同义（查询解析兼容旧词“禁用”，历史输入仍映射禁用筛选）。
+    - 验证：命令 `dart format lib/features/rss/services/rss_source_manage_helper.dart lib/features/rss/views/rss_source_manage_view.dart`、`flutter test test/rss_source_manage_view_compile_test.dart`、`flutter test test/rss_source_manage_helper_test.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 右上角分组 -> 已禁用`（校验文案与筛选结果）；手工路径（待回归）`搜索框输入“禁用”`（校验旧词兼容仍命中禁用筛选）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source/menu_disabled_group` 文案与查询词语义，不改动 `menu_group_null/menu_add`（`seq326/327`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq326`（`rss_source.xml / @+id/menu_group_null / 未分组`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq323`（`rss_source.xml / @+id/menu_enabled_group / 已启用`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq323`：对照 legado `rss_source.xml`、`RssSourceActivity.onCompatOptionsItemSelected(menu_enabled_group)` 与 `upSourceFlow(flowEnabled)`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“已启用”筛选动作语义。Flutter 侧将 `RssSourceManageView` 分组弹层固定动作“启用”收敛为 legacy 同义“已启用”，点击后查询词写入“已启用”并即时筛选启用源；同时在 `RssSourceManageHelper.parseQueryIntent` 保留旧词“启用”兼容，避免历史输入失效。
+  - `P7-seq323` 差异点清单（实施前）：
+    - legado `rss_source.xml` 将 `menu_enabled_group` 文案定义为 `@string/enabled`，中文语义为“已启用”；Flutter `RssSourceManageView` 此前显示“启用”，用户可见文案存在偏差。
+    - legado `RssSourceActivity` 点击 `menu_enabled_group` 固定写入 `getString(R.string.enabled)` 并命中 `upSourceFlow(flowEnabled)`；Flutter 侧此前菜单点击写入“启用”，导致“已启用”查询词不会命中启用筛选分支。
+    - 历史版本与手工输入已存在“启用”关键词，若直接切换到“已启用”且不兼容旧词，会造成旧查询词回归为普通搜索，形成筛选行为回退。
+  - `P7-seq323` 逐项检查清单（实施前）：
+    - 入口：分组弹层是否保留 `menu_enabled_group` 同层级动作并展示“已启用”文案。
+    - 状态：点击“已启用”后是否将查询词写入“已启用”并立即筛选 `enabled=true` 源。
+    - 异常：筛选流程是否保持静默且不新增额外提示。
+    - 文案：固定动作文案是否与 legacy 同义为“已启用”。
+    - 排版：是否保持现有 `CupertinoActionSheet` 承载，不新增跨序号入口。
+    - 交互触发：手工输入旧词“启用”是否仍命中启用筛选结果。
+  - `P7-seq323` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView` 分组弹层固定动作文案收敛为“已启用”）。
+    - 状态：已同义（点击后查询词写入“已启用”，并由 `RssSourceManageHelper` 命中 `enabled` 模式即时筛选）。
+    - 异常：已同义（筛选触发保持静默，不新增提示分支）。
+    - 文案：已同义（动作文案与 legacy `@string/enabled` 中文语义一致）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 承载，仅收敛 `menu_enabled_group` 单项语义）。
+    - 交互触发：已同义（查询解析兼容旧词“启用”，历史输入仍映射启用筛选）。
+    - 验证：命令 `dart format lib/features/rss/services/rss_source_manage_helper.dart lib/features/rss/views/rss_source_manage_view.dart`、`flutter test test/rss_source_manage_view_compile_test.dart`、`flutter test test/rss_source_manage_helper_test.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 右上角分组 -> 已启用`（校验文案与筛选结果）；手工路径（待回归）`搜索框输入“启用”`（校验旧词兼容仍命中启用筛选）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source/menu_enabled_group` 文案与查询词语义，不改动 `menu_disabled_group/menu_group_null`（`seq324/326`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq324`（`rss_source.xml / @+id/menu_disabled_group / 已禁用`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq322`（`rss_source.xml / @+id/menu_group_manage / 分组管理`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq322`：对照 legado `rss_source.xml`、`RssSourceActivity.onCompatOptionsItemSelected(menu_group_manage)`、`GroupManageDialog` 与 `RssSourceDao.flowGroups`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“分组管理”入口层级语义。Flutter 侧将 `RssSourceManageView` 的“分组管理”动作由整页路由跳转收敛为同层弹层承载（`CupertinoPopupSurface`），并复用 `RssGroupManageView` 的“添加/编辑/删除分组”闭环；弹层顶部补齐“完成”退出动作，分组列表继续依赖 `flowGroups` 自动回刷。
+  - `P7-seq322` 差异点清单（实施前）：
+    - legado `RssSourceActivity` 点击 `menu_group_manage` 直接 `showDialogFragment<GroupManageDialog>()`，属于当前页同层弹窗；Flutter 侧此前通过 `Navigator.push` 打开整页 `RssGroupManageView`，入口层级存在偏差。
+    - legado `GroupManageDialog` 在弹层内部完成分组新增/编辑/删除后即可关闭返回原上下文；Flutter 侧此前为整页跳转，退出路径依赖系统返回，交互层级不一致。
+    - legado 的分组管理与分组筛选共用 `flowGroups` 数据源，关闭管理弹层后重新展开分组菜单应看到最新分组集合；Flutter 侧此前虽具备分组写库能力，但入口形态未与 legacy 同义。
+  - `P7-seq322` 逐项检查清单（实施前）：
+    - 入口：`menu_group_manage` 是否在分组弹层内同层打开分组管理承载。
+    - 状态：分组管理内新增/编辑/删除后，分组集合是否通过 `flowGroups` 自动更新。
+    - 异常：分组更新失败是否保持现有静默边界，不新增扩展成功提示。
+    - 文案：入口与承载标题是否保持“分组管理”同义语义。
+    - 排版：是否保持 `CupertinoActionSheet -> CupertinoPopupSurface` 的同层弹层路径，不新增跨序号入口。
+    - 交互触发：关闭分组管理后重新打开分组菜单，动态分组是否立即可见且仍可触发 `group:<name>` 筛选。
+  - `P7-seq322` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSourceManageView` 分组弹层中点击“分组管理”改为同层弹层承载，不再跳转整页路由）。
+    - 状态：已同义（`RssGroupManageView` 继续监听 `flowGroups`，新增/编辑/删除后列表实时刷新）。
+    - 异常：已同义（分组变更流程保持静默写库边界，不追加扩展提示）。
+    - 文案：已同义（入口与承载标题保持“分组管理”，弹层内补齐“完成”退出动作）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 入口与 `CupertinoPopupSurface` 管理承载，仅收敛 `menu_group_manage` 同序号层级语义）。
+    - 交互触发：已同义（关闭分组管理后重开分组菜单可见最新动态分组，点击后仍写入 `group:<name>` 即时筛选）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart lib/features/rss/views/rss_group_manage_view.dart`、`flutter test test/rss_source_manage_view_compile_test.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 右上角分组 -> 分组管理`（校验同层弹层打开，顶部可执行“添加/完成”）；手工路径（待回归）`分组管理弹层 -> 添加/编辑/删除分组 -> 完成 -> 重新打开分组菜单`（校验动态分组已回刷并可继续触发 `group:<分组名>` 筛选）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source/menu_group_manage` 的入口层级与弹层承载，不改动 `menu_enabled_group/menu_disabled_group/menu_group_null`（`seq323/324/326`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq323`（`rss_source.xml / @+id/menu_enabled_group / 启用`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq321`（`rss_source.xml / @+id/menu_group / 分组`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq321`：对照 legado `rss_source.xml`、`RssSourceActivity.onPrepareOptionsMenu/upGroupMenu/onCompatOptionsItemSelected(item.groupId==source_group)` 与 `RssSourceDao.flowGroups`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路收敛“分组菜单”动作语义。Flutter 侧将 `RssSourceManageView` 顶栏分组动作标题从“筛选与分组”收敛为“分组”，弹层动作顺序收敛为“分组管理/启用/禁用/需要登录/未分组/动态分组”，并移除非 legacy 扩展动作“全部”与条目更多中的“筛选与分组”入口；动态分组点击保持写入 `group:<groupName>` 后立即筛选。
+  - `P7-seq321` 差异点清单（实施前）：
+    - legado `rss_source.xml` 的 `menu_group` 语义为“分组”，并在子菜单按固定顺序承载 `menu_group_manage/menu_enabled_group/menu_disabled_group/menu_group_login/menu_group_null + source_group`；Flutter 侧此前弹层标题为“筛选与分组”，且动作顺序与 legacy 不一致。
+    - legado `RssSourceActivity` 不提供“全部”动作；Flutter 侧此前额外提供“全部”动作，属于会改变入口集合的扩展流程。
+    - legado `RssSourceAdapter` 条目菜单不包含“分组”二级入口；Flutter 侧条目“更多”此前追加“筛选与分组”扩展入口，交互路径存在偏差。
+  - `P7-seq321` 逐项检查清单（实施前）：
+    - 入口：顶栏分组入口是否为 legacy 同义“分组”语义。
+    - 状态：动态分组菜单是否基于 `flowGroups` 结果构建并保持即时生效。
+    - 异常：分组集合为空时菜单结构是否仍可用且不崩溃。
+    - 文案：标题与固定菜单项文案是否同义（分组管理/启用/禁用/需要登录/未分组）。
+    - 排版：是否保持现有 `CupertinoActionSheet` 承载，不新增跨序号入口。
+    - 交互触发：点击动态分组是否写入 `group:<name>` 并立即筛选。
+  - `P7-seq321` 逐项对照清单（实施后）：
+    - 入口：已同义（顶栏分组动作标题收敛为“分组”，保留同层级入口）。
+    - 状态：已同义（动态分组基于 `_repo.allGroups()` 生成，点击后写入 `group:<groupName>` 并立即筛选）。
+    - 异常：已同义（分组为空时仅展示固定动作项，流程静默可用）。
+    - 文案：已同义（固定动作文案收敛为“分组管理/启用/禁用/需要登录/未分组”）。
+    - 排版：已同义（沿用 `CupertinoActionSheet` 承载，仅收敛 `menu_group` 同序号入口与动作顺序）。
+    - 交互触发：已同义（动态分组点击后查询词固定写入 `group:<name>`，实时触发筛选流）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`、`flutter test test/rss_source_manage_view_compile_test.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 右上角分组`（校验弹层标题“分组”与动作顺序同义）；手工路径（待回归）`同入口 -> 点击任一动态分组`（校验搜索框写入 `group:<分组名>` 并即时筛选）；手工路径（待回归）`订阅源条目 -> 右侧更多`（校验无“筛选与分组”扩展入口）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source/menu_group` 的入口文案、动作顺序与扩展入口清理，不改动 `menu_group_manage`（`seq322`）实现细节。
+  - 下一项：按优先级继续推进 `P7-seq322`（`rss_source.xml / @+id/menu_group_manage / 分组管理`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq320`（`rss_read_record.xml / @+id/menu_clear / 清除`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq320`：对照 legado `rss_read_record.xml`、`ReadRecordDialog.onMenuItemClick(menu_clear)` 与 `RssSortViewModel.countRecords/deleteAllRecord`，在 `订阅 -> RSS 文章列表 -> 更多 -> 阅读记录` 链路收敛“清除阅读记录”动作语义。Flutter 侧在 `RssReadRecordView` 保持顶栏“清空”入口常驻可达，点击后弹 legacy 同义确认文案“提醒 / 确定删除\nN 阅读记录”；确认后执行 `deleteAllRecord -> reload` 并保持成功路径静默。
+  - `P7-seq320` 差异点清单（实施前）：
+    - legado `rss_read_record.xml` 中 `menu_clear` 为 `showAsAction=always`，入口始终可触发；Flutter `RssReadRecordView` 此前将“清空”绑定为“空列表禁用”，与 legacy 触发边界不一致。
+    - legado `ReadRecordDialog` 的确认文案由 `draw + sure_del + count + read_record` 组合，语义为“提醒 / 确定删除\nN 阅读记录”；Flutter 侧此前使用“清空阅读记录 / 确定删除 N 条阅读记录吗？”文案结构，存在迁移口径偏差。
+    - legado 点击确认后仅执行 `deleteAllRecord` 并清空列表，不弹成功提示；Flutter 侧此前缺少 `rss_read_record.menu_clear` 节点级异常可观测日志。
+  - `P7-seq320` 逐项检查清单（实施前）：
+    - 入口：阅读记录页顶栏是否常驻“清空”动作且空列表可触发。
+    - 状态：确认弹窗是否按实时记录数回显 `N 阅读记录`。
+    - 异常：统计数量或删除失败是否可观测。
+    - 文案：确认标题/内容是否收敛为“提醒 / 确定删除\nN 阅读记录”。
+    - 排版：是否保持现有 `AppCupertinoPageScaffold + CupertinoAlertDialog` 承载，不新增跨序号入口。
+    - 交互触发：取消是否静默返回，确认后是否仅清空记录并刷新列表。
+  - `P7-seq320` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssReadRecordView` 顶栏“清空”动作保持常驻可达，空列表场景不禁用）。
+    - 状态：已同义（每次触发均先实时查询 `countRecords`，确认文案按 `N 阅读记录` 回显）。
+    - 异常：已同义（数量统计/删除失败统一记录 `ExceptionLogService(node=rss_read_record.menu_clear)`，不新增扩展提示）。
+    - 文案：已同义（确认弹窗标题收敛为“提醒”，内容收敛为“确定删除\nN 阅读记录”）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold` 顶栏与 `CupertinoAlertDialog` 承载，仅收敛 `menu_clear` 同序号触发边界）。
+    - 交互触发：已同义（取消静默返回；确认后执行 `deleteAllRecord -> reload`，成功路径不弹提示）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_read_record_view.dart`；手工路径（待回归）`订阅 -> 点击任一订阅源进入文章列表 -> 右上角更多 -> 阅读记录 -> 右上角清空`（校验空列表仍可触发确认弹窗，标题“提醒”，内容“确定删除\nN 阅读记录”）；手工路径（待回归）`同入口确认清空`（校验记录列表清空且无成功提示）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_read_record/menu_clear` 入口、文案与触发边界，不改动 `rss_source/menu_group`（`seq321`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq321`（`rss_source.xml / @+id/menu_group / 分组`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq319`（`rss_read.xml / @+id/menu_browser_open / 浏览器打开`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq319`：对照 legado `rss_read.xml`、`ReadRssActivity.onCompatOptionsItemSelected(menu_browser_open)` 与 `Context.openUrl`，在 `订阅 -> RSS 阅读页` 链路收敛“浏览器打开”动作语义。Flutter 侧在 `RssReadPlaceholderView` 保持现有顶栏结构（刷新/收藏/分享/朗读）不变，补齐“更多 -> 浏览器打开”入口并与“登录”同层级承载；点击后按当前阅读 URL 拉起外部浏览器，无可用 URL 时提示 `url null`。
+  - `P7-seq319` 差异点清单（实施前）：
+    - legado `rss_read.xml` 定义 `menu_browser_open` 为溢出菜单项（`showAsAction=never`）；Flutter `RssReadPlaceholderView` 此前“更多”菜单仅有 `menu_login`，缺少“浏览器打开”入口。
+    - legado `ReadRssActivity` 触发链路为 `webView.url -> openUrl`，空值分支提示 `url null`；Flutter 侧此前无该触发链路与同义边界提示。
+    - legado `menu_browser_open` 不依赖登录显隐；Flutter 侧此前“更多”按钮绑定 `loginUrl` 显隐，会导致 `loginUrl` 为空时“浏览器打开”不可达。
+  - `P7-seq319` 逐项检查清单（实施前）：
+    - 入口：RSS 阅读页“更多”菜单是否可达“浏览器打开”动作。
+    - 状态：`loginUrl` 为空时“更多”菜单是否仍可见且可触发浏览器打开。
+    - 异常：无 URL 时是否提示 `url null`；外部浏览器打开失败是否可观测。
+    - 文案：菜单动作文案是否保持“浏览器打开”。
+    - 排版：是否保持现有 `AppCupertinoPageScaffold` 顶栏结构，不新增跨序号入口。
+    - 交互触发：点击后是否直连外部浏览器且成功路径保持静默。
+  - `P7-seq319` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssReadPlaceholderView` “更多”菜单新增 `menu_browser_open` 同义动作“浏览器打开”）。
+    - 状态：已同义（`loginUrl` 为空时“更多”按钮仍可见，菜单内仅保留“浏览器打开”；`loginUrl` 非空时与“登录”同层级并列）。
+    - 异常：已同义（无可用 URL 提示 `url null`；打开失败统一记录 `ExceptionLogService(node=rss_read.menu_browser_open)` 并提示 `open url error`）。
+    - 文案：已同义（保持“浏览器打开”动作语义；调试区新增“浏览器打开目标”状态回显用于回归核验）。
+    - 排版：已同义（沿用现有 `AppCupertinoPageScaffold` 顶栏承载，仅补齐 `menu_browser_open` 同序号入口）。
+    - 交互触发：已同义（点击即触发外部浏览器打开，不新增中间承载页，不影响刷新/收藏/分享/朗读/登录链路）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 点击任一 singleUrl 订阅源进入 RSS 阅读页 -> 右上角更多 -> 浏览器打开`（校验直接拉起系统浏览器且无成功提示）；手工路径（待回归）`订阅 -> 从无 link 的入口进入 RSS 阅读页 -> 右上角更多 -> 浏览器打开`（校验提示 `url null` 且页面保持当前阅读页）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_read/menu_browser_open` 入口与触发边界，不改动 `rss_read_record/menu_clear`（`seq320`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq320`（`rss_read_record.xml / @+id/menu_clear / 清除`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq317`（`rss_read.xml / @+id/menu_aloud / 朗读`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq317`：对照 legado `rss_read.xml`、`ReadRssActivity.onPrepareOptionsMenu/onCompatOptionsItemSelected(menu_aloud)/readAloud` 与 `ReadRssViewModel.readAloud`，在 `订阅 -> RSS 阅读页` 链路收敛“朗读”动作语义。Flutter 侧在 `RssReadPlaceholderView` 顶栏补齐一级“朗读”入口，点击后按播放态在“朗读/停止”图标间切换；触发时优先提取当前文章正文文本（HTML 转纯文本）并调用 TTS，空文本场景保持 legacy 同义静默返回。
+  - `P7-seq317` 差异点清单（实施前）：
+    - legado `rss_read.xml` 定义 `menu_aloud` 为顶栏一级动作（`showAsAction=ifRoom`）；Flutter `RssReadPlaceholderView` 此前仅有“刷新/收藏/分享/登录”，缺少同层级“朗读”入口。
+    - legado `ReadRssActivity.upTtsMenu` 会按 TTS 播放状态切换 `ic_volume_up / ic_stop_black_24dp`；Flutter 侧此前没有朗读状态与图标切换能力，无法对齐“点击朗读后再次点击停止”语义。
+    - legado `readAloud()` 从 WebView 当前 DOM 提取正文文本后交给 `ReadRssViewModel.readAloud`；Flutter 占位阅读页暂无 WebView 承载，需收敛为“优先读取当前文章正文字段并转纯文本，空文本静默返回”，避免新增提示分支。
+  - `P7-seq317` 逐项检查清单（实施前）：
+    - 入口：RSS 阅读页顶栏是否可达一级“朗读”动作。
+    - 状态：朗读开始/停止时图标是否在喇叭与停止态之间切换。
+    - 异常：启动或停止失败是否仅记录 `ExceptionLogService(node=rss_read.menu_aloud)`。
+    - 文案：动作语义是否保持“朗读”。
+    - 排版：是否保持现有 `AppCupertinoPageScaffold` 顶栏结构，不新增跨序号入口。
+    - 交互触发：首次点击是否启动朗读，再次点击是否停止；空文本场景是否静默返回。
+  - `P7-seq317` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssReadPlaceholderView` 顶栏新增一级“朗读”动作，位于分享与更多菜单同层级）。
+    - 状态：已同义（朗读运行时图标切换为停止，停止后回落喇叭；页面新增“朗读状态”回显用于回归核验）。
+    - 异常：已同义（TTS 启动/停止失败统一记录 `ExceptionLogService(node=rss_read.menu_aloud)`，不新增错误弹窗）。
+    - 文案：已同义（保持“朗读”动作语义；停止态仅图标变化，不额外新增文案弹层）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold` 顶栏承载，仅补齐 `menu_aloud` 同序号入口）。
+    - 交互触发：已同义（点击按“启动朗读/停止朗读”双态切换；空文本场景静默 no-op，不影响刷新/收藏/分享/登录链路）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 点击任一 singleUrl 订阅源进入 RSS 阅读页（link 命中文章）-> 右上角朗读`（校验图标切换为停止且状态回显为朗读中）；手工路径（待回归）`同入口再次点击朗读`（校验朗读停止且图标回落喇叭）；手工路径（待回归）`订阅 -> 从无 link 或无正文命中入口进入 RSS 阅读页 -> 右上角朗读`（校验流程静默返回）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_read/menu_aloud` 入口与 TTS 触发边界，不改动 `menu_browser_open`（`seq319`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq319`（`rss_read.xml / @+id/menu_browser_open / 浏览器打开`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq316`（`rss_read.xml / @+id/menu_share_it / 分享`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq316`：对照 legado `rss_read.xml`、`ReadRssActivity.onCompatOptionsItemSelected(menu_share_it)` 与 `Context.share(text)`，在 `订阅 -> RSS 阅读页` 链路收敛“分享”动作语义。Flutter 侧在 `RssReadPlaceholderView` 顶栏补齐一级“分享”入口并保持与“刷新/收藏”同层级；点击后按当前可命中链接直接触发系统分享，未命中时提示 `Null url`；分享异常保持 legacy 同义静默吞掉，不新增成功或失败提示。
+  - `P7-seq316` 差异点清单（实施前）：
+    - legado `rss_read.xml` 定义 `menu_share_it` 为顶栏一级动作（`showAsAction=ifRoom`）；Flutter `RssReadPlaceholderView` 此前缺少同层级“分享”入口，交互路径不一致。
+    - legado 分享触发为 `webView.url -> rssArticle.link -> toast(null_url)` 回退链路；Flutter 占位阅读页此前无分享动作，也无 `Null url` 边界提示。
+    - legado `Context.share(text)` 对分享异常保持静默；Flutter 侧需避免新增成功/失败提示以维持同义状态流转。
+  - `P7-seq316` 逐项检查清单（实施前）：
+    - 入口：RSS 阅读页顶栏是否可达一级“分享”动作。
+    - 状态：存在可用链接时是否直接触发系统分享。
+    - 异常：无链接时是否提示 `Null url`，分享异常是否静默。
+    - 文案：动作语义是否保持“分享”。
+    - 排版：是否保持现有 `AppCupertinoPageScaffold` 顶栏结构，不新增跨序号入口。
+    - 交互触发：点击后是否直接分享，不新增中间路由并保持刷新/收藏/登录链路不受影响。
+  - `P7-seq316` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssReadPlaceholderView` 顶栏新增一级“分享”动作，位于刷新与更多菜单同层级）。
+    - 状态：已同义（优先按 `link` 命中分享文本并直接触发系统分享）。
+    - 异常：已同义（无可用链接时弹轻提示 `Null url`；分享异常静默吞掉，不新增错误弹窗）。
+    - 文案：已同义（顶栏动作语义为“分享”，并补充“分享目标”状态回显用于调试核验）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold` 顶栏承载，仅补齐 `menu_share_it` 同序号入口）。
+    - 交互触发：已同义（点击即分享，无中间承载页；不改动 `menu_aloud/menu_browser_open` 后续序号能力）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 点击任一 singleUrl 订阅源进入 RSS 阅读页 -> 右上角分享`（校验可直接触发系统分享）；手工路径（待回归）`订阅 -> 从无 link 的入口进入 RSS 阅读页 -> 右上角分享`（校验轻提示 `Null url` 且流程静默）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_read/menu_share_it` 入口与触发语义，不改动 `menu_aloud/menu_browser_open`（`seq317/319`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq317`（`rss_read.xml / @+id/menu_aloud / 朗读`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq315`（`rss_read.xml / @+id/menu_rss_star / 收藏`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq315`：对照 legado `rss_read.xml`、`ReadRssActivity.onPrepareOptionsMenu/onCompatOptionsItemSelected(menu_rss_star)`、`RssFavoritesDialog` 与 `ReadRssViewModel.addFavorite/updateFavorite/delFavorite`，在 `订阅 -> RSS 阅读页` 链路收敛“收藏”动作语义。Flutter 侧在 `RssReadPlaceholderView` 顶栏补齐一级星标入口并保持“仅在 `origin+link` 命中文章时显示”边界；点击后先确保当前文章入收藏，再打开“收藏设置”弹层，支持编辑标题/分组与删除收藏，取消保持静默。
+  - `P7-seq315` 差异点清单（实施前）：
+    - legado `menu_rss_star` 为阅读页顶栏常驻一级动作，`ReadRssActivity.upStarMenu` 按 `rssStar` 状态切换图标与文案；Flutter `RssReadPlaceholderView` 此前仅有“刷新 + 登录”，缺少收藏入口与状态切换。
+    - legado 点击 `menu_rss_star` 时先执行 `addFavorite()`，再弹 `RssFavoritesDialog`；即使用户取消编辑，当前文章也会保持已收藏。Flutter 侧此前无“先入收藏再编辑”的同义状态流。
+    - legado 收藏编辑弹层支持“编辑标题/分组 + 删除收藏”，且“标题/分组空输入不覆盖原值”；Flutter 侧此前无对应承载，也缺少 `rss_read.menu_rss_star` 节点级异常可观测输出。
+    - legado 仅在 `rssArticle != null` 时显示星标（通常要求 `origin+link` 可命中当前文章）；Flutter 侧此前没有该显隐边界，收藏夹回读阅读页也未传递 `link`。
+  - `P7-seq315` 逐项检查清单（实施前）：
+    - 入口：RSS 阅读页顶栏是否可达一级星标动作。
+    - 状态：星标是否按“已收藏/未收藏”切换图标；无文章命中时是否隐藏入口。
+    - 异常：收藏读写失败是否仅记录 `ExceptionLogService(node=rss_read.menu_rss_star)`。
+    - 文案：收藏编辑弹层动作文案是否同义（删除收藏/取消/确定）。
+    - 排版：是否保持现有 `AppCupertinoPageScaffold` 承载，不新增跨序号入口。
+    - 交互触发：点击星标是否先入收藏再弹编辑层；取消是否静默；删除后是否回落空心星标。
+  - `P7-seq315` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssReadPlaceholderView` 顶栏新增一级星标动作，位于刷新与更多菜单同层级）。
+    - 状态：已同义（仅 `origin+link` 命中文章时显示；收藏中显示实心星标，未收藏显示空心星标）。
+    - 异常：已同义（收藏状态加载/新增/更新/删除失败统一记录 `ExceptionLogService(node=rss_read.menu_rss_star)`，不新增错误弹窗）。
+    - 文案：已同义（收藏编辑弹层提供“删除收藏/取消/确定”；标题或分组空输入保持原值不覆盖）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold + CupertinoAlertDialog` 承载，仅补齐 `menu_rss_star` 同序号入口）。
+    - 交互触发：已同义（点击星标先 `upsert` 入收藏再打开编辑弹层；取消静默；删除后仅移除当前收藏并回落空心星标）。
+    - 验证：命令 `dart format lib/core/database/repositories/rss_star_repository.dart lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 右上角收藏 -> 任一收藏条目进入阅读页 -> 右上角星标`（校验初始实心、可弹收藏设置、删除后回落空心）；手工路径（待回归）`订阅 -> 点击 singleUrl 订阅源进入 RSS 阅读页`（校验无文章命中时不显示星标）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_read/menu_rss_star` 入口与收藏编辑链路语义，不改动分享/朗读/浏览器打开后续动作。
+  - 下一项：按优先级继续推进 `P7-seq316`（`rss_read.xml / @+id/menu_share_it / 分享`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq313`（`rss_main_item.xml / @+id/menu_del / 删除`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq313`：对照 legado `rss_main_item.xml`、`RssAdapter.showMenu(menu_del)`、`RssFragment.del`、`RssViewModel.del` 与 `SourceHelp.deleteRssSources`，在 `订阅 -> RSS 主列表` 链路收敛“删除订阅源”动作语义。Flutter 侧保持长按条目动作面板“删除”入口，点击后弹 legacy 同义确认文案“提醒 / 确定删除\n<sourceName>”；确认后按 `sourceUrl` 回查当前源并执行“删除源记录 + 清理该源文章缓存 + 删除源变量”，未命中场景静默返回。
+  - `P7-seq313` 差异点清单（实施前）：
+    - legado `RssFragment.del` 使用 `draw + sure_del + "\n" + sourceName` 固定确认弹窗语义；Flutter 侧此前确认弹窗标题为“删除订阅源”、文案为“确定删除：<name>”，文案口径与行文结构不一致。
+    - legado 删除链路经 `RssViewModel.del -> SourceHelp.deleteRssSources -> deleteRssSourceInternal`，会同步执行 `rssSourceDao.delete + rssArticleDao.delete + cacheDao.deleteSourceVariables`；Flutter 侧此前仅删除 `rssSource`，未同义清理 RSS 文章缓存与源变量。
+    - legado 删除动作执行失败不弹成功提示，且在目标源已不存在时保持静默；Flutter 侧此前缺少 `rss_main_item.menu_del` 节点级异常可观测输出，也未显式收敛“回查未命中静默返回”边界。
+  - `P7-seq313` 逐项检查清单（实施前）：
+    - 入口：长按订阅源条目是否可达“删除”动作。
+    - 状态：确认后是否删除当前源并同步清理该源文章缓存与源变量。
+    - 异常：删除失败是否仅记录 `ExceptionLogService(node=rss_main_item.menu_del)`。
+    - 文案：确认标题/文案是否收敛为 legacy 同义“提醒 / 确定删除\n<sourceName>”。
+    - 排版：是否保持现有 `CupertinoActionSheet + CupertinoAlertDialog` 承载，不新增跨序号入口。
+    - 交互触发：取消是否静默返回，确认后是否无成功提示且列表自动刷新。
+  - `P7-seq313` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSubscriptionView` 长按条目动作面板保留“删除”入口并可触发）。
+    - 状态：已同义（确认后先按 `sourceUrl` 回查当前源；命中时执行删源 + 清理 `rssArticleRecords(origin=sourceUrl)` + 删除 `sourceVariable_<sourceUrl>`，未命中时静默返回）。
+    - 异常：已同义（失败分支仅记录 `ExceptionLogService(node=rss_main_item.menu_del)`，不新增错误弹窗）。
+    - 文案：已同义（确认弹窗标题收敛为“提醒”，内容收敛为“确定删除\n<sourceName>”）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold + CupertinoActionSheet + CupertinoAlertDialog` 承载，未新增扩展入口）。
+    - 交互触发：已同义（取消不落库且静默返回；确认后静默执行删除链路并由列表流刷新，不追加成功提示）。
+    - 验证：命令 `dart format lib/core/database/repositories/rss_source_repository.dart lib/features/rss/views/rss_subscription_view.dart`；手工路径（待回归）`订阅 -> 长按任一启用订阅源 -> 删除 -> 取消/确定`（校验标题“提醒”、文案“确定删除\n<sourceName>”、取消静默、确认后条目移除）；手工路径（待回归）`确认删除后重新进入同源文章列表`（校验该源文章缓存已清理且无残留 sourceVariable）；手工路径（待回归）`源被删除后再次触发删除`（校验流程静默返回不崩溃）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_del` 删除链路语义并补齐删除时的 RSS 文章缓存与源变量清理，不改动 RSS 收藏链路与阅读页 `menu_rss_star`（`seq315`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq315`（`rss_read.xml / @+id/menu_rss_star / 收藏`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成“阅读器滚动模式顶部/底部状态栏定位”回归修复（非序号临时修复项），ExecPlan 保持 `active`。
+  - 完成项：对照 legado `PageView.kt` 与 `view_book_page.xml` 的“系统栏占位 + 页眉页脚占位 + 正文区域”串联语义，修复 Flutter 阅读器滚动模式中页眉/页脚与正文占位不一致问题。具体改动：
+    - `simple_reader_view.dart` 新增统一滚动模式 insets 计算（状态栏/导航栏 + cutout + header/footer slot），并将正文容器由 `SafeArea(top)` 收敛为统一 `Padding` 占位；
+    - 移除滚动模式尾段与步进快照中的硬编码 `30` 页脚占位，改为与设置项一致的动态规则；
+    - `reader_status_bar.dart` 的页眉/页脚系统 inset 改为同义规则：`showStatusBar/hideNavigationBar/paddingDisplayCutouts` 共同决定 top/bottom inset。
+  - 差异点清单（实施前）：
+    - 现有滚动模式正文仅用 `SafeArea(top)` 规避系统栏，未对页眉/页脚动态高度完整让位，页眉/页脚与正文存在叠层覆盖风险。
+    - 滚动模式尾段与 `ScrollPageStepCalculator` 快照使用固定 `30` 作为页脚占位，和 `footerPadding* / showFooterLine` 动态配置不一致。
+    - 页眉/页脚组件底层只读取 `MediaQuery.padding`，在“隐藏状态栏/导航栏 + 开启 cutout 补偿”场景下会失去 `viewPadding` 补偿，导致顶部/底部贴边。
+  - 逐项检查清单（实施前）：
+    - 入口：阅读页滚动模式顶/底状态栏可见且可配置。
+    - 状态：状态栏/导航栏显示开关与 cutout 开关切换后，正文与页眉/页脚占位应同步。
+    - 异常：布局调整不得引入崩溃或空态错位。
+    - 文案：不改动用户可见文案。
+    - 排版：顶/底栏与正文不可互相覆盖，末尾行可见。
+    - 交互触发：菜单开关、搜索面板开关不应导致阅读正文跳变。
+  - 逐项对照清单（实施后）：
+    - 入口：已同义（滚动模式仍由原入口触发，未新增扩展入口）。
+    - 状态：已同义（系统栏与 cutout inset 统一按设置计算；header/footer slot 与正文占位一致）。
+    - 异常：已同义（仅布局计算收敛，无新增异常分支）。
+    - 文案：已同义（无文案变更）。
+    - 排版：已同义（移除硬编码 `30`，正文顶部/底部让位与 tip 高度动态一致）。
+    - 交互触发：已同义（菜单/搜索面板开关期间仍保持同一占位基线，不引入额外跳变）。
+    - 验证：命令 `dart format lib/features/reader/views/simple_reader_view.dart lib/features/reader/widgets/reader_status_bar.dart`；手工路径（待回归）`阅读页 -> 滚动模式 -> 状态栏与显示 -> 切换 显示状态栏/隐藏导航栏/显示刘海区域`（校验页眉页脚与正文无覆盖）；手工路径（待回归）`同路径调大 header/footer padding 并切换分割线`（校验顶部/底部占位即时同步）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本次仅收敛阅读器滚动模式布局与系统 inset 语义，不改动搜索/发现/详情/目录/正文抓取链路。
+  - 下一项：继续推进 `P7-seq313`（`rss_main_item.xml / @+id/menu_del / 删除`），本修复不改变既有优先级队列。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq312`（`rss_main_item.xml / @+id/menu_disable / 禁用源`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq312`：对照 legado `rss_main_item.xml`、`RssAdapter.showMenu(menu_disable)`、`RssFragment.disable` 与 `RssViewModel.disable`，在 `订阅 -> RSS 主列表` 链路收敛“禁用源”动作语义。Flutter 侧保持长按条目动作面板“禁用”入口，点击后先按 `sourceUrl` 回查当前源，命中后静默写库 `enabled=false` 并依赖启用列表过滤即时移除条目；未命中场景静默返回。
+  - `P7-seq312` 差异点清单（实施前）：
+    - legado `rss_main_item.xml` 固定包含 `menu_disable`，由 `RssAdapter.showMenu` 在长按条目时触发；Flutter 侧虽已有“禁用”动作，但此前直接使用传入快照对象写库，未对齐 legacy “基于当前库内实体更新”边界。
+    - legado `RssFragment.disable -> RssViewModel.disable` 仅执行 `enabled=false` 写库，不弹确认框、不弹成功提示；Flutter 侧需保持同义静默触发与状态流转。
+    - 与 `P7-seq310` 一致，Flutter `RssSourceRepository.updateSource` 为 upsert 语义；若目标源已被并发删除而仍写入快照对象，可能发生“已删除源被重新插入”的状态漂移，且此前缺少 `rss_main_item.menu_disable` 节点级异常可观测日志。
+  - `P7-seq312` 逐项检查清单（实施前）：
+    - 入口：长按订阅源条目是否可达“禁用”动作。
+    - 状态：点击后是否仅将当前源写为 `enabled=false` 并从启用列表移除。
+    - 异常：写库失败是否仅记录 `ExceptionLogService(node=rss_main_item.menu_disable)`。
+    - 文案：动作文案是否保持“禁用”。
+    - 排版：是否保持现有 `CupertinoActionSheet` 四项结构，不新增跨序号入口。
+    - 交互触发：是否点击即执行、无确认弹窗、无成功提示。
+  - `P7-seq312` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSubscriptionView` 长按条目动作面板保留“禁用”入口并可触发）。
+    - 状态：已同义（动作前先回查当前 `sourceUrl` 对应源；命中时写回 `enabled=false`，未命中时静默返回；启用列表按流刷新后移除该条目）。
+    - 异常：已同义（失败分支仅记录 `ExceptionLogService(node=rss_main_item.menu_disable)`，不新增错误弹窗）。
+    - 文案：已同义（动作文案保持“禁用”）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold + CupertinoActionSheet` 承载，保持 `置顶/编辑/禁用/删除` 四项结构）。
+    - 交互触发：已同义（点击后直接执行禁用写库链路，成功静默，无确认框与成功提示）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_subscription_view.dart`；手工路径（待回归）`订阅 -> 长按任一启用订阅源 -> 禁用`（校验目标源从启用列表移除且无确认/成功提示）；手工路径（待回归）`源被删除后再次触发禁用`（校验流程静默返回不崩溃）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_disable` 触发边界与异常可观测输出，不改动 `menu_del`（`seq313`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq313`（`rss_main_item.xml / @+id/menu_del / 删除`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq311`（`rss_main_item.xml / @+id/menu_edit / 编辑`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq311`：对照 legado `rss_main_item.xml`、`RssAdapter.showMenu(menu_edit)` 与 `RssFragment.edit`，在 `订阅 -> RSS 主列表` 链路收敛“编辑”动作语义。Flutter 侧保持长按条目动作面板“编辑”入口，点击后仅按 `sourceUrl` 直接打开 `RssSourceEditView`；同步移除 legado 不存在的扩展入口“分组筛选”，使动作面板结构回归 `置顶/编辑/禁用/删除` 四项同层级菜单。
+  - `P7-seq311` 差异点清单（实施前）：
+    - legado `rss_main_item.xml` 的长按菜单固定只有 `menu_top/menu_edit/menu_disable/menu_del` 四项；Flutter 侧此前在同一动作面板额外保留“分组筛选”扩展入口，菜单结构存在偏差。
+    - legado `RssFragment.edit` 仅按 `sourceUrl` 直达 `RssSourceEditActivity`，无确认弹窗、无成功提示、无 `RESULT_OK` 刷新分支；Flutter 侧需保持同义直达与静默返回边界。
+    - legado `menu_edit` 与 `menu_disable/menu_del` 为并列独立动作；本序号需只处理 `menu_edit`，不得提前并入 `seq312/seq313` 的禁用/删除行为改造。
+  - `P7-seq311` 逐项检查清单（实施前）：
+    - 入口：长按订阅源条目是否可达“编辑”动作。
+    - 状态：动作面板是否收敛为四项同层级菜单（置顶/编辑/禁用/删除）。
+    - 异常：编辑动作是否保持静默触发，不引入额外提示分支。
+    - 文案：动作文案是否保持“编辑”。
+    - 排版：是否保持现有 `CupertinoActionSheet` 承载并移除扩展入口。
+    - 交互触发：点击后是否仅打开编辑页，取消/保存返回均静默。
+  - `P7-seq311` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSubscriptionView` 长按条目动作面板保留“编辑”入口并可触发）。
+    - 状态：已同义（动作面板收敛为 `置顶/编辑/禁用/删除` 四项，同层级顺序与 legado 一致）。
+    - 异常：已同义（编辑动作保持静默触发，不新增确认框与成功提示）。
+    - 文案：已同义（动作文案保持“编辑”）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold + CupertinoActionSheet` 承载，仅移除非 legacy 扩展入口）。
+    - 交互触发：已同义（点击后仅按 `sourceUrl` 打开 `RssSourceEditView`；取消返回与保存返回均不触发额外刷新提示）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_subscription_view.dart`；手工路径（待回归）`订阅 -> 长按任一启用订阅源 -> 编辑`（校验动作面板仅保留四项且点击后直接进入编辑页）；手工路径（待回归）`编辑页直接返回取消`（校验订阅列表保持静默且不弹提示）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_edit` 入口与动作面板结构，不改动 `menu_disable/menu_del`（`seq312/seq313`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq312`（`rss_main_item.xml / @+id/menu_disable / 禁用源`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-26`
+  - 状态变更：完成 `P7-seq310`（`rss_main_item.xml / @+id/menu_top / 置顶`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq310`：对照 legado `rss_main_item.xml`、`RssAdapter.showMenu(menu_top)`、`RssFragment.toTop` 与 `RssViewModel.topSource`，在 `订阅 -> RSS 主列表` 链路收敛“置顶”动作语义。Flutter 侧保持长按条目动作面板“置顶”入口，点击后按 `customOrder=minOrder-1` 静默写库并依赖列表流刷新回显；补齐失败分支可观测日志 `ExceptionLogService(node=rss_main_item.menu_top)`，并新增“源已不存在时静默返回”边界保护。
+  - `P7-seq310` 差异点清单（实施前）：
+    - legado `rss_main_item.xml` 固定包含 `menu_top` 且由 `RssAdapter.showMenu` 在长按条目时触发；Flutter 侧虽已有“置顶”动作，但此前缺少 `rss_main_item.menu_top` 节点级异常可观测输出。
+    - legado `RssFragment.toTop -> RssViewModel.topSource` 使用库内实体执行写库更新；Flutter 侧此前 `_moveToTop` 直接使用传入对象写库，缺少“目标源已不存在”时的静默短路边界，存在状态漂移风险。
+    - legado `menu_top` 全流程静默，无成功提示或确认弹窗；Flutter 侧需要明确保持该静默边界不变。
+  - `P7-seq310` 逐项检查清单（实施前）：
+    - 入口：长按订阅源条目是否可达“置顶”动作。
+    - 状态：置顶后是否按 `customOrder=minOrder-1` 前移并刷新列表。
+    - 异常：写库失败是否仅记录 `ExceptionLogService(node=rss_main_item.menu_top)`。
+    - 文案：动作文案是否保持“置顶”。
+    - 排版：是否保持现有 `CupertinoActionSheet` 结构，不新增扩展入口。
+    - 交互触发：点击后是否静默执行，不弹成功提示。
+  - `P7-seq310` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssSubscriptionView` 长按条目动作面板保留“置顶”入口并可触发）。
+    - 状态：已同义（动作前先回查当前 `sourceUrl` 对应源；命中时按 `minOrder-1` 写回 `customOrder` 并由流刷新前移，未命中时静默返回）。
+    - 异常：已同义（失败分支仅记录 `ExceptionLogService(node=rss_main_item.menu_top)`，不新增错误弹窗）。
+    - 文案：已同义（动作文案保持“置顶”）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold + CupertinoActionSheet` 承载，未新增跨序号入口）。
+    - 交互触发：已同义（点击后直接进入置顶写库链路，成功静默，无确认框与成功提示）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_subscription_view.dart`；手工路径（待回归）`订阅 -> 长按任一启用订阅源 -> 置顶`（校验目标源移动到启用列表顶部且无成功提示）；手工路径（待回归）`源被删除后再次触发置顶`（校验流程静默返回不崩溃）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `menu_top` 触发边界与异常可观测输出，不改动 `menu_edit/menu_disable/menu_del`（`seq311~313`）后续动作。
+  - 下一项：按优先级继续推进 `P7-seq311`（`rss_main_item.xml / @+id/menu_edit / 编辑`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq309`（`rss_favorites.xml / @+id/menu_del_all / 删除所有`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq309`：对照 legado `rss_favorites.xml`、`RssFavoritesActivity.onCompatOptionsItemSelected(menu_del_all)/deleteAll` 与 `RssStarDao.deleteAll`，在 `订阅 -> 收藏夹` 链路收敛“删除所有”动作语义。Flutter 侧在 `RssFavoritesPlaceholderView` 顶栏“更多”菜单补齐“删除所有”单项入口；点击后弹确认文案“确定删除\n<全部>收藏”，取消保持静默，确认后清空全部收藏记录。
+  - `P7-seq309` 差异点清单（实施前）：
+    - legado `rss_favorites.xml` 已定义 `menu_del_all`；Flutter 收藏夹此前“更多”菜单仅包含“删除当前分组”，缺少“删除所有”同层动作入口。
+    - legado `RssFavoritesActivity.deleteAll` 不依赖当前分组状态，始终弹确认框并在确认后执行全量清空；Flutter 侧此前没有“全量删除收藏”状态机，无法对齐确认文案与触发边界。
+    - legado 依赖 `RssStarDao.deleteAll()` 执行全量删除；Flutter `RssStarRepository` 此前仅提供 `deleteByGroup`，缺少全量删除接口。
+  - `P7-seq309` 逐项检查清单（实施前）：
+    - 入口：收藏夹是否补齐“更多 -> 删除所有”动作入口。
+    - 状态：是否不依赖分组状态即可触发确认并执行全量删除。
+    - 异常：全量删除失败是否可观测且不新增扩展提示。
+    - 文案：动作文案是否为“删除所有”，确认文案是否为“确定删除\n<全部>收藏”。
+    - 排版：是否保持 `Cupertino` 顶栏 + 弹层结构，不引入额外扩展入口。
+    - 交互触发：取消是否静默返回，确认后是否清空全部收藏且不弹成功提示。
+  - `P7-seq309` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssFavoritesPlaceholderView` 顶栏“更多”菜单新增“删除所有”单项入口，保留“删除当前分组”同层结构）。
+    - 状态：已同义（删除所有不依赖当前分组；即使收藏为空也可触发确认，确认后执行全量删除 no-op）。
+    - 异常：已同义（失败分支仅记录 `ExceptionLogService(node=rss_favorites.menu_del_all)`）。
+    - 文案：已同义（动作文案“删除所有”；确认内容为“确定删除\n<全部>收藏”）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold + CupertinoActionSheet + CupertinoAlertDialog`，仅补齐 `menu_del_all` 必需入口与触发逻辑）。
+    - 交互触发：已同义（取消不落库且静默返回；确认后调用 `RssStarRepository.deleteAll` 清空全部收藏，不追加成功提示）。
+    - 验证：命令 `dart format lib/core/database/repositories/rss_star_repository.dart lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 右上角收藏 -> 收藏夹 -> 右上角更多 -> 删除所有 -> 取消/确定`（校验确认文案、取消静默、确认后收藏全量清空）；手工路径（待回归）`收藏为空 -> 同入口执行删除所有`（校验仍弹确认且确认后流程静默不崩溃）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_del_all` 入口与全量删除链路，不改动 RSS 源、文章缓存与收藏分组展示链路。
+  - 下一项：按优先级继续推进 `P7-seq310`（`rss_main_item.xml / @+id/menu_top / 置顶`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq308`（`rss_favorites.xml / @+id/menu_del_group / 删除当前分组`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq308`：对照 legado `rss_favorites.xml`、`RssFavoritesActivity.onCompatOptionsItemSelected(menu_del_group)/deleteGroup` 与 `RssStarDao.deleteByGroup`，在 `订阅 -> 收藏夹` 链路收敛“删除当前分组”动作语义。Flutter 侧在 `RssFavoritesPlaceholderView` 顶栏补齐“更多”一级动作，并新增“删除当前分组”单项入口；点击后按当前分组弹确认文案“确定删除\n<分组名>分组”，取消保持静默，确认后按 `group_name` 删除该分组收藏记录。
+  - `P7-seq308` 差异点清单（实施前）：
+    - legado `rss_favorites.xml` 已定义 `menu_del_group`；Flutter 收藏夹此前仅有“分组”入口，缺少“删除当前分组”菜单层级与触发链路。
+    - legado `RssFavoritesActivity.deleteGroup` 以当前 tab 分组为删除目标并弹确认框；Flutter 收藏页此前没有“当前分组”删除状态机，无法对齐确认文案与删除边界。
+    - legado 依赖 `RssStarDao.deleteByGroup(group)` 执行按分组删除；Flutter `RssStarRepository` 此前仅提供 `watchGroups/watchByGroup`，缺少删除接口。
+  - `P7-seq308` 逐项检查清单（实施前）：
+    - 入口：收藏夹是否补齐“更多 -> 删除当前分组”动作入口。
+    - 状态：是否以当前选中分组作为删除目标。
+    - 异常：删除失败是否可观测且不新增扩展提示。
+    - 文案：确认弹窗是否为“确定删除\n<分组名>分组”语义。
+    - 排版：是否保持 `Cupertino` 顶栏 + 弹层结构，不引入额外扩展入口。
+    - 交互触发：取消是否静默返回，确认后是否仅删除当前分组收藏。
+  - `P7-seq308` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssFavoritesPlaceholderView` 顶栏新增“更多”动作，内含“删除当前分组”单项入口）。
+    - 状态：已同义（删除目标取 `currentGroup`，空分组场景直接静默返回）。
+    - 异常：已同义（失败分支仅记录 `ExceptionLogService(node=rss_favorites.menu_del_group)`）。
+    - 文案：已同义（确认内容为“确定删除\n<分组名>分组”）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold + CupertinoActionSheet + CupertinoAlertDialog`，仅补齐 `menu_del_group` 必需入口）。
+    - 交互触发：已同义（取消不落库且静默返回；确认后调用 `RssStarRepository.deleteByGroup` 删除当前分组记录，不追加成功提示）。
+    - 验证：命令 `dart format lib/core/database/repositories/rss_star_repository.dart lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 右上角收藏 -> 收藏夹 -> 右上角更多 -> 删除当前分组 -> 取消/确定`（校验确认文案、取消静默、确认后当前分组收藏被删除）；手工路径（待回归）`收藏为空或无当前分组 -> 同入口执行删除当前分组`（校验流程静默且不崩溃）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_del_group` 入口与按分组删除链路，不改动 RSS 源、文章缓存与收藏写入链路。
+  - 下一项：按优先级继续推进 `P7-seq309`（`rss_favorites.xml / @+id/menu_del_all / 删除所有`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq307`（`rss_favorites.xml / @+id/menu_group / 分组`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq307`：对照 legado `rss_favorites.xml`、`RssFavoritesActivity.onCompatCreateOptionsMenu/upGroupsMenu/onCompatOptionsItemSelected(item.groupId == menu_group)`、`RssFavoritesFragment` 与 `RssStarDao.flowGroups/flowByGroup`，在 `订阅 -> 收藏夹` 链路收敛“分组”动作语义。Flutter 侧将 `RssFavoritesPlaceholderView` 由占位承载升级为可用收藏夹页面：补齐顶栏一级“分组”入口，分组菜单按收藏表动态生成，点击后切换当前分组收藏列表并保持静默。
+  - `P7-seq307` 差异点清单（实施前）：
+    - legado `rss_favorites.xml` 将 `menu_group` 定义为 `showAsAction=always` 且承载动态子菜单；Flutter 收藏页此前仅为占位卡片，缺少顶栏“分组”入口与动态分组菜单。
+    - legado `RssFavoritesActivity` 通过 `flowGroups -> upGroupsMenu -> setCurrentItem(item.order)` 完成“分组菜单驱动当前页面切换”；Flutter 侧此前不存在收藏分组状态机，无法等价切组。
+    - legado 依赖 `RssStarDao` 持久层提供 `flowGroups/flowByGroup`；Flutter 数据库此前无 `rssStars` 对应表与仓储，收藏分组数据链路缺失。
+  - `P7-seq307` 逐项检查清单（实施前）：
+    - 入口：收藏夹是否补齐顶栏一级“分组”动作入口。
+    - 状态：分组菜单是否按收藏分组动态生成，切组后是否切换当前分组列表。
+    - 异常：空分组/空收藏场景是否保持静默且页面可继续操作。
+    - 文案：菜单标题是否为“分组”，页面语义是否为“收藏夹”。
+    - 排版：是否保持 `Cupertino` 顶栏 + 分组控件 + 列表承载层级，不引入额外扩展入口。
+    - 交互触发：点击分组后是否即时切换当前分组列表且不弹成功提示。
+  - `P7-seq307` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssFavoritesPlaceholderView` 顶栏新增一级“分组”动作按钮，保持收藏页入口层级）。
+    - 状态：已同义（分组项来自 `rss_star_records.group_name` 动态查询并按组名排序；点击分组后更新当前分组并切换对应收藏列表）。
+    - 异常：已同义（当无分组或分组无收藏时仅展示空态文案“暂无收藏/当前分组暂无收藏”，流程静默不弹额外提示）。
+    - 文案：已同义（分组动作文案为“分组”，收藏页标题收敛为“收藏夹”）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold` 承载，分组切换使用 `CupertinoActionSheet + CupertinoSlidingSegmentedControl`，仅补齐 `menu_group` 必需结构）。
+    - 交互触发：已同义（分组菜单点击后立即切组并刷新列表，不新增确认弹窗与成功提示）。
+    - 验证：命令 `dart run build_runner build --delete-conflicting-outputs`；命令 `dart format lib/features/rss/views/rss_articles_placeholder_view.dart lib/core/database/repositories/rss_star_repository.dart lib/features/rss/models/rss_star.dart lib/core/database/drift/source_drift_database.dart lib/main.dart`；手工路径（待回归）`订阅 -> 右上角收藏 -> 收藏夹 -> 右上角分组`（校验分组菜单可达、分组项动态回显且点击后切换列表）；手工路径（待回归）`收藏仅 1 组/0 组场景`（校验分组控件显隐与空态文案边界）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号新增 `rss_star_records` 持久层用于收藏分组承载，不改动 RSS 源与文章缓存结构。已知后续依赖：收藏写入入口 `menu_rss_star`（`seq315`）尚未迁移前，收藏数据需依赖已有库数据或后续序号回补。
+  - 下一项：按优先级继续推进 `P7-seq308`（`rss_favorites.xml / @+id/menu_del_group / 删除当前分组`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq306`（`rss_articles.xml / @+id/menu_clear / 清除`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq306`：对照 legado `rss_articles.xml`、`RssSortActivity.onCompatOptionsItemSelected(menu_clear)`、`RssSortViewModel.clearArticles` 与 `RssArticleDao.delete(origin)`，在 `订阅 -> RSS 文章列表` 链路收敛“清除”动作语义。Flutter 侧在 `RssArticlesPlaceholderView` 的“更多”菜单补齐 legacy 同义“清除”入口；点击后仅按当前 `sourceUrl` 清空 RSS 文章缓存并静默返回，不追加确认弹窗或成功提示。
+  - `P7-seq306` 差异点清单（实施前）：
+    - legado `rss_articles.xml` 已定义 `menu_clear`；Flutter `RssArticlesPlaceholderView` 此前“更多”菜单仅有 `menu_login/menu_refresh_sort/menu_set_source_variable/menu_edit_source/menu_switch_layout/menu_read_record`，缺少“清除”同层入口。
+    - legado `RssSortActivity.onCompatOptionsItemSelected(menu_clear)` 仅在 `url` 非空时调用 `viewModel.clearArticles()`；Flutter RSS 文章列表此前缺少按当前源直接清空文章缓存的触发链路。
+    - legado `RssSortViewModel.clearArticles -> RssArticleDao.delete(origin)` 语义是“静默清空并返回当前页”；Flutter 侧此前没有对应数据层调用，无法对齐“无确认/无成功提示”的边界。
+  - `P7-seq306` 逐项检查清单（实施前）：
+    - 入口：RSS 文章列表“更多”菜单是否补齐“清除”入口。
+    - 状态：点击后是否仅清空当前 `sourceUrl` 对应 RSS 文章缓存。
+    - 异常：清空失败是否可观测且不新增扩展提示。
+    - 文案：动作文案是否为“清除”并与 legacy 菜单层级同义。
+    - 排版：是否保持现有 `CupertinoActionSheet` 承载，不引入额外确认流程。
+    - 交互触发：点击后是否静默完成且页面保持可继续操作。
+  - `P7-seq306` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssArticlesPlaceholderView` “更多”菜单新增“清除”单项入口，位置在“阅读记录”后）。
+    - 状态：已同义（点击后调用 `RssArticleRepository.deleteByOrigin(sourceUrl)`，仅作用于当前源缓存）。
+    - 异常：已同义（失败分支仅记录 `ExceptionLogService(node=rss_articles.menu_clear)`，不新增扩展提示）。
+    - 文案：已同义（菜单文案“清除”与 legado `@string/clear` 语义一致）。
+    - 排版：已同义（沿用现有 `Cupertino` 页面与弹层结构，仅补齐 `menu_clear` 必需入口与触发逻辑）。
+    - 交互触发：已同义（点击后直接执行清理并静默返回；无确认弹窗、无成功提示、页面保持可继续操作）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 点击任一订阅源进入文章列表 -> 右上角更多 -> 清除`（校验入口可达且点击后无确认/无成功提示）；手工路径（待回归）`同一订阅源先写入文章缓存 -> 右上角更多 -> 清除 -> 检查本地表 rss_article_records(origin=sourceUrl)`（校验计数归零）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_articles/menu_clear` 入口与静默清理边界，不改动 `rss_favorites/menu_group`（`seq307`）后续能力。
+  - 下一项：按优先级继续推进 `P7-seq307`（`rss_favorites.xml / @+id/menu_group / 分组`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq304`（`rss_articles.xml / @+id/menu_switch_layout / 切换布局`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq304`：对照 legado `rss_articles.xml`、`RssSortActivity.onCompatOptionsItemSelected(menu_switch_layout)`、`RssSortViewModel.switchLayout` 与 `RssArticlesFragment`，在 `订阅 -> RSS 文章列表` 链路收敛“切换布局”动作语义。Flutter 侧在 `RssArticlesPlaceholderView` 的“更多”菜单补齐 legacy 同义“切换布局”入口；点击后按当前源执行 `articleStyle` 轮换 `0 -> 1 -> 2 -> 0` 并写回源记录，流程保持静默，不追加成功提示；为支撑回归核验，页面新增“布局模式”回显卡片展示当前 `articleStyle`。
+  - `P7-seq304` 差异点清单（实施前）：
+    - legado `rss_articles.xml` 已定义 `menu_switch_layout`；Flutter `RssArticlesPlaceholderView` 此前“更多”菜单仅有 `menu_login/menu_refresh_sort/menu_set_source_variable/menu_edit_source/menu_read_record`，缺少“切换布局”同层入口。
+    - legado `RssSortViewModel.switchLayout` 语义为 `articleStyle` 轮换（`0->1->2->0`）并更新当前源，再由 `upFragments` 即时刷新页面；Flutter RSS 文章列表此前缺少对应的轮换与持久化触发链路。
+    - legado `RssArticlesFragment` 依赖 `articleStyle` 决定列表/网格布局；Flutter 当前占位承载此前没有可见状态回显，不利于手工确认“切换后状态是否生效并持久化”。
+  - `P7-seq304` 逐项检查清单（实施前）：
+    - 入口：RSS 文章列表“更多”菜单是否补齐“切换布局”入口。
+    - 状态：点击后是否按 `articleStyle` 顺序轮换并写回当前源。
+    - 异常：写库失败是否可观测且无额外扩展提示。
+    - 文案：动作文案是否为“切换布局”并保持同层级语义。
+    - 排版：是否保持现有 `CupertinoActionSheet` 承载，不引入扩展流程。
+    - 交互触发：切换后是否立即刷新页面状态并支持重进回显。
+  - `P7-seq304` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssArticlesPlaceholderView` “更多”菜单新增“切换布局”单项入口，位置在“编辑源”后、“阅读记录”前）。
+    - 状态：已同义（点击后按当前 `articleStyle` 执行 `0->1->2->0` 轮换；存在源记录时通过 `RssSourceRepository.updateSource` 持久化，缺失源记录时保持内存回显轮换）。
+    - 异常：已同义（写库失败仅记录 `ExceptionLogService(node=rss_articles.menu_switch_layout)`，不新增扩展提示）。
+    - 文案：已同义（菜单文案“切换布局”与 legado `@string/switchLayout` 语义一致）。
+    - 排版：已同义（沿用现有 `Cupertino` 页面与弹层结构，仅补齐 `menu_switch_layout` 必需入口与状态回显卡片）。
+    - 交互触发：已同义（每次点击均触发样式轮换与 `_sortReloadVersion` 刷新；“布局模式”卡片即时回显当前样式，重进页面可核对持久化结果）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 点击任一订阅源进入文章列表 -> 右上角更多 -> 切换布局`（校验 `articleStyle` 按 `0->1->2->0` 循环，且页面“布局模式”即时更新）；手工路径（待回归）`连续切换后返回订阅列表并重进同一源`（校验“布局模式”回显保持上次切换结果）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_articles/menu_switch_layout` 入口、轮换与持久化边界，不改动 `menu_clear`（`seq306`）后续能力。
+  - 下一项：按优先级继续推进 `P7-seq306`（`rss_articles.xml / @+id/menu_clear / 清除`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq303`（`rss_articles.xml / @+id/menu_edit_source / 编辑源`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq303`：对照 legado `rss_articles.xml`、`RssSortActivity.onCompatOptionsItemSelected(menu_edit_source)`、`editSourceResult(RESULT_OK->initData/upFragments)` 与 `RssSourceEditActivity`，在 `订阅 -> RSS 文章列表` 链路收敛“编辑源”动作语义。Flutter 侧在 `RssArticlesPlaceholderView` 的“更多”菜单补齐 legacy 同义“编辑源”入口；点击后按当前 `sourceUrl` 打开 `RssSourceEditView`，仅在保存返回（`result=true`）刷新标题与分类预览，取消返回保持静默不刷新。
+  - `P7-seq303` 差异点清单（实施前）：
+    - legado `rss_articles.xml` 已定义 `menu_edit_source`；Flutter `RssArticlesPlaceholderView` 此前“更多”菜单仅有 `menu_login/menu_refresh_sort/menu_set_source_variable/menu_read_record`，缺少“编辑源”同层入口。
+    - legado `RssSortActivity` 通过 `viewModel.rssSource?.sourceUrl` 打开 `RssSourceEditActivity`；Flutter RSS 文章列表此前无按 `sourceUrl` 打开 RSS 源编辑承载的触发链路。
+    - legado 仅在 `editSourceResult` 返回 `RESULT_OK` 时执行 `initData + upFragments`；Flutter 侧此前缺少“保存返回刷新、取消不刷新”的明确边界。
+  - `P7-seq303` 逐项检查清单（实施前）：
+    - 入口：RSS 文章列表“更多”菜单是否补齐“编辑源”入口。
+    - 状态：点击后是否按当前 `sourceUrl` 打开 RSS 源编辑承载并回显源信息。
+    - 异常：打开编辑承载失败是否可观测。
+    - 文案：动作文案是否为“编辑源”并与菜单层级同义。
+    - 排版：是否保持现有 `CupertinoActionSheet` 承载，不引入扩展入口。
+    - 交互触发：是否仅在保存返回时刷新分类预览，取消返回不刷新。
+  - `P7-seq303` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssArticlesPlaceholderView` “更多”菜单新增“编辑源”单项入口，位置在“设置源变量”后）。
+    - 状态：已同义（点击后按当前 `sourceUrl` 进入 `RssSourceEditView`，保存返回后页面状态回刷）。
+    - 异常：已同义（失败分支记录 `ExceptionLogService(node=rss_articles.menu_edit_source)`，不新增扩展提示）。
+    - 文案：已同义（菜单文案“编辑源”与 legado `@string/edit_source` 语义一致）。
+    - 排版：已同义（沿用现有 `Cupertino` 页面与弹层结构，仅补齐 `menu_edit_source` 必需入口）。
+    - 交互触发：已同义（仅 `result=true` 触发 `_sortReloadVersion` 递增刷新；取消返回保持静默不刷新）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 点击任一订阅源进入文章列表 -> 右上角更多 -> 编辑源 -> 修改后保存返回`（校验标题/分类预览刷新）；手工路径（待回归）`同入口进入编辑页后直接返回`（校验页面不刷新）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_articles/menu_edit_source` 入口与返回刷新边界，不改动 `menu_switch_layout/menu_clear`（`seq304/306`）后续能力。
+  - 下一项：按优先级继续推进 `P7-seq304`（`rss_articles.xml / @+id/menu_switch_layout / 切换布局`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq302`（`rss_articles.xml / @+id/menu_set_source_variable / 设置源变量`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq302`：对照 legado `rss_articles.xml`、`RssSortActivity.setSourceVariable`、`VariableDialog` 与 `BaseSource.setVariable`，在 `订阅 -> RSS 文章列表` 链路收敛“设置源变量”动作语义。Flutter 侧在 `RssArticlesPlaceholderView` 的“更多”菜单补齐 legacy 同义“设置源变量”入口；点击后打开源变量编辑承载（标题“设置源变量”，说明文案“源变量可在js中通过source.getVariable()获取”），保存仅写入 `sourceVariable_<sourceUrl>`（空串可保存），取消与成功均不追加提示。
+  - `P7-seq302` 差异点清单（实施前）：
+    - legado `rss_articles.xml` 已定义 `menu_set_source_variable`；Flutter `RssArticlesPlaceholderView` 此前“更多”菜单仅有 `menu_login/menu_refresh_sort/menu_read_record`，缺少“设置源变量”同层入口。
+    - legado `RssSortActivity.setSourceVariable` 固定读取 `source.getVariable()` 并拼接 `source.getDisplayVariableComment("源变量可在js中通过source.getVariable()获取")` 展示说明；Flutter RSS 文章列表此前缺少对应变量编辑承载与说明文案。
+    - legado `VariableDialog(menu_save)` 保存后仅回调 `setVariable`，`BaseSource.setVariable` 语义为“`null` 删除，空串保留并写入”；Flutter 侧需保持“空串可保存、取消静默、成功不提示”的同义边界。
+  - `P7-seq302` 逐项检查清单（实施前）：
+    - 入口：RSS 文章列表“更多”菜单是否补齐“设置源变量”入口。
+    - 状态：点击后是否打开变量编辑承载并回显当前 `sourceVariable_<sourceUrl>`。
+    - 异常：源不存在时是否提示“源不存在”，保存失败是否保持可观测。
+    - 文案：标题是否为“设置源变量”，说明文案是否与 legado 默认注释同义。
+    - 排版：是否保持现有 `CupertinoActionSheet -> CupertinoPopupSurface` 层级，不引入扩展入口。
+    - 交互触发：保存是否仅写 `sourceVariable_<sourceUrl>`，空串是否可保存，取消是否静默返回。
+  - `P7-seq302` 逐项对照清单（实施后）：
+    - 入口：已同义（`RssArticlesPlaceholderView` “更多”菜单新增“设置源变量”单项入口）。
+    - 状态：已同义（点击后打开源变量编辑承载并回显当前变量值；重进可回显最新保存内容）。
+    - 异常：已同义（`sourceUrl` 为空时提示“源不存在”；其余异常保持框架可观测输出）。
+    - 文案：已同义（标题“设置源变量”；说明文案默认“源变量可在js中通过source.getVariable()获取”并支持叠加 `variableComment`）。
+    - 排版：已同义（沿用 `Cupertino` 页面与弹层结构，仅补齐 `menu_set_source_variable` 必需入口与编辑承载）。
+    - 交互触发：已同义（保存仅写 `sourceVariable_<sourceUrl>`；空串可保存；取消静默返回；成功无提示）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_articles_placeholder_view.dart`、`dart analyze lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 点击任一订阅源进入文章列表 -> 右上角更多 -> 设置源变量`（校验入口可达、文案一致、保存后回显）；手工路径（待回归）`变量编辑承载 -> 取消`（校验静默返回不落盘）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_articles/menu_set_source_variable` 入口与变量保存边界，不改动 `menu_edit_source/menu_switch_layout/menu_clear`（`seq303/304/306`）后续能力。
+  - 下一项：按优先级继续推进 `P7-seq303`（`rss_articles.xml / @+id/menu_edit_source / 编辑源`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq344`（`rss_source_sel.xml / @+id/menu_export_selection / 导出所选`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq344`：对照 legado `rss_source_sel.xml`、`RssSourceActivity.onMenuItemClick(menu_export_selection)`、`RssSourceViewModel.saveToFile` 与 `HandleFileContract.EXPORT(fileName=exportRssSource.json)`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路补齐 legacy 同义“多选 -> 批量操作 -> 导出所选”动作。Flutter 侧在 RSS 源管理页新增行级勾选与底部批量操作承载，并在“批量操作”菜单补齐“导出所选”单项入口；导出默认文件名收敛为 `exportRssSource.json`，取消导出保持静默，导出成功后弹“导出成功”路径框并支持复制路径。
+  - `P7-seq344` 差异点清单（实施前）：
+    - legado `rss_source_sel.xml` 已定义 `menu_export_selection`，并挂载在 `SelectActionBar` 多选菜单；Flutter `RssSourceManageView` 此前缺少 RSS 源多选承载层，入口不可达。
+    - legado `menu_export_selection` 固定调用 `saveToFile(adapter.selection)` 并以 `HandleFileContract.EXPORT` 默认文件名 `exportRssSource.json` 导出；Flutter RSS 导出服务此前默认名为时间戳文件 `soupreader_rss_<ts>.json`，存在语义偏差。
+    - legado 导出取消分支静默返回，成功分支弹路径并可复制；Flutter RSS 管理页此前无“导出成功路径弹层”同义反馈。
+  - `P7-seq344` 逐项检查清单（实施前）：
+    - 入口：RSS 源管理页是否具备可达的多选承载与“批量操作 -> 导出所选”入口。
+    - 状态：导出集合是否严格取当前可见选中 RSS 源。
+    - 异常：取消导出是否静默返回，导出失败是否保留可观测错误摘要。
+    - 文案：批量动作文案是否为“导出所选”，成功弹层标题是否为“导出成功”。
+    - 排版：是否沿用 `AppCupertinoPageScaffold + 底部批量栏 + ActionSheet` 结构，不引入扩展入口。
+    - 交互触发：导出默认文件名是否固定 `exportRssSource.json` 且成功后支持复制路径。
+  - `P7-seq344` 逐项对照清单（实施后）：
+    - 入口：已同义（RSS 源管理页新增行级勾选与底部“全选/反选/更多”批量承载，“更多”内新增“导出所选”单项入口）。
+    - 状态：已同义（导出集合取当前可见列表的选中源，与 legado `adapter.selection` 作用域一致）。
+    - 异常：已同义（取消保存返回 `cancelled=true` 后静默返回；失败分支弹错误摘要“导出失败: ...”保持可观测）。
+    - 文案：已同义（动作文案“导出所选”；成功弹层标题“导出成功”并展示导出路径）。
+    - 排版：已同义（沿用 Cupertino 页面结构，仅补齐多选承载与 `menu_export_selection` 必需入口）。
+    - 交互触发：已同义（导出默认文件名固定 `exportRssSource.json`；成功弹层支持“复制路径”；取消导出不提示）。
+    - 验证：命令 `dart format lib/features/rss/services/rss_source_import_export_service.dart lib/features/rss/views/rss_source_manage_view.dart`、`dart analyze lib/features/rss/services/rss_source_import_export_service.dart lib/features/rss/views/rss_source_manage_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 右上角设置(订阅源管理) -> 勾选若干订阅源 -> 底部更多 -> 导出所选`（校验默认文件名 `exportRssSource.json` 且取消保存静默返回）；手工路径（待回归）`导出成功后查看提示框`（校验标题“导出成功”与“复制路径”动作可用）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `rss_source_sel/menu_export_selection` 的多选承载与导出默认文件名/反馈边界，不改动 `menu_share_source/menu_check_selected_interval`（`seq345/346`）后续能力。
+  - 下一项：按优先级继续推进 `P7-seq302`（`rss_articles.xml / @+id/menu_set_source_variable / 设置源变量`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq334`（`rss_source_debug.xml / @+id/menu_content_src / 正文源码`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq334`：对照 legado `rss_source_debug.xml`、`RssSourceDebugActivity.onCompatOptionsItemSelected(menu_content_src)`、`RssSourceDebugModel.printLog(state=20)` 与 `TextDialog("Html", viewModel.contentSrc)`，在 `订阅源调试` 链路补齐 legacy 同义“更多 -> 正文源码”动作。Flutter 侧新增 `RssSourceDebugService` 与 `RssSourceDebugView` 承载 RSS 调试快照，并在调试页“更多”菜单补齐“正文源码”单项入口；点击后直接打开源码承载页（标题固定 `Html`），源码为空时也不拦截。为保证入口可达，`RssSourceEditView` 顶栏同步补齐“调试源”触发，进入调试前先保存草稿。
+  - `P7-seq334` 差异点清单（实施前）：
+    - legado `rss_source_debug.xml` 定义 `menu_content_src` 且点击后直接执行 `TextDialog("Html", contentSrc)`；Flutter 侧此前缺少 RSS 调试承载页与正文源码动作，入口不可达。
+    - legado `menu_content_src` 无“空源码拦截提示”分支；Flutter 侧若沿用扩展提示语义会产生状态流转偏差。
+    - legado RSS 调试源码标题固定为 `Html`；Flutter 侧既有书源调试链路标题为 `html`，需要在 RSS 调试链路保持独立标题语义。
+  - `P7-seq334` 逐项检查清单（实施前）：
+    - 入口：订阅源编辑页是否存在可达的“调试源”触发并能进入 RSS 调试页。
+    - 状态：RSS 调试执行后是否可读取正文原始响应并供 `menu_content_src` 承载。
+    - 异常：调试失败是否保留可观测日志且不阻断“正文源码”空态承载。
+    - 文案：动作文案是否为“正文源码”，承载页标题是否固定 `Html`。
+    - 排版：是否保持现有 `AppCupertinoPageScaffold + CupertinoActionSheet` 层级，不额外引入扩展入口。
+    - 交互触发：点击 `menu_content_src` 是否始终直接打开源码承载页，取消路径是否静默返回。
+  - `P7-seq334` 逐项对照清单（实施后）：
+    - 入口：已同义（订阅源编辑页顶栏补齐“调试源”触发并可进入 `订阅源调试` 承载页）。
+    - 状态：已同义（调试链路保存列表/正文源码快照；`menu_content_src` 始终可打开正文源码承载页）。
+    - 异常：已同义（列表解析失败或正文规则异常写入调试日志；正文源码入口不追加空源码拦截提示）。
+    - 文案：已同义（动作文案“正文源码”；源码承载标题固定 `Html`）。
+    - 排版：已同义（沿用 `Cupertino` 顶栏与 ActionSheet 结构，仅补齐 `menu_content_src` 必需动作）。
+    - 交互触发：已同义（点击后直接 push 源码承载页；源码为空时展示空文本页，不新增额外弹窗）。
+    - 验证：命令 `dart format lib/features/rss/services/rss_source_debug_service.dart lib/features/rss/views/rss_source_debug_view.dart lib/features/rss/views/rss_source_edit_view.dart`、`dart analyze lib/features/rss/services/rss_source_debug_service.dart lib/features/rss/views/rss_source_debug_view.dart lib/features/rss/views/rss_source_edit_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 订阅源管理 -> 编辑任一订阅源 -> 右上角调试源 -> 订阅源调试 -> 右上角更多 -> 正文源码`（校验直接打开源码承载页且标题为 `Html`）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `rss_source_debug/menu_content_src` 入口触发与承载语义，不改动 RSS 源导入导出与阅读主链路。
+  - 下一项：按优先级继续推进 `P7-seq344`（`rss_source_sel.xml / @+id/menu_export_selection / 导出所选`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq331`（`rss_source.xml / @+id/menu_import_default / 导入默认规则`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq331`：对照 legado `rss_source.xml`、`RssSourceActivity.onCompatOptionsItemSelected(menu_import_default)`、`RssSourceViewModel.importDefault`、`DefaultData.importDefaultRssSources` 与 `RssSourceDao.deleteDefault`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路补齐 legacy 同义“更多 -> 导入默认规则”动作。Flutter 侧在 RSS 源管理页“更多”菜单新增单项入口“导入默认规则”，点击后直接执行默认导入链路 `deleteDefault(sourceGroup=legado) + insert(assets/rss/rssSources.json)`，不经过候选导入弹层，成功保持静默。
+  - `P7-seq331` 差异点清单（实施前）：
+    - legado `rss_source.xml` 在管理页溢出菜单定义 `menu_import_default`（`@string/import_default_rule`）；Flutter `RssSourceManageView` 此前仅有“本地导入/网络导入/二维码导入”，默认导入动作不可达。
+    - legado `RssSourceActivity.onCompatOptionsItemSelected(menu_import_default)` 固定走 `viewModel.importDefault()`；Flutter 侧此前仅有“候选导入”状态机，缺少“直接默认导入”分支。
+    - legado `DefaultData.importDefaultRssSources` 语义是 `rssSourceDao.deleteDefault() + insert(defaultData/rssSources.json)`，其中 `deleteDefault` 仅清理 `sourceGroup='legado'` 默认源；Flutter 侧需对齐该删除边界并保持成功静默。
+  - `P7-seq331` 逐项检查清单（实施前）：
+    - 入口：RSS 源管理页是否补齐同层级“更多 -> 导入默认规则”入口。
+    - 状态：点击后是否直接执行默认导入，不弹候选选择层。
+    - 异常：默认资产读取失败或写库异常是否可观测。
+    - 文案：入口文案是否收敛为“导入默认规则”。
+    - 排版：是否保持现有 `AppCupertinoPageScaffold + CupertinoActionSheet` 结构，仅补齐单项入口。
+    - 交互触发：是否对齐 `deleteDefault(sourceGroup=legado) + insert(default)`，且成功后静默返回。
+  - `P7-seq331` 逐项对照清单（实施后）：
+    - 入口：已同义（RSS 源管理页“更多”菜单新增“导入默认规则”单项入口）。
+    - 状态：已同义（点击后直接导入默认订阅源，不进入候选导入弹层，不追加成功提示）。
+    - 异常：已同义（默认资产读取失败沿用统一“提示”弹窗可观测输出；写库异常提示错误摘要）。
+    - 文案：已同义（入口文案“导入默认规则”）。
+    - 排版：已同义（沿用现有 `Cupertino` 顶栏与 ActionSheet 层级，仅新增 `menu_import_default` 必需入口）。
+    - 交互触发：已同义（先清理 `sourceGroup=legado` 默认源，再按默认资产逐条 upsert；非默认分组订阅源不受影响）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 右上角设置(订阅源管理) -> 右上角更多 -> 导入默认规则`（校验直接导入且无候选层/无成功提示）；手工路径（待回归）`先修改默认源名称后再次导入默认规则`（校验默认源恢复为资产定义，非 legado 分组源保持不变）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `rss_source/menu_import_default` 入口与默认导入链路，不改动本地/网络/二维码候选导入状态机。
+  - 下一项：按优先级继续推进 `P7-seq334`（`rss_source_debug.xml / @+id/menu_content_src / 正文源码`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq330`（`rss_source.xml / @+id/menu_import_qr / 二维码导入`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq330`：对照 legado `rss_source.xml`、`RssSourceActivity.onCompatOptionsItemSelected(menu_import_qr)`、`QrCodeResult`、`ImportRssSourceDialog` 与 `ImportRssSourceViewModel`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路补齐 legacy 同义“更多 -> 二维码导入”动作。Flutter 侧在 RSS 源管理页“更多”菜单新增单项入口“二维码导入”，点击后拉起扫码页；扫码文本直接复用既有“导入 RSS 源”候选弹层，候选状态保持“新增/更新/已有”，默认勾选“新增+更新”，提交后保持成功静默关闭。
+  - `P7-seq330` 差异点清单（实施前）：
+    - legado `rss_source.xml` 在管理页溢出菜单定义 `menu_import_qr`（`@string/import_by_qr_code`）；Flutter `RssSourceManageView` 此前仅有“本地导入/网络导入”，二维码导入动作不可达。
+    - legado `RssSourceActivity.onCompatOptionsItemSelected(menu_import_qr)` 固定触发 `qrCodeResult.launch()`，扫码回调直接进入 `ImportRssSourceDialog(it)`；Flutter 侧此前缺少 RSS 维度的扫码触发分支。
+    - legado 二维码分支不经过 `showImportDialog(importRecordKey=rssSourceRecordKey)` 输入历史链路；Flutter 侧需避免将扫码结果写入 `rssSourceRecordKey`，防止跨入口历史污染。
+  - `P7-seq330` 逐项检查清单（实施前）：
+    - 入口：RSS 源管理页是否补齐同层级“更多 -> 二维码导入”入口。
+    - 状态：扫码成功后是否直接进入既有 RSS 候选导入弹层并保持默认勾选新增+更新。
+    - 异常：扫码取消或空结果是否静默返回，导入失败是否保持可观测提示。
+    - 文案：入口文案是否收敛为“二维码导入”。
+    - 排版：是否保持现有 `AppCupertinoPageScaffold + CupertinoActionSheet` 结构，仅补齐单项入口。
+    - 交互触发：二维码分支是否复用既有候选导入状态机且不写 `rssSourceRecordKey` 历史。
+  - `P7-seq330` 逐项对照清单（实施后）：
+    - 入口：已同义（RSS 源管理页“更多”菜单新增“二维码导入”单项入口）。
+    - 状态：已同义（扫码成功后直接进入既有 RSS 候选导入弹层，状态“新增/更新/已有”与默认勾选“新增+更新”保持不变）。
+    - 异常：已同义（扫码取消与空结果静默返回；导入失败沿用统一“提示”弹窗可观测输出）。
+    - 文案：已同义（入口文案“二维码导入”，扫码页标题“二维码导入”）。
+    - 排版：已同义（沿用现有 `Cupertino` 顶栏与 ActionSheet 层级，仅新增 `menu_import_qr` 必需入口）。
+    - 交互触发：已同义（扫码文本直达候选导入链路，二维码分支不写 `rssSourceRecordKey` 网络导入历史）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`、`flutter test test/rss_source_manage_view_compile_test.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 右上角设置(订阅源管理) -> 右上角更多 -> 二维码导入 -> 扫码`（校验扫码文本直达候选导入弹层且默认勾选新增+更新）；手工路径（待回归）`二维码导入 -> 取消扫码`（校验静默返回）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `rss_source/menu_import_qr` 扫码触发链路并复用既有候选导入状态机，不改动 RSS 源解析与提交结构；不提前并入 `menu_import_default`（`seq331`）后续能力。
+  - 下一项：按优先级继续推进 `P7-seq331`（`rss_source.xml / @+id/menu_import_default / 导入默认规则`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq329`（`rss_source.xml / @+id/menu_import_onLine / 网络导入`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq329`：对照 legado `rss_source.xml`、`RssSourceActivity.onCompatOptionsItemSelected(menu_import_onLine)`、`RssSourceActivity.showImportDialog`、`ImportRssSourceDialog` 与 `ImportRssSourceViewModel`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路补齐 legacy 同义“更多 -> 网络导入”动作。Flutter 侧在 RSS 源管理页“更多”菜单新增单项入口“网络导入”，点击后先弹 URL 输入层（标题“网络导入”、输入占位 `url`），输入确认后复用既有“导入 RSS 源”候选弹层；候选状态保持“新增/更新/已有”，默认勾选“新增+更新”，提交后保持成功静默关闭。
+  - `P7-seq329` 差异点清单（实施前）：
+    - legado `rss_source.xml` 在管理页溢出菜单定义 `menu_import_onLine`（`@string/import_on_line`）；Flutter `RssSourceManageView` 此前仅有“本地导入”，网络导入动作不可达。
+    - legado `RssSourceActivity.showImportDialog` 固定先弹输入层并维护同名历史键 `rssSourceRecordKey`（支持点选回填与删除回写）；Flutter 侧此前缺少 RSS 网络导入输入历史状态机。
+    - legado `showImportDialog` 对输入内容不做入口拦截，确认后统一进入 `ImportRssSourceDialog` 候选链路；Flutter 侧需保持“输入层 -> 候选层”双层语义，不得跳过候选导入状态机。
+  - `P7-seq329` 逐项检查清单（实施前）：
+    - 入口：RSS 源管理页是否补齐同层级“更多 -> 网络导入”入口。
+    - 状态：是否先进入 URL 输入层并展示历史记录列表。
+    - 异常：空输入取消是否静默返回，导入失败是否保持可观测提示。
+    - 文案：入口与输入层标题是否收敛为“网络导入”，输入占位是否为 `url`。
+    - 排版：是否保持现有 `AppCupertinoPageScaffold + CupertinoActionSheet` 顶栏结构，并沿用弹层承载历史列表。
+    - 交互触发：历史是否支持点选回填与删除回写，确认后是否复用既有 RSS 候选导入并保持默认勾选新增+更新。
+  - `P7-seq329` 逐项对照清单（实施后）：
+    - 入口：已同义（RSS 源管理页“更多”菜单新增“网络导入”单项入口）。
+    - 状态：已同义（点击后先弹 URL 输入层，再进入既有 RSS 候选导入弹层）。
+    - 异常：已同义（空输入与取消输入均静默返回；导入失败沿用统一“提示”弹窗可观测输出）。
+    - 文案：已同义（入口文案“网络导入”；输入层标题“网络导入”；输入占位 `url`）。
+    - 排版：已同义（沿用 `Cupertino` 结构与历史列表布局，仅新增 `menu_import_onLine` 必需入口与输入层）。
+    - 交互触发：已同义（历史键使用 `rssSourceRecordKey`，支持点选回填与删除；仅 `http/https` 输入写入历史；确认后复用候选状态机并保持默认勾选新增+更新）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`、`flutter test test/rss_source_manage_view_compile_test.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 右上角设置(订阅源管理) -> 右上角更多 -> 网络导入 -> 输入 URL`（校验先弹输入层并可进入候选弹层）；手工路径（待回归）`网络导入输入层 -> 历史记录点选/删除`（校验回填与删除回写）；手工路径（待回归）`候选弹层 -> 调整勾选并确认导入`（校验仅导入勾选项且成功静默关闭）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `rss_source/menu_import_onLine` 输入层与历史状态机，不改动 RSS 源解析与候选提交结构；不提前并入 `menu_import_qr/menu_import_default`（`seq330/331`）后续能力。
+  - 下一项：按优先级继续推进 `P7-seq330`（`rss_source.xml / @+id/menu_import_qr / 二维码导入`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq328`（`rss_source.xml / @+id/menu_import_local / 本地导入`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq328`：对照 legado `rss_source.xml`、`RssSourceActivity.onCompatOptionsItemSelected(menu_import_local)`、`HandleFileContract(FILE txt/json)`、`ImportRssSourceDialog` 与 `ImportRssSourceViewModel`，在 `订阅 -> 规则订阅 -> 订阅源管理` 链路补齐 legacy 同义“更多 -> 本地导入”动作。Flutter 侧新增顶栏“更多”单项入口“本地导入”，触发后固定本地选档 `txt/json`，读取成功后进入“导入 RSS 源”候选弹层；候选按 `sourceUrl + lastUpdateTime` 标记“新增/更新/已有”，默认勾选“新增+更新”，并支持“保留原名/保留分组/保留启用状态 + 自定义分组（覆盖/追加）”策略，确认后仅导入勾选项并保持成功静默关闭。
+  - `P7-seq328` 差异点清单（实施前）：
+    - legado `rss_source.xml` 在管理页溢出菜单定义 `menu_import_local`（`@string/import_local`）；Flutter `RssSourceManageView` 此前无 RSS 本地导入入口，动作不可达。
+    - legado `RssSourceActivity.menu_import_local` 固定走 `HandleFileContract(FILE)` 且仅允许 `txt/json`；Flutter 虽已有 `RssSourceImportExportService.importFromFile`，但未接入管理页触发层。
+    - legado 本地导入固定进入 `ImportRssSourceDialog` 候选提交链路，默认勾选“新增+更新”，确认导入后静默关闭；Flutter 侧此前缺少 RSS 候选导入承载页与提交状态机。
+  - `P7-seq328` 逐项检查清单（实施前）：
+    - 入口：RSS 源管理页是否补齐同层级“更多 -> 本地导入”入口。
+    - 状态：是否固定 `txt/json` 选档并进入候选导入弹层。
+    - 异常：选档失败/格式错误是否可观测，取消选档或取消导入是否静默返回。
+    - 文案：入口文案是否收敛为“本地导入”，候选状态文案是否为“新增/更新/已有”。
+    - 排版：是否保持 `AppCupertinoPageScaffold + CupertinoActionSheet` 顶栏结构与导入弹层层级，不改动其它 RSS 管理操作热区。
+    - 交互触发：候选默认是否勾选新增+更新，提交时是否仅导入勾选项并保持成功静默。
+  - `P7-seq328` 逐项对照清单（实施后）：
+    - 入口：已同义（RSS 源管理页补齐顶栏“更多 -> 本地导入”单项入口）。
+    - 状态：已同义（本地导入固定 `txt/json` 选档；读取成功后进入候选弹层，状态按“新增/更新/已有”回显，默认勾选新增+更新）。
+    - 异常：已同义（取消选档/取消导入静默返回；导入失败弹“提示”并输出错误摘要、输入统计与告警明细）。
+    - 文案：已同义（入口文案“本地导入”；候选状态文案“新增/更新/已有”；策略文案“保留原名/保留分组/保留启用状态”）。
+    - 排版：已同义（沿用现有 `Cupertino` 顶栏与弹层结构，仅增补 `menu_import_local` 必需入口与候选导入承载，不改动筛选/分组与条目操作热区）。
+    - 交互触发：已同义（候选提交仅导入勾选项；支持自定义分组覆盖/追加策略；提交成功静默关闭，不追加成功提示）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_source_manage_view.dart`、`flutter test test/rss_source_manage_view_compile_test.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 右上角设置(订阅源管理) -> 右上角更多 -> 本地导入 -> 选择 txt/json 文件`（校验可进入候选弹层且默认勾选新增/更新）；手工路径（待回归）`导入候选弹层 -> 取消`（校验静默返回）；手工路径（待回归）`导入候选弹层 -> 调整勾选并确认导入`（校验仅导入勾选项且列表即时刷新）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `rss_source/menu_import_local` 入口与候选导入闭环，不改动 RSS 订阅解析结构；不提前并入 `menu_import_onLine/menu_import_qr/menu_import_default`（`seq329/330/331`）后续能力。
+  - 下一项：按优先级继续推进 `P7-seq329`（`rss_source.xml / @+id/menu_import_onLine / 网络导入`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq325`（`rss_source.xml / @+id/menu_group_login / 需要登录`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq325`：对照 legado `rss_source.xml`、`RssSourceActivity.onCompatOptionsItemSelected(menu_group_login)` 与 `upSourceFlow(flowLogin)`，在 `订阅 -> 规则订阅 -> 筛选与分组` 链路收敛“需要登录”筛选动作语义。Flutter 侧将 RSS 源管理页筛选弹层中的旧文案“需登录”收敛为 legacy 同义“需要登录”，点击后写入查询词并立即筛选 `loginUrl` 非空订阅源；同时在查询解析层保留“需登录”兼容分支，确保历史输入不失效。
+  - `P7-seq325` 差异点清单（实施前）：
+    - legado `rss_source.xml` 将 `menu_group_login` 文案定义为 `@string/need_login`（中文语义“需要登录”）；Flutter `RssSourceManageView` 筛选弹层此前使用“需登录”，用户可见文案存在偏差。
+    - legado `RssSourceActivity.onCompatOptionsItemSelected(menu_group_login)` 固定执行 `searchView.setQuery(getString(R.string.need_login), true)`；Flutter `RssSourceManageHelper.parseQueryIntent` 仅将“需登录”映射为登录筛选，缺少对“需要登录”的同义识别，状态流转与 legacy 关键字不完全一致。
+    - 需保持兼容边界：收敛到“需要登录”后仍需兼容旧输入“需登录”，避免已有筛选习惯失效。
+  - `P7-seq325` 逐项检查清单（实施前）：
+    - 入口：RSS 源管理页“筛选与分组”是否补齐 legacy 同义“需要登录”动作文案。
+    - 状态：点击后是否写入“需要登录”并立即筛选 `loginUrl` 非空源。
+    - 异常：空查询与无命中场景是否保持可继续操作且不崩溃。
+    - 文案：用户可见文案是否收敛为“需要登录”。
+    - 排版：是否保持现有 `CupertinoActionSheet` 结构，仅修改单项文案与查询词。
+    - 交互触发：手动输入“需登录”时是否仍命中同一登录筛选结果。
+  - `P7-seq325` 逐项对照清单（实施后）：
+    - 入口：已同义（RSS 源管理页筛选弹层登录分组动作文案收敛为“需要登录”）。
+    - 状态：已同义（点击后写入查询词“需要登录”，并立即按 `loginUrl` 非空过滤订阅源列表）。
+    - 异常：已同义（无命中时回落“没有匹配结果”空态；页面保持可继续筛选与编辑操作）。
+    - 文案：已同义（动作文案与 legacy 保持“需要登录”）。
+    - 排版：已同义（沿用现有 `AppCupertinoPageScaffold + CupertinoActionSheet` 布局与热区结构，仅调整单项文案/查询词）。
+    - 交互触发：已同义（查询解析新增“需登录”兼容分支；手动输入旧词仍映射到登录筛选模式）。
+    - 验证：命令 `dart format lib/features/rss/services/rss_source_manage_helper.dart lib/features/rss/views/rss_source_manage_view.dart`、`dart analyze lib/features/rss/services/rss_source_manage_helper.dart lib/features/rss/views/rss_source_manage_view.dart`；手工路径（待回归）`订阅 -> 规则订阅 -> 右上角筛选与分组 -> 需要登录`（校验动作文案、查询词写入与筛选结果）；手工路径（待回归）`搜索框输入“需登录”`（校验旧词兼容仍生效）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_source/menu_group_login` 文案与查询词同义边界，不改动 RSS 导入链路与源数据结构。
+  - 下一项：按优先级继续推进 `P7-seq328`（`rss_source.xml / @+id/menu_import_local / 本地导入`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq318`（`rss_read.xml / @+id/menu_login / 登录`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq318`：对照 legado `rss_read.xml`、`ReadRssActivity.onMenuOpened/onCompatOptionsItemSelected(menu_login)` 与 `SourceLoginActivity`，在 `订阅 -> singleUrl -> RSS 阅读页` 链路收敛“登录”动作语义。Flutter 侧在 `RssReadPlaceholderView` 保留顶栏一级“刷新”动作前提下补齐 legacy 同义“更多 -> 登录”单项入口；入口显隐按 `origin` 命中的 `rssSource.loginUrl` 非空控制，点击后按 `loginUi` 非空/空值分流到表单登录/网页登录，并以 `rssSource.sourceUrl` 作为登录 key 触发统一登录承载。
+  - `P7-seq318` 差异点清单（实施前）：
+    - legado `rss_read.xml` 将 `menu_login` 定义在顶栏溢出菜单；Flutter `RssReadPlaceholderView` 此前仅有一级“刷新”按钮，缺少同层级“登录”入口。
+    - legado `ReadRssActivity.onMenuOpened` 使用 `!viewModel.rssSource?.loginUrl.isNullOrBlank()` 控制 `menu_login` 显隐，且 `rssSource` 来源于 `ReadRssViewModel.initData -> appDb.rssSourceDao.getByKey(origin)`；Flutter 侧此前未按 `origin` 回查 RSS 源，无法收敛该显隐边界。
+    - legado `menu_login` 点击固定触发 `SourceLoginActivity(type=rssSource,key=sourceUrl)`，并由 `SourceLoginActivity` 按 `loginUi` 非空/空值分流；Flutter 侧此前无 RSS 阅读页维度的登录触发路径。
+  - `P7-seq318` 逐项检查清单（实施前）：
+    - 入口：RSS 阅读页是否补齐同层级“更多 -> 登录”动作。
+    - 状态：是否仅在 `origin` 命中的 RSS 源 `loginUrl` 非空时展示登录入口。
+    - 异常：登录地址缺失或非法时是否保持可观测提示且不崩溃。
+    - 文案：菜单动作文案是否为“登录”。
+    - 排版：是否保持现有 `Cupertino` 导航结构，仅补齐同层级动作。
+    - 交互触发：点击登录后是否按 `loginUi` 非空/空值分流到表单登录/网页登录，并使用 `sourceUrl` 作为登录 key。
+  - `P7-seq318` 逐项对照清单（实施后）：
+    - 入口：已同义（RSS 阅读页在保留一级“刷新”动作前提下补齐“更多 -> 登录”入口）。
+    - 状态：已同义（仅 `origin` 命中的 RSS 源 `loginUrl` 非空时展示“登录”；`loginUrl` 为空或未命中源时隐藏）。
+    - 异常：已同义（登录地址缺失或非法地址时弹提示并保持页面可继续操作；异常不阻塞刷新动作）。
+    - 文案：已同义（动作文案为“登录”）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold` 导航结构与刷新一级动作，仅新增右上角“更多”入口及轻量登录状态回显）。
+    - 交互触发：已同义（点击后按 `loginUi` 非空/空值分流到 `SourceLoginFormView/SourceLoginWebViewView`，并以 `rssSource.sourceUrl` 作为登录 key）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 点击任一 singleUrl 订阅源进入 RSS 阅读页（origin 命中 sourceUrl 且配置 loginUrl） -> 右上角更多 -> 登录`（校验入口可见且点击后按 `loginUi` 分流）；手工路径（待回归）`同入口使用 loginUrl 为空或 origin 未命中 sourceUrl 的订阅源`（校验“登录”入口不展示）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_read/menu_login` 入口显隐与触发分流语义，不改动 `menu_rss_star/menu_share_it/menu_aloud/menu_browser_open`（`seq315/316/317/319`）后续能力。
+  - 下一项：按优先级继续推进 `P7-seq325`（`rss_source.xml / @+id/menu_group_login / 需要登录`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq314`（`rss_read.xml / @+id/menu_rss_refresh / 刷新`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq314`：对照 legado `rss_read.xml`、`ReadRssActivity.onCompatOptionsItemSelected(menu_rss_refresh)` 与 `ReadRssViewModel.refresh`，在 `订阅 -> singleUrl -> RSS 阅读页` 链路收敛“刷新”动作语义。Flutter 侧在 `RssReadPlaceholderView` 顶栏补齐 legacy 同义一级“刷新”动作，点击后静默执行刷新并更新页面内刷新状态回显（最近刷新时间与次数），保持页面可继续操作且不追加成功提示。
+  - `P7-seq314` 差异点清单（实施前）：
+    - legado `rss_read.xml` 将 `menu_rss_refresh` 定义为顶栏常驻一级动作；Flutter `RssReadPlaceholderView` 此前无同层级“刷新”入口，交互路径缺口明显。
+    - legado `ReadRssActivity` 点击 `menu_rss_refresh` 后固定调用 `viewModel.refresh { webView.reload() }`，动作边界为“刷新后保持页面停留且无成功提示”；Flutter 侧此前无刷新触发语义。
+    - 当前序号范围是 `menu_rss_refresh` 入口与触发，不提前并入 `menu_rss_star/menu_share_it/menu_aloud/menu_login/menu_browser_open`（`seq315/316/317/318/319`）后续动作。
+  - `P7-seq314` 逐项检查清单（实施前）：
+    - 入口：RSS 阅读页是否补齐顶栏一级“刷新”动作。
+    - 状态：点击后是否触发刷新并保持页面停留可继续操作。
+    - 异常：刷新触发是否不引入崩溃或额外阻塞提示。
+    - 文案：动作语义是否保持“刷新”。
+    - 排版：是否保持现有 `Cupertino` 导航结构，仅补齐同层级动作与轻量回显信息。
+    - 交互触发：是否保持“成功静默”边界，不新增成功提示或中间跳转。
+  - `P7-seq314` 逐项对照清单（实施后）：
+    - 入口：已同义（RSS 阅读页顶栏补齐“刷新”一级动作）。
+    - 状态：已同义（点击后刷新状态即时回显为“最近刷新时间 + 次数”，页面保持停留可继续操作）。
+    - 异常：已同义（刷新触发链路无新增异常分支，且不引入崩溃）。
+    - 文案：已同义（动作语义保持“刷新”）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold` 导航结构，仅新增右上角刷新动作与状态信息卡）。
+    - 交互触发：已同义（点击刷新后全流程静默，不追加成功提示）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 点击任一 singleUrl 订阅源进入 RSS 阅读页 -> 右上角刷新`（校验顶栏存在“刷新”动作，点击后“刷新状态”更新为最新时间与次数，页面保持可继续操作）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_read/menu_rss_refresh` 入口与触发语义，不改动 `menu_rss_star/menu_share_it/menu_aloud/menu_login/menu_browser_open` 后续能力。
+  - 下一项：按优先级继续推进 `P7-seq318`（`rss_read.xml / @+id/menu_login / 登录`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq305`（`rss_articles.xml / @+id/menu_read_record / 阅读记录`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq305`：对照 legado `rss_articles.xml`、`RssSortActivity.onCompatOptionsItemSelected(menu_read_record)` 与 `ReadRecordDialog`，在 `订阅 -> RSS 文章列表` 链路收敛“阅读记录”动作语义。Flutter 侧在 `RssArticlesPlaceholderView` 的“更多”菜单补齐 legacy 同义“阅读记录”入口；点击后打开 `RssReadRecordView` 承载 RSS 阅读记录列表，并复用既有“清空阅读记录”确认删除链路（`确定删除 N 条阅读记录吗？`），保持成功静默与页面可继续操作边界。
+  - `P7-seq305` 差异点清单（实施前）：
+    - legado `rss_articles.xml` 在文章列表工具栏定义 `menu_read_record`；Flutter 侧此前“更多”菜单仅包含 `menu_login/menu_refresh_sort`，缺少“阅读记录”同层动作。
+    - legado `RssSortActivity.onCompatOptionsItemSelected(menu_read_record)` 固定触发 `showDialogFragment<ReadRecordDialog>()`；Flutter 侧虽已有 `RssReadRecordView`，但 RSS 文章列表页此前无可达入口，交互路径缺口明显。
+    - legado `ReadRecordDialog` 在同一承载内提供 `menu_clear` 清空动作并弹确认框后执行 `deleteAllRecord`；Flutter 侧需保持“入口补齐后即可复用既有清空确认链路”边界，不扩展额外成功提示或跨页流程。
+  - `P7-seq305` 逐项检查清单（实施前）：
+    - 入口：RSS 文章列表页是否补齐同层级“更多 -> 阅读记录”动作。
+    - 状态：点击后是否打开 RSS 阅读记录承载并展示记录列表/空态。
+    - 异常：清空记录链路是否保持可继续操作且不引入崩溃。
+    - 文案：菜单动作文案是否为“阅读记录”。
+    - 排版：是否保持现有 `Cupertino` 导航结构，仅补齐同层级菜单动作与既有记录页承载。
+    - 交互触发：清空操作是否沿用“确认删除 N 条阅读记录吗？”确认链路并在确认后刷新列表。
+  - `P7-seq305` 逐项对照清单（实施后）：
+    - 入口：已同义（RSS 文章列表页“更多”菜单补齐“阅读记录”入口）。
+    - 状态：已同义（点击后打开 `RssReadRecordView`，按记录状态展示列表或“暂无阅读记录”空态）。
+    - 异常：已同义（清空流程保持确认后执行、完成后静默刷新；未新增扩展成功提示或阻塞分支）。
+    - 文案：已同义（动作文案为“阅读记录”）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold` 导航结构，入口与承载层级保持简洁）。
+    - 交互触发：已同义（记录页“清空”沿用确认弹窗，确认后删除全部记录并刷新列表）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 点击任一订阅源进入文章列表 -> 右上角更多 -> 阅读记录`（校验入口可达、页面标题与列表/空态展示）；手工路径（待回归）`阅读记录页 -> 清空 -> 确认`（校验确认文案为“确定删除 N 条阅读记录吗？”，确认后列表刷新）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_articles/menu_read_record` 入口与触发语义，不改动 `menu_set_source_variable/menu_edit_source/menu_switch_layout/menu_clear`（`seq302/303/304/306`）后续能力。
+  - 下一项：按优先级继续推进 `P7-seq314`（`rss_read.xml / @+id/menu_rss_refresh / 刷新`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq301`（`rss_articles.xml / @+id/menu_refresh_sort / 刷新分类`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq301`：对照 legado `rss_articles.xml`、`RssSortActivity.onCompatOptionsItemSelected(menu_refresh_sort)`、`RssSortViewModel.clearSortCache` 与 `RssSourceExtensions.removeSortCache`，在 `订阅 -> RSS 文章列表` 链路收敛“刷新分类”动作语义。Flutter 侧在 `RssArticlesPlaceholderView` 的“更多”菜单补齐 legacy 同义“刷新分类”入口，点击后仅清理当前 RSS 源分类缓存并触发分类重算，不追加成功提示；同时补齐分类预览回显以支撑 “分类数量与 Tab 显隐（<=1 隐藏，>1 显示）”手工回归。
+  - `P7-seq301` 差异点清单（实施前）：
+    - legado `rss_articles.xml` 在文章列表工具栏定义 `menu_refresh_sort`；Flutter 侧此前“更多”菜单仅包含 `menu_login`，缺少“刷新分类”同层动作。
+    - legado `RssSortActivity` 点击 `menu_refresh_sort` 后固定执行 `clearSortCache -> upFragments`，语义是“清分类缓存并重建分类 Tab”；Flutter 侧此前未触发 `RssSortUrlsHelper.clearSortCache`，存在缓存状态流转缺口。
+    - legado 刷新分类动作不追加成功提示；Flutter 侧需保持“成功静默、异常可观测”的边界，避免扩展提示分支。
+  - `P7-seq301` 逐项检查清单（实施前）：
+    - 入口：RSS 文章列表页是否补齐同层级“更多 -> 刷新分类”动作。
+    - 状态：点击后是否仅清理当前 RSS 源分类缓存并触发分类重算。
+    - 异常：清理缓存失败是否保持可观测输出且不崩溃。
+    - 文案：菜单动作文案是否为“刷新分类”。
+    - 排版：是否保持现有 `Cupertino` 导航结构，仅新增同层级动作和分类预览回显。
+    - 交互触发：无 `loginUrl` 时是否仍可触发“刷新分类”，且不影响 `menu_login` 现有显隐规则。
+  - `P7-seq301` 逐项对照清单（实施后）：
+    - 入口：已同义（RSS 文章列表页“更多”菜单补齐“刷新分类”入口）。
+    - 状态：已同义（点击后执行 `RssSortUrlsHelper.clearSortCache` 清理当前源分类缓存，并触发分类重算）。
+    - 异常：已同义（失败分支记录 `ExceptionLogService(node=rss_articles.menu_refresh_sort)`，不新增扩展弹窗）。
+    - 文案：已同义（动作文案为“刷新分类”）。
+    - 排版：已同义（沿用 `AppCupertinoPageScaffold` 导航结构，仅新增同层级动作与分类预览卡片用于回归验证）。
+    - 交互触发：已同义（`menu_refresh_sort` 常驻可见；`menu_login` 继续按 `loginUrl` 非空控制显隐，二者互不干扰）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_articles_placeholder_view.dart`、`dart analyze lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 点击任一订阅源进入文章列表 -> 右上角更多 -> 刷新分类`（校验无 `loginUrl` 时仍可触发刷新分类，点击后分类预览即时重算）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_articles/menu_refresh_sort` 缓存清理与重算语义，不改动 `menu_read_record/menu_set_source_variable/menu_edit_source/menu_switch_layout/menu_clear` 后续能力。
+  - 下一项：按优先级继续推进 `P7-seq305`（`rss_articles.xml / @+id/menu_read_record / 阅读记录`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P7-seq300`（`rss_articles.xml / @+id/menu_login / 登录`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P7-seq300`：对照 legado `rss_articles.xml`、`RssSortActivity.onMenuOpened/onCompatOptionsItemSelected` 与 `SourceLoginActivity`，在 `订阅 -> RSS 文章列表` 链路收敛“登录”动作语义。Flutter 侧将 `RssArticlesPlaceholderView` 从纯静态占位承载收敛为可读取当前 RSS 源状态的页面，并补齐 legacy 同义“更多 -> 登录”单项动作；入口显隐按 `loginUrl` 非空控制，点击后按 `loginUi` 非空/空值分流到表单登录/网页登录，统一以 `rssSource.sourceUrl` 作为登录 key 触发登录承载。
+  - `P7-seq300` 差异点清单（实施前）：
+    - legado `rss_articles.xml` 在文章列表工具栏定义 `menu_login`；Flutter `RssArticlesPlaceholderView` 此前无“更多”菜单，缺少同层级入口。
+    - legado `RssSortActivity.onMenuOpened` 仅在 `rssSource.loginUrl` 非空显示 `menu_login`；Flutter 侧此前无法按 `loginUrl` 控制入口显隐，存在状态边界缺口。
+    - legado `menu_login` 点击固定触发 `SourceLoginActivity(type=rssSource,key=sourceUrl)`，并由 `SourceLoginActivity` 按 `loginUi` 非空/空值分流；Flutter 侧此前无 RSS 文章列表维度的登录触发路径。
+  - `P7-seq300` 逐项检查清单（实施前）：
+    - 入口：RSS 文章列表页是否补齐同层级“更多 -> 登录”动作。
+    - 状态：是否仅在 `loginUrl` 非空时展示登录入口。
+    - 异常：登录地址缺失/非法时是否保持可观测提示且不崩溃。
+    - 文案：菜单动作文案是否为“登录”。
+    - 排版：是否保持现有 `Cupertino` 导航结构，仅新增同层级动作入口。
+    - 交互触发：点击登录后是否按 `loginUi` 非空/空值分流到表单登录/网页登录，并使用 `sourceUrl` 作为 key。
+  - `P7-seq300` 逐项对照清单（实施后）：
+    - 入口：已同义（RSS 文章列表页补齐“更多 -> 登录”单项入口）。
+    - 状态：已同义（仅 `loginUrl` 非空时显示入口；空值时不展示）。
+    - 异常：已同义（登录地址缺失或非法地址时给出提示并保持页面可继续操作）。
+    - 文案：已同义（动作文案为“登录”）。
+    - 排版：已同义（沿用现有 `AppCupertinoPageScaffold` 导航布局，仅新增右上角“更多”动作）。
+    - 交互触发：已同义（点击后按 `loginUi` 非空/空值分流到 `SourceLoginFormView/SourceLoginWebViewView`，并以 `rssSource.sourceUrl` 作为登录 key）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_articles_placeholder_view.dart`；手工路径（待回归）`订阅 -> 点击任一含 loginUrl 的订阅源进入文章列表 -> 右上角更多 -> 登录`（校验 `loginUrl` 非空才显示入口，点击后按 `loginUi` 分流）；手工路径（待回归）`同入口使用 loginUrl 为空订阅源`（校验“登录”入口不展示）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `rss_articles/menu_login` 入口显隐与触发分流语义，不改动 `menu_refresh_sort/menu_set_source_variable/menu_edit_source/menu_switch_layout/menu_read_record/menu_clear` 后续能力。
+  - 下一项：按优先级继续推进 `P7-seq301`（`rss_articles.xml / @+id/menu_refresh_sort / 刷新分类`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P8-seq347`（`save.xml / @+id/menu_save / 保存`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P8-seq347`：对照 legado `save.xml`、`VariableDialog.onMenuItemClick(menu_save)` 与 `BookSourceEditActivity.setSourceVariable`，在 `设置 -> 源管理 -> 书源管理 -> 编辑书源（legacy） -> 更多 -> 设置源变量` 链路收敛“顶栏一级保存”语义。Flutter 侧将源变量编辑承载由 `CupertinoAlertDialog` 收敛为带顶栏动作的 `CupertinoPopupSurface`，补齐 legacy 同义一级“保存”触发；点击“保存”后仅回写 `sourceVariable_<bookSourceUrl>` 并关闭承载层，不追加成功提示。
+  - `P8-seq347` 差异点清单（实施前）：
+    - legado `VariableDialog` 使用 `R.menu.save`，`menu_save` 作为顶栏一级动作触发提交；Flutter 侧“设置源变量”此前使用 `CupertinoAlertDialog` 底部 action，入口层级与 legado 不同。
+    - legado `menu_save` 触发后仅执行 `setVariable(key, variable)` 并关闭承载层；Flutter 侧虽已回写变量并关闭，但保存动作位置与承载布局未对齐 legado。
+    - legado 在该链路不追加成功提示；Flutter 侧需保持“保存静默、取消不落盘、异常可观测”边界不变，避免扩展反馈分支。
+  - `P8-seq347` 逐项检查清单（实施前）：
+    - 入口：源变量编辑承载是否提供同层级一级“保存”动作。
+    - 状态：点击“保存”后是否仅回写当前书源变量并关闭承载层。
+    - 异常：变量写入失败是否保持可观测输出且不新增成功提示。
+    - 文案：动作文案是否保持“保存”，标题是否保持“设置源变量”。
+    - 排版：是否从弹窗 action 形态收敛为带顶栏动作的编辑承载，保持信息层级清晰。
+    - 交互触发：取消是否不落盘，保存是否不影响书源保存主链路与其它更多菜单动作。
+  - `P8-seq347` 逐项对照清单（实施后）：
+    - 入口：已同义（源变量编辑承载补齐顶栏一级“保存”动作）。
+    - 状态：已同义（点击“保存”仅回写 `sourceVariable_<bookSourceUrl>` 并关闭承载层）。
+    - 异常：已同义（沿用现有失败可观测链路，不新增成功提示）。
+    - 文案：已同义（标题“设置源变量”、动作“保存/取消”保持 legacy 同义语义）。
+    - 排版：已同义（承载从 `CupertinoAlertDialog` 收敛为顶栏动作结构，更贴齐 legado `save.xml` 工具栏语义）。
+    - 交互触发：已同义（取消不落盘；保存不改写其它设置项，不影响 `menu_login/menu_search/menu_clear_cookie` 等分支）。
+    - 验证：命令 `dart format lib/features/source/views/source_edit_legacy_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 任一书源 -> 编辑书源（legacy） -> 更多 -> 设置源变量 -> 修改变量 -> 保存`（校验保存后承载关闭且变量写入）；手工路径（待回归）`同路径修改变量 -> 取消`（校验不落盘）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `save.xml/menu_save` 在源变量编辑承载内的入口层级与保存触发语义，不改动 `rss_articles/menu_login`（`seq300`）后续能力。
+  - 下一项：按优先级继续推进 `P7-seq300`（`rss_articles.xml / @+id/menu_login / 登录`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P8-seq279`（`open_url_confirm.xml / @+id/menu_delete_source / 删除源`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P8-seq279`：对照 legado `open_url_confirm.xml`、`OpenUrlConfirmDialog.onMenuItemClick(menu_delete_source)`、`OpenUrlConfirmViewModel.deleteSource` 与 `SourceHelp.deleteSource`，在 `设置 -> 源管理 -> 书源管理 -> 书源条目 -> 登录(Web)` 的外部应用跳转确认链路收敛“删除源”动作语义。Flutter 侧在 `SourceLoginWebViewView._confirmOpenExternalApp` 的跳转确认弹窗补齐 legacy 同义动作“删除源”；点击后先弹出 legacy 同义二次确认框“提醒/是否确认删除？”，确认后按 `sourceUrl` 执行“删库 + 清理 sourceVariable_*”并关闭当前登录承载页，不追加成功提示。
+  - `P8-seq279` 差异点清单（实施前）：
+    - legado `open_url_confirm.xml` 将 `menu_delete_source` 定义为跳转确认弹窗工具栏动作；Flutter 侧 `SourceLoginWebViewView._confirmOpenExternalApp` 仅有“取消/确认/禁用源”动作，缺少“删除源”入口。
+    - legado `OpenUrlConfirmDialog.onMenuItemClick(menu_delete_source)` 触发后会先弹“提醒/是否确认删除？”二次确认，再执行 `OpenUrlConfirmViewModel.deleteSource -> SourceHelp.deleteSource`；Flutter 侧此前无二次确认与删除动作，存在交互路径偏差。
+    - legado `SourceHelp.deleteSource` 在删除源时同时清理 source variables；Flutter 侧此前在该链路未执行 source 变量清理，存在边界处理差异。
+  - `P8-seq279` 逐项检查清单（实施前）：
+    - 入口：外部跳转确认弹窗是否存在“删除源”同层动作。
+    - 状态：点击后是否先二次确认，再执行“删库 + 清理 source 变量”，并关闭当前登录承载页。
+    - 异常：删除失败是否保持可观测输出且不新增成功/失败弹窗。
+    - 文案：动作文案是否为“删除源”，确认框文案是否为“提醒/是否确认删除？”。
+    - 排版：是否保持现有 `CupertinoAlertDialog` 结构，不新增中间路由。
+    - 交互触发：是否不影响“取消/确认外部跳转”“禁用源”既有分支与 Cookie 同步链路。
+  - `P8-seq279` 逐项对照清单（实施后）：
+    - 入口：已同义（跳转确认弹窗补齐“删除源”动作入口，与“取消/确认/禁用源”同层可触发）。
+    - 状态：已同义（点击“删除源”后先弹 legacy 同义二次确认框；确认后按 `sourceUrl` 执行删库并清理 `sourceVariable_*`，随后关闭当前登录承载页）。
+    - 异常：已同义（删除失败仅记录 `ExceptionLogService(node=source.webview_login.open_url_confirm.menu_delete_source)`，不新增成功/失败弹窗）。
+    - 文案：已同义（动作文案为“删除源”，二次确认文案为“提醒/是否确认删除？”）。
+    - 排版：已同义（沿用现有 `CupertinoAlertDialog`，未新增页面跳转）。
+    - 交互触发：已同义（“取消/确认外部跳转”“禁用源”分支保持原有行为；删除分支仅影响当前书源删除与变量清理）。
+    - 验证：命令 `dart format lib/features/source/views/source_login_webview_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 任一含 loginUrl 的书源 -> 登录(Web) -> 触发外部 Scheme 跳转 -> 跳转确认弹窗 -> 删除源 -> 确认`（校验先弹二次确认，确认后登录页关闭且书源删除并清理 source 变量）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `open_url_confirm/menu_delete_source` 动作与状态边界，不改动 `save/menu_save`（`seq347`）后续能力。
+  - 下一项：按优先级继续推进 `P8-seq347`（`save.xml / @+id/menu_save / 保存`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P8-seq278`（`open_url_confirm.xml / @+id/menu_disable_source / 禁用源`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P8-seq278`：对照 legado `open_url_confirm.xml`、`OpenUrlConfirmDialog.onMenuItemClick(menu_disable_source)`、`OpenUrlConfirmViewModel.disableSource` 与 `SourceHelp.enableSource`，在 `设置 -> 源管理 -> 书源管理 -> 书源条目 -> 登录(Web)` 的外部应用跳转确认链路收敛“禁用源”动作语义。Flutter 侧在 `SourceLoginWebViewView._confirmOpenExternalApp` 的跳转确认弹窗补齐 legacy 同义动作“禁用源”；点击后按 `sourceUrl` 实时回查并静默写库 `enabled=false`，随后关闭当前登录承载页，不追加成功提示。
+  - `P8-seq278` 差异点清单（实施前）：
+    - legado `open_url_confirm.xml` 将 `menu_disable_source` 定义为跳转确认弹窗工具栏动作；Flutter 侧 `SourceLoginWebViewView._confirmOpenExternalApp` 仅有“取消/确认”按钮，缺少“禁用源”入口。
+    - legado `OpenUrlConfirmDialog.onMenuItemClick(menu_disable_source)` 触发后走 `OpenUrlConfirmViewModel.disableSource -> SourceHelp.enableSource(..., false)` 并直接关闭承载页；Flutter 侧此前无书源禁用写库与关闭承载页状态流转，存在交互与状态边界偏差。
+  - `P8-seq278` 逐项检查清单（实施前）：
+    - 入口：外部跳转确认弹窗是否存在“禁用源”同层动作。
+    - 状态：点击后是否仅将当前书源 `enabled` 置为 `false`，并关闭当前登录承载页。
+    - 异常：写库失败是否保持可观测输出且不新增扩展弹窗。
+    - 文案：动作文案是否为“禁用源”。
+    - 排版：是否保持现有 `CupertinoAlertDialog` 结构，不新增中间路由。
+    - 交互触发：是否不影响“取消/确认外部跳转”既有分支与 Cookie 同步链路。
+  - `P8-seq278` 逐项对照清单（实施后）：
+    - 入口：已同义（跳转确认弹窗补齐“禁用源”动作入口，与“取消/确认”同层可触发）。
+    - 状态：已同义（点击后按 `sourceUrl` 回查当前书源并静默写库 `enabled=false`，随后关闭当前登录承载页）。
+    - 异常：已同义（禁用写库失败仅记录 `ExceptionLogService(node=source.webview_login.open_url_confirm.menu_disable_source)`，不新增成功/失败弹窗）。
+    - 文案：已同义（动作文案为 legacy 同义“禁用源”）。
+    - 排版：已同义（沿用现有 `CupertinoAlertDialog`，不新增页面跳转）。
+    - 交互触发：已同义（“取消/确认外部跳转”分支保持原有行为，禁用动作仅影响当前书源启用状态）。
+    - 验证：命令 `dart format lib/features/source/views/source_login_webview_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 任一含 loginUrl 的书源 -> 登录(Web) -> 触发外部 Scheme 跳转 -> 跳转确认弹窗 -> 禁用源`（校验当前登录页关闭且书源 `enabled=false`）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `open_url_confirm/menu_disable_source` 动作与状态边界，不改动 `menu_delete_source`（`seq279`）后续能力。
+  - 下一项：按优先级继续推进 `P8-seq279`（`open_url_confirm.xml / @+id/menu_delete_source / 删除源`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P8-seq255`（`import_source.xml / @+id/menu_keep_enable / 保留启用状态`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P8-seq255`：对照 legado `import_source.xml`、`ImportBookSourceDialog.onMenuItemClick(menu_keep_enable)` 与 `ImportBookSourceViewModel.importSelect`，在 `设置 -> 源管理 -> 书源管理 -> 更多 -> 导入（本地/网络/扫码任一）-> 导入候选弹层` 收敛“保留启用状态”策略语义。Flutter 侧保持策略项文案为 legacy 同义“保留启用状态”，并将切换动作改为即时持久化启用状态保留开关；导入确认时保持“仅控制是否沿用本地书源 enabled/enabledExplore、不影响保留原名/保留分组”边界不变。
+  - `P8-seq255` 差异点清单（实施前）：
+    - legado `import_source.xml` 将 `menu_keep_enable` 定义为 checkable 策略项，标题语义固定为“保留启用状态”；Flutter 侧虽已展示同义文案，但切换动作未即时落盘，导致“切换后取消弹层”场景与 legacy 状态流转不一致。
+    - legado `ImportBookSourceDialog.onMenuItemClick(menu_keep_enable)` 在每次切换时即时持久化 `importKeepEnable`；Flutter 侧此前仅在“导入”提交时统一写入策略值，存在持久化时序偏差。
+  - `P8-seq255` 逐项检查清单（实施前）：
+    - 入口：导入候选弹层是否存在启用状态保留策略入口并与其它策略同层展示。
+    - 状态：切换“保留启用状态”后是否即时持久化并在重进弹层时回显。
+    - 异常：切换写入失败是否保持可观测输出且不阻塞导入主流程。
+    - 文案：策略项文案是否保持“保留启用状态”。
+    - 排版：是否保持现有 `CupertinoPopupSurface` 策略区结构，不新增中间路由。
+    - 交互触发：导入确认后是否仅影响启用状态保留策略，不影响保留原名/保留分组及候选勾选链路。
+  - `P8-seq255` 逐项对照清单（实施后）：
+    - 入口：已同义（导入候选弹层保留“保留启用状态”策略入口，并维持与其它策略同层布局）。
+    - 状态：已同义（切换“保留启用状态”后即时写入设置；重进弹层可回显最新勾选态）。
+    - 异常：已同义（写入失败沿用现有设置写入失败可观测链路，不阻塞弹层继续操作）。
+    - 文案：已同义（策略项文案保持 legacy 同义“保留启用状态”）。
+    - 排版：已同义（沿用现有 `Cupertino` 弹层策略区，不新增页面跳转）。
+    - 交互触发：已同义（导入确认后仅影响启用状态保留策略，不改变保留原名/保留分组与候选勾选逻辑）。
+    - 验证：命令 `dart format lib/features/source/views/source_list_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 更多 -> 导入（本地/网络/扫码任一）-> 导入候选弹层 -> 保留启用状态 -> 取消 -> 重新进入`（校验勾选态持久化回显）；手工路径（待回归）`同路径切换保留启用状态后确认导入`（校验仅启用状态保留策略受影响）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `import_source/menu_keep_enable` 即时持久化语义，不改动保留原名/保留分组策略及书源解析链路。
+  - 下一项：按优先级继续推进 `P8-seq278`（`open_url_confirm.xml / @+id/menu_disable_source / 禁用源`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P8-seq254`（`import_source.xml / @+id/menu_keep_group / 保留分组`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P8-seq254`：对照 legado `import_source.xml`、`ImportBookSourceDialog.onMenuItemClick(menu_keep_group)` 与 `ImportBookSourceViewModel.importSelect`，在 `设置 -> 源管理 -> 书源管理 -> 更多 -> 导入（本地/网络/扫码任一）-> 导入候选弹层` 收敛“保留分组”策略语义。Flutter 侧将策略项文案由“保留本地分组”改为 legacy 同义“保留分组”，并在切换时即时持久化分组保留开关；导入确认时保持“仅控制是否沿用本地书源分组、不影响保留原名/保留启用状态”边界不变。
+  - `P8-seq254` 差异点清单（实施前）：
+    - legado `import_source.xml` 将 `menu_keep_group` 定义为 checkable 策略项，标题语义固定为“保留分组”；Flutter 侧策略区文案仍为“保留本地分组”，存在用户可见语义偏差。
+    - legado `ImportBookSourceDialog.onMenuItemClick(menu_keep_group)` 在每次切换时即时持久化偏好；Flutter 侧此前在确认导入时统一写入策略值，导致“切换后取消弹层”无法保留设置，存在状态流转偏差。
+  - `P8-seq254` 逐项检查清单（实施前）：
+    - 入口：导入候选弹层是否存在分组保留策略入口并与其它策略同层展示。
+    - 状态：切换“保留分组”后是否即时持久化并在重进弹层时回显。
+    - 异常：切换失败是否保持可观测输出且不阻塞导入主流程。
+    - 文案：策略项文案是否收敛为“保留分组”。
+    - 排版：是否保持现有 `CupertinoPopupSurface` 策略区结构，不新增中间路由。
+    - 交互触发：导入确认后是否仅影响分组保留策略，不影响保留原名/保留启用状态及候选勾选链路。
+  - `P8-seq254` 逐项对照清单（实施后）：
+    - 入口：已同义（导入候选弹层保留分组保留策略入口，并维持与其它策略同层布局）。
+    - 状态：已同义（切换“保留分组”后即时写入设置；重进弹层可回显最新勾选态）。
+    - 异常：已同义（写入失败沿用现有设置写入失败可观测链路，不阻塞弹层继续操作）。
+    - 文案：已同义（策略项文案由“保留本地分组”收敛为“保留分组”）。
+    - 排版：已同义（沿用现有 `Cupertino` 弹层策略区，不新增页面跳转）。
+    - 交互触发：已同义（导入确认后仅影响分组保留策略，不改变保留原名/保留启用状态与候选勾选逻辑）。
+    - 验证：命令 `dart format lib/features/source/views/source_list_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 更多 -> 导入（本地/网络/扫码任一）-> 导入候选弹层 -> 保留分组 -> 取消 -> 重新进入`（校验勾选态持久化回显）；手工路径（待回归）`同路径切换保留分组后确认导入`（校验仅分组保留策略受影响）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `import_source/menu_keep_group` 文案与即时持久化语义，不改动保留原名/保留启用状态及书源解析链路。
+  - 下一项：按优先级继续推进 `P8-seq255`（`import_source.xml / @+id/menu_keep_enable / 保留启用状态`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P8-seq253`（`import_source.xml / @+id/menu_keep_original_name / 保留原名`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P8-seq253`：对照 legado `import_source.xml`、`ImportBookSourceDialog.onMenuItemClick(menu_keep_original_name)` 与 `ImportBookSourceViewModel.importSelect`，在 `设置 -> 源管理 -> 书源管理 -> 更多 -> 导入（本地/网络/扫码任一）-> 导入候选弹层` 收敛“保留原名”策略语义。Flutter 侧将策略项文案由“保留本地名称”改为 legacy 同义“保留原名”，并在切换时即时持久化名称保留开关；导入确认时保持“仅控制是否沿用本地书源名称、不影响保留分组/保留启用状态”边界不变。
+  - `P8-seq253` 差异点清单（实施前）：
+    - legado `import_source.xml` 将 `menu_keep_original_name` 定义为 checkable 策略项，标题语义固定为“保留原名”；Flutter 侧策略区文案仍为“保留本地名称”，存在用户可见语义偏差。
+    - legado `ImportBookSourceDialog.onMenuItemClick(menu_keep_original_name)` 在每次切换时即时持久化偏好；Flutter 侧此前在确认导入时统一写入策略值，导致“切换后取消弹层”无法保留设置，存在状态流转偏差。
+  - `P8-seq253` 逐项检查清单（实施前）：
+    - 入口：导入候选弹层是否存在名称保留策略入口并与其它策略同层展示。
+    - 状态：切换“保留原名”后是否即时持久化并在重进弹层时回显。
+    - 异常：切换失败是否保持可观测输出且不阻塞导入主流程。
+    - 文案：策略项文案是否收敛为“保留原名”。
+    - 排版：是否保持现有 `CupertinoPopupSurface` 策略区结构，不新增中间路由。
+    - 交互触发：导入确认后是否仅影响名称保留策略，不影响保留分组/保留启用状态及候选勾选链路。
+  - `P8-seq253` 逐项对照清单（实施后）：
+    - 入口：已同义（导入候选弹层保留名称保留策略入口，并维持与其它策略同层布局）。
+    - 状态：已同义（切换“保留原名”后即时写入设置；重进弹层可回显最新勾选态）。
+    - 异常：已同义（写入失败沿用现有设置写入失败可观测链路，不阻塞弹层继续操作）。
+    - 文案：已同义（策略项文案由“保留本地名称”收敛为“保留原名”）。
+    - 排版：已同义（沿用现有 `Cupertino` 弹层策略区，不新增页面跳转）。
+    - 交互触发：已同义（导入确认后仅影响名称保留策略，不改变保留分组/保留启用状态与候选勾选逻辑）。
+    - 验证：命令 `dart format lib/features/source/views/source_list_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 更多 -> 导入（本地/网络/扫码任一）-> 导入候选弹层 -> 保留原名 -> 取消 -> 重新进入`（校验勾选态持久化回显）；手工路径（待回归）`同路径切换保留原名后确认导入`（校验仅名称保留策略受影响）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `import_source/menu_keep_original_name` 文案与即时持久化语义，不改动保留分组/保留启用状态及书源解析链路。
+  - 下一项：按优先级继续推进 `P8-seq254`（`import_source.xml / @+id/menu_keep_group / 保留分组`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P8-seq252`（`import_source.xml / @+id/menu_select_update_source / 选中更新源`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P8-seq252`：对照 legado `import_source.xml`、`ImportBookSourceDialog.onMenuItemClick(menu_select_update_source)` 与 `ImportBookSourceViewModel.isSelectAllUpdate`，在 `设置 -> 源管理 -> 书源管理 -> 更多 -> 导入（本地/网络/扫码任一）-> 导入候选弹层` 收敛“选中更新源”动作语义。Flutter 侧将动作文案由“选择更新”改为 legacy 同义“选中更新源”；触发逻辑保持“仅对更新候选执行全选/反选切换、空更新集合静默 no-op、不影响新增/已有候选”边界不变。
+  - `P8-seq252` 差异点清单（实施前）：
+    - legado `import_source.xml` 将 `menu_select_update_source` 定义为独立动作且标题语义为“选中更新源”；Flutter 侧 `SourceListView._showImportSelectionDialog` 虽已有同义触发逻辑，但按钮文案仍为“选择更新”，存在用户可见语义偏差。
+  - `P8-seq252` 逐项检查清单（实施前）：
+    - 入口：导入候选弹层是否存在 `menu_select_update_source` 同层级动作。
+    - 状态：动作是否仅作用于更新候选，并保持“全选则取消 未全选则全选”切换语义。
+    - 异常：更新候选为空时是否保持静默 no-op。
+    - 文案：动作文案是否收敛为“选中更新源”。
+    - 排版：是否保持现有 `CupertinoPopupSurface` 导入候选弹层结构，不新增中间路由。
+    - 交互触发：是否不影响“全选/选中新增源/自定义源分组/保留策略/确认导入”既有链路。
+  - `P8-seq252` 逐项对照清单（实施后）：
+    - 入口：已同义（导入候选弹层保留 `menu_select_update_source` 同层级动作入口）。
+    - 状态：已同义（触发后仅遍历更新候选切换勾选态；全选则取消 未全选则全选）。
+    - 异常：已同义（更新候选为空时动作保持静默 no-op）。
+    - 文案：已同义（动作文案由“选择更新”收敛为“选中更新源”）。
+    - 排版：已同义（沿用现有 `Cupertino` 弹层布局，不新增页面跳转）。
+    - 交互触发：已同义（不影响“全选/选中新增源/自定义源分组/保留策略/确认导入”已有状态流转）。
+    - 验证：命令 `dart format lib/features/source/views/source_list_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 更多 -> 导入（本地/网络/扫码任一）-> 导入候选弹层 -> 选中更新源`（校验仅更新候选勾选态被切换）；手工路径（待回归）`同路径导入内容仅含新增/已有候选 -> 选中更新源`（校验动作静默 no-op）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `import_source/menu_select_update_source` 文案与动作语义一致性，不改动导入提交、分组改写与书源解析链路。
+  - 下一项：按优先级继续推进 `P8-seq253`（`import_source.xml / @+id/menu_keep_original_name / 保留原名`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P8-seq251`（`import_source.xml / @+id/menu_select_new_source / 选中新增源`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P8-seq251`：对照 legado `import_source.xml`、`ImportBookSourceDialog.onMenuItemClick(menu_select_new_source)` 与 `ImportBookSourceViewModel.isSelectAllNew`，在 `设置 -> 源管理 -> 书源管理 -> 更多 -> 导入（本地/网络/扫码任一）-> 导入候选弹层` 收敛“选中新增源”动作语义。Flutter 侧将动作文案由“选择新增”改为 legacy 同义“选中新增源”；触发逻辑保持“仅对新增候选执行全选/反选切换、空新增集合静默 no-op、不影响更新/已有候选”边界不变。
+  - `P8-seq251` 差异点清单（实施前）：
+    - legado `import_source.xml` 将 `menu_select_new_source` 定义为独立动作且标题语义为“选中新增源”；Flutter 侧 `SourceListView._showImportSelectionDialog` 虽已有同义触发逻辑，但按钮文案仍为“选择新增”，存在用户可见语义偏差。
+  - `P8-seq251` 逐项检查清单（实施前）：
+    - 入口：导入候选弹层是否存在 `menu_select_new_source` 同层级动作。
+    - 状态：动作是否仅作用于新增候选，并保持“全选则取消 未全选则全选”切换语义。
+    - 异常：新增候选为空时是否保持静默 no-op。
+    - 文案：动作文案是否收敛为“选中新增源”。
+    - 排版：是否保持现有 `CupertinoPopupSurface` 导入候选弹层结构，不新增中间路由。
+    - 交互触发：是否不影响“全选/选中更新源/自定义源分组/保留策略/确认导入”既有链路。
+  - `P8-seq251` 逐项对照清单（实施后）：
+    - 入口：已同义（导入候选弹层保留 `menu_select_new_source` 同层级动作入口）。
+    - 状态：已同义（触发后仅遍历新增候选切换勾选态；全选则取消 未全选则全选）。
+    - 异常：已同义（新增候选为空时动作保持静默 no-op）。
+    - 文案：已同义（动作文案由“选择新增”收敛为“选中新增源”）。
+    - 排版：已同义（沿用现有 `Cupertino` 弹层布局，不新增页面跳转）。
+    - 交互触发：已同义（不影响“全选/选中更新源/自定义源分组/保留策略/确认导入”已有状态流转）。
+    - 验证：命令 `dart format lib/features/source/views/source_list_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 更多 -> 导入（本地/网络/扫码任一）-> 导入候选弹层 -> 选中新增源`（校验仅新增候选勾选态被切换）；手工路径（待回归）`同路径导入内容仅含更新/已有候选 -> 选中新增源`（校验动作静默 no-op）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `import_source/menu_select_new_source` 文案与动作语义一致性，不改动导入提交、分组改写与书源解析链路。
+  - 下一项：按优先级继续推进 `P8-seq252`（`import_source.xml / @+id/menu_select_update_source / 选中更新源`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P8-seq250`（`import_source.xml / @+id/menu_new_group / 自定义源分组`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P8-seq250`：对照 legado `import_source.xml`、`ImportBookSourceDialog.alertCustomGroup` 与 `ImportBookSourceViewModel.importSelect`，在 `设置 -> 源管理 -> 书源管理 -> 更多 -> 导入（本地/网络/扫码任一）-> 导入候选弹层` 补齐同义“自定义源分组”动作。入口文案按 legacy 同步回显 `自定义源分组 -> 【分组名】 -> +【分组名】`；确认导入时仅对已勾选书源应用分组策略（空分组不改写、覆盖模式直接写入、追加模式按 legacy 分组分隔语义去重后合并），全流程保持静默无成功提示。
+  - `P8-seq250` 差异点清单（实施前）：
+    - legado `import_source.xml` 在导入书源弹层顶栏定义一级动作 `menu_new_group(@string/diy_source_group)`；Flutter 侧 `SourceListView._showImportSelectionDialog` 采用“策略区域内嵌输入框 + 覆盖/追加按钮”，缺少同层级动作入口与菜单态回显。
+    - legado `ImportBookSourceDialog.alertCustomGroup` 通过单独弹窗完成分组设置，并支持已有分组候选与“追加分组”开关；Flutter 侧此前无同义分组弹窗与候选分组快捷填充。
+    - legado `menu_new_group` 文案会随设置状态回显 `【group】/+【group】`；Flutter 侧此前无法在动作入口层展示当前分组策略状态。
+  - `P8-seq250` 逐项检查清单（实施前）：
+    - 入口：导入候选弹层是否存在“自定义源分组”一级动作。
+    - 状态：是否支持覆盖/追加两种分组策略并在动作文案回显当前策略。
+    - 异常：取消设置分组、空分组提交时是否静默返回且不影响导入主链路。
+    - 文案：入口文案与状态回显是否同义 `自定义源分组/【分组名】/+【分组名】`。
+    - 排版：是否保持现有 `CupertinoPopupSurface` 导入候选弹层结构，不新增中间路由。
+    - 交互触发：确认导入后是否仅对已勾选书源应用分组策略，未勾选项不改写。
+  - `P8-seq250` 逐项对照清单（实施后）：
+    - 入口：已同义（导入候选弹层新增“自定义源分组”动作，与全选/选择新增/选择更新同层级）。
+    - 状态：已同义（补齐覆盖/追加双模式，并按当前状态回显 `【分组名】/+【分组名】`）。
+    - 异常：已同义（取消设置或空分组均静默返回，导入流程保持可继续）。
+    - 文案：已同义（默认“自定义源分组”，设置后按 legacy 样式回显）。
+    - 排版：已同义（沿用现有 `Cupertino` 弹层，不新增页面跳转，仅移除策略区内嵌分组输入框）。
+    - 交互触发：已同义（确认导入时仍仅对已勾选候选应用分组改写；未勾选候选保持原值）。
+    - 验证：命令 `dart format lib/features/source/views/source_list_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 书源管理 -> 更多 -> 导入（本地/网络/扫码任一）-> 导入候选弹层 -> 自定义源分组`（校验入口默认文案与 `【group】/+【group】` 回显）；手工路径（待回归）`同路径设置分组后仅勾选部分候选并导入`（校验仅勾选候选分组被改写且空分组不改写）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `import_source/menu_new_group` 的导入分组策略入口与回显语义，不改动书源解析、书源校验与阅读主链路。
+  - 下一项：按优先级继续推进 `P8-seq251`（`import_source.xml / @+id/menu_select_new_source / 选中新增源`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P8-seq249`（`import_replace.xml / @+id/menu_new_group / 自定义源分组`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P8-seq249`：对照 legado `import_replace.xml`、`ImportReplaceRuleDialog.alertCustomGroup` 与 `ImportReplaceRuleViewModel.importSelect`，在 `设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 导入候选弹层` 补齐同义“自定义源分组”入口。入口文案按 legacy 同步回显 `自定义源分组 -> 【分组名】 -> +【分组名】`；确认导入时仅对已勾选规则应用分组策略（空分组不改写、覆盖模式直接写入、追加模式按 legacy 分组分隔语义去重后合并），全流程保持静默无成功提示。
+  - `P8-seq249` 差异点清单（实施前）：
+    - legado `import_replace.xml` 在导入替换规则弹层顶栏定义一级动作 `menu_new_group(@string/diy_source_group)`；Flutter 侧 `ReplaceRuleListView._showImportSelectionSheet` 仅有“全选/取消全选 + 勾选候选”，缺少同层级分组入口。
+    - legado `ImportReplaceRuleDialog.alertCustomGroup` 提供“覆盖/追加”双模式，并在菜单标题中实时回显 `【group】/+【group】`；Flutter 侧此前无等价策略状态与入口文案回显。
+    - legado `ImportReplaceRuleViewModel.importSelect` 仅对“已选候选”应用分组改写，且空分组不改写；Flutter 侧此前导入仅按候选原值入库，无法在导入提交时覆盖/追加分组。
+  - `P8-seq249` 逐项检查清单（实施前）：
+    - 入口：导入候选弹层是否有“自定义源分组”一级入口。
+    - 状态：是否支持覆盖/追加两种分组策略，并回显当前策略状态。
+    - 异常：取消设置分组、空分组提交时是否保持静默且不影响导入主链路。
+    - 文案：入口文案与状态回显是否同义 `自定义源分组/【分组名】/+【分组名】`。
+    - 排版：是否保持现有 `Cupertino` 导入候选弹层结构，不新增中间路由。
+    - 交互触发：确认导入后是否仅对已勾选规则应用分组策略，未勾选项不改写。
+  - `P8-seq249` 逐项对照清单（实施后）：
+    - 入口：已同义（导入候选弹层新增“自定义源分组”动作入口）。
+    - 状态：已同义（补齐覆盖/追加双模式，并按当前状态回显 `【分组名】/+【分组名】`）。
+    - 异常：已同义（取消设置或空分组均静默返回，导入流程保持可继续）。
+    - 文案：已同义（默认“自定义源分组”，设置后按 legacy 样式回显）。
+    - 排版：已同义（沿用现有 `CupertinoPopupSurface` 导入候选弹层，不新增页面跳转）。
+    - 交互触发：已同义（仅对已勾选规则应用分组改写；未勾选候选保持原值）。
+    - 验证：命令 `dart format lib/features/replace/views/replace_rule_list_view.dart`；手工路径（待回归）`设置 -> 源管理 -> 替换净化 -> 文本替换规则 -> 更多 -> 导入（本地/网络/扫码任一）-> 导入候选弹层 -> 自定义源分组`（校验入口文案与覆盖/追加回显）；手工路径（待回归）`同路径设置分组后仅勾选部分候选并导入`（校验仅勾选项分组被改写且空分组不改写）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `import_replace/menu_new_group` 的导入分组策略语义，不改动替换规则匹配引擎、正文渲染与书源主链路。
+  - 下一项：按优先级继续推进 `P8-seq250`（`import_source.xml / @+id/menu_new_group / 自定义源分组`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P8-seq237`（`file_long_click.xml / @+id/menu_del / 删除`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P8-seq237`：对照 legado `file_long_click.xml`、`FileManageActivity.showFileMenu(menu_del)` 与 `FileManageViewModel.delFile`，在 `书架 -> 更多 -> 智能扫描` 候选弹层补齐同义“长按条目 -> 删除”动作。候选条目长按后弹出仅含“删除”的操作菜单；确认删除后直接执行文件删除并按删除结果刷新候选列表，不追加成功提示。
+  - `P8-seq237` 差异点清单（实施前）：
+    - legado `file_long_click.xml` 仅定义单一动作 `menu_del(@string/delete)`；Flutter 侧智能扫描候选条目此前仅支持点按勾选，缺少长按菜单入口。
+    - legado `FileManageActivity.showFileMenu` 在条目长按后弹出仅含“删除”的一级菜单；Flutter 侧此前无同层级 `menu_del` 承载。
+    - legado `FileManageViewModel.delFile` 触发后直接执行删除并刷新列表，成功分支不提示；Flutter 侧此前仅有“删除所选”底部动作，无法覆盖单条长按删除触发路径。
+  - `P8-seq237` 逐项检查清单（实施前）：
+    - 入口：`书架 -> 更多 -> 智能扫描` 候选条目是否支持长按弹出“删除”菜单。
+    - 状态：删除执行中是否阻断重复触发，并在完成后刷新候选列表与勾选集合。
+    - 异常：删除失败时是否保持静默边界并维持当前候选数据可继续操作。
+    - 文案：长按菜单动作是否固定为“删除”。
+    - 排版：是否保持现有 `Cupertino` 候选列表布局，不新增中间页面。
+    - 交互触发：条目点击勾选、底部“全选/删除/导入”既有链路是否保持可用。
+  - `P8-seq237` 逐项对照清单（实施后）：
+    - 入口：已同义（候选条目新增长按入口，长按后弹出仅含“删除”的菜单）。
+    - 状态：已同义（删除中置忙并禁用重复触发；删除成功后即时移除候选并同步移除勾选态）。
+    - 异常：已同义（删除失败保持静默，不追加成功/失败提示，列表保留原候选可继续操作）。
+    - 文案：已同义（长按菜单动作固定“删除”）。
+    - 排版：已同义（沿用现有 `CupertinoAlertDialog` 候选弹层与 `CupertinoActionSheet` 菜单结构，不新增路由）。
+    - 交互触发：已同义（条目点按勾选与底部“删除所选/导入”流程保持原有语义，不受长按分支影响）。
+    - 验证：命令 `dart format lib/features/bookshelf/views/bookshelf_view.dart`；手工路径（待回归）`书架 -> 更多 -> 智能扫描 -> 长按候选文件 -> 删除`（校验候选即时移除且无成功提示）；手工路径（待回归）`同路径长按候选文件 -> 取消`（校验候选与勾选状态不变）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_del` 长按删除触发语义，不改动导入解析、书源规则与阅读主链路。
+  - 下一项：按优先级继续推进 `P8-seq249`（`import_replace.xml / @+id/menu_new_group / 自定义源分组`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P8-seq236`（`file_chooser.xml / @+id/menu_create / 创建文件夹`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P8-seq236`：对照 legado `file_chooser.xml`、`FilePickerDialog.onMenuItemClick(menu_create)` 与 `FilePickerViewModel.createFolder`，在 `书架 -> 更多 -> 选择文件夹` 链路补齐同义“创建文件夹”动作。选择文件夹入口新增二级分流“选择文件夹 / 创建文件夹”；创建分支弹出“创建文件夹”输入框（占位“文件夹名”），空输入拦截为“文件夹名不能为空”；确认后按当前导入目录执行目录创建并写回 `importBookPath`。
+  - `P8-seq236` 差异点清单（实施前）：
+    - legado `file_chooser.xml` 定义顶栏一级动作 `menu_create(@string/create_folder)`；Flutter 侧 `bookshelf_view` 的“选择文件夹”仅能调用 `FilePicker.getDirectoryPath`，缺少创建分支。
+    - legado `FilePickerDialog.menu_create` 在输入为空时直接提示“文件夹名不能为空”，并保持当前弹窗不关闭；Flutter 侧此前没有文件夹名称输入校验链路。
+    - legado `FilePickerViewModel.createFolder` 对创建路径有父目录约束（`canonicalPath` 包含检查）并在异常分支可观测；Flutter 侧此前无同义的越界防护与创建失败日志节点。
+  - `P8-seq236` 逐项检查清单（实施前）：
+    - 入口：`书架 -> 更多 -> 选择文件夹` 是否可触发“创建文件夹”。
+    - 状态：创建成功后是否可写回并回显新的 `importBookPath`。
+    - 异常：空名称/非法名称/父目录不存在/创建失败是否提示并可观测。
+    - 文案：是否对齐“创建文件夹 / 文件夹名 / 文件夹名不能为空”语义。
+    - 排版：是否保持现有 `Cupertino` 弹层结构，不新增中间路由。
+    - 交互触发：创建过程是否不影响既有“选择文件夹/智能扫描/添加本地”入口可用性。
+  - `P8-seq236` 逐项对照清单（实施后）：
+    - 入口：已同义（“选择文件夹”入口新增“创建文件夹”分支，菜单层级保持在 `更多` 弹层内）。
+    - 状态：已同义（创建成功后返回并提示“已选择文件夹：<path>”，后续 `添加本地/智能扫描` 读取到新的 `importBookPath`）。
+    - 异常：已同义（空名称拦截提示“文件夹名不能为空”；非法名称与越界命名返回错误；异常分支记录 `ExceptionLogService(node=bookshelf.import.create_folder.failed)`）。
+    - 文案：已同义（动作“创建文件夹”，输入占位“文件夹名”，空输入提示“文件夹名不能为空”）。
+    - 排版：已同义（沿用 `CupertinoActionSheet + CupertinoAlertDialog` 组合，不新增页面跳转）。
+    - 交互触发：已同义（创建分支复用导入目录上下文，不改动 `menu_select_folder/menu_scan_folder/menu_import_file_name` 既有触发链路）。
+    - 验证：命令 `dart format lib/features/import/import_service.dart lib/features/bookshelf/views/bookshelf_view.dart`；手工路径（待回归）`书架 -> 更多 -> 选择文件夹 -> 创建文件夹 -> 输入非空名称 -> 确定`（校验成功写回导入目录）；手工路径（待回归）`同路径输入空白名称`（校验提示“文件夹名不能为空”且弹层不关闭）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐导入目录选择器内的 `menu_create` 语义，不改动搜索/发现/详情/目录/正文五段链路与书源解析规则。
+  - 下一项：按优先级继续推进 `P8-seq237`（`file_long_click.xml / @+id/menu_del / 删除`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq240`（`group_manage.xml / @+id/menu_add / 添加分组`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P6-seq240`：对照 legado `group_manage.xml` 与 `RssSource GroupManageDialog.addGroup`，收敛 RSS 分组管理页右上角 `+` 动作文案。分组输入弹窗标题由“新增分组”统一为“添加分组”，并保持既有语义“空输入静默返回、非空仅批量更新未分组源、无成功提示”。
+  - `P6-seq240` 差异点清单（实施前）：
+    - legado `group_manage.xml` 仅定义 `menu_add(@string/add_group)` 一级动作，并被书源管理/替换规则/RSS 分组管理对话框复用；该动作语义固定为“添加分组”。
+    - legado `RssSource GroupManageDialog.onMenuItemClick(menu_add)` 固定触发输入弹窗；确认后仅在输入 `isNotBlank` 时调用 `viewModel.addGroup(group)`，而 `addGroup` 仅批量更新“未分组”数据。
+    - Flutter 侧 source/replace 的 `menu_add` 文案已为“添加分组”，RSS 分组管理页 `_addGroup` 弹窗标题仍为“新增分组”，存在用户可见文案语义偏差。
+  - `P6-seq240` 逐项检查清单（实施前）：
+    - 入口：`订阅源管理 -> 筛选与分组 -> 分组管理 -> 右上角 +` 是否可达“添加分组”输入弹窗。
+    - 状态：确认非空输入后是否仅更新当前“未分组”订阅源集合。
+    - 异常：空输入或取消是否保持静默返回，不写库、不提示成功。
+    - 文案：输入弹窗标题是否与 legacy 同义为“添加分组”。
+    - 排版：是否保持现有 `Cupertino` 分组管理列表结构，不新增中间路由。
+    - 交互触发：确认按钮是否仍沿用当前提交链路，不改变编辑/删除入口触发顺序。
+  - `P6-seq240` 逐项对照清单（实施后）：
+    - 入口：已同义（分组管理页右上角 `+` 保持可达，点击进入分组输入弹窗）。
+    - 状态：已同义（非空输入仍仅批量写入未分组订阅源，已分组项不受影响）。
+    - 异常：已同义（空输入与取消均静默返回，不写库、不提示）。
+    - 文案：已同义（弹窗标题统一为“添加分组”）。
+    - 排版：已同义（保持当前 `Cupertino` 列表与操作热区布局，不新增 UI 分支）。
+    - 交互触发：已同义（仅调整标题文案，不改动 `_addGroup -> addGroupToNoGroupSources -> updateSources` 触发链路）。
+    - 验证：命令 `dart format lib/features/rss/views/rss_group_manage_view.dart`；手工路径（待回归）`订阅源管理 -> 筛选与分组 -> 分组管理 -> 右上角添加`（校验标题“添加分组”）；手工路径（待回归）`同入口输入空白并确定`（校验静默返回且分组数据不变）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅收敛 `group_manage/menu_add` 用户可见文案语义，不改动 RSS/书源/替换规则分组写入规则与排序逻辑。
+  - 下一项：按优先级继续推进 `P8-seq236`（`file_chooser.xml / @+id/menu_create / 创建文件夹`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq183`（`bookshelf_menage_sel.xml / @+id/menu_check_selected_interval / 选中所选区间`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P6-seq183`：`书架管理` 页选中态补齐 legado 同义一级动作“选中所选区间”。点击后基于当前可见列表中已选项最小/最大索引补齐连续选区，底部“已选 N / total”计数即时刷新；全流程保持静默，不写库、不弹成功或失败提示。
+  - `P6-seq183` 差异点清单（实施前）：
+    - legado `bookshelf_menage_sel.xml` 定义 `menu_check_selected_interval`，`BookshelfManageActivity.onMenuItemClick` 直接调用 `adapter.checkSelectedInterval()`；Flutter 侧此前选中态摘要栏缺少同义入口。
+    - legado `BookAdapter.checkSelectedInterval()` 仅基于当前列表选中项最小/最大索引扩展勾选区间并更新计数；Flutter 侧此前缺少对应区间补选逻辑。
+    - 当前页面已有“全选/清空/批量换源/清理缓存/删除/允许更新/禁止更新/加入分组”动作，若不补齐本序号会形成 `bookshelf_menage_sel` 菜单动作缺口并影响后续批量流程一致性。
+  - `P6-seq183` 逐项检查清单（实施前）：
+    - 入口：`书架 -> 更多 -> 书架管理` 选中态是否存在“选中所选区间”一级动作。
+    - 状态：点击后是否仅按当前可见列表中已选项索引范围补齐连续选区。
+    - 异常：无选中项或可见列表为空时是否静默返回，不触发额外状态变更。
+    - 文案：动作文案是否与 legacy 同义为“选中所选区间”。
+    - 排版：是否保持现有 `Cupertino` 选中态摘要栏结构，不新增中间路由与弹层。
+    - 交互触发：触发后是否仅刷新勾选态与计数，不写数据库、不弹提示。
+  - `P6-seq183` 逐项对照清单（实施后）：
+    - 入口：已同义（选中态摘要栏新增“选中所选区间”一级动作）。
+    - 状态：已同义（按当前可见列表选中项最小/最大索引补齐区间勾选，不扩展到不可见列表）。
+    - 异常：已同义（无选中项或无可见书籍时静默返回，不触发写库或提示）。
+    - 文案：已同义（动作文案固定“选中所选区间”）。
+    - 排版：已同义（沿用现有 `Cupertino` 选中态摘要栏与按钮布局，仅补齐单项动作）。
+    - 交互触发：已同义（仅更新 `_selectedBookIds` 与计数展示，保持静默边界）。
+    - 验证：命令 `dart format lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 勾选多本非连续书籍 -> 选中所选区间`（校验最小/最大索引区间全部补选且计数更新）；手工路径（待回归）`同路径仅勾选 1 本 -> 选中所选区间`（校验状态不漂移且无提示）；开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_check_selected_interval` 选中态区间扩选语义，不改动书架持久化模型、书源解析与正文链路。
+  - 下一项：按优先级继续推进 `P6-seq240`（`group_manage.xml / @+id/menu_add / 添加分组`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq180`（`bookshelf_menage_sel.xml / @+id/menu_add_to_group / 加入分组`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P6-seq180`：`书架管理` 页选中态补齐 legado 同义一级动作“加入分组”。点击后弹出“选择分组”多选弹层，确认后按当前可见选中集合批量执行 `membership = membership | selectedGroupBits` 并落盘到 `bookshelf.book_group_membership_map`；成功分支保持静默并停留当前页，失败分支记录可观测日志并提示错误摘要。
+  - `P6-seq180` 差异点清单（实施前）：
+    - legado `bookshelf_menage_sel.xml` 在选中态菜单定义 `menu_add_to_group`；Flutter 侧此前选中态摘要栏缺少“加入分组”同层级入口。
+    - legado `BookshelfManageActivity.onMenuItemClick(menu_add_to_group)` 触发 `selectGroup(addToGroupRequestCode, 0)`，由 `GroupSelectDialog` 多选分组后在 `upGroup(addToGroupRequestCode)` 里按 `book.group or groupId` 写回；Flutter 侧此前仅有 membership 读取与分组筛选能力，缺少分组位写入链路。
+    - `P6-seq173` 已记录“书籍分组位写入链路待 seq180 回补”；若本序号未补齐写入会导致“分组筛选入口可见但加入分组无效”的行为断层。
+  - `P6-seq180` 逐项检查清单（实施前）：
+    - 入口：`书架 -> 更多 -> 书架管理` 选中态是否存在“加入分组”一级动作。
+    - 状态：点击后是否进入分组多选弹层并在确认后仅更新当前可见选中集合的分组位。
+    - 异常：写入失败是否记录可观测日志并提示错误摘要，页面是否保持可继续操作。
+    - 文案：动作与弹层文案是否保持 legacy 同义（“加入分组 / 选择分组 / 取消 / 确定”）。
+    - 排版：是否沿用现有 `Cupertino` 选中态摘要栏与弹层层级，不新增中间路由。
+    - 交互触发：是否使用忙碌态闸门阻断与批量换源/清理缓存/删除/允许更新/禁止更新并发触发。
+  - `P6-seq180` 逐项对照清单（实施后）：
+    - 入口：已同义（选中态摘要栏新增“加入分组”一级动作）。
+    - 状态：已同义（触发后进入“选择分组”多选弹层；确认后按当前可见选中集合批量写入 `membership | selectedGroupBits`，成功保持静默停留）。
+    - 异常：已同义（失败记录 `ExceptionLogService(node=bookshelf_manage.menu_add_to_group)` 并提示 `加入分组出错\n<摘要>`）。
+    - 文案：已同义（动作“加入分组”，弹层“选择分组 / 取消 / 确定”）。
+    - 排版：已同义（保持现有 `Cupertino` 选中态摘要栏结构，仅补齐单项动作与弹层，不改动列表/搜索/顶栏布局）。
+    - 交互触发：已同义（加入分组执行期间启用 `addingToGroup` 忙碌态，阻断其它批量动作与导航菜单并发触发）。
+    - 验证：命令 `dart format lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 勾选多本书 -> 加入分组 -> 勾选分组并确定`（校验仅当前可见选中书籍命中分组筛选）；手工路径（待回归）`同路径 -> 加入分组 -> 取消`（校验静默返回且不改动分组位）；手工路径（待回归）`同路径构造写入异常`（校验错误提示与日志节点）。开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号补齐 `menu_add_to_group` 入口与 membership 分组位写入链路，已回补 `P6-seq173` 记录的“分组位写入待补”差异。保留差异：当前 `Book` 模型仍未迁移 legado `audio/updateError` 类型位，`音频/更新失败` 分组命中继续依赖后续类型位迁移序号回补。
+  - 下一项：按优先级继续推进 `P6-seq183`（`bookshelf_menage_sel.xml / @+id/menu_check_selected_interval / 选中所选区间`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq179`（`bookshelf_menage_sel.xml / @+id/menu_update_disable / 禁止更新`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P6-seq179`：`书架管理` 页选中态补齐 legado 同义一级动作“禁止更新”。点击后按当前可见选中集合批量设置 `canUpdate=false`（落盘到同义键 `book_can_update_map`），成功分支保持静默并停留当前页，失败分支记录可观测日志并提示错误摘要。
+  - `P6-seq179` 差异点清单（实施前）：
+    - legado `bookshelf_menage_sel.xml` 在选中态菜单定义 `menu_update_disable`；Flutter 侧此前仅补齐“允许更新”，缺少“禁止更新”同层级入口。
+    - legado `BookshelfManageActivity.onMenuItemClick(menu_update_disable)` 直接调用 `viewModel.upCanUpdate(adapter.selection, false)`，无确认弹层、无成功提示且页面保持停留；Flutter 侧此前无对应触发链路。
+    - legado `BookshelfManageViewModel.upCanUpdate` 在 `canUpdate=false` 分支会清除 `BookType.updateError`；Flutter 当前 `Book` 模型未迁移类型位，需在本序号先收敛 `canUpdate=false` 主语义并记录差异待回补。
+  - `P6-seq179` 逐项检查清单（实施前）：
+    - 入口：`书架 -> 更多 -> 书架管理` 选中态是否存在“禁止更新”一级动作。
+    - 状态：点击后是否按当前可见选中集合批量设置 `canUpdate=false`，并保持页面停留。
+    - 异常：写入失败是否记录可观测日志并提示错误摘要，页面是否保持可继续操作。
+    - 文案：动作文案是否与 legacy 同义为“禁止更新”。
+    - 排版：是否沿用现有 `Cupertino` 选中态操作栏层级，不新增中间页。
+    - 交互触发：执行期间是否具备忙碌态闸门，避免与批量换源/清理缓存/删除/允许更新并发冲突。
+  - `P6-seq179` 逐项对照清单（实施后）：
+    - 入口：已同义（选中态摘要栏新增“禁止更新”一级动作）。
+    - 状态：已同义（点击后按当前可见选中集合批量写入 `canUpdate=false`，成功保持静默且不清空当前选中态）。
+    - 异常：已同义（失败记录 `ExceptionLogService(node=bookshelf_manage.menu_update_disable)` 并提示 `禁止更新出错\n<摘要>`）。
+    - 文案：已同义（动作文案“禁止更新”）。
+    - 排版：已同义（保持现有 `Cupertino` 选中态摘要栏结构，仅补齐单项动作，不改动列表/搜索/顶栏布局）。
+    - 交互触发：已同义（允许/禁止更新共享 `updatingCanUpdate` 忙碌态，执行中统一阻断与批量换源/清理缓存/删除/顶栏菜单并发触发）。
+    - 验证：命令 `dart format lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 勾选多本书 -> 禁止更新`（校验动作可触发且成功静默）；手工路径（待回归）`同路径构造写入异常`（校验错误提示与日志节点 `bookshelf_manage.menu_update_disable`）；手工路径（待回归）`返回书架 -> 更新目录`（校验已选网络书籍不再进入更新候选集合）。开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_update_disable` 入口与批量写入语义，不改动 `menu_add_to_group/menu_check_selected_interval` 后续动作。保留差异：当前模型未迁移 legacy `updateError` 类型位，`removeType(updateError)` 副作用待后续类型位迁移序号回补。
+  - 下一项：按优先级继续推进 `P6-seq180`（`bookshelf_menage_sel.xml / @+id/menu_add_to_group / 加入分组`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq178`（`bookshelf_menage_sel.xml / @+id/menu_update_enable / 允许更新`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P6-seq178`：`书架管理` 页选中态补齐 legado 同义一级动作“允许更新”。点击后按当前可见选中集合批量设置 `canUpdate=true`（落盘到同义键 `book_can_update_map`），成功分支保持静默并停留当前页，失败分支记录可观测日志并提示错误摘要。
+  - `P6-seq178` 差异点清单（实施前）：
+    - legado `bookshelf_menage_sel.xml` 在选中态菜单定义 `menu_update_enable`；Flutter 侧此前选中态摘要栏仅有“批量换源/清理缓存/删除”，缺少“允许更新”同层级入口。
+    - legado `BookshelfManageActivity.onMenuItemClick(menu_update_enable)` 直接调用 `viewModel.upCanUpdate(adapter.selection, true)`，无确认弹层、无成功提示且页面保持停留；Flutter 侧此前无该触发链路。
+    - legado `BookshelfManageViewModel.upCanUpdate` 以选中集批量写库 `canUpdate=true`；Flutter 侧 `canUpdate` 由 `SettingsService.book_can_update_map` 承载，需补齐批量写入接口以避免逐本频繁重写偏好。
+  - `P6-seq178` 逐项检查清单（实施前）：
+    - 入口：`书架 -> 更多 -> 书架管理` 选中态是否存在“允许更新”一级动作。
+    - 状态：点击后是否按当前可见选中集合批量设置 `canUpdate=true`，并保持页面停留。
+    - 异常：写入失败是否记录可观测日志并提示错误摘要，页面是否保持可继续操作。
+    - 文案：动作文案是否与 legacy 同义为“允许更新”。
+    - 排版：是否沿用现有 `Cupertino` 选中态操作栏层级，不新增中间页。
+    - 交互触发：执行期间是否具备忙碌态闸门，避免与批量换源/清理缓存/删除并发冲突。
+  - `P6-seq178` 逐项对照清单（实施后）：
+    - 入口：已同义（选中态摘要栏新增“允许更新”一级动作）。
+    - 状态：已同义（点击后按当前可见选中集合批量写入 `canUpdate=true`，成功保持静默且不清空当前选中态）。
+    - 异常：已同义（失败记录 `ExceptionLogService(node=bookshelf_manage.menu_update_enable)` 并提示 `允许更新出错\n<摘要>`）。
+    - 文案：已同义（动作文案“允许更新”）。
+    - 排版：已同义（保持现有 `Cupertino` 选中态摘要栏结构，仅补齐单项动作，不改动列表/搜索/顶栏布局）。
+    - 交互触发：已同义（执行中置 `updatingCanUpdate` 忙碌态，阻断与批量换源/清理缓存/删除/顶栏菜单的并发触发）。
+    - 验证：命令 `dart format lib/core/services/settings_service.dart lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；命令 `dart analyze lib/core/services/settings_service.dart lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 勾选多本书 -> 允许更新`（校验动作可触发且成功静默）；手工路径（待回归）`同路径构造写入异常`（校验错误提示与日志节点 `bookshelf_manage.menu_update_enable`）；手工路径（待回归）`返回书架 -> 更新目录`（校验已选网络书籍可重新进入可更新候选集合）。开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_update_enable` 入口与批量写入语义，不改动 `menu_update_disable/menu_add_to_group` 后续动作。当前模型未迁移 legacy `updateError` 类型位，`canUpdate=true` 路径不涉及该类型位副作用。
+  - 下一项：按优先级继续推进 `P6-seq179`（`bookshelf_menage_sel.xml / @+id/menu_update_disable / 禁止更新`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq177`（`bookshelf_menage_sel.xml / @+id/menu_del_selection / 删除`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P6-seq177`：`书架管理` 页选中态补齐 legado 同义一级动作“删除”。点击后弹出“提醒/是否确认删除？”确认层并提供“删除源文件”开关，开关状态持久化到 legacy 同名键 `deleteBookOriginal`；确认后按选中集合批量删书并保持成功静默，失败分支记录可观测日志并提示错误摘要。
+  - `P6-seq177` 差异点清单（实施前）：
+    - legado `bookshelf_menage_sel.xml` 在选中态菜单首项定义 `menu_del_selection`；Flutter 侧此前选中态摘要栏仅有“批量换源/清理缓存”，缺少同层级“删除”动作入口。
+    - legado `BookshelfManageActivity.alertDelSelection()` 固定弹出“提醒/是否确认删除？”并提供 `delete_book_file` 复选框；复选框状态读写 `LocalConfig.deleteBookOriginal`，确认后才提交删除。Flutter 侧此前无确认中间层，也无“删除源文件”偏好持久化。
+    - legado `BookshelfManageViewModel.deleteBook()` 删除书籍记录后，对本地书执行 `LocalBook.deleteBook`（始终清缓存与封面，按开关删除源文件）；Flutter 侧此前仅覆盖批量换源与清缓存链路，未补齐本序号删书与本地文件清理语义。
+  - `P6-seq177` 逐项检查清单（实施前）：
+    - 入口：`书架 -> 更多 -> 书架管理` 选中态是否存在“删除”一级动作。
+    - 状态：删除前是否弹出确认层且展示“删除源文件”开关，开关默认值是否回显上次选择。
+    - 异常：批量删书失败是否记录可观测日志并提示错误摘要，页面是否保持可继续操作。
+    - 文案：动作与弹层文案是否保持 legacy 同义（“删除 / 提醒 / 是否确认删除？ / 删除源文件”）。
+    - 排版：是否沿用当前 `Cupertino` 选中态操作栏与弹窗层级，不新增额外导航页。
+    - 交互触发：确认后是否仅作用于当前可见选中集合；取消删除是否保持静默且不改动选择集。
+  - `P6-seq177` 逐项对照清单（实施后）：
+    - 入口：已同义（选中态摘要栏新增“删除”一级动作）。
+    - 状态：已同义（删除前弹出确认层并展示“删除源文件”开关；开关值持久化 legacy 同名键 `deleteBookOriginal` 并在下次删除前回显）。
+    - 异常：已同义（删除失败记录 `ExceptionLogService(node=bookshelf_manage.menu_del_selection.delete_book)` 并提示 `删除出错\n<摘要>`；本地文件删除失败记录 `delete_cover/delete_original` 节点并继续批量流程）。
+    - 文案：已同义（入口“删除”，弹层“提醒/是否确认删除？/删除源文件”）。
+    - 排版：已同义（保持现有 `Cupertino` 选中态栏与 `CupertinoAlertDialog` 弹层结构，仅补齐单项动作与开关，不改动列表层级）。
+    - 交互触发：已同义（仅删除当前可见选中书籍；取消分支静默返回；确认分支成功不追加成功提示）。
+    - 验证：命令 `dart format lib/core/services/settings_service.dart lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；命令 `dart analyze lib/core/services/settings_service.dart lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 勾选多本书 -> 删除 -> 取消`（校验取消后列表与选中态不变）；手工路径（待回归）`同路径 -> 删除 -> 勾选删除源文件 -> 确认`（校验仅删除选中书籍且重进弹层回显开关状态）；手工路径（待回归）`同路径构造删除异常`（校验错误提示与日志节点）。开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_del_selection` 删除链路与 `deleteBookOriginal` 偏好键，不改动 `menu_update_enable/menu_update_disable/menu_add_to_group` 后续动作。
+  - 下一项：按优先级继续推进 `P6-seq178`（`bookshelf_menage_sel.xml / @+id/menu_update_enable / 允许更新`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq176`（`bookshelf_manage.xml / @+id/menu_open_book_info_by_click_title / 点击书名打开详情`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P6-seq176`：`书架管理` 页右上角“更多”菜单补齐 legado 同义 checkable 动作“点击书名打开详情”；开关状态持久化 legado 同名键 `openBookInfoByClickTitle`，开启时点击书名进入书籍详情，关闭时书名点击回落为勾选切换。
+  - `P6-seq176` 差异点清单（实施前）：
+    - legado `bookshelf_manage.xml` 定义 checkable 菜单项 `menu_open_book_info_by_click_title`，且 `BookshelfManageActivity.onPrepareOptionsMenu` 每次打开菜单前会按 `AppConfig.openBookInfoByClickTitle` 回显勾选态；Flutter 侧此前“更多”菜单缺少该动作。
+    - legado `BookAdapter` 在开关开启时仅为 `tvName` 注入详情点击监听并保留整行勾选入口；Flutter 侧此前整行统一用于勾选切换，缺少“书名点击打开详情”的分流语义。
+    - legado 开关状态使用 `PreferKey.openBookInfoByClickTitle` 持久化且默认 `true`；Flutter 侧此前无同名键读写，重进页面无法回显行为状态。
+  - `P6-seq176` 逐项检查清单（实施前）：
+    - 入口：`书架 -> 更多 -> 书架管理 -> 右上角更多` 是否存在“点击书名打开详情”一级动作且具备勾选态。
+    - 状态：开关切换后是否即时生效并在重进页面后保持回显。
+    - 异常：持久化链路是否保持静默边界且不引入额外确认流程。
+    - 文案：菜单文案是否与 legacy 同义为“点击书名打开详情”。
+    - 排版：是否保持现有 `CupertinoActionSheet` 层级与热区布局不变。
+    - 交互触发：开启时点击书名是否进入详情且不改变勾选；关闭时点击书名是否回落为勾选切换。
+  - `P6-seq176` 逐项对照清单（实施后）：
+    - 入口：已同义（“更多”菜单新增 checkable 动作“点击书名打开详情”并回显勾选态）。
+    - 状态：已同义（默认开启；切换后即时生效并通过同名键 `openBookInfoByClickTitle` 持久化）。
+    - 异常：已同义（开关切换保持静默，不新增成功提示与确认中间层）。
+    - 文案：已同义（动作文案固定“点击书名打开详情”）。
+    - 排版：已同义（复用既有 `CupertinoActionSheet`，仅补齐单项动作，不改动顶栏与列表层级）。
+    - 交互触发：已同义（开启时书名点击进入 `SearchBookInfoView.fromBookshelf`；关闭时书名点击回落为整行勾选切换）。
+    - 验证：命令 `dart format lib/core/services/settings_service.dart lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 更多 -> 点击书名打开详情`（校验勾选态切换与重进回显）；手工路径（待回归）`开关开启时点击书名`（校验进入书籍详情）；手工路径（待回归）`开关关闭时点击书名`（校验仅切换勾选）。开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_open_book_info_by_click_title` 开关与点击分流语义，不改动删除/允许更新/加入分组等后续动作链路。
+  - 下一项：按优先级继续推进 `P6-seq177`（`bookshelf_menage_sel.xml / @+id/menu_del_selection / 删除`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq174`（`bookshelf_manage.xml / @+id/menu_group_manage / 分组管理`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P6-seq174`：`书架管理` 页“分组”弹层补齐 legado 同义首项“分组管理”。点击后进入分组管理弹窗，关闭后回刷分组上下文，保持当前分组回显并在分组被删除时回退到“全部”。
+  - `P6-seq174` 差异点清单（实施前）：
+    - legado `bookshelf_manage.xml` 的 `menu_group_manage` 位于 `menu_book_group` 子菜单首项；Flutter 侧此前分组弹层仅展示分组选项，缺少“分组管理”入口。
+    - legado `BookshelfManageActivity` 点击 `menu_group_manage` 会打开 `GroupManageDialog`；Flutter 侧此前未在书架管理页接入分组管理弹窗触发链路。
+    - legado 页面通过 `flowAll` 感知分组变化；Flutter 侧此前仅在打开分组菜单时刷新分组，分组管理弹窗关闭后未主动回刷上下文。
+  - `P6-seq174` 逐项检查清单（实施前）：
+    - 入口：分组弹层是否存在“分组管理”一级动作。
+    - 状态：点击后是否打开分组管理弹窗并可正常关闭返回当前页。
+    - 异常：分组管理关闭后分组上下文是否可恢复并兜底无效选中分组。
+    - 文案：“分组管理”动作文案是否与 legacy 同义。
+    - 排版：入口是否位于分组弹层同级动作区，不新增额外导航层级。
+    - 交互触发：关闭分组管理后是否同步刷新分组列表与选中态回显。
+  - `P6-seq174` 逐项对照清单（实施后）：
+    - 入口：已同义（分组弹层首项新增“分组管理”）。
+    - 状态：已同义（点击后弹出 `BookshelfGroupManagePlaceholderDialog`，关闭后返回书架管理页）。
+    - 异常：已同义（关闭后执行分组上下文回刷；若当前分组不存在则回退到“全部”并回显）。
+    - 文案：已同义（动作文案为“分组管理”）。
+    - 排版：已同义（保持现有 `CupertinoActionSheet` 结构，仅补齐首项动作，不改动分组项热区与层级）。
+    - 交互触发：已同义（分组管理关闭后调用 `_reloadBookGroupContext(showError: false)`，分组筛选与提示文案同步更新）。
+    - 验证：命令 `dart format lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 顶栏分组 -> 分组管理`（校验可打开分组管理弹窗）；手工路径（待回归）`分组管理中新增/删除分组 -> 关闭弹窗`（校验分组列表回刷与选中态兜底）。开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_group_manage` 入口与返回回刷语义，不改动批量动作、书源换源与缓存清理链路。
+  - 下一项：按优先级继续推进 `P6-seq176`（`bookshelf_manage.xml / @+id/menu_open_book_info_by_click_title / 点击书名打开详情`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq173`（`bookshelf_manage.xml / @+id/menu_book_group / 分组`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P6-seq173`：`书架管理` 页顶栏补齐 legado 同义一级“分组”入口。点击后按书架分组顺序展示分组选项并回显当前选中项；切换分组后立即重算当前列表，搜索提示同步为 `筛选 • 分组名`；批量换源与清理缓存动作作用域收敛为“当前分组 + 当前筛选结果”中的选中集合。
+  - `P6-seq173` 差异点清单（实施前）：
+    - legado `bookshelf_manage.xml` 将 `menu_book_group` 作为顶栏一级 action，`BookshelfManageActivity.upMenu()` 会将 `bookGroupDao.flowAll()` 动态挂载到该子菜单；Flutter 侧此前顶栏仅有“更多”，缺少同层级分组入口。
+    - legado `onCompatOptionsItemSelected(item.groupId == menu_group)` 在点击分组后会更新 `groupId/groupName` 并触发 `upBookDataByGroupId()` 重拉列表；Flutter 侧此前书架管理列表始终展示全量书籍，分组切换状态机缺失。
+    - legado 选中态动作（删除/换源/清缓存等）天然消费当前可见列表 `adapter.selection`；Flutter 侧此前按全量选中集合执行，存在“切组后动作仍作用于隐藏项”的语义偏差。
+  - `P6-seq173` 逐项检查清单（实施前）：
+    - 入口：书架管理顶栏是否存在独立“分组”一级动作。
+    - 状态：分组菜单是否动态展示并回显当前选中项，切换后是否即时刷新列表。
+    - 异常：分组加载失败是否可观测并提示错误摘要，且页面保持可继续操作。
+    - 文案：动作标题与分组选项文案是否保持 legacy 同义（“分组/全部/本地/网络未分组/本地未分组/更新失败”）。
+    - 排版：分组入口是否与“更多”保持同级顶栏热区，不引入额外页面层级。
+    - 交互触发：批量换源/清缓存是否仅作用于当前分组+当前筛选结果的选中集合。
+  - `P6-seq173` 逐项对照清单（实施后）：
+    - 入口：已同义（顶栏新增一级“分组”入口，位于“更多”同层级）。
+    - 状态：已同义（分组菜单按 `book_groups` 动态展示并回显选中项；切换后立即重算当前列表，搜索提示回显当前分组名）。
+    - 异常：已同义（分组加载失败记录 `ExceptionLogService(node=bookshelf_manage.menu_book_group.load)` 并提示 `加载分组失败` 摘要）。
+    - 文案：已同义（菜单标题“分组”，选项文案与 legacy 分组语义一致）。
+    - 排版：已同义（保持现有 `Cupertino` 顶栏结构，仅增加同级分组按钮，不改变列表与选中态摘要栏层级）。
+    - 交互触发：已同义（批量换源/清缓存改为消费“当前可见列表”的选中集合，避免跨分组隐藏项误操作）。
+    - 验证：命令 `dart format lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 顶栏分组 -> 切换“全部/本地/网络未分组/本地未分组”`（校验列表即时切换且搜索提示同步）；手工路径（待回归）`切换分组后勾选书籍 -> 批量换源/清理缓存`（校验动作仅作用于当前分组可见选中项）。开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；保留差异：当前 `Book` 模型未迁移 legado `audio/updateError` 类型位，且书籍分组位写入链路待 `P6-seq180` 回补，`音频/更新失败` 与自定义分组命中依赖 membership 映射。
+  - 下一项：按优先级继续推进 `P6-seq174`（`bookshelf_manage.xml / @+id/menu_group_manage / 分组管理`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq182`（`bookshelf_menage_sel.xml / @+id/menu_clear_cache / 清理缓存`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P6-seq182`：`书架管理` 页选中态补齐 legado 同义一级动作“清理缓存”。点击后按当前选中集合批量清理章节缓存，完成后统一提示“成功清理缓存”；失败分支记录 `ExceptionLogService(node=bookshelf_manage.menu_clear_cache)` 并提示错误摘要。
+  - `P6-seq182` 差异点清单（实施前）：
+    - legado `BookshelfManageActivity.onMenuItemClick(menu_clear_cache)` 在选中态菜单（`bookshelf_menage_sel.xml`）提供一级动作，点击即执行 `viewModel.clearCache(adapter.selection)`；Flutter 侧此前仅有“批量换源”动作，缺少 `menu_clear_cache` 可达入口。
+    - legado `BookshelfManageViewModel.clearCache` 对选中书籍逐本执行 `BookHelp.clearCache(book)`，完成后统一提示 `clear_cache_success`；Flutter 侧此前仅覆盖单书详情页 `menu_clear_cache`，缺少书架管理批量清理语义。
+    - 现有 Flutter 章节仓储仅暴露单书 `clearDownloadedCacheForBook`；若直接在页面层循环清理会造成保护集合重复计算且边界难以统一，需要补齐批量清理接口以对齐“选中集一次性执行”语义。
+  - `P6-seq182` 逐项检查清单（实施前）：
+    - 入口：`书架 -> 更多 -> 书架管理` 选中态是否存在“清理缓存”一级动作。
+    - 状态：点击后是否按当前选中集合批量执行，不引入额外确认中间层。
+    - 异常：清理失败是否写可观测日志并提示错误摘要，且页面保持可继续操作。
+    - 文案：动作文案与成功反馈是否保持“清理缓存 / 成功清理缓存”同义。
+    - 排版：是否沿用当前 `Cupertino` 选中态操作栏布局，不改变既有热区层级。
+    - 交互触发：清理执行期间是否具备忙碌态闸门，防止重复点击并发。
+  - `P6-seq182` 逐项对照清单（实施后）：
+    - 入口：已同义（书架管理选中态操作栏新增“清理缓存”一级动作）。
+    - 状态：已同义（点击后按选中书籍集合批量清理缓存，执行完成统一提示成功）。
+    - 异常：已同义（失败写 `ExceptionLogService(node=bookshelf_manage.menu_clear_cache)`，并提示 `清理缓存出错\n<原因>`）。
+    - 文案：已同义（动作文案“清理缓存”，成功提示“成功清理缓存”）。
+    - 排版：已同义（保持既有 `Cupertino` 选中态摘要栏结构，仅追加单个动作按钮，不改动列表与搜索布局）。
+    - 交互触发：已同义（执行中置 `clearingCache` 忙碌态，禁止重复触发并在完成后恢复）。
+    - 验证：命令 `dart format lib/core/database/repositories/book_repository.dart lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 勾选多本书 -> 清理缓存`（校验提示“成功清理缓存”且仅清理选中书籍缓存）；手工路径（待回归）`同路径构造异常后触发`（校验错误提示与日志节点 `bookshelf_manage.menu_clear_cache`）。开发阶段未执行 `flutter analyze`。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_clear_cache` 入口与批量清理状态机，不改动书源规则解析、目录抓取和正文渲染逻辑。
+  - 下一项：按优先级继续推进 `P6-seq173`（`bookshelf_manage.xml / @+id/menu_book_group / 分组`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
+- `2026-02-25`
+  - 流程优化：为“任务定位”新增轻量快照 `docs/plans/ACTIVE_CONTEXT.md`，并在 `AGENTS.md` 增加“增量读取协议”。
+  - 原因：当前主计划与 ExecPlan 体量较大，重复全量读取会显著增加上下文准备耗时。
+  - 验证：`ACTIVE_CONTEXT.md` 包含 `当前任务/下一任务/阻塞项/最近交付`，并在 `PLANS.md` 顶部建立快速入口。
+  - 兼容影响：无旧书源兼容性影响；仅协作流程优化，不改动迁移语义与功能链路。
 - `2026-02-25`
   - 报错收敛：恢复 `lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`（按历史实现回补），修复 `bookshelf_view.dart` 与 `test/widget_test.dart` 对该页面的导入与类型引用失配，消除 `uri_does_not_exist / creation_with_non_type / undefined_identifier`。
   - 报错收敛：`tool/_tmp_html_test.dart` 调试输出改为 `stdout.writeln`，消除 `avoid_print` 诊断信息。
   - 原因：近期改动中 `bookshelf_manage_placeholder_view.dart` 被删除，导致书架“书架管理”入口页面与对应测试无法解析；临时工具脚本仍含 `print`。
   - 验证：`dart analyze lib/features/bookshelf/views/bookshelf_view.dart lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart test/widget_test.dart tool/_tmp_html_test.dart` -> `No issues found!`（遵循仓库约束，开发阶段未执行 `flutter analyze`）。
   - 兼容影响：无旧书源兼容性破坏；本次仅恢复既有承载页与 lint 收敛，不改动 legado 同义迁移主链路。
+- `2026-02-25`
+  - 状态变更：完成 `P6-seq181`（`bookshelf_menage_sel.xml / @+id/menu_change_source / 批量换源`）迁移闭环，ExecPlan 保持 `active`。
+  - 完成 `P6-seq181`：`书架管理` 页补齐 legado 同义“多选批量换源”主链路。管理页从占位文案切换为书籍多选列表，选中态新增一级动作“批量换源”；点击后进入“选择书源”页（支持书源搜索 + 顶栏“换源间隔”`0~9999` 秒配置），确认后复用 `BookshelfManageBatchChangeSourceService` 按选中集合逐本迁移书源。
+  - `P6-seq181` 逐项对照清单（实施后）：
+    - 入口：已同义（`书架 -> 更多 -> 书架管理 -> 勾选书籍 -> 批量换源` 可达）。
+    - 状态：已同义（批量换源先进入“选择书源”，选定后执行整批迁移；运行中弹等待框并持续更新 `current / total`）。
+    - 异常：已同义（单书搜索/详情/目录/写库失败记录 `ExceptionLogService(node=bookshelf_manage.menu_change_source.*)` 且不中断整批；取消动作通过 `CancelToken` 立即中断后续流程）。
+    - 文案：已同义（`书架管理/批量换源/选择书源/换源间隔/取消` 均按 legado 语义落地）。
+    - 排版：已同义（管理页与书源选择页均保持 `Cupertino` 分层结构；多选状态栏、书源列表、进度弹窗热区独立可触达）。
+    - 交互触发：已同义（选择书源页“更多 -> 换源间隔”即时写入 `batchChangeSourceDelay`，后续批量换源按该秒数串行延迟；执行弹窗支持取消）。
+    - 验证：命令 `dart format lib/features/bookshelf/views/bookshelf_manage_placeholder_view.dart`；手工路径（待回归）`书架 -> 更多 -> 书架管理 -> 勾选多本书 -> 批量换源 -> 选择书源 -> 确定`（校验进度文本从“批量换源”切换为 `current / total` 且流程可完成）；手工路径（待回归）`同路径执行中点击取消`（校验可中断且弹窗关闭）；手工路径（待回归）`选择书源页 -> 更多 -> 换源间隔`（校验可选 `0~9999` 秒并持久化）。
+  - 兼容影响：无旧书源兼容性破坏；本序号仅补齐 `menu_change_source` UI 触发与等待态/取消语义，不改动书源规则解析、目录匹配与正文抓取核心实现。
+  - 下一项：按优先级继续推进 `P6-seq182`（`bookshelf_menage_sel.xml / @+id/menu_clear_cache / 清理缓存`）；`P6-seq26(menu_log)` 与 `P8-seq11/12(menu_help/menu_log)` 继续保持 `detail_later` 全局后置策略。
 - `2026-02-25`
   - 状态变更：启动 `P6-seq181`（`bookshelf_menage_sel.xml / @+id/menu_change_source / 批量换源`）迁移实施，ExecPlan 保持 `active`。
   - `P6-seq181` 差异点清单（实施前）：
@@ -4164,6 +6569,69 @@
 
 ## Surprises & Discoveries
 
+- `2026-02-26`：推进 `P3-seq86` 时确认偏差不只是“帮助入口点击后有提示”这么简单，而是“承载形态 + 资产来源”双边界：legado `menu_help` 走 `showHelp("readMenuHelp")`，固定读取 `assets/web/help/md/readMenuHelp.md` 并以文档弹层展示。Flutter 旧实现仅 toast 一句短提示且仓库缺失 `readMenuHelp.md`，属于“入口可触发但内容承载断链”的伪一致。本次已收敛为“补齐同源资产 + 点击读取文档并弹层展示 + 失败提示‘帮助文档加载失败：<error>’”。
+- `2026-02-26`：推进 `P10-seq407` 时确认偏差核心不是“菜单里缺一个复制入口”本身，而是“复制目标 URL 的语义边界”：legado `menu_copy_url` 固定复制 `viewModel.baseUrl`，不是当前跳转态 `_currentUrl`。若 Flutter 复制当前地址，会在网页内重定向后产生语义漂移。本次已收敛为“更多菜单补齐 `拷贝 URL` 单项动作 + 固定复制 `initialUrl(baseUrl)` + 复制完成反馈 + 当前页保持停留”。
+- `2026-02-26`：推进 `P10-seq410` 时确认偏差核心不是“菜单缺少删除入口”本身，而是“确认文案、删除副作用、关闭时序”三处边界同时缺失：legado `menu_delete_source` 在网页承载页会先弹“提醒/是否确认删除？\n<sourceName>”，确认后执行 `SourceHelp.deleteSource`（含源变量清理）并关闭承载页。Flutter 若仅补入口并直删，会丢失二次确认与 `sourceVariable_*` 清理边界。本次已收敛为“按 `sourceOrigin` 条件显隐 + legacy 同义确认弹窗 + 删库并清理源变量 + 成功后关闭当前页 + 失败仅节点日志可观测”。
+- `2026-02-26`：推进 `P10-seq409` 时确认关键偏差不是“菜单里没有禁用按钮”本身，而是“来源上下文透传 + 显示闸门 + 关闭时序”三处边界同时缺失：legado `menu_disable_source` 只有在 `sourceOrigin` 非空时显示，点击后即执行 `enableSource(false)` 并关闭承载页。Flutter 若仅补动作而不从调用入口透传 `sourceOrigin`，菜单在多数场景不可达；若禁用后不关闭页面也会与 legacy 状态流转漂移。本次已收敛为“调用方透传 `sourceOrigin/sourceName` + 更多菜单按 `sourceOrigin` 条件显隐 + 点击后静默禁用并关闭当前页 + 失败仅节点日志可观测”。
+- `2026-02-26`：推进 `P10-seq408` 时确认偏差核心不是“菜单里有全屏入口”本身，而是“全屏状态机与返回优先级”双边界：legado `toggleFullScreen` 通过 `isFullScreen` 切换系统栏/顶栏，并在返回链路中先退出全屏再处理页面返回。Flutter 若仅补“全屏”按钮而不拦截返回，会直接退页导致状态漂移。本次已收敛为“菜单单项补齐 + 全屏态隐藏系统栏与顶栏 + 返回先退全屏 + 页面销毁时恢复系统栏”。
+- `2026-02-26`：推进 `P10-seq406` 时确认 `menu_open_in_browser` 的关键边界不是“能打开外部浏览器”本身，而是“打开目标 URL 应使用承载初始 baseUrl 而非当前跳转 URL”。legado `WebViewActivity.menu_open_in_browser` 固定调用 `openUrl(viewModel.baseUrl)`；若 Flutter 使用 `_currentUrl` 会在网页内二次跳转后产生行为漂移。本次已收敛为“优先使用 `initialUrl` 拉起外部浏览器 + 失败节点 `source.web_view.menu_open_in_browser` 可观测 + 成功路径不关闭当前承载页”。
+- `2026-02-26`：推进 `P10-seq405` 时确认偏差核心不是“网页承载功能不可用”，而是“顶栏一级确认入口缺失导致交互热区不对齐”：legado `web_view/menu_ok` 是常驻 action 位确认动作，Flutter `SourceWebVerifyView` 仅保留“更多”与系统返回。若直接并入后续菜单项会掩盖单项偏差。本次先按序号收敛为“顶栏补齐 check 确认并关闭当前承载页”，并将 `menu_open_in_browser/menu_copy_url/menu_full_screen/menu_disable_source/menu_delete_source` 保持后续序号独立推进。
+- `2026-02-26`：推进 `P10-seq280` 时确认偏差不止“扫码页缺少图库按钮”，还包含“结果回传时序”边界：legado `QrCodeActivity` 在选图完成后无论解析命中与否都会回调 `onScanResultCallback` 并结束扫码页（解析为 `null` 也结束），但取消选图会停留在扫码页。Flutter 若仅补入口不收敛该时序，会出现“无二维码图片不退出扫码页”的伪一致。本次已收敛为“命中返回文本并关闭、未命中/解析异常返回空并关闭、取消选图不退出”，并补齐 `qr_code_scan.action_choose_from_gallery` 节点日志。
+- `2026-02-26`：推进 `P10-seq235` 时确认 discovery 删除链路的偏差不只“有删除入口就算完成”，而是“菜单文案/确认文案/删除副作用”三处同时漂移：Flutter 此前动作文案是“删除书源”，确认框是“删除书源/确定删除…”，且仅删库不清理 `sourceVariable_*`。legado `ExploreAdapter.menu_del -> ExploreFragment.deleteSource -> SourceHelp.deleteBookSource` 对应语义是“删除 + 提醒/是否确认删除？ + 删库并清理源变量”。本次已收敛为同义文案与同义删除副作用，并补齐 `explore_item.menu_del` 节点级异常可观测。
+- `2026-02-26`：推进 `P10-seq231` 时确认偏差不止“置顶入口可点”，还包含“写库语义与最小序号基线”双边界：Flutter `DiscoveryView._toTop` 旧实现直接回写长按快照并走 upsert，若菜单打开后源被删除会被重插；同时最小序号用 `0` 起算，不等价 legacy `BookSourceDao.minOrder`。本次已收敛为“按 `sourceUrl` 实时回查当前源 + `min(customOrder)-1` 写库 + 源缺失静默返回”，避免并发删除场景状态漂移。
+- `2026-02-26`：推进 `P10-seq230` 时确认 discovery 编辑入口的偏差不在“功能缺失”，而在“触发参数语义与文案漂移”双重边界：Flutter 侧此前用“编辑书源”文案并直接传长按快照 `BookSource` 打开编辑页；而 legado `ExploreAdapter.menu_edit -> ExploreFragment.editSource` 仅以 `sourceUrl` 作为编辑 key。若菜单打开后源被并发删除，快照路径会保留旧数据，和 legacy 的“空白编辑承载”边界不一致。本次已收敛为“文案=编辑 + 按 `sourceUrl` 实时取数 + 源缺失空白编辑承载”，并同步补齐 tracker 缺失的 `seq230/seq231` 映射行，恢复队列与台账一致性。
+- `2026-02-26`：推进 `P10-seq214` 时确认偏差不是“缺少关闭能力”，而是“通用文本承载残留 non-legacy 扩展入口 + 关闭文案不一致”双漂移：`SourceDebugTextView` 顶栏此前为“复制”并触发复制成功提示，`app_help_dialog` 关闭入口为图标 `x`。legado `dialog_text.xml + TextDialog.menu_close` 只要求顶栏单项“关闭”并执行纯 `dismiss`。本次已收敛为“顶栏单项关闭 + 点击仅关闭承载 + 无附加提示”。
+- `2026-02-26`：推进 `P10-seq213` 时再次发现“队列有条目、tracker 缺失对应行”的台账偏差：`feature-priority-queue` 已包含 `seq213/seq214(crash_log/menu_clear|dialog_text/menu_close)`，但 `feature-item-tracker` 在 `seq212` 后直接跳到 `seq215`。若仅改队列状态会造成逐项证据断层。本次已补齐 tracker `seq213(done)` 与 `seq214(pending)` 映射行，继续保持“队列与台账双写一致”约束执行。
+- `2026-02-26`：推进 `P10-seq3` 时确认偏差不在“清除能力不可用”，而在“用户可见文案与入口扩展”双漂移：Flutter 日志弹层此前动作文案为“清空”，且保留了关闭图标、空态文案“暂无日志/未知日志”；而 legado `app_log.xml + AppLogDialog.menu_clear` 仅要求顶栏单项“清除”动作并静默清空列表。本次已收敛为“顶栏单项清除 + 点击即清空 + 空列表留白 + 弹层外可关闭”，保持单项语义闭环。
+- `2026-02-26`：推进 `P10-seq1` 时确认偏差不在“分享能力缺失”，而在“入口层级与失败边界”双漂移：Flutter `AboutSettingsView` 之前没有顶栏一级分享动作，只在设置其它分组残留占位“分享暂未实现”；同时若直接复用占位提示会偏离 legacy `Context.share` 的静默异常边界。本次按迁移级别收敛为“关于页顶栏一级分享 + 直接系统分享 + 异常静默吞掉”，并保持 `menu_scoring(seq2)` 不提前并入。
+- `2026-02-26`：推进 `P10-seq234` 时确认发现页刷新动作的主要偏差不是状态流缺失，而是“用户可见文案语义漂移 + 台账映射缺口”双问题：Flutter `DiscoveryView` 已具备 `clearExploreKindsCache + 展开态重载` 链路，但菜单文案仍为“刷新发现缓存”，与 legado `menu_refresh(@string/refresh)` 不同；同时 tracker 缺失 `seq234/seq235` 行，若不补齐会导致单项证据断层。本次已收敛文案为“刷新”并同步补齐台账映射。
+- `2026-02-26`：推进 `P10-seq233` 时确认 discovery 搜索入口存在“范围看似可用但触发时机漂移”风险：Flutter `DiscoveryView` 旧实现通过 `SearchView.scoped(sourceUrls)` 在搜索页 `initState` 内按 `sourceUrl` 回查并异步写入 scope，若菜单打开后源被删除或异步写入未及时落盘，搜索页可能继承旧范围。legado `ExploreFragment.searchBook` 则在入口侧直接写入 `SearchScope(bookSource)`。本次已收敛为“入口侧按条目快照写入 `SearchScope(name::url)` 后再跳转”，并保留源缺失场景在搜索页回退全部书源的同义边界。
+- `2026-02-26`：推进 `P10-seq232` 时确认 discovery 登录分流边界存在“可见即不等于同义”风险：Flutter `DiscoveryView` 旧实现用 `SourceLoginUiHelper.hasLoginUi`（要求 `loginUi` 可解析为 JSON rows）决定是否进入表单登录，而 legado `SourceLoginActivity` 仅按 `loginUi.isNullOrEmpty()` 判定。若 `loginUi` 为非空但格式异常字符串，旧实现会误走网页登录分支。本次已收敛为“`loginUi` 原始非空即表单登录”，并补齐“点击前按 `sourceUrl` 回查当前书源”边界，避免弹层快照漂移。
+- `2026-02-26`：推进 `P10-seq4` 时确认更新接口返回字段存在形态漂移（有时返回 `tag/name/downloadUrl/publishedAt`，有时补充 `body/updateLog/fileName`）。若仅按单一字段集解析，会出现“下载入口可达但正文为空或文件名丢失”的伪一致。本次在 `AboutSettingsView` 补齐多字段兼容解析，并保留 `updateBody` 为空时“没有数据”边界以贴齐 legacy `UpdateDialog`。
+- `2026-02-26`：推进 `P7-seq342` 时再次发现台账缺口：优先级队列存在 `seq342/seq343`，但 `feature-item-tracker` 在 `seq341` 后直接跳到 `seq344`。若仅推进队列状态会导致逐项证据断链。本次已同步补齐 tracker 的 `seq342(done)` 与 `seq343(pending)` 映射行，恢复队列与台账一一对应。
+- `2026-02-26`：推进 `P7-seq337` 时确认偏差不止删除确认文案，还包含“删除后清理链路 + 选中态时序 + 异常可观测”三处边界：Flutter `RssSourceManageView._deleteSource` 仅删除 `rssSource` 且文案为“删除订阅源/确定删除：xxx”，未对齐 legacy `提醒/确定删除\nxxx`；同时缺少 `rssArticle(origin)` 与 `sourceVariable_*` 级联清理，且未对齐 `RssSourceAdapter` 的“触发删除前先移除选中态”时序。本次已收敛为“先移除选中态 -> legacy 同义确认 -> 回查短路 -> 删源+清缓存+删变量 -> 失败节点可观测”。
+- `2026-02-26`：推进 `P7-seq336` 时确认 `menu_bottom` 仍存在与 `seq335` 同类的数据层边界漂移：Flutter `_moveToBottom` 直接使用条目快照调用 `updateSource(upsert)`，在“源已被并发删除”场景会重插记录；而 legacy `bottomSource -> dao.update` 仅更新已存在实体。若仅保持现状会出现“动作可用但边界不一致”的伪一致。本次已收敛为“置底前按 `sourceUrl` 回查当前源未命中静默返回 + 命中后 `maxOrder+1` 写库 + 失败节点可观测”。
+- `2026-02-26`：推进 `P7-seq335` 时确认偏差不止“置顶入口已存在”，还包括菜单结构与数据层边界双重漂移：Flutter 条目更多菜单残留 legacy 不存在的“编辑”扩展入口，且 `RssSourceRepository.updateSource` 为 upsert 语义，直接写条目快照会在“源已被并发删除”场景重插记录。若仅保留现状会出现“入口可点但状态流与边界不一致”的伪一致。本次已收敛为“菜单结构回归 `置顶/置底/删除` + 置顶前按 `sourceUrl` 回查当前源未命中静默返回 + 失败节点可观测”。
+- `2026-02-26`：推进 `P7-seq327` 时确认偏差不是“缺少新增能力”，而是“入口层级漂移”。Flutter 侧已有顶栏 `+` 直达新增，但 legacy `menu_add` 语义是 `showAsAction="never"` 的“更多菜单一级动作”；若只保留顶栏入口会形成“能力可用但触发层级不一致”的伪一致。为避免重复路径与扩展入口残留，本次按迁移级别收敛为“移除顶栏 `+` + 更多首项补齐‘新建订阅源’”。
+- `2026-02-26`：推进 `P7-seq326` 时确认“未分组”偏差不止入口文案。虽然分组弹层点击已写入“未分组”，但查询解析未兼容历史旧词“无分组”，会让历史筛选词回退到普通搜索，形成“入口一致但历史行为漂移”的伪一致。本次已补齐旧词兼容并保持 legacy 同义触发。
+- `2026-02-26`：推进 `P7-seq326` 时再次发现台账缺口：优先级队列存在 `seq326/seq327`，但 `feature-item-tracker` 在 `seq325` 后直接跳到 `seq328`。若仅推进队列状态会导致逐项证据断链。本次已同步补齐 tracker 的 `seq326(done)` 与 `seq327(pending)` 映射行，恢复队列与台账一一对应。
+- `2026-02-26`：推进 `P7-seq324` 时确认偏差不仅是分组菜单文案“禁用”与 legacy “已禁用”不一致，还包括查询词兼容边界：当前解析仅识别“禁用”，而 legacy 点击 `menu_disabled_group` 写入的是“已禁用”。若仅改菜单文案不改解析，会出现“入口文案一致但筛选不生效”的伪一致。本次已收敛为“菜单写入已禁用 + 解析兼容禁用旧词”，并同步补齐 tracker `seq324` 行保持队列与台账一致。
+- `2026-02-26`：推进 `P7-seq323` 时确认偏差不止“分组菜单文案是启用而非已启用”，还包含查询词兼容边界：当前解析仅识别“启用”，而 legacy 点击 `menu_enabled_group` 写入的是“已启用”。若仅改菜单文案不改解析，会出现“入口文案一致但筛选不生效”的伪一致。本次已收敛为“菜单写入已启用 + 解析兼容启用旧词”，并同步补齐 tracker `seq323` 行保持队列与台账一致。
+- `2026-02-26`：推进 `P7-seq345` 时再次发现台账存在“队列有条目、tracker 缺失对应行”的偏差：`feature-priority-queue` 已包含 `seq345/seq346(rss_source_sel/menu_share_source|menu_check_selected_interval)`，但 `feature-item-tracker` 在 `seq344` 后直接跳到 `seq347`。若仅更新队列状态会造成逐项验收证据断层。本次在完成 `seq345` 后同步补齐 `tracker` 的 `seq345(done)` 与 `seq346(pending)` 行，恢复队列与台账一一映射。
+- `2026-02-26`：推进 `P7-seq322` 时确认 RSS 源管理页“分组管理”此前采用整页路由跳转，和 legado `showDialogFragment<GroupManageDialog>()` 的同层弹窗层级不一致；若继续沿用会形成“入口存在但层级偏移”的伪一致。本次已收敛为 `CupertinoActionSheet -> CupertinoPopupSurface` 同层承载，并同步补齐 tracker `seq322` 行，保持队列与台账双写一致。
+- `2026-02-26`：推进 `P7-seq321` 时发现 RSS 源管理页此前已混入两个非 legacy 扩展入口（分组弹层“全部”与条目更多“筛选与分组”）。若继续在该基线上补 `menu_group` 会形成“主入口看似一致、交互集合偏多”的伪一致。本次已按迁移级别收敛为 legacy 菜单集合，并将 `menu_group_manage` 细节留在下一序号 `seq322` 独立推进。
+- `2026-02-26`：推进 `P7-seq320` 时再次发现“队列有条目、tracker 缺失对应行”的台账偏差：`feature-priority-queue` 已存在 `seq320(rss_read_record/menu_clear)`，但 `feature-item-tracker` 在 `seq319` 后直接跳到 `seq325`。若仅修改队列状态会造成验收证据断层。本次已补齐 tracker `seq320` 行并同步回填验证与对照证据，继续保持“队列与台账双写一致”约束执行。
+
+- `2026-02-26`：推进 `P7-seq319` 时确认 legacy `menu_browser_open` 的可达性不依赖登录状态。若沿用 Flutter 侧“仅 `loginUrl` 非空才展示更多菜单”的旧逻辑，会导致 `loginUrl` 为空时“浏览器打开”入口整体丢失。本次收敛为“更多菜单常驻，登录按 `loginUrl` 动态显隐，浏览器打开始终可达”，并补齐 `url null` 与打开失败可观测边界。
+
+- `2026-02-26`：推进 `P7-seq317` 时确认 legacy `menu_aloud` 依赖 WebView DOM 文本（`document.documentElement.outerHTML -> Jsoup.textArray()`），而 Flutter RSS 阅读页当前仍是占位承载，没有可直接读取的 WebView。若直接以 `link` 朗读会读出 URL 串，偏离 legacy 正文朗读语义。本次收敛为“优先读取当前文章 `description/content/title` 并做 HTML 转纯文本，空文本场景静默返回”，保持入口可用并避免新增提示分支。
+
+- `2026-02-26`：推进 `P7-seq316` 时确认 legacy `menu_share_it` 的首选来源是 `WebView.url`，但 Flutter 当前 RSS 阅读页仍为占位承载，没有 `WebView` 可直接取值。若硬迁移为“无 WebView 即不可分享”，会让 `singleUrl` 场景丢失可分享能力。本次收敛为“优先使用阅读态 `link`（含收藏回读透传），命中失败回落 `Null url` 轻提示”，以保持 legacy 同义回退语义并确保入口可回归验证。
+
+- `2026-02-26`：推进 `P7-seq315` 时确认 legacy `menu_rss_star` 的显隐前提不是“在阅读页就显示”，而是“当前阅读态必须命中 `origin+link` 文章实体（`rssArticle != null`）”；`singleUrl` 打开阅读页通常仅传 `origin`，应隐藏星标。Flutter 侧此前收藏夹进入阅读页也未传 `link`，会导致收藏动作不可达。本次补齐收藏页 -> 阅读页 `link` 透传，并在阅读页按 `origin+link` 回查文章/收藏状态后再决定星标显隐，避免把单 URL 场景错误暴露为可收藏。
+
+- `2026-02-26`：阅读器滚动模式排查时确认“位置错位”并非单点样式问题，而是三处叠加导致：`simple_reader_view` 正文未按 tip slot 完整让位、尾段/步进快照仍用固定 `30` 占位、`ReaderHeaderBar/ReaderStatusBar` 在隐藏系统栏场景仅使用 `MediaQuery.padding` 导致 cutout inset 丢失。对照 legado `PageView + view_book_page` 后，需同时收敛正文占位与页眉页脚 inset 计算，单点修补无法稳定消除顶部/底部错位。
+- `2026-02-26`：推进 `P7-seq312` 时再次发现“队列有条目、tracker 缺失对应行”的台账偏差：`feature-priority-queue` 已包含 `seq312/seq313(rss_main_item/menu_disable|menu_del)`，但 `feature-item-tracker` 在 `seq311` 后直接跳到 `seq314`。若仅更新队列状态会造成逐项证据断层。本次在完成 `seq312` 后同步补齐 tracker 的 `seq312(done)` 与 `seq313(pending)` 行，恢复一一映射。
+- `2026-02-26`：推进 `P7-seq311` 时发现订阅主列表长按动作面板仍残留 legacy 不存在的扩展入口“分组筛选”，会导致 `rss_main_item.xml` 菜单结构与触发层级漂移。本次将动作面板收敛为 `menu_top/menu_edit/menu_disable/menu_del` 四项同层级入口，确保 `menu_edit` 与后续 `menu_disable/menu_del` 的序号边界可独立验收。
+- `2026-02-26`：推进 `P7-seq310` 时确认 Flutter `RssSourceRepository.updateSource` 采用 upsert 语义，若直接使用条目快照对象写库，在“源已被并发删除”场景可能发生重新插入，偏离 legacy `RssViewModel.topSource -> dao.update` 的“仅更新已存在实体”边界。本次将 `menu_top` 触发收敛为“先按 `sourceUrl` 回查当前源，未命中静默返回”，并补齐异常日志节点，避免状态漂移。
+- `2026-02-25`：推进 `P7-seq306` 时发现台账存在“队列有条目、tracker 缺失对应行”的执行偏差：`feature-priority-queue` 已包含 `seq306(rss_articles/menu_clear)`，但 `feature-item-tracker` 缺失该序号记录，若仅改队列状态会造成验收证据断层。本次已在 tracker 补齐 `seq306` 行并同步回填验证与对照证据，后续继续按“队列与台账双写一致”约束执行。
+- `2026-02-25`：推进 `P7-seq303` 时确认 Flutter `RssSourceEditView` 的返回值边界与 legado `StartActivityContract` 语义可以一一映射：保存走 `Navigator.pop(true)`，直接返回/取消为 `null`。若在 RSS 文章列表页编辑返回后无条件刷新，会偏离 legado `RESULT_OK` 才执行 `initData + upFragments` 的状态流。本次据此将刷新收敛为“仅 `result=true` 增量回刷”，并补充 `rss_articles.menu_edit_source` 异常日志节点。
+- `2026-02-25`：推进 `P7-seq344` 时确认关键缺口不是“RSS 导出能力缺失”，而是“RSS 源管理页缺少多选承载导致 `rss_source_sel/menu_export_selection` 入口不可达”。同时发现 Flutter RSS 导出服务默认文件名为时间戳文件，和 legado 固定名 `exportRssSource.json` 存在语义漂移。本次先补“行级勾选 + 底部批量栏 + 批量更多菜单”可达性，再收敛导出默认名与成功路径复制边界，且未提前并入 `menu_share_source/menu_check_selected_interval` 后续动作。
+- `2026-02-25`：推进 `P7-seq331` 时发现台账存在“队列有条目、tracker 缺失对应行”的执行偏差：`feature-priority-queue` 已包含 `seq331`，但 `feature-item-tracker` 缺失该序号记录，若直接改状态会导致验收证据断层。本次已在 tracker 补齐 `seq331` 行并同步回填验证与对照证据，后续继续按“队列与台账双写一致”约束执行。
+- `2026-02-25`：推进 `P7-seq329` 时确认 legado `RssSourceActivity.showImportDialog` 的关键边界不是“输入 URL 后可拉取数据”本身，而是“输入层历史闭环 + 候选导入复用”：输入层使用 `rssSourceRecordKey` 历史，支持点选回填与删除回写，且仅 `http/https` 输入写入历史；确认后必须复用 `ImportRssSourceDialog` 候选状态机（新增/更新/已有，默认勾选新增+更新）并保持导入成功静默关闭。若直接做“输入 URL 立即导入”会破坏 legado 同义状态流。本序号已按同名键与候选复用完成收敛。
+- `2026-02-25`：推进 `P7-seq328` 时确认 Flutter 侧此前已具备 RSS 导入解析与候选提交服务，但管理页没有任何 `menu_import_local` 触发入口，形成“实现存在但动作不可达”的迁移断层；且若仅补入口不补候选提交层，会偏离 legado `ImportRssSourceDialog` 的默认勾选与静默提交边界。本次已同步补齐“入口可达 + 候选导入承载 + 静默提交”闭环并保持后续 `menu_import_onLine/menu_import_qr/menu_import_default` 不提前并入。
+- `2026-02-25`：推进 `P7-seq325` 时确认 RSS 源管理的“需要登录”不仅是菜单文案差异，还与查询解析关键字绑定：legado 点击 `menu_group_login` 后固定写入 `need_login` 并走 `flowLogin`，若 Flutter 仅改显示文案而未同步解析“需要登录”，会出现“入口文案一致但筛选不生效”的伪一致。本次已同步收敛为“文案改为需要登录 + 旧词需登录兼容”。
+- `2026-02-25`：推进 `P7-seq318` 时确认 legado `ReadRssActivity` 的 `menu_login` 显隐依赖 `rssSourceDao.getByKey(origin)` 的命中结果，而 `singleUrl` 打开链路传入的 `origin` 可能是解析后的目标 URL，不一定等于 `sourceUrl`。若 Flutter 侧直接按“页面存在 sourceUrl 参数”展示登录入口，会偏离 legacy 的“源未命中时隐藏登录”边界。本次已按 `origin` 回查源并保留该状态约束。
+- `2026-02-25`：推进 `P7-seq314` 时确认 RSS 阅读页当前仍处于占位承载阶段，原本缺少 `menu_rss_refresh` 同层级触发入口，若仅补按钮但无任何可观察回显，手工回归难以确认动作是否触发。本次在保持“成功静默、无额外提示”边界不变前提下，补充轻量“刷新状态”信息卡，仅用于回归验证最近刷新时间与次数，避免把入口补齐做成不可验证的伪一致。
+- `2026-02-25`：推进 `P8-seq254` 时确认差异不仅是文案偏差（“保留本地分组” vs “保留分组”），还包含设置持久化时序偏差：legado `menu_keep_group` 切换即写入偏好，Flutter 侧此前仅在确认导入时统一写入。若只改文案会保留“取消弹层后设置丢失”的状态漂移。本次在保持导入策略链路不变的前提下，将分组保留开关切换改为即时持久化，确保与 legado 时序同义。
+- `2026-02-25`：推进 `P8-seq253` 时确认差异不仅是文案偏差（“保留本地名称” vs “保留原名”），还包含设置持久化时序偏差：legado `menu_keep_original_name` 切换即写入偏好，Flutter 侧此前仅在确认导入时统一写入。若只改文案会保留“取消弹层后设置丢失”的状态漂移。本次在保持导入策略链路不变的前提下，将名称保留开关切换改为即时持久化，确保与 legado 时序同义。
+- `2026-02-25`：推进 `P8-seq251` 时确认 Flutter 侧“选中新增”触发逻辑已与 legado `menu_select_new_source` 同义，但用户可见文案仍停留在“选择新增”。该偏差不会影响导入结果，却会造成菜单语义不一致并影响迁移验收口径。本次按单项收敛策略仅修正文案为“选中新增源”，保持状态流转与边界处理不变。
+- `2026-02-25`：推进 `P8-seq250` 时确认 Flutter 侧“导入书源”候选弹层虽然已有自定义分组改写能力，但承载形态是策略面板内嵌输入框，不是 legacy `menu_new_group` 同层级动作；若保留内嵌输入会导致入口层级与状态回显（`【group】/+【group】`）偏差。本次已收敛为同层级动作入口 + 独立分组设置弹窗，并保留“空分组不改写、仅作用于勾选候选”的提交边界。
+- `2026-02-25`：推进 `P8-seq249` 时确认 Flutter 侧“导入替换规则”候选弹层此前只有勾选能力，没有 legado `menu_new_group` 的分组策略入口；若直接沿用当前导入链路会导致“候选状态一致但入库分组语义缺失”的伪一致。本次在候选弹层补齐“自定义源分组”动作，并将“覆盖/追加”策略与入口标题回显一并收敛到 legacy 语义，且保持“空分组不改写、仅作用于已勾选候选”边界。
+- `2026-02-25`：推进 `P8-seq237` 时确认当前 Flutter 侧最接近 legado `file_long_click` 的承载是“智能扫描候选列表”，此前仅支持点按勾选与底部“删除所选”。若只保留批量删除会缺失 legacy 的“单条长按删除”触发语义。本次在候选条目补齐长按菜单“删除”，并将删除中互斥闸门复用到候选层，避免与底部删除动作并发冲突。
+- `2026-02-25`：推进 `P6-seq174` 时发现书架管理页分组弹层此前只有“分组选项”而无 `menu_group_manage` 首项，且分组管理弹窗关闭后不会主动回刷分组上下文；若直接补入口不补回刷，会出现“新增/删除分组后筛选菜单仍是旧数据”的伪一致。本次已在弹窗关闭后补 `_reloadBookGroupContext(showError: false)` 收敛状态边界。
+- `2026-02-25`：推进 `P6-seq173` 时发现 Flutter 书架管理页选中集合此前按“全量列表”计算，切换筛选或分组后批量动作仍会命中隐藏项；而 legado `adapter.selection` 始终基于当前可见列表。若不收敛该边界，会出现“切组后批量换源/清缓存误操作其他分组”的伪一致。本次已将动作作用域改为“当前分组 + 当前筛选结果”的可见选中集合。
+- `2026-02-25`：推进 `P6-seq182` 时发现 `ChapterRepository` 仅提供单书 `clearDownloadedCacheForBook`。若在页面层按选中集循环调用，会重复构造保护集合并放大遍历成本；若在缓存未就绪时由 UI 侧自行推导保护集合，存在误清全量缓存的边界风险。本次收敛为仓储层新增 `clearDownloadedCacheForBooks`，由仓储在确保缓存就绪后统一构造保护集合并一次性执行批量清理，避免页面层重复拼装状态机。
 - `2026-02-25`：推进 `P6-seq29` 时发现台账存在状态漂移：优先级队列中 `seq29(book_group_manage/menu_add)` 仍为 `pending`，但 `feature-item-tracker` 已记录为 `done`。进一步对照 legado `GroupManageDialog.menu_add -> GroupEditDialog` 后确认当前 Flutter 仅覆盖“分组名称”输入，`cover/bookSort/enableRefresh` 字段语义缺口仍在。已在本次实现中补齐结构化编辑态，并同步修正队列状态，避免“证据完成但语义未闭环”的伪一致。
 - `2026-02-23`：分页渲染链路里标题使用 `TextPainter.layout(maxWidth: width)` 时，单行标题会退化为“按文本本身宽度布局”，导致 `TextAlign.center` 在画布路径视觉上接近左对齐；且标题命中计算若不复用同一段宽，会出现点击坐标与字符位置偏移。已收敛为统一固定段宽 painter，避免“设置值已切换但视觉无变化”的伪一致。
 - `2026-02-23`：推进 `P6-seq171` 时确认差异不止“缺少导出动作”，而是“缺少 `bookmark.xml` 对应承载页入口”。Flutter 侧已有 `book_toc/menu_export_bookmark`（单书导出），若直接复用会把 `AllBookmarkActivity`（全量书签）与 `BookTocActivity`（单书目录）语义混淆，形成伪一致。本次先补“设置 -> 书签 -> 所有书签”承载与全量排序，再落 `menu_export` 单项导出，`menu_export_md` 保持下一序号推进。
@@ -4349,9 +6817,103 @@
 - `2026-02-21`：`P2-seq134` 对照 legado 时确认 `menu_group_sources_by_domain` 的关键约束是“固定标题 + checkable 勾选态”，不是“根据状态切换开/关文案”；Flutter 端已收敛为固定“按域名分组显示”并补齐勾选态回归。
 - `2026-02-21`：`P2-seq136` 的 widget 回归如果直接走真实扫码页面，会受到 `mobile_scanner` 插件平台通道影响导致测试不稳定；本序号通过在调试页引入可注入扫码启动器，仅对 `menu_scan` 触发语义做定向断言，保证迁移证据稳定可复现。
 - `2026-02-23`：推进 `P6-seq24` 时发现仅补 `menu_export_type` 入口会形成“可切换但导出仍固定 TXT”的伪一致；同时 `epubx.EpubWriter` 对 `EpubPackage.Guide` 存在非空约束（缺失会触发空指针）。本次已同步补齐 `exportType -> 导出分支` 联动，并在 EPUB 构建中显式初始化 `Guide` 以稳定写出。
+- `2026-02-26`：推进 `P7-seq313` 时对照 legado `SourceHelp.deleteRssSources` 发现当前 Flutter `RssSourceRepository.deleteSource` 仅删除 `rssSource`，未同义清理 `rssArticle(origin)` 与 `sourceVariable_<sourceUrl>`；若用户删源后重建同 URL 源，会残留旧文章缓存与源变量。本序号已补齐 `deleteSourceWithArticles + SourceVariableStore.removeVariable` 收敛该偏差。
 
 ## Decision Log
 
+- `2026-02-26` 决策 342：`P3-seq86` 采用“帮助入口文档化收敛 + legacy 同源资产补齐 + 单序号边界保持”策略：在 `SimpleReaderView` 保持阅读操作菜单结构与 `menu_log` 等既有动作不变，仅收敛 `book_read/menu_help` 单项能力。实现上将 `ReaderLegacyReadMenuAction.help` 从 toast 文案提示改为读取 `assets/web/help/md/readMenuHelp.md` 并调用 `showAppHelpDialog` 展示，失败分支统一提示“帮助文档加载失败：<error>”，对齐 legacy `ReadBookActivity.menu_help -> showHelp("readMenuHelp")` 的文档承载语义；`P3-seq91`（`book_read_record/menu_sort_read_long`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 341：`P3-seq85` 采用“日志入口承载收敛 + 弹层语义对齐 + 单序号边界保持”策略：在 `SimpleReaderView` 保持阅读操作菜单结构与 `menu_help` 等后续动作不变，仅收敛 `book_read/menu_log` 单项能力。实现上将 `ReaderLegacyReadMenuAction.log` 从 `_openExceptionLogsFromReader` 跳转异常日志页改为直接触发 `showAppLogDialog(context)`，对齐 legacy `ReadBookActivity.menu_log -> AppLogDialog` 的“无前置校验、关闭后停留当前阅读会话”语义；`menu_help`（`seq86`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 340：`P2-seq170` 采用“目录菜单单项补齐 + 常驻日志入口收敛 + 通用日志承载复用 + 单序号边界保持”策略：在 `SearchBookInfoView._SearchBookTocView` 保持既有目录规则、反转目录、使用替换、加载字数、导出书签链路不变，仅收敛 `book_toc/menu_log` 单项能力。实现上在 `CupertinoActionSheet` 末尾补齐一级动作“日志”，点击后直接触发 `showAppLogDialog(context)` 并保持当前目录页状态不变，不新增前置校验与扩展提示；`P3-seq85`（`book_read/menu_log`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 339：`P10-seq407` 采用“更多菜单单项拷贝 URL 补齐 + baseUrl 复制语义收敛 + 反馈轻量对齐 + 单序号边界保持”策略：在 `SourceWebVerifyView` 保持网页加载、进度条、Cookie 导入、顶栏确认、浏览器打开、全屏、禁用源与删除源链路不变，仅收敛 `web_view/menu_copy_url` 单项能力。实现上在 `CupertinoActionSheet` 补齐一级动作“拷贝 URL”，点击后调用 `_copyBaseUrl` 复制 `initialUrl`（legacy 同义 `baseUrl`）到剪贴板并提示“复制完成”，成功路径保持当前承载页停留；`P2-seq170`（`book_toc/menu_log`）作为全局 `detail_later` 下一项独立推进，不跨序号并项。
+- `2026-02-26` 决策 338：`P10-seq410` 采用“更多菜单单项删除补齐 + legacy 二次确认 + 删除副作用对齐 + 成功后关闭 + 失败可观测”策略：在 `SourceWebVerifyView` 保持网页加载、进度条、Cookie 导入、顶栏确认、浏览器打开、全屏与禁用源链路不变，仅收敛 `web_view/menu_delete_source` 单项能力。实现上在 `CupertinoActionSheet` 按 `sourceOrigin` 非空闸门新增 destructive 动作“删除源”，点击后先弹 legacy 同义确认框“提醒/是否确认删除？\n<书源名>”；确认后执行 `_sourceRepo.deleteSource(sourceUrl) + SourceVariableStore.removeVariable(sourceUrl)` 并关闭当前承载页，不新增成功提示。失败分支仅记录 `ExceptionLogService(node=source.web_view.menu_delete_source)`；`menu_copy_url`（`seq407`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 337：`P10-seq409` 采用“来源上下文透传优先 + 条件显隐收敛 + 单项禁用后关闭 + 失败可观测”策略：在 `SourceWebVerifyView` 保持网页加载、进度条、Cookie 导入、顶栏确认、浏览器打开与全屏链路不变，仅收敛 `web_view/menu_disable_source` 单项能力。实现上为网页承载新增 `sourceOrigin/sourceName` 上下文字段，并在来源调用方（`SourceEditView`、阅读章节链接、章节付费网页）透传；`CupertinoActionSheet` 按 `sourceOrigin` 非空闸门补齐 destructive 动作“禁用源”，点击后执行 `_disableCurrentSource`，按 `sourceUrl` 回查当前书源并静默写库 `enabled=false`，随后关闭当前承载页。失败分支仅记录 `ExceptionLogService(node=source.web_view.menu_disable_source)`，不新增确认弹窗与成功提示；`menu_delete_source`（`seq410`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 336：`P10-seq408` 采用“更多菜单单项全屏补齐 + 全屏状态机收敛 + 返回优先级对齐 + 页面销毁恢复系统栏”策略：在 `SourceWebVerifyView` 保持网页加载、进度条、Cookie 导入、顶栏确认与既有更多菜单链路不变，仅收敛 `web_view/menu_full_screen` 单项能力。实现上在 `CupertinoActionSheet` 补齐“全屏”一级动作，点击后进入 `_isFullScreen` 状态并切换系统栏隐藏与顶栏隐藏；通过 `PopScope` 在全屏态优先消费返回手势/返回键以退出全屏，再回到页面返回链路；`dispose` 中补齐系统栏恢复，避免退出页面后状态泄漏。`menu_disable_source/menu_delete_source`（`seq409/410`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 335：`P10-seq406` 采用“更多菜单单项浏览器打开补齐 + baseUrl 目标收敛 + 失败可观测 + 单序号边界保持”策略：在 `SourceWebVerifyView` 保持网页加载、进度条、Cookie 导入、顶栏确认与既有更多菜单链路不变，仅收敛 `web_view/menu_open_in_browser` 单项能力。实现上在 `CupertinoActionSheet` 补齐“浏览器打开”一级动作，点击后调用 `_openInBrowser`，优先按 `initialUrl`（legacy 同义 `baseUrl`）拉起系统外部浏览器；成功路径静默且不关闭当前承载页，失败分支仅记录 `ExceptionLogService(node=source.web_view.menu_open_in_browser)` 并提示 `open url error`。`menu_copy_url/menu_full_screen/menu_disable_source/menu_delete_source`（`seq407/408/409/410`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 334：`P10-seq405` 采用“顶栏单项确认补齐 + 关闭语义收敛 + 单序号边界保持”策略：在 `SourceWebVerifyView` 保持现有网页加载、进度条、Cookie 导入与“更多”菜单链路不变，仅收敛 `web_view/menu_ok` 单项能力。实现上将顶栏 trailing 收敛为 `check + ellipsis` 双动作，新增 check 一级动作 `_confirmAndClose`，点击后直接关闭当前网页承载页并返回上级；不新增成功提示与扩展状态。`menu_open_in_browser/menu_copy_url/menu_full_screen/menu_disable_source/menu_delete_source`（`seq406/407/408/409/410`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 333：`P10-seq404` 采用“更多菜单单项删除补齐 + legacy 二次确认 + 删除副作用对齐 + 失败可观测”策略：在 `SourceDebugLegacyView` 保持扫码、源码查看、刷新发现、帮助与既有调试执行链路不变，仅收敛 `verification_code/menu_delete_source` 单项能力。实现上在“更多”菜单新增 destructive 动作“删除源”，点击后先弹 legacy 同义确认框“提醒/是否确认删除？\n<书源名>”；仅确认后执行 `_sourceRepo.deleteSource(sourceUrl) + SourceVariableStore.removeVariable(sourceUrl)` 并关闭当前调试页，不新增成功提示。失败分支仅记录 `ExceptionLogService(node=source.debug.verification_code.menu_delete_source)`；`web_view/menu_ok`（`seq405`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 332：`P10-seq403` 采用“更多菜单单项禁用补齐 + 回查短路写库 + 成功后关闭承载页 + 失败可观测”策略：在 `SourceDebugLegacyView` 保持扫码、源码查看、刷新发现与帮助等既有调试链路不变，仅收敛 `verification_code/menu_disable_source` 单项能力。实现上在“更多”菜单新增 destructive 动作“禁用源”，点击后按 `sourceUrl` 回查当前书源，命中则静默写库 `enabled=false`，随后关闭当前调试页；失败分支仅记录 `ExceptionLogService(node=source.debug.verification_code.menu_disable_source)`，不新增确认弹窗与成功提示。`menu_delete_source`（`seq404`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 331：`P10-seq402` 采用“顶栏一级确认补齐 + 输入提交语义对齐 + 单序号边界收敛”策略：在 `SourceDebugLegacyView` 保持扫码、更多与既有调试执行链路不变，仅收敛 `verification_code/menu_ok` 单项能力。实现上在顶栏补齐 check 图标一级动作，点击后复用 `_runCurrentKeyIfNotEmpty -> _runDebug` 提交当前输入 key，收敛到 legacy `VerificationCodeDialog.menu_ok` 的“输入后确认提交”语义；`menu_disable_source/menu_delete_source`（`seq403/404`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 330：`P10-seq280` 采用“扫码承载补齐单项图库入口 + 选图解析同义回传 + 失败可观测”策略：在 `QrScanView` 保持摄像头扫码与闪光灯既有链路不变，仅收敛 `action_choose_from_gallery` 单项能力。实现上在顶栏补齐 legacy 同义“图库”动作，触发后走系统选图并以 `MobileScannerController.analyzeImage` 解析二维码；命中时回传文本并关闭扫码页，未命中/解析异常回传空结果并关闭扫码页，取消选图保持当前页。异常分支统一记录 `ExceptionLogService(node=qr_code_scan.action_choose_from_gallery)`；`verification_code/menu_ok`（`seq402`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 329：`P10-seq235` 采用“文案同义收敛 + legacy 确认弹窗回归 + 删除副作用补齐 + 失败可观测”策略：在 `DiscoveryView` 保持发现页长按菜单结构与 `menu_edit/menu_top/menu_login/menu_search/menu_refresh` 既有承载不变，仅收敛 `menu_del` 单项能力。实现上将动作文案收敛为“删除”，确认弹窗收敛为“提醒 / 是否确认删除？\n<书源名> / 取消+确定”；确认后统一执行 `_sourceRepo.deleteSource(sourceUrl) + SourceVariableStore.removeVariable(sourceUrl)`，贴齐 legacy `SourceHelp.deleteBookSource` 的“删库+清理源变量”语义。失败分支仅记录 `ExceptionLogService(node=explore_item.menu_del)`；`qr_code_scan/action_choose_from_gallery`（`seq280`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 328：`P10-seq231` 采用“回查短路优先 + 最小序号同义写库 + 单项边界收敛”策略：在 `DiscoveryView` 保持发现页长按菜单结构与 `menu_edit/menu_login/menu_search/menu_refresh/menu_del` 既有承载不变，仅收敛 `menu_top` 单项能力。实现上将置顶触发改为“先按 `sourceUrl` 回查当前书源，未命中静默返回；命中后按当前库最小 `customOrder` 写入 `customOrder=minOrder-1`”，避免 upsert 快照在并发删除场景重插记录并修正最小序号基线漂移。`menu_del`（`seq235`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 327：`P10-seq230` 采用“文案同义收敛 + `sourceUrl` 实时编辑 key + 源缺失空白承载”策略：在 `DiscoveryView` 保持发现页长按菜单结构与 `menu_top/menu_login/menu_search/menu_refresh/menu_del` 既有承载不变，仅收敛 `menu_edit` 单项能力。实现上将动作文案从“编辑书源”收敛为 legacy 同义“编辑”，并将编辑触发从“传条目快照对象”改为“仅传 `sourceUrl` 后实时回查当前书源再进入编辑承载”；若回查未命中则进入空白编辑承载，以贴齐 legacy `BookSourceEditActivity.initData(source=null)` 边界。同步补齐 tracker `seq230(done)` 与 `seq231(pending)` 映射行，确保队列与台账双写闭环。`menu_top`（`seq231`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 326：`P10-seq214` 采用“通用文本承载单项关闭收敛 + 扩展入口回撤 + 文案同义统一”策略：在文本查看承载与帮助弹层保持现有内容展示能力与进入路径不变，仅收敛 `dialog_text/menu_close` 单项能力。实现上将 `SourceDebugTextView` 顶栏动作从“复制”回撤为 legacy 同义“关闭”，点击仅执行 `Navigator.pop`；同时将 `showAppHelpDialog` 顶栏关闭入口从图标收敛为“关闭”文案，避免用户可见语义漂移。`explore_item/menu_edit`（`seq230`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 325：`P10-seq213` 采用“顶栏单项动作收敛 + 清空直达触发 + 空态留白回撤”策略：在 `ExceptionLogsView` 保持异常日志列表与详情链路不变，仅收敛 `menu_clear` 单项能力。实现上将顶栏动作从垃圾桶图标收敛为 legacy 同义“清除”文本动作，点击后直接调用 `ExceptionLogService.clear` 清空日志并即时刷新，不新增确认弹窗与成功提示；同时移除“暂无异常日志”扩展空态文案，清空后保持列表留白态，贴齐 `CrashLogsDialog.menu_clear -> clearCrashLog -> initData` 的静默边界。`dialog_text/menu_close`（`seq214`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 324：`P10-seq200` 采用“导入候选编辑承载收敛 + 顶栏单动作保存 + 编辑输入保护”策略：在 `SourceListView._editImportRawJsonText` 保持导入候选“打开”入口与 `tryReplaceCandidateRawJson` 回写链路不变，仅将编辑承载顶栏收敛为 legacy `code_edit.xml` 同义结构（固定标题 `edit` + 右上单一保存图标动作），移除额外取消按钮；同时关闭自动纠错与联想并使用 monospace 编辑样式，贴齐 `CodeDialog` 编辑态语义。`crash_log/menu_clear`（`seq213`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 323：`P10-seq184` 采用“同入口状态机收敛 + 动作图标同步 + 启动态前移”策略：在 `SearchBookCoverChangeView` 保持封面候选网格与点击换封面流程不变，仅收敛 `menu_start_stop` 单项能力。实现上将顶栏动作由纯文本收敛为“图标+文案”组合，并在点击刷新后立即进入搜索中态（动作切换为“停止”）；运行中点击同入口执行 `CancelToken.cancel` 中断封面换源请求并回落“刷新”态。`code_edit/menu_save`（`seq200`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 322：`P10-seq3` 采用“顶栏单项动作收敛 + 扩展文案回撤 + 静默清空闭环”策略：在 `app_log_dialog` 保持弹层承载与日志点击详情链路不变，仅收敛 `menu_clear` 单项能力。实现上将动作文案从“清空”收敛为 legacy 同义“清除”，并将清除动作放在顶栏单项位置，点击后直接调用 `service.clear` 清空列表，不新增确认弹窗与成功提示；同时移除“暂无日志/未知日志”扩展文案，空列表保持留白态。额外关闭图标回撤为点击遮罩关闭，避免与 legacy 菜单入口形成并行扩展路径。`change_cover/menu_start_stop`（`seq184`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 321：`P10-seq1` 采用“顶栏单项补齐 + 应用名/链接直分享 + 异常静默边界对齐”策略：在 `AboutSettingsView` 保持现有列表结构与检查更新链路不变，仅收敛 `menu_share_it` 单项能力。实现上通过 `AppCupertinoPageScaffold.trailing` 补齐一级分享图标，点击后直接 `SharePlus.instance.share(text=应用发布链接, subject=应用名)`；失败分支保持静默吞掉，不新增成功或失败提示，以贴齐 legacy `AboutActivity.menu_share_it -> Context.share(app_share_description, app_name)` 语义。`menu_scoring`（`seq2`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 320：`P9-seq386` 采用“承载先补可达性 + 顶栏导入单项收敛 + 同名覆盖持久化”策略：先在设置页主题分组补齐“主题列表”承载入口，再在 `ThemeConfigListView` 顶栏仅实现 `menu_import` 同义动作“剪贴板导入”。导入链路严格对齐 legacy：读取剪贴板首条文本后仅按单对象 `Config` 解析，颜色字段不合法或结构异常统一提示“格式不对,添加失败”，剪贴板无内容静默返回；成功按 `themeName` 同名覆盖并刷新列表，不追加成功提示。`theme_config/menu_theme_mode`（`seq385`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 319：`P10-seq234` 采用“单项文案收敛 + 刷新链路保持 + 台账双写补齐”策略：在 `DiscoveryView` 保持发现页长按菜单结构与 `menu_edit/menu_top/menu_login/menu_search/menu_del` 既有承载不变，仅收敛 `menu_refresh` 单项能力。实现上不改动现有 `clearExploreKindsCache -> 展开态重载/收起态下次展开重载` 状态流，仅将动作文案从“刷新发现缓存”收敛为 legacy 同义“刷新”；同时补齐 tracker 缺失的 `seq234(done)` 与 `seq235(pending)` 映射行，确保优先级队列与台账证据闭环。`P9-seq386`（`theme_list/menu_import`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 318：`P10-seq233` 采用“入口侧显式 scope 写入 + 条目快照优先 + 直达搜索承载”策略：在 `DiscoveryView` 保持发现页长按菜单结构与 `menu_edit/menu_top/menu_login/menu_refresh/menu_del` 既有承载不变，仅收敛 `menu_search` 单项能力。实现上将搜索触发改为“先用当前条目快照写入 `SearchScope.fromSource(source)` 到设置，再打开 `SearchView`”，移除 `SearchView.scoped(sourceUrls)` 对 `sourceUrl` 回查与异步 scope 改写的依赖，以贴齐 legado `ExploreAdapter.menu_search -> ExploreFragment.searchBook -> SearchActivity(searchScope=SearchScope(bookSource))` 语义；`menu_refresh`（`seq234`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 317：`P10-seq232` 采用“登录单项语义收敛 + URL 回查优先 + 原始 `loginUi` 分流”策略：在 `DiscoveryView` 保持发现页长按菜单结构与 `menu_edit/menu_top/menu_search/menu_refresh/menu_del` 既有承载不变，仅收敛 `menu_login` 单项能力。实现上将登录触发改为“先按 `sourceUrl` 回查当前书源，未命中提示‘未找到书源’并返回；命中后按 `loginUi` 原始非空/空值分流到表单登录或网页登录”，以贴齐 legado `ExploreAdapter.menu_login -> SourceLoginActivity(type=bookSource,key=bookSourceUrl)` 与 `SourceLoginActivity(loginUi.isNullOrEmpty())` 语义；`menu_search`（`seq233`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 316：`P10-seq4` 采用“更新弹层顶栏动作收敛 + 下载触发单项补齐 + 失败可观测”策略：在 `AboutSettingsView` 保持“检查更新”入口与网络请求链路不变，仅收敛 `menu_download` 对应的更新弹层承载与下载动作。实现上将成功弹层改为 `CupertinoPopupSurface`（顶部版本标题 + 正文滚动区 + 右上角“下载”），点击“下载”仅在 `downloadUrl/fileName` 有效时触发下载拉起并反馈“开始下载”；无效链接/拉起失败统一提示“下载启动失败”并记录 `ExceptionLogService(node=app_update.menu_download)`。`P10-seq232`（`menu_login`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 315：`P7-seq346` 采用“批量菜单单项补齐 + 可见列表区间补选 + 静默计数刷新”策略：在 `RssSourceManageView` 保持多选弹层承载结构与 `menu_enable_selection/menu_disable_selection/menu_add_group/menu_remove_group/menu_top_sel/menu_bottom_sel/menu_export_selection/menu_share_source` 既有实现不变，仅收敛 `menu_check_selected_interval` 单项能力。实现上在“批量操作”中补齐“选中所选区间”（位于“分享选中源”后），触发后仅遍历当前可见列表，按已选项最小/最大索引补齐连续选区并刷新底栏计数，不写库、不新增提示。`P10-seq4`（`menu_download`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 314：`P7-seq345` 采用“批量菜单单项补齐 + 选中集合复用 + 系统分享直连 + 异常静默”策略：在 `RssSourceManageView` 保持多选弹层承载结构与 `menu_enable_selection/menu_disable_selection/menu_add_group/menu_remove_group/menu_top_sel/menu_bottom_sel/menu_export_selection` 既有实现不变，仅收敛 `menu_share_source` 单项能力。实现上在“批量操作”中补齐“分享选中源”（位于“导出所选”后），触发后仅取当前可见选中集合生成临时 JSON 并直接拉起系统分享，不新增确认弹窗、成功提示与失败复制兜底。`menu_check_selected_interval`（`seq346`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 313：`P7-seq343` 采用“批量菜单单项补齐 + 回查短路批量置底 + 顺序同义计算 + 失败可观测”策略：在 `RssSourceManageView` 保持多选弹层承载结构与 `menu_enable_selection/menu_disable_selection/menu_add_group/menu_remove_group/menu_top_sel/menu_export_selection` 既有实现不变，仅收敛 `menu_bottom_sel` 单项能力。实现上在“批量操作”中补齐“置底所选”（位于“置顶所选”后），触发后按当前可见选中集合提取 `sourceUrl` 并逐个回查库内当前源，命中集合按 `customOrder` 升序后批量写入 `customOrder=maxOrder+1+index`，未命中静默跳过，不新增确认弹窗与成功提示。失败分支统一记录 `ExceptionLogService(node=rss_source_sel.menu_bottom_sel)`；`menu_share_source`（`seq345`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 312：`P7-seq342` 采用“批量菜单单项补齐 + 回查短路批量置顶 + 顺序同义计算 + 失败可观测”策略：在 `RssSourceManageView` 保持多选弹层承载结构与 `menu_enable_selection/menu_disable_selection/menu_add_group/menu_remove_group/menu_export_selection` 既有实现不变，仅收敛 `menu_top_sel` 单项能力。实现上在“批量操作”中补齐“置顶所选”（位于“移除分组”后），触发后按当前可见选中集合提取 `sourceUrl` 并逐个回查库内当前源，命中集合按 `customOrder` 升序后批量写入 `customOrder=minOrder-1-index`，未命中静默跳过，不新增确认弹窗与成功提示。失败分支统一记录 `ExceptionLogService(node=rss_source_sel.menu_top_sel)`；`menu_bottom_sel`（`seq343`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 311：`P7-seq341` 采用“批量菜单单项补齐 + 分组输入弹窗 + 回查短路批量移除 + 失败可观测”策略：在 `RssSourceManageView` 保持多选弹层承载结构与 `menu_enable_selection/menu_disable_selection/menu_add_group/menu_export_selection` 既有实现不变，仅收敛 `menu_remove_group` 单项能力。实现上在“批量操作”中补齐“移除分组”（位于“添加分组”后），点击后弹出 legacy 同义“移除分组”输入框并提供已有分组候选；仅输入非空时按当前可见选中集合提取 `sourceUrl`，逐个回查库内当前源，命中后执行 `removeGroup` 并批量写库，未命中静默跳过，不新增确认弹窗与成功提示。失败分支统一记录 `ExceptionLogService(node=rss_source_sel.menu_remove_group)`；`menu_top_sel`（`seq342`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 310：`P7-seq340` 采用“批量菜单单项补齐 + 分组输入弹窗 + 回查短路批量追加 + 失败可观测”策略：在 `RssSourceManageView` 保持多选弹层承载结构与 `menu_enable_selection/menu_disable_selection/menu_export_selection` 既有实现不变，仅收敛 `menu_add_group` 单项能力。实现上在“批量操作”中补齐“添加分组”（位于“禁用所选”后），点击后弹出 legacy 同义“添加分组”输入框并提供已有分组候选；仅输入非空时按当前可见选中集合提取 `sourceUrl`，逐个回查库内当前源，命中后执行 `addGroup` 并批量写库，未命中静默跳过，不新增确认弹窗与成功提示。失败分支统一记录 `ExceptionLogService(node=rss_source_sel.menu_add_group)`；`menu_remove_group`（`seq341`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 309：`P7-seq339` 采用“批量菜单单项补齐 + 回查短路批量禁用 + 失败可观测”策略：在 `RssSourceManageView` 保持多选弹层承载结构与 `menu_enable_selection/menu_export_selection` 既有实现不变，仅收敛 `menu_disable_selection` 单项能力。实现上在“批量操作”中补齐“禁用所选”并保持位于“启用所选”后，触发后按当前可见选中集合提取 `sourceUrl`，逐个回查库内当前源，命中后批量写 `enabled=false`，未命中静默跳过，不新增确认弹窗与成功提示。失败分支统一记录 `ExceptionLogService(node=rss_source_sel.menu_disable_selection)`；`menu_add_group`（`seq340`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 308：`P7-seq338` 采用“批量菜单首项补齐 + 回查短路批量启用 + 失败可观测”策略：在 `RssSourceManageView` 保持多选弹层承载结构与 `menu_export_selection` 既有实现不变，仅收敛 `menu_enable_selection` 单项能力。实现上在“批量操作”首项补齐“启用所选”，触发后按当前可见选中集合提取 `sourceUrl`，逐个回查库内当前源，命中后批量写 `enabled=true`，未命中静默跳过，不新增确认弹窗与成功提示。失败分支统一记录 `ExceptionLogService(node=rss_source_sel.menu_enable_selection)`；`menu_disable_selection`（`seq339`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 307：`P7-seq337` 采用“选中态先移除 + legacy 同义确认文案 + 回查短路删除 + 级联清理 + 失败可观测”策略：在 `RssSourceManageView` 保持条目更多菜单结构与 `menu_top/menu_bottom` 既有实现不变，仅收敛 `menu_del` 单项能力。实现上将删除动作改为先从 `_selectedSourceUrls` 移除当前条目（对齐 `RssSourceAdapter.showMenu(menu_del)` 时序），确认弹窗标题/正文收敛为“提醒 / 确定删除\n<sourceName>”；仅确认后按 `sourceUrl` 回查当前源，未命中静默返回，命中后执行 `deleteSourceWithArticles + SourceVariableStore.removeVariable`。失败分支统一记录 `ExceptionLogService(node=rss_source_item.menu_del)`；`menu_enable_selection`（`seq338`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 306：`P7-seq336` 采用“回查短路优先 + 单项置底静默写库 + 失败可观测”策略：在 `RssSourceManageView` 保持条目更多菜单结构与 `menu_top` 既有实现不变，仅收敛 `menu_bottom` 单项能力。实现上将“置底”触发改为先按 `sourceUrl` 回查当前源，未命中静默返回，命中后按 `maxOrder+1` 写入并依赖流刷新，不新增成功提示；失败分支统一记录 `ExceptionLogService(node=rss_source_item.menu_bottom)`。`menu_del`（`seq337`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 305：`P7-seq335` 采用“菜单结构同义收敛 + 回查短路 + 失败可观测”策略：在 `RssSourceManageView` 保持现有条目动作承载，不改动 `menu_bottom/menu_del` 执行链路，仅收敛 `menu_top` 单项能力。实现上将条目更多菜单回归 legacy 同义三项（`置顶/置底/删除`），移除非 legacy 扩展入口“编辑”；点击“置顶”先按 `sourceUrl` 回查当前源，未命中静默返回，命中后按 `minOrder-1` 写入并依赖流刷新，不新增成功提示。为对齐异常可观测约束，失败分支统一记录 `ExceptionLogService(node=rss_source_item.menu_top)`；`menu_bottom/menu_del`（`seq336/337`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 304：`P7-seq333` 采用“菜单首项补齐 + listSrc 快照承载 + 空值直出”策略：在 `RssSourceDebugView` 保持现有调试日志承载与“正文源码”链路不变，仅在“更多”菜单首项补齐 `menu_list_src` 同义入口“列表源码”；实现上新增 `_listSrcRaw` 接收 `snapshot.listSrc`，点击动作固定 push `SourceDebugTextView(title=Html, text=listSrc ?? '')`，源码为空时不拦截提示，严格对齐 legacy `TextDialog("Html", listSrc)` 语义。`rss_source_item/menu_top`（`seq335`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 303：`P7-seq327` 采用“入口层级同义收敛 + 扩展入口回撤 + 文案统一”策略：在 `RssSourceManageView` 仅收敛 `menu_add` 单项能力，不提前并入 `menu_help` 等后续动作；具体实现为移除非 legacy 顶栏 `+` 直达入口，并在 `_openMainOptions` 首项补齐 legacy 同义“新建订阅源”，点击后复用既有 `_openAddSource()` 进入新增编辑承载。为避免同链路文案漂移，空态主动作文案同步收敛为“新建订阅源”；`menu_list_src`（`seq333`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 302：`P7-seq326` 采用“单项同义收敛 + 旧词兼容 + 台账补齐”策略：在 `RssSourceManageView` 保持 `menu_group_null` 固定动作“未分组”与 `CupertinoActionSheet` 承载不变，仅在 `RssSourceManageHelper.parseQueryIntent` 补齐旧词“无分组”兼容，确保历史输入与 legacy 同义入口都映射到 `noGroup` 筛选，不回退到普通搜索。同时将 `feature-item-tracker` 缺失的 `seq326(done)` 与 `seq327(pending)` 映射行一并补齐，恢复队列与台账一一对应；`menu_add`（`seq327`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 301：`P7-seq324` 采用“文案同义收敛 + 查询词双词兼容”策略：在 `RssSourceManageView` 分组弹层仅收敛 `menu_disabled_group` 单项文案与触发词为 legacy 同义“已禁用”，点击后固定写入“已禁用”即时筛选禁用源；在 `RssSourceManageHelper.parseQueryIntent` 同步兼容旧词“禁用”，确保历史输入不回退到普通搜索。`menu_group_null/menu_add`（`seq326/327`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 300：`P7-seq323` 采用“文案同义收敛 + 查询词双词兼容”策略：在 `RssSourceManageView` 分组弹层仅收敛 `menu_enabled_group` 单项文案与触发词为 legacy 同义“已启用”，点击后固定写入“已启用”即时筛选；在 `RssSourceManageHelper.parseQueryIntent` 同步兼容旧词“启用”，确保历史输入不回退到普通搜索。`menu_disabled_group/menu_group_null`（`seq324/326`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 299：`P7-seq322` 采用“同层弹层承载 + 既有分组管理能力复用 + flowGroups 自动回刷”策略：保持 `RssSourceManageView` 顶栏与分组动作顺序不变，仅将“分组管理”触发从整页 `Navigator.push` 收敛为 `CupertinoPopupSurface` 同层弹层，确保入口层级与 legacy `GroupManageDialog` 同义。弹层内容复用 `RssGroupManageView` 既有 `添加/编辑/删除分组` 写库链路，顶部补齐“完成”退出动作；动态分组回刷继续依赖 `flowGroups` 数据流，不新增跨序号筛选动作。`menu_enabled_group/menu_disabled_group/menu_group_null`（`seq323/324/326`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 298：`P7-seq321` 采用“菜单语义收敛优先 + 扩展入口回撤 + 分组点击链路保持”策略：在 `RssSourceManageView` 保持现有顶栏承载不变，仅将分组动作标题收敛为 legacy 同义“分组”，并将弹层固定动作顺序收敛到 `分组管理/启用/禁用/需要登录/未分组`，动态分组继续按 `flowGroups` 结果追加。为消除交互集合偏差，本序号移除非 legacy 扩展动作“全部”与条目更多中的“筛选与分组”入口；动态分组点击仍统一写入 `group:<name>` 即时筛选。`menu_group_manage`（`seq322`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 297：`P7-seq320` 采用“常驻清空入口 + 文案同义收敛 + 失败可观测”策略：在 `RssReadRecordView` 保持顶栏“清空”入口常驻可触发，不再按空列表禁用；触发后先查询实时记录数再弹确认框，标题/文案收敛为 legacy 同义“提醒 / 确定删除\nN 阅读记录”，确认后执行 `deleteAllRecord -> reload`，成功路径保持静默不新增提示。异常分支统一记录 `ExceptionLogService(node=rss_read_record.menu_clear)`；`rss_source/menu_group`（`seq321`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 296：`P7-seq319` 采用“更多菜单常驻承载 + 浏览器打开单项补齐 + URL 回退边界显式化”策略：在 `RssReadPlaceholderView` 保持现有顶栏一级动作 `刷新/收藏/分享/朗读` 不变，将右上角“更多”从“仅登录可见”收敛为“常驻可见”，并在动作列表中补齐 `menu_browser_open` 同义入口“浏览器打开”。触发链路收敛为“优先使用当前阅读 URL（`link -> article.link -> origin`）后调用外部浏览器”，无 URL 时提示 `url null`；外部拉起失败统一记录 `ExceptionLogService(node=rss_read.menu_browser_open)` 并提示 `open url error`，成功路径保持静默不新增提示。`rss_read_record/menu_clear`（`seq320`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 295：`P7-seq317` 采用“顶栏一级朗读补齐 + 播放态图标切换 + 文章正文转纯文本 + 失败可观测”策略：在 `RssReadPlaceholderView` 保持现有顶栏结构与 `刷新/收藏/分享/登录` 承载不变，仅补齐 `menu_aloud` 同义一级入口。触发链路收敛为“未播放时提取当前文章正文文本（`description/content/title` 按序回退并做 HTML 转纯文本）后启动 TTS；播放中再次点击则停止朗读”；空文本场景保持静默返回，不新增提示。为满足迁移阶段可调试要求，同步补充“朗读状态”回显，并将启动/停止失败统一记录 `ExceptionLogService(node=rss_read.menu_aloud)`；`menu_browser_open`（`seq319`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 294：`P7-seq316` 采用“顶栏一级分享补齐 + `link` 回退 + 空链接轻提示 + 分享异常静默”策略：在 `RssReadPlaceholderView` 保持现有顶栏结构与 `刷新/收藏/登录` 承载不变，仅补齐 `menu_share_it` 同义一级入口。触发链路收敛为“优先分享当前阅读态 `link`，未命中则提示 `Null url`”，分享调用复用 `share_plus` 文本分享并对异常静默吞掉，以贴齐 legacy `Context.share(text)` 无额外提示边界。为满足迁移阶段可调试要求，同步补充“分享目标”状态回显；`menu_aloud/menu_browser_open`（`seq317/319`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 293：`P7-seq315` 采用“一级星标入口补齐 + 先入收藏后编辑 + link 命中显隐”策略：在 `RssReadPlaceholderView` 保持现有承载结构与一级“刷新”动作不变，仅补齐 `menu_rss_star` 同义一级入口；入口显隐严格收敛为 `origin+link` 可命中当前文章时显示。点击星标后先执行收藏 upsert，再弹“收藏设置”承载（编辑标题/分组 + 删除收藏），取消保持静默，删除仅移除当前收藏并回落空心星标。为贴齐 legacy 收藏回读路径，`RssFavoritesPlaceholderView` 打开阅读页时同步透传 `link`；仓储层补齐 `RssStarRepository.get/upsert/update/delete` 接口并统一失败日志节点 `rss_read.menu_rss_star`。`menu_share_it/menu_aloud/menu_browser_open`（`seq316/317/319`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 292：`P7-seq313` 采用“确认文案同义收敛 + 删除链路级联清理 + 回查短路静默”策略：在 `RssSubscriptionView` 保持现有长按动作面板结构，仅收敛 `menu_del` 单项动作。确认弹窗文案对齐 legacy 为“提醒 / 确定删除\n<sourceName>”；确认后先按 `sourceUrl` 回查当前源，未命中直接静默返回；命中时执行删源并同步清理该源 RSS 文章缓存与源变量，保持成功静默无提示。为满足异常可观测约束，失败分支统一记录 `ExceptionLogService(node=rss_main_item.menu_del)`；`rss_read/menu_rss_star`（`seq315`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 291：阅读器滚动模式采用“统一 insets 基线 + 动态 tip slot 占位 + 组件内系统 inset 同步”策略：在 `simple_reader_view` 新增 `top/bottom system inset` 与 `header/footer slot` 统一计算，正文容器改为统一 `Padding` 占位；移除尾段与步进快照中的固定 `30` 页脚占位，改为按 `paddingBottom` 与 tip slot 动态收敛；并在 `reader_status_bar.dart` 将页眉/页脚 inset 规则对齐到 `showStatusBar/hideNavigationBar/paddingDisplayCutouts` 组合语义。该策略保持 UI 组件承载不变，只收敛布局基线，避免跨模块扩散。
+- `2026-02-26` 决策 290：`P7-seq312` 采用“单项行为收敛 + 回查短路 + 失败可观测”策略：在 `RssSubscriptionView` 保持现有长按动作面板结构，仅收敛 `menu_disable` 单项动作。触发时先按 `sourceUrl` 回查库内当前源，未命中直接静默返回；命中后仅写 `enabled=false` 并依赖启用列表流刷新，不新增确认弹窗与成功提示。为对齐异常可观测约束，失败分支统一记录 `ExceptionLogService(node=rss_main_item.menu_disable)`；`menu_del`（`seq313`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 289：`P7-seq311` 采用“菜单结构同义收敛 + 编辑直达承载 + 扩展入口剔除”策略：在 `RssSubscriptionView` 保持现有长按动作承载，不改动 `menu_top/menu_disable/menu_del` 执行链路，仅收敛 `menu_edit` 同序号能力。实现上将动作面板结构回归 legacy 同义四项（`置顶/编辑/禁用/删除`），移除非 legacy 扩展入口“分组筛选”；点击“编辑”仅按当前 `sourceUrl` 直达 `RssSourceEditView`，不新增确认弹窗、不引入 `RESULT_OK` 刷新分支。`menu_disable/menu_del`（`seq312/seq313`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-26` 决策 288：`P7-seq310` 采用“单项行为收敛 + 失败可观测 + 并发删除静默短路”策略：在 `RssSubscriptionView` 保持现有长按动作面板结构，仅收敛 `menu_top` 单项动作。触发时先按 `sourceUrl` 回查库内当前源，未命中直接静默返回；命中后按 legacy 同义规则执行 `customOrder=minOrder-1` 写库并依赖流刷新，不新增成功提示。为对齐异常可观测约束，失败分支统一记录 `ExceptionLogService(node=rss_main_item.menu_top)`；`menu_edit/menu_disable/menu_del`（`seq311~313`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 287：`P7-seq309` 采用“更多菜单单项补齐 + 全量删除确认 + 数据层 deleteAll 收敛”策略：在 `RssFavoritesPlaceholderView` 维持现有收藏夹承载结构，仅在“更多”菜单补齐 `menu_del_all` 同义入口“删除所有”，并保留 `menu_del_group` 同层动作不变；点击“删除所有”后固定弹 legacy 同义确认文案“确定删除\n<全部>收藏”，取消静默返回，确认后调用 `RssStarRepository.deleteAll` 全量清空收藏，不新增成功提示。为保证链路等价，仓储层补齐 `deleteAll` 接口并将失败分支统一记录 `ExceptionLogService(node=rss_favorites.menu_del_all)`；`rss_main_item/menu_top`（`seq310`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 286：`P7-seq306` 采用“菜单单项补齐 + 按源静默清库”策略：在 `RssArticlesPlaceholderView` 维持现有承载结构，仅在“更多”菜单补齐 `menu_clear` 同义入口“清除”；点击后按当前 `sourceUrl` 直接调用 `RssArticleRepository.deleteByOrigin` 清空 RSS 文章缓存，不新增确认弹窗与成功提示。异常分支仅记录 `ExceptionLogService(node=rss_articles.menu_clear)`，保持 legacy `RssSortActivity.menu_clear -> RssSortViewModel.clearArticles` 的静默边界；`rss_favorites/menu_group`（`seq307`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 285：`P7-seq304` 采用“菜单单项补齐 + `articleStyle` 轮换持久化 + 轻量回显核验”策略：在 `RssArticlesPlaceholderView` 维持现有承载结构，仅在“更多”菜单补齐 `menu_switch_layout` 同义入口“切换布局”；点击后按 legado `RssSortViewModel.switchLayout` 语义执行 `articleStyle` 循环 `0->1->2->0` 并写回当前源记录，不新增中间路由与成功提示。为保持 `upFragments` 的可观测刷新效果，本序号在页面内新增“布局模式”状态回显并复用 `_sortReloadVersion` 触发刷新；失败分支仅记录 `ExceptionLogService(node=rss_articles.menu_switch_layout)`。`menu_clear`（`seq306`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 284：`P7-seq303` 采用“菜单单项补齐 + 编辑承载复用 + 仅保存回刷”策略：在 `RssArticlesPlaceholderView` 维持现有承载结构，仅在“更多”菜单补齐 `menu_edit_source` 同义入口“编辑源”；点击后按当前 `sourceUrl` 打开 `RssSourceEditView`，不新增中间路由与扩展提示。返回边界严格对齐 legado `editSourceResult(RESULT_OK)`：仅 `Navigator.pop(true)`（保存）触发 `_sortReloadVersion` 回刷标题/分类预览，取消返回保持静默不刷新；失败分支仅记录 `ExceptionLogService(node=rss_articles.menu_edit_source)`。`menu_switch_layout/menu_clear`（`seq304/306`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 283：`P7-seq302` 采用“菜单单项补齐 + 变量编辑承载顶栏化 + 保存静默回写”策略：在 `RssArticlesPlaceholderView` 维持现有承载结构，仅在“更多”菜单补齐 `menu_set_source_variable` 同义入口“设置源变量”；点击后打开 `CupertinoPopupSurface` 变量编辑承载，标题/说明文案对齐 legado `VariableDialog`，保存仅调用 `SourceVariableStore.putVariable(sourceUrl, value)` 回写 `sourceVariable_<sourceUrl>`，空串允许保存，取消与成功均不追加提示。`menu_edit_source/menu_switch_layout/menu_clear`（`seq303/304/306`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 282：`P7-seq344` 采用“多选承载先补可达性 + 导出单项收敛”策略：在 `RssSourceManageView` 新增 legacy 同义多选承载（行级勾选 + 底部批量栏 `全选/反选/更多`），并在“批量操作”菜单仅补齐 `menu_export_selection` 单项“导出所选”；导出集合严格限定为当前可见选中源，默认文件名固定 `exportRssSource.json`，取消导出静默返回，成功后弹路径并支持复制。`menu_share_source/menu_check_selected_interval`（`seq345/346`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 281：`P7-seq334` 采用“RSS 调试承载最小补齐 + 正文源码单项直出”策略：新增 `RssSourceDebugService` 与 `RssSourceDebugView` 承载 RSS 调试快照，仅在调试页“更多”菜单补齐 `menu_content_src` 同义入口“正文源码”；点击后固定打开源码承载页并使用 legacy 同义标题 `Html`，不追加空源码拦截提示。为保持入口可达且不引入跨序号菜单扩展，`RssSourceEditView` 仅补齐顶栏“调试源”触发并复用“先保存草稿再进入调试”边界；`menu_list_src`（`seq333`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 280：`P7-seq331` 采用“菜单单项补齐 + 默认导入直写链路”策略：在 `RssSourceManageView` 的“更多”菜单仅新增 `menu_import_default` 同义入口“导入默认规则”；点击后不进入候选导入弹层，而是直接执行 `deleteDefault(sourceGroup=legado) + upsert(default asset)`。默认资产沿用 `assets/rss/rssSources.json`，写库阶段逐条按 `sourceUrl` upsert，成功保持静默、失败以错误摘要可观测；`menu_content_src`（`seq334`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 279：`P7-seq330` 采用“扫码入口单项补齐 + 候选导入链路复用 + 历史隔离”策略：在 `RssSourceManageView` 的“更多”菜单仅新增 `menu_import_qr` 单项入口“二维码导入”，点击后调用统一扫码服务并将扫码文本直接交给既有 RSS 候选导入弹层；候选状态继续保持“新增/更新/已有”，默认勾选新增+更新。二维码分支不写 `rssSourceRecordKey` 历史，避免与 `menu_import_onLine` 输入历史耦合；`menu_import_default`（`seq331`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 278：`P7-seq329` 采用“输入层历史同义优先 + 候选导入链路复用”策略：在 `RssSourceManageView` 的“更多”菜单仅新增 `menu_import_onLine` 单项入口“网络导入”，点击后先弹 URL 输入层（占位 `url`）并使用 legado 同名历史键 `rssSourceRecordKey`（支持点选回填与删除）；确认后统一复用既有 RSS 候选导入弹层完成勾选导入，候选状态保持“新增/更新/已有”并默认勾选新增+更新。仅 `http/https` 输入写入历史，`menu_import_qr/menu_import_default`（`seq330/331`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 277：`P7-seq328` 采用“入口可达优先 + 候选导入同义闭环”策略：在 `RssSourceManageView` 顶栏仅新增 `menu_import_local` 同义入口“更多 -> 本地导入”，点击后固定走 `txt/json` 本地选档并进入 RSS 导入候选弹层；候选状态按 `sourceUrl + lastUpdateTime` 收敛为“新增/更新/已有”，默认勾选新增+更新，提交阶段复用 `RssSourceImportCommitService` 仅导入勾选项并保持成功静默。为贴齐 legado `ImportRssSourceDialog`，本序号同步补齐“保留原名/保留分组/保留启用状态 + 自定义分组覆盖/追加”策略项；`menu_import_onLine/menu_import_qr/menu_import_default`（`seq329/330/331`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 276：`P7-seq325` 采用“文案同义收敛 + 查询关键字双词兼容”策略：在 `RssSourceManageView` 的筛选弹层仅收敛 `menu_group_login` 动作为 legacy 同义“需要登录”，并将查询写入值同步改为“需要登录”；在 `RssSourceManageHelper.parseQueryIntent` 同时兼容“需要登录/需登录”两种输入映射到 `login` 模式，确保新文案与历史输入都能命中同一 `filterLogin` 结果。不提前并入 `menu_import_local/menu_import_onLine/menu_import_qr/menu_import_default`（`seq328~331`）后续能力，保持按序单项推进。
+- `2026-02-25` 决策 275：`P7-seq318` 采用“阅读页顶栏组合动作 + 登录单项入口补齐 + RSS 登录链路复用”策略：保持 `RssReadPlaceholderView` 现有承载结构与一级“刷新”动作不变，仅在满足 `origin` 命中源且 `loginUrl` 非空时展示右上角“更多”按钮，菜单内只补齐 `menu_login`。点击后复用现有 RSS 源登录承载，按 `loginUi` 非空/空值分流到表单登录或网页登录，并统一以 `rssSource.sourceUrl` 作为登录 key；不提前并入 `menu_rss_star/menu_share_it/menu_aloud/menu_browser_open`（`seq315/316/317/319`）后续能力，保持按序单项推进。
+- `2026-02-25` 决策 274：`P7-seq314` 采用“阅读页顶栏单项入口补齐 + 静默刷新回显”策略：保持 `RssReadPlaceholderView` 现有承载结构，不新增中间路由，仅补齐 legado `menu_rss_refresh` 同义一级动作；点击后在页面内更新轻量刷新状态（最近刷新时间与次数）用于回归核验，同时保持动作静默完成且不弹成功提示。`menu_rss_star/menu_share_it/menu_aloud/menu_login/menu_browser_open`（`seq315/316/317/318/319`）保持后续序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 273：`P7-seq305` 采用“菜单单项补齐 + 记录页承载复用 + 清空确认链路保持”策略：在 `RssArticlesPlaceholderView` 维持现有承载结构，仅在“更多”菜单补齐 `menu_read_record` 同义入口，点击后直接进入既有 `RssReadRecordView`；不新增中间路由、不改写记录数据层。阅读记录清空流程继续沿用现有确认弹窗与 `deleteAllRecord -> 刷新列表` 闭环，保持成功静默与异常可观测边界；不提前并入 `menu_set_source_variable/menu_edit_source/menu_switch_layout/menu_clear`（`seq302/303/304/306`）后续能力，维持按序单项推进。
+- `2026-02-25` 决策 272：`P7-seq301` 采用“菜单单项补齐 + 分类缓存清理重算闭环 + 无提示静默完成”策略：在 `RssArticlesPlaceholderView` 维持现有承载结构，仅在“更多”菜单补齐 `menu_refresh_sort` 同义入口，并将其设为与 `menu_login` 解耦的常驻动作；触发后仅执行 `RssSortUrlsHelper.clearSortCache` 清理当前 RSS 源分类缓存，再重建分类预览数据，不追加成功提示。为对齐 legado `clearSortCache -> upFragments` 的可观测结果，本序号新增轻量分类预览回显（分类数量与 Tab 显隐）用于手工回归，不提前并入 `menu_read_record/menu_set_source_variable/menu_edit_source/menu_switch_layout/menu_clear`（`seq305/302/303/304/306`）后续能力，保持按序单项推进。
+- `2026-02-25` 决策 271：`P7-seq300` 采用“文章列表承载最小升级 + 登录单项入口补齐 + RSS 源登录映射复用”策略：在 `RssArticlesPlaceholderView` 保持现有占位内容不变，仅新增 RSS 源状态监听与右上角“更多”菜单；`menu_login` 显隐严格收敛到 `loginUrl` 非空，点击后按 `loginUi` 原始非空/空值分流至表单登录或网页登录。为复用既有登录承载能力，本序号在页面内新增 `RssSource -> BookSource` 轻量映射，仅覆盖登录所需字段，并统一以 `sourceUrl` 作为 key；不提前并入 `menu_refresh_sort/menu_set_source_variable/menu_edit_source/menu_switch_layout/menu_read_record/menu_clear`（`seq301/302/303/304/305/306`）后续能力，保持按序单项推进。
+- `2026-02-25` 决策 270：`P8-seq347` 采用“变量编辑承载顶栏化 + 保存单项收敛”策略：在 `SourceEditLegacyView._setSourceVariable` 将源变量编辑承载由 `CupertinoAlertDialog` 收敛为 `CupertinoPopupSurface` 顶栏结构，仅补齐 legacy `save.xml/menu_save` 同义一级“保存”触发；点击“保存”后继续仅调用 `SourceVariableStore.putVariable` 回写当前书源变量并关闭承载层，取消保持不落盘，全流程不追加成功提示。`rss_articles/menu_login`（`seq300`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 269：`P8-seq279` 采用“跳转确认弹窗单项补齐 + legacy 二次确认 + 删除规则复用”策略：在 `SourceLoginWebViewView._confirmOpenExternalApp` 仅新增 `menu_delete_source` 同义动作“删除源”，点击后先弹 legacy 同义确认框“提醒/是否确认删除？”，确认后按 `sourceUrl` 执行 `SourceRepository.deleteSource + SourceVariableStore.removeVariable`，并关闭当前登录承载页；不追加成功提示，不提前并入 `save/menu_save`（`seq347`）后续能力，保持序号边界单项推进。
+- `2026-02-25` 决策 268：`P8-seq278` 采用“跳转确认弹窗单项补齐 + 禁用即关闭承载页”策略：在 `SourceLoginWebViewView._confirmOpenExternalApp` 仅新增 `menu_disable_source` 同义动作“禁用源”，点击后按 `sourceUrl` 回查并静默写库 `enabled=false`，随后关闭当前登录承载页；不追加成功提示，不提前并入 `menu_delete_source`（`seq279`）后续能力，保持序号边界单项推进。
+- `2026-02-25` 决策 267：`P8-seq255` 采用“单项时序收敛 + 启用策略即时持久化”策略：在 `SourceListView._showImportSelectionDialog` 保持 `menu_keep_enable` 文案与候选导入边界不变，仅将“保留启用状态”开关切换改为即时写入设置（对齐 legado `onMenuItemClick(menu_keep_enable)` 的持久化时序）；导入确认阶段继续仅消费该策略决定 `enabled/enabledExplore` 是否沿用本地值，不并入 `open_url_confirm`（`seq278/279`）后续能力，保持序号边界单项推进。
+- `2026-02-25` 决策 266：`P8-seq254` 采用“单项文案收敛 + 分组策略即时持久化”策略：在 `SourceListView._showImportSelectionDialog` 仅收敛 `menu_keep_group` 对应策略项文案为 legacy 同义“保留分组”，并将分组保留开关切换改为即时写入设置（对齐 legado `onMenuItemClick(menu_keep_group)` 的 `putPrefBoolean` 时序）；导入确认阶段继续仅消费该策略以决定是否沿用本地分组，不并入 `menu_keep_enable`（`seq255`）后续能力，保持序号边界单项推进。
+- `2026-02-25` 决策 265：`P8-seq253` 采用“单项文案收敛 + 名称策略即时持久化”策略：在 `SourceListView._showImportSelectionDialog` 仅收敛 `menu_keep_original_name` 对应策略项文案为 legacy 同义“保留原名”，并将名称保留开关切换改为即时写入设置（对齐 legado `onMenuItemClick(menu_keep_original_name)` 的 `putPrefBoolean` 时序）；导入确认阶段继续仅消费该策略以决定是否沿用本地名称，不并入 `menu_keep_group/menu_keep_enable`（`seq254/255`）后续能力，保持序号边界单项推进。
+- `2026-02-25` 决策 264：`P8-seq252` 采用“单项文案收敛 + 状态流转零漂移”策略：在 `SourceListView._showImportSelectionDialog` 仅将 `menu_select_update_source` 动作文案由“选择更新”收敛为 legacy 同义“选中更新源”，不改动现有切换逻辑与候选集合计算，确保“仅影响更新候选勾选态、空更新集合静默 no-op、其它动作链路不受影响”。`menu_keep_original_name`（`seq253`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 263：`P8-seq251` 采用“单项文案收敛 + 状态流转零漂移”策略：在 `SourceListView._showImportSelectionDialog` 仅将 `menu_select_new_source` 动作文案由“选择新增”收敛为 legacy 同义“选中新增源”，不改动现有切换逻辑与候选集合计算，确保“仅影响新增候选勾选态、空新增集合静默 no-op、其它动作链路不受影响”。`menu_select_update_source`（`seq252`）保持下一序号独立推进，不跨序号并项。
+- `2026-02-25` 决策 262：`P8-seq250` 采用“导入候选弹层同层级动作补齐 + 分组设置弹窗承载 + 提交阶段改写”策略：在 `SourceListView._showImportSelectionDialog` 去除策略区内嵌“自定义分组（可选）”输入，改为与“全选/选择新增/选择更新”同层级的 `menu_new_group` 同义动作；动作触发后弹“输入自定义源分组名称”对话框，支持候选分组快捷填充与“追加分组”开关，并按 legacy 规则回显 `【group】/+【group】`。确认导入时保持原有“仅导入勾选候选”边界，同时将分组策略下沉到提交阶段：空分组不改写、覆盖直接写入、追加按 legacy 分组分隔语义去重后写回，确保与 `ImportBookSourceViewModel.importSelect` 状态流转同义。
+- `2026-02-25` 决策 261：`P8-seq249` 采用“导入候选弹层入口补齐 + 分组策略随提交生效”策略：在 `ReplaceRuleListView._showImportSelectionSheet` 仅补齐 `menu_new_group` 同义动作，不提前并入 `P8-seq250(import_source/menu_new_group)` 后续书源导入能力；动作触发后弹“自定义源分组”设置层，支持覆盖/追加两种模式并按 legacy 规则回显标题 `【group】/+【group】`。确认导入时保持原有“仅导入勾选候选”边界，同时将分组策略下沉到提交阶段：空分组不改写、覆盖直接写入、追加按 legacy 分组分隔语义去重后写回，确保与 `ImportReplaceRuleViewModel.importSelect` 状态流转同义。
+- `2026-02-25` 决策 260：`P8-seq237` 采用“候选条目长按单项补齐 + 删除结果驱动刷新”策略：在 `BookshelfView._showScanImportSelectionDialog` 的候选条目层新增长按菜单，仅补齐 `menu_del` 同义动作，不提前并入 `P8-seq249(import_replace/menu_new_group)` 后续能力；长按后弹出仅含“删除”的 `CupertinoActionSheet`，确认即调用 `ImportService.deleteLocalBooksByPaths([path])`。删除中复用 `deletingSelection` 忙碌闸门阻断重复触发；完成后仅在 `deletedCount > 0` 时移除候选与选中态，失败保持静默并维持候选可继续操作，确保与 legado `showFileMenu(menu_del) -> delFile -> 列表刷新` 的触发边界一致。
+- `2026-02-25` 决策 259：`P6-seq183` 采用“选中态单项补齐 + 可见列表区间扩选 + 静默计数刷新”策略：在 `BookshelfManagePlaceholderView` 选中态摘要栏仅新增 `menu_check_selected_interval` 同义动作，不提前并入 `P6-seq240` 后续分组管理能力；触发后仅遍历当前可见列表，按已选项最小/最大索引补齐连续选区并刷新“已选 N / total”，不写库、不弹提示。实现复用现有 `_selectedBookIds` 状态集，不引入新持久化键，确保与 legado `BookAdapter.checkSelectedInterval` 边界一致。
+- `2026-02-25` 决策 258：`P6-seq180` 采用“选中态单项补齐 + 分组位多选弹层 + membership 批量写入”策略：在 `BookshelfManagePlaceholderView` 选中态摘要栏仅新增 `menu_add_to_group` 同义动作，不提前并入 `menu_check_selected_interval` 后续动作；触发后先按 legacy `flowSelect` 口径收敛为 `groupId >= 0` 的可选分组集合，再通过“选择分组”多选弹层返回分组位掩码，并对当前可见选中集合批量执行 `membership | selectedGroupBits` 落盘 `bookshelf.book_group_membership_map`。执行期间新增 `addingToGroup` 忙碌态闸门统一阻断其它批量动作并发触发；失败分支统一记录 `ExceptionLogService(node=bookshelf_manage.menu_add_to_group)` 并保留错误摘要提示。
+- `2026-02-25` 决策 257：`P6-seq179` 采用“选中态单项补齐 + 允许/禁止统一处理 + 差异显式记录”策略：在 `BookshelfManagePlaceholderView` 选中态摘要栏仅新增 `menu_update_disable` 同义动作，不提前并入 `menu_add_to_group/menu_check_selected_interval` 后续动作；允许/禁止更新统一收敛到 `_handleSetCanUpdate(canUpdate)`，共用 `updatingCanUpdate` 忙碌闸门以阻断并发触发。触发后按当前可见选中集合批量写入 `book_can_update_map=false` 并保持成功静默；失败分支统一记录 `ExceptionLogService(node=bookshelf_manage.menu_update_disable)` 并保留错误摘要提示。legacy `removeType(updateError)` 因当前 `Book` 模型缺少类型位暂无法等价复刻，已在 Progress 记录例外与回补点。
+- `2026-02-25` 决策 256：`P6-seq178` 采用“选中态单项补齐 + 设置层批量写入下沉”策略：在 `BookshelfManagePlaceholderView` 选中态摘要栏仅新增 `menu_update_enable` 同义动作，不提前并入 `menu_update_disable/menu_add_to_group/menu_check_selected_interval` 后续动作；触发后按当前可见选中集合批量写入 `book_can_update_map=true` 并保持成功静默。为避免逐本持久化导致的重复写盘，`SettingsService` 新增 `saveBooksCanUpdate` 批量接口并由单书接口复用；失败分支统一记录 `ExceptionLogService(node=bookshelf_manage.menu_update_enable)` 并保留错误摘要提示。
+- `2026-02-25` 决策 255：`P6-seq177` 采用“选中态单项补齐 + 确认弹层承载删除源文件开关 + 本地文件清理下沉”策略：在 `BookshelfManagePlaceholderView` 选中态摘要栏仅新增 `menu_del_selection` 同义动作，不提前并入 `menu_update_enable/menu_update_disable/menu_add_to_group/menu_check_selected_interval` 后续动作；删除触发前统一弹出“提醒/是否确认删除？”并回显 `deleteBookOriginal` 开关，确认后按当前可见选中集合执行批量删书，本地书按 legacy 语义清理封面并在开关开启时额外删除源文件。失败分支统一记录 `ExceptionLogService` 节点并保留错误摘要提示，成功分支保持静默。
+- `2026-02-25` 决策 254：`P6-seq176` 采用“菜单 checkable 单项补齐 + 列表标题点击分流”策略：在 `BookshelfManagePlaceholderView._showMoreMenu` 仅新增 `menu_open_book_info_by_click_title` 同义动作并复用同名键 `openBookInfoByClickTitle` 持久化，不提前并入 `menu_del_selection/menu_update_enable/menu_update_disable/menu_add_to_group` 等后续序号动作；列表项层保持“整行勾选”为基线，仅在开关开启时为书名热区注入详情跳转（`SearchBookInfoView.fromBookshelf`），关闭时回落为勾选切换，以对齐 legado `BookAdapter` 的标题点击边界。
+- `2026-02-25` 决策 253：`P6-seq174` 采用“分组弹层首项补齐 + 弹窗关闭后回刷上下文”策略：不调整顶栏层级与“更多”菜单，不新增路由中转，仅在 `BookshelfManagePlaceholderView._showBookGroupMenu` 的分组动作弹层首项新增 `menu_group_manage` 同义入口“分组管理”；点击后直接弹出 `BookshelfGroupManagePlaceholderDialog`，关闭后执行 `_reloadBookGroupContext(showError: false)` 以对齐 legado `flowAll` 驱动下的分组回显更新。`menu_open_book_info_by_click_title`（`seq176`）保持下一序号单独推进，不跨序号并项。
+- `2026-02-25` 决策 252：`P6-seq173` 采用“顶栏一级入口补齐 + 动态分组回显 + 可见选中作用域收敛”策略：在 `BookshelfManagePlaceholderView` 顶栏新增 `menu_book_group` 同义入口并按 `BookshelfBookGroupStore` 动态展示分组；分组切换只更新当前分组并即时重算列表，同时搜索提示回显 `筛选 • 分组名`。为对齐 legado `adapter.selection` 作用域，批量换源与清缓存改为仅消费当前可见列表选中项，避免跨分组隐藏项误操作。考虑到当前 `Book` 模型尚未迁移 `audio/updateError` 类型位及书籍分组位写入链路，本序号保留分组入口并通过 membership 映射承接，缺失类型位语义留待 `seq180` 后续回补。
+- `2026-02-25` 决策 251：`P6-seq182` 采用“选中态入口单项补齐 + 仓储层批量清理接口下沉”策略：在 `BookshelfManagePlaceholderView` 的选中态摘要栏仅新增 `menu_clear_cache` 同义动作，不提前并入 `menu_del_selection/menu_update_enable/menu_update_disable/menu_add_to_group/menu_check_selected_interval` 后续动作；清理实现不在页面层循环单书接口，而是由 `ChapterRepository.clearDownloadedCacheForBooks` 一次性处理选中集合，确保“选中集批量清理 + 成功统一提示”语义稳定，并在失败时保留 `ExceptionLogService` 可观测输出。
+- `2026-02-25` 决策 250：`P6-seq181` 采用“管理页承载切换 + 既有批量服务复用”策略：不新建独立路由链，直接在 `BookshelfManagePlaceholderView` 内将占位文案升级为可交互管理页，补齐“多选列表 -> 批量换源 -> 选择书源（含搜索与换源间隔）-> 执行进度/取消”完整状态机；服务层继续复用现有 `BookshelfManageBatchChangeSourceService`，仅补 UI 触发与等待态，避免跨序号改动 `menu_clear_cache/menu_del_selection/menu_update_enable` 等后续动作。
 - `2026-02-25` 决策 249：`P6-seq29` 采用“入口不变 + 新增态结构化编辑补齐”策略：保留书架“分组管理”弹层右上角 `+` 一级入口，不新增中间跳转；将新增分组从“单输入框”收敛为 legado 同义结构化编辑态，补齐 `groupName/cover/bookSort/enableRefresh` 字段采集。存储层 `BookshelfBookGroupStore.addGroup` 改为承接上述字段并维持 `getUnusedId + maxOrder+1` 规则写入，保证 `menu_add` 入口语义与状态边界同义；编辑/删除与拖拽排序保持后续序号独立推进，不跨序号并项。
 - `2026-02-23` 决策 248：正文标题居中问题采用“分页标题统一 painter 固定段宽”策略：不改动 `titleMode` 配置值与菜单结构，仅在 `PagedReaderWidget` 增加 `_buildPageTitlePainter`，统一给标题 `TextPainter` 使用固定 `minWidth/maxWidth` 布局，并复用于画布绘制、标题高度测量、长按命中坐标换算三条路径。该策略与 legado “按可视宽度计算标题居中”的语义一致，且变更面最小、不会影响滚动模式与书源主链路。
 - `2026-02-23` 决策 247：`P6-seq171` 采用“先补承载入口可达性 + 单项导出收敛”策略：先在 `SettingsView` 补齐 `书签 -> 所有书签` 入口并新增 `AllBookmarkView` 承载 `bookmark.xml` 语义，再仅实现 `menu_export` 单项 JSON 导出，不提前并入 `menu_export_md`（`seq172`）。为对齐 legado `BookmarkDao.all` 顺序，`BookmarkRepository` 新增 `getAllBookmarksByLegacyOrder`（`bookName/bookAuthor/chapterIndex/chapterPos`）；导出服务新增 `exportAllJson` 并固定文件名 `bookmark-yyMMddHHmmss.json`，失败记 `ExceptionLogService(node=all_bookmark.menu_export)`，取消分支保持静默返回。
@@ -4606,6 +7168,96 @@
 
 ## Outcomes & Retrospective
 
+- `2026-02-26`：完成 `P3-seq86`（`book_read/menu_help`）迁移闭环，已补齐“阅读操作菜单常驻‘帮助’入口 + 点击后读取 `assets/web/help/md/readMenuHelp.md` 并弹出帮助文档 + 关闭后保持当前阅读会话状态 + 失败分支提示‘帮助文档加载失败：<error>’ + 单序号不并入 `P3-seq91`”的同义证据；优先级队列 `seq86` 已同步置为 `done`，tracker 已回填 `seq86(done)` 映射行，队列推进到下一项 `seq91(book_read_record/menu_sort_read_long)`。
+- `2026-02-26`：完成 `P3-seq85`（`book_read/menu_log`）迁移闭环，已补齐“阅读操作菜单常驻‘日志’入口 + 点击后直接打开 `showAppLogDialog` 弹层 + 无前置校验且关闭后保持当前阅读会话状态 + 单序号不并入 `P3-seq86(menu_help)`”的同义证据；优先级队列 `seq85` 已同步置为 `done`，tracker 已回填 `seq85(done)` 与 `seq86(pending)` 映射行，队列推进到下一项 `seq86(book_read/menu_help)`。
+- `2026-02-26`：完成 `P2-seq170`（`book_toc/menu_log`）迁移闭环，已补齐“书籍详情目录页更多菜单常驻‘日志’入口 + 点击后直接打开日志弹层 `showAppLogDialog` + 无前置校验且关闭后保持目录页状态 + 单序号不并入 `P3-seq85/P3-seq86`”的同义证据；优先级队列 `seq170` 已同步置为 `done`，tracker 已回填 `seq170(done)` 映射行，队列推进到下一项 `seq85(book_read/menu_log)`。
+- `2026-02-26`：完成 `P10-seq407`（`web_view/menu_copy_url`）迁移闭环，已补齐“网页承载页更多菜单一级‘拷贝 URL’入口 + 点击后固定复制 `initialUrl(baseUrl)` 到剪贴板 + 复制完成反馈 + 成功路径停留当前承载页 + 单序号不并入全局后续 detail_later 项”的同义证据；优先级队列 `seq407` 已同步置为 `done`，tracker 已回填 `seq407(done)` 映射行，队列推进到下一项 `seq170(book_toc/menu_log)`。
+- `2026-02-26`：完成 `P10-seq410`（`web_view/menu_delete_source`）迁移闭环，已补齐“网页承载页更多菜单一级 destructive‘删除源’入口 + 仅 `sourceOrigin` 非空可见 + 点击后 legacy 同义二次确认‘提醒/是否确认删除？\n<书源名>’ + 确认后按 `sourceUrl` 执行删库与 `sourceVariable_*` 清理 + 成功后关闭当前承载页 + 无成功提示 + 失败节点 `source.web_view.menu_delete_source` 可观测 + 单序号不并入 `menu_copy_url`”的同义证据；优先级队列 `seq410` 已同步置为 `done`，tracker 已回填 `seq410(done)` 映射行，队列推进到下一项 `seq407(web_view/menu_copy_url)`。
+- `2026-02-26`：完成 `P10-seq409`（`web_view/menu_disable_source`）迁移闭环，已补齐“网页承载页更多菜单一级 destructive‘禁用源’入口 + 仅 `sourceOrigin` 非空可见 + 点击后按 `sourceUrl` 静默禁用并关闭当前承载页 + 无确认/无成功提示 + 失败节点 `source.web_view.menu_disable_source` 可观测 + 单序号不并入 `menu_delete_source`”的同义证据；优先级队列 `seq409` 已同步置为 `done`，tracker 已回填 `seq409(done)` 与 `seq410(pending)` 映射行，队列推进到下一项 `seq410(web_view/menu_delete_source)`。
+- `2026-02-26`：完成 `P10-seq408`（`web_view/menu_full_screen`）迁移闭环，已补齐“网页承载页更多菜单一级‘全屏’入口 + 点击后切换无顶栏全屏态并隐藏系统栏 + 返回键/手势优先退出全屏再回到页面返回路径 + 页面销毁恢复系统栏 + 单序号不并入 `menu_disable_source/menu_delete_source`”的同义证据；优先级队列 `seq408` 已同步置为 `done`，tracker 已回填 `seq408(done)` 映射行，队列推进到下一项 `seq409(web_view/menu_disable_source)`。
+- `2026-02-26`：完成 `P10-seq406`（`web_view/menu_open_in_browser`）迁移闭环，已补齐“网页承载页更多菜单一级‘浏览器打开’入口 + 点击后按 `initialUrl(baseUrl)` 拉起外部浏览器 + 成功路径静默且当前承载页保持停留 + 失败节点 `source.web_view.menu_open_in_browser` 可观测 + 单序号不并入 `menu_copy_url/menu_full_screen/menu_disable_source/menu_delete_source`”的同义证据；优先级队列 `seq406` 已同步置为 `done`，tracker 已回填 `seq406(done)` 映射行，队列推进到下一项 `seq408(web_view/menu_full_screen)`。
+- `2026-02-26`：完成 `P10-seq405`（`web_view/menu_ok`）迁移闭环，已补齐“网页承载页顶栏一级 check 确认动作 + 点击后关闭当前 WebView 承载页并返回上级 + 既有更多菜单保持不变 + 单序号不并入 `menu_open_in_browser/menu_copy_url/menu_full_screen/menu_disable_source/menu_delete_source`”的同义证据；优先级队列 `seq405` 已同步置为 `done`，tracker 已回填 `seq405(done)` 映射行，队列推进到下一项 `seq406(web_view/menu_open_in_browser)`。
+- `2026-02-26`：完成 `P10-seq404`（`verification_code/menu_delete_source`）迁移闭环，已补齐“调试承载更多菜单一级‘删除源’入口 + 点击后 legacy 同义二次确认‘提醒/是否确认删除？\n<书源名>’ + 确认后按 `sourceUrl` 执行删库与 `sourceVariable_*` 清理 + 成功后关闭当前页 + 无成功提示 + 失败节点 `source.debug.verification_code.menu_delete_source` 可观测”的同义证据；优先级队列 `seq404` 已同步置为 `done`，tracker 已回填 `seq404(done)` 与 `seq405(pending)` 映射行，队列推进到下一项 `seq405(web_view/menu_ok)`。
+- `2026-02-26`：完成 `P10-seq403`（`verification_code/menu_disable_source`）迁移闭环，已补齐“调试承载更多菜单一级‘禁用源’入口 + 点击后按 `sourceUrl` 回查并静默写库 `enabled=false` + 成功后关闭当前页 + 无确认弹窗/无成功提示 + 失败节点 `source.debug.verification_code.menu_disable_source` 可观测”的同义证据；优先级队列 `seq403` 已同步置为 `done`，tracker 已回填 `seq403(done)` 映射行，队列推进到下一项 `seq404(verification_code/menu_delete_source)`。
+- `2026-02-26`：完成 `P10-seq402`（`verification_code/menu_ok`）迁移闭环，已补齐“验证码/调试输入承载顶栏一级确认动作 + 点击后按当前 key 提交并进入既有运行态 + 异常继续沿用调试链路可观测 + 单序号不并入 `menu_disable_source/menu_delete_source`”的同义证据；优先级队列 `seq402` 已同步置为 `done`，tracker 已回填 `seq402(done)` 与 `seq403(pending)` 映射行，队列推进到下一项 `seq403(verification_code/menu_disable_source)`。
+- `2026-02-26`：完成 `P10-seq280`（`qr_code_scan/action_choose_from_gallery`）迁移闭环，已补齐“扫码页顶栏一级‘图库’动作 + 选图后二维码解析回传 + 命中返回文本关闭/未命中返回空关闭 + 取消选图保持扫码页 + 失败节点 `qr_code_scan.action_choose_from_gallery` 可观测”的同义证据；优先级队列 `seq280` 已同步置为 `done`，tracker 已回填 `seq280(done)` 映射行，队列推进到下一项 `seq402(verification_code/menu_ok)`。
+- `2026-02-26`：完成 `P10-seq235`（`explore_item/menu_del`）迁移闭环，已补齐“发现页长按菜单删除入口文案收敛为 `删除` + 二次确认文案收敛为 `提醒/是否确认删除？\n<书源名>` + 确认后执行删库与 `sourceVariable_*` 清理 + 失败节点 `explore_item.menu_del` 可观测 + 全流程静默无成功提示”的同义证据；优先级队列 `seq235` 已同步置为 `done`，tracker 已回填 `seq235(done)` 映射行，队列推进到下一项 `seq280(qr_code_scan/action_choose_from_gallery)`。
+- `2026-02-26`：完成 `P10-seq231`（`explore_item/menu_top`）迁移闭环，已补齐“发现页长按菜单置顶入口保持同层级 + 点击后按 `sourceUrl` 回查当前书源 + `customOrder=minOrder-1` 静默写库 + 源不存在时静默返回且不重插”的同义证据；优先级队列 `seq231` 已同步置为 `done`，tracker 已回填 `seq231(done)` 映射行，队列推进到下一项 `seq235(explore_item/menu_del)`。
+- `2026-02-26`：完成 `P10-seq230`（`explore_item/menu_edit`）迁移闭环，已补齐“发现页长按菜单编辑入口文案收敛为 `编辑` + 点击后仅按 `sourceUrl` 实时回查并进入编辑承载 + 源缺失时保持空白编辑承载边界 + 单序号不并入 `menu_top/menu_del`”的同义证据；优先级队列 `seq230` 已同步置为 `done`，tracker 已回填 `seq230(done)` 与 `seq231(pending)` 映射行，队列推进到下一项 `seq231(explore_item/menu_top)`。
+- `2026-02-26`：完成 `P10-seq214`（`dialog_text/menu_close`）迁移闭环，已补齐“通用文本承载顶栏一级‘关闭’动作 + 点击仅关闭承载无附加副作用 + 回撤 non-legacy‘复制’扩展入口 + 帮助弹层关闭文案收敛为‘关闭’”的同义证据；优先级队列 `seq214` 已同步置为 `done`，tracker 已回填 `seq214(done)` 映射行，队列推进到下一项 `seq230(explore_item/menu_edit)`。
+- `2026-02-26`：完成 `P10-seq213`（`crash_log/menu_clear`）迁移闭环，已补齐“异常日志页顶栏一级‘清除’动作 + 点击即清空异常日志并立即刷新列表 + 全流程无确认/无成功提示 + 清空后列表留白”的同义证据；优先级队列 `seq213` 已同步置为 `done`，并补齐 tracker `seq213(done)/seq214(pending)` 映射行，队列推进到下一项 `seq214(dialog_text/menu_close)`。
+- `2026-02-26`：完成 `P10-seq200`（`code_edit/menu_save`）迁移闭环，已补齐“导入候选编辑承载标题固定 `edit` + 顶栏仅保留一级保存图标动作 + 保存后仅回传文本并关闭承载 + 非法 JSON 保存后静默不落盘”的同义证据；优先级队列 `seq200` 已同步置为 `done`，tracker 已回填 `seq200(done)` 映射行，队列推进到下一项 `seq213(crash_log/menu_clear)`。
+- `2026-02-26`：完成 `P10-seq184`（`change_cover/menu_start_stop`）迁移闭环，已补齐“封面换源页顶栏同入口刷新/停止状态机 + 动作图标与文案同步切换 + 点击刷新后即时进入停止态 + 点击停止可取消进行中搜索并回落刷新态”的同义证据；优先级队列 `seq184` 已同步置为 `done`，tracker 已回填 `seq184(done)` 映射行，队列推进到下一项 `seq200(code_edit/menu_save)`。
+- `2026-02-26`：完成 `P10-seq3`（`app_log/menu_clear`）迁移闭环，已补齐“日志弹层顶栏一级‘清除’动作 + 点击即清空日志并立即刷新列表 + 全流程无确认/无成功提示 + 空列表保持留白且可点击遮罩关闭弹层”的同义证据；优先级队列 `seq3` 已同步置为 `done`，tracker 已回填 `seq3(done)` 映射行，队列推进到下一项 `seq184(change_cover/menu_start_stop)`。
+- `2026-02-26`：完成 `P10-seq1`（`about/menu_share_it`）迁移闭环，已补齐“关于页顶栏一级分享入口 + 点击直接系统分享 + 分享文本固定应用发布链接 + 分享主题取应用名 + 分享异常静默吞掉”的同义证据；优先级队列 `seq1` 已同步置为 `done`，tracker 已回填 `seq1(done)` 映射行，队列推进到下一项 `seq3(app_log/menu_clear)`。
+- `2026-02-26`：完成 `P9-seq386`（`theme_list/menu_import`）迁移闭环，已补齐“设置页主题分组主题列表入口 + 主题列表页顶栏剪贴板导入动作 + 单对象 Config 解析与颜色合法性校验 + 同名 themeName 覆盖写入 + 空剪贴板静默 + 非法输入提示‘格式不对,添加失败’”的同义证据；优先级队列 `seq386` 已同步置为 `done`，tracker 已回填 `seq386(done)` 映射行，队列推进到下一项 `seq1(about/menu_share_it)`。
+- `2026-02-26`：完成 `P10-seq234`（`explore_item/menu_refresh`）迁移闭环，已补齐“发现页长按菜单刷新入口文案收敛为 `刷新` + 点击后清理发现缓存 + 展开态即时重载入口 + 收起态下次展开重载 + 全流程静默无成功提示”的同义证据；优先级队列 `seq234` 已同步置为 `done`，tracker 已回填 `seq234(done)` 与 `seq235(pending)` 映射行，队列推进到下一项 `seq386(theme_list/menu_import)`。
+- `2026-02-26`：完成 `P10-seq233`（`explore_item/menu_search`）迁移闭环，已补齐“发现页长按菜单搜索入口保持同层级 + 点击后入口侧按条目快照写入 `SearchScope(name::url)` + 直达搜索页 + 源删除场景范围回退全部书源”的同义证据；优先级队列 `seq233` 已同步置为 `done`，tracker 已回填 `seq233(done)` 映射行，队列推进到下一项 `seq234(explore_item/menu_refresh)`。
+- `2026-02-26`：完成 `P10-seq232`（`explore_item/menu_login`）迁移闭环，已补齐“发现页长按菜单登录入口保持 `loginUrl` 显隐边界 + 点击后按 `sourceUrl` 回查当前书源 + `loginUi` 原始非空/空值分流到表单登录/网页登录 + 源缺失提示‘未找到书源’”的同义证据；优先级队列 `seq232` 已同步置为 `done`，tracker 已回填 `seq232(done)` 与 `seq233(pending)` 映射行，队列推进到下一项 `seq233(explore_item/menu_search)`。
+- `2026-02-26`：完成 `P10-seq4`（`app_update/menu_download`）迁移闭环，已补齐“检查更新成功弹层收敛为顶部动作承载（版本标题 + 正文滚动区）+ 顶部 `下载` 动作单项触发 + `downloadUrl/fileName` 校验边界 + 成功反馈‘开始下载’ + 失败提示与 `app_update.menu_download` 节点可观测”的同义证据；优先级队列 `seq4` 已同步置为 `done`，tracker 已回填 `seq4(done)` 映射行，队列推进到下一项 `seq232(explore_item/menu_login)`。
+- `2026-02-26`：完成 `P7-seq346`（`rss_source_sel/menu_check_selected_interval`）迁移闭环，已补齐“RSS 源管理页多选批量操作‘选中所选区间’入口（位于‘分享选中源’后）+ 触发后仅按当前可见列表中已选项最小/最大索引补齐连续选区 + 底栏计数即时刷新 + 全流程静默无提示无写库”的同义证据；优先级队列 `seq346` 已同步置为 `done`，tracker 已回填 `seq346(done)` 映射行，队列推进到下一项 `seq4(app_update/menu_download)`。
+- `2026-02-26`：完成 `P7-seq345`（`rss_source_sel/menu_share_source`）迁移闭环，已补齐“RSS 源管理页多选批量操作‘分享选中源’入口（位于‘导出所选’后）+ 触发后仅取当前可见选中集合生成临时 JSON 并直接拉起系统分享 + 无确认/无成功提示 + 分享异常静默返回且不做复制兜底”的同义证据；优先级队列 `seq345` 已同步置为 `done`，tracker 已回填 `seq345(done)` 与 `seq346(pending)` 映射行，队列推进到下一项 `seq346(rss_source_sel/menu_check_selected_interval)`。
+- `2026-02-26`：完成 `P7-seq343`（`rss_source_sel/menu_bottom_sel`）迁移闭环，已补齐“RSS 源管理页多选批量操作‘置底所选’入口（位于‘置顶所选’后）+ 触发后仅对当前可见选中集合按 `sourceUrl` 回查并按 `customOrder` 升序批量写入 `customOrder=maxOrder+1+index` + 源不存在时静默跳过 + 无确认/无成功提示 + 失败日志节点 `rss_source_sel.menu_bottom_sel` 可观测”的同义证据；优先级队列 `seq343` 已同步置为 `done`，tracker 已回填 `seq343(done)` 映射行，队列推进到下一项 `seq345(rss_source_sel/menu_share_source)`。
+- `2026-02-26`：完成 `P7-seq342`（`rss_source_sel/menu_top_sel`）迁移闭环，已补齐“RSS 源管理页多选批量操作‘置顶所选’入口（位于‘移除分组’后）+ 触发后仅对当前可见选中集合按 `sourceUrl` 回查并按 `customOrder` 升序批量写入 `customOrder=minOrder-1-index` + 源不存在时静默跳过 + 无确认/无成功提示 + 失败日志节点 `rss_source_sel.menu_top_sel` 可观测”的同义证据；优先级队列 `seq342` 已同步置为 `done`，tracker 已回填 `seq342(done)` 与 `seq343(pending)` 映射行，队列推进到下一项 `seq343(rss_source_sel/menu_bottom_sel)`。
+- `2026-02-26`：完成 `P7-seq341`（`rss_source_sel/menu_remove_group`）迁移闭环，已补齐“RSS 源管理页多选批量操作‘移除分组’入口（位于‘添加分组’后）+ 触发后弹出 legacy 同义分组输入框并提供已有分组候选 + 仅输入非空时对当前可见选中集合按 `sourceUrl` 回查并批量执行 `removeGroup` + 源不存在时静默跳过 + 无确认/无成功提示 + 失败日志节点 `rss_source_sel.menu_remove_group` 可观测”的同义证据；优先级队列 `seq341` 已同步置为 `done`，tracker 已回填 `seq341(done)` 映射行，队列推进到下一项 `seq342(rss_source_sel/menu_top_sel)`。
+- `2026-02-26`：完成 `P7-seq340`（`rss_source_sel/menu_add_group`）迁移闭环，已补齐“RSS 源管理页多选批量操作‘添加分组’入口（位于‘禁用所选’后）+ 触发后弹出 legacy 同义分组输入框并提供已有分组候选 + 仅输入非空时对当前可见选中集合按 `sourceUrl` 回查并批量执行 `addGroup` + 源不存在时静默跳过 + 无确认/无成功提示 + 失败日志节点 `rss_source_sel.menu_add_group` 可观测”的同义证据；优先级队列 `seq340` 已同步置为 `done`，tracker 已回填 `seq340(done)` 与 `seq341(pending)` 映射行，队列推进到下一项 `seq341(rss_source_sel/menu_remove_group)`。
+- `2026-02-26`：完成 `P7-seq339`（`rss_source_sel/menu_disable_selection`）迁移闭环，已补齐“RSS 源管理页多选批量操作‘禁用所选’入口（位于‘启用所选’后）+ 触发后仅对当前可见选中集合按 `sourceUrl` 回查并批量写 `enabled=false` + 源不存在时静默跳过 + 无确认/无成功提示 + 失败日志节点 `rss_source_sel.menu_disable_selection` 可观测”的同义证据；优先级队列 `seq339` 已同步置为 `done`，tracker 已回填 `seq339(done)` 与 `seq340(pending)` 映射行，队列推进到下一项 `seq340(rss_source_sel/menu_add_group)`。
+- `2026-02-26`：完成 `P7-seq338`（`rss_source_sel/menu_enable_selection`）迁移闭环，已补齐“RSS 源管理页多选批量操作首项‘启用所选’入口 + 触发后仅对当前可见选中集合按 `sourceUrl` 回查并批量写 `enabled=true` + 源不存在时静默跳过 + 无确认/无成功提示 + 失败日志节点 `rss_source_sel.menu_enable_selection` 可观测”的同义证据；优先级队列 `seq338` 已同步置为 `done`，tracker 已回填 `seq338(done)` 与 `seq339(pending)` 映射行，队列推进到下一项 `seq339(rss_source_sel/menu_disable_selection)`。
+- `2026-02-26`：完成 `P7-seq337`（`rss_source_item/menu_del`）迁移闭环，已补齐“RSS 源管理页条目更多菜单删除入口 + 触发后先移除当前条目选中态 + legacy 同义确认文案 `提醒/确定删除\n<sourceName>` + 确认后按 `sourceUrl` 回查并执行删源、清理该源文章缓存与源变量 + 源不存在时静默返回 + 失败日志节点 `rss_source_item.menu_del` 可观测”的同义证据；优先级队列 `seq337` 已同步置为 `done`，tracker 已回填 `seq337(done)` 与 `seq338(pending)` 映射行，队列推进到下一项 `seq338(rss_source_sel/menu_enable_selection)`。
+- `2026-02-26`：完成 `P7-seq336`（`rss_source_item/menu_bottom`）迁移闭环，已补齐“RSS 源管理页条目更多菜单置底触发先按 `sourceUrl` 回查当前源 + `customOrder=maxOrder+1` 静默写库 + 源不存在时静默返回 + 失败日志节点 `rss_source_item.menu_bottom` 可观测”的同义证据；优先级队列 `seq336` 已同步置为 `done`，tracker 已回填 `seq336(done)` 与 `seq337(pending)` 映射行，队列推进到下一项 `seq337(rss_source_item/menu_del)`。
+- `2026-02-26`：完成 `P7-seq335`（`rss_source_item/menu_top`）迁移闭环，已补齐“RSS 源管理页条目更多菜单结构收敛为 `置顶/置底/删除` + 置顶前按 `sourceUrl` 回查当前源 + `customOrder=minOrder-1` 静默写库 + 源不存在时静默返回 + 失败日志节点 `rss_source_item.menu_top` 可观测”的同义证据；优先级队列 `seq335` 已同步置为 `done`，tracker 已回填 `seq335(done)` 与 `seq336(pending)` 映射行，队列推进到下一项 `seq336(rss_source_item/menu_bottom)`。
+- `2026-02-26`：完成 `P7-seq333`（`rss_source_debug/menu_list_src`）迁移闭环，已补齐“订阅源调试页更多菜单首项‘列表源码’入口 + 调试快照 `listSrc` 承载 + 点击后直接打开 `Html` 源码页 + 列表源码为空时不拦截”的同义证据；优先级队列 `seq333` 已同步置为 `done`，tracker 已回填 `seq333(done)` 与 `seq335(pending)` 映射行，队列推进到下一项 `seq335(rss_source_item/menu_top)`。
+- `2026-02-26`：完成 `P7-seq327`（`rss_source/menu_add`）迁移闭环，已补齐“RSS 源管理页‘更多->新建订阅源’一级入口 + 顶栏非 legacy `+` 直达入口回撤 + 点击后固定进入新增订阅源编辑承载 + 空态动作文案收敛为‘新建订阅源’”的同义证据；优先级队列 `seq327` 已同步置为 `done`，tracker `seq327` 已回填验证证据，队列推进到下一项 `seq333(rss_source_debug/menu_list_src)`。
+- `2026-02-26`：完成 `P7-seq326`（`rss_source/menu_group_null`）迁移闭环，已补齐“RSS 源管理页分组弹层‘未分组’固定动作保留 + 点击写入 `未分组` 查询词即时筛选 no-group 源 + 查询解析兼容旧词 `无分组` 防回退”的同义证据；优先级队列 `seq326` 已同步置为 `done`，并补齐 tracker `seq326(done)/seq327(pending)` 映射行，队列推进到下一项 `seq327(rss_source/menu_add)`。
+- `2026-02-26`：完成 `P7-seq324`（`rss_source/menu_disabled_group`）迁移闭环，已补齐“RSS 源管理页分组弹层‘已禁用’固定动作文案收敛 + 点击写入 `已禁用` 查询词并即时筛选禁用源 + 查询解析兼容旧词 `禁用` 防回退”的同义证据；优先级队列 `seq324` 已同步置为 `done` 并补齐 tracker `seq324` 行，队列推进到下一项 `seq326(rss_source/menu_group_null)`。
+- `2026-02-26`：完成 `P7-seq323`（`rss_source/menu_enabled_group`）迁移闭环，已补齐“RSS 源管理页分组弹层‘已启用’固定动作文案收敛 + 点击写入 `已启用` 查询词并即时筛选启用源 + 查询解析兼容旧词 `启用` 防回退”的同义证据；优先级队列 `seq323` 已同步置为 `done` 并补齐 tracker `seq323` 行，队列推进到下一项 `seq324(rss_source/menu_disabled_group)`。
+- `2026-02-26`：完成 `P7-seq322`（`rss_source/menu_group_manage`）迁移闭环，已补齐“RSS 源管理页分组弹层中的分组管理入口同层弹层触发 + 分组管理承载顶部添加/完成动作 + 添加/编辑/删除分组闭环复用 + 分组数据按 `flowGroups` 自动回刷”的同义证据；优先级队列 `seq322` 已同步置为 `done` 并补齐 tracker `seq322` 行，队列推进到下一项 `seq323(rss_source/menu_enabled_group)`。
+- `2026-02-26`：完成 `P7-seq321`（`rss_source/menu_group`）迁移闭环，已补齐“RSS 源管理页顶栏分组入口文案收敛为‘分组’ + 分组弹层动作顺序同义（分组管理/启用/禁用/需要登录/未分组/动态分组）+ 动态分组点击写入 `group:<name>` 即时筛选 + 回撤非 legacy 扩展入口（全部/条目更多筛选与分组）”的同义证据；优先级队列 `seq321` 已同步置为 `done` 并补齐 tracker `seq321` 行，队列推进到下一项 `seq322(rss_source/menu_group_manage)`。
+- `2026-02-26`：完成 `P7-seq320`（`rss_read_record/menu_clear`）迁移闭环，已补齐“阅读记录页顶栏清空入口常驻可触发（空列表不禁用）+ 确认弹窗文案收敛为 `提醒/确定删除\nN 阅读记录` + 确认后 `deleteAllRecord -> reload` + 成功静默 + 失败日志节点 `rss_read_record.menu_clear` 可观测”的同义证据；优先级队列 `seq320` 已同步置为 `done` 并补齐 tracker `seq320` 行，队列推进到下一项 `seq321(rss_source/menu_group)`。
+- `2026-02-26`：完成 `P7-seq319`（`rss_read/menu_browser_open`）迁移闭环，已补齐“RSS 阅读页更多菜单浏览器打开入口 + `loginUrl` 为空时入口仍可达 + 当前阅读 URL（`link/article.link/origin`）外部打开 + 空 URL 提示 `url null` + 打开失败日志节点 `rss_read.menu_browser_open` 可观测 + 浏览器打开目标状态回显”的同义证据；优先级队列 `seq319` 已同步置为 `done`，队列推进到下一项 `seq320(rss_read_record/menu_clear)`。
+- `2026-02-26`：完成 `P7-seq317`（`rss_read/menu_aloud`）迁移闭环，已补齐“RSS 阅读页顶栏一级朗读入口 + 播放态喇叭/停止图标切换 + 当前文章正文 HTML 转纯文本后触发 TTS + 空文本静默返回 + 失败日志节点 `rss_read.menu_aloud` 可观测 + 朗读状态回显”的同义证据；优先级队列 `seq317` 已同步置为 `done`，队列推进到下一项 `seq319(rss_read/menu_browser_open)`。
+- `2026-02-26`：完成 `P7-seq316`（`rss_read/menu_share_it`）迁移闭环，已补齐“RSS 阅读页顶栏一级分享入口 + `link` 命中直接系统分享 + 空链接 `Null url` 轻提示 + 分享异常静默吞掉 + 分享目标状态回显”的同义证据；优先级队列 `seq316` 已同步置为 `done`，队列推进到下一项 `seq317(rss_read/menu_aloud)`。
+- `2026-02-26`：完成 `P7-seq315`（`rss_read/menu_rss_star`）迁移闭环，已补齐“RSS 阅读页顶栏一级星标入口 + `origin+link` 命中显隐边界 + 点击先入收藏再弹收藏设置 + 编辑标题/分组与删除收藏 + 收藏状态图标同义切换 + 失败日志节点 `rss_read.menu_rss_star` 可观测”的同义证据；优先级队列 `seq315` 已同步置为 `done`，队列推进到下一项 `seq316(rss_read/menu_share_it)`。
+- `2026-02-26`：完成 `P7-seq313`（`rss_main_item/menu_del`）迁移闭环，已补齐“订阅主列表长按动作面板删除入口 + legacy 同义确认文案 `提醒/确定删除\n<sourceName>` + 按 `sourceUrl` 回查后执行删源并级联清理该源文章缓存与源变量 + 源不存在时静默返回 + 失败日志节点 `rss_main_item.menu_del` 可观测”的同义证据；优先级队列 `seq313` 已同步置为 `done`，队列推进到下一项 `seq315(rss_read/menu_rss_star)`。
+- `2026-02-26`：完成 `P7-seq312`（`rss_main_item/menu_disable`）迁移闭环，已补齐“订阅主列表长按动作面板禁用入口 + 按 `sourceUrl` 回查当前源后静默写 `enabled=false` + 源不存在时静默返回 + 失败日志节点 `rss_main_item.menu_disable` 可观测”的同义证据；优先级队列 `seq312` 已同步置为 `done`，并补齐 tracker `seq312/seq313` 映射行，队列推进到下一项 `seq313(rss_main_item/menu_del)`。
+- `2026-02-26`：完成 `P7-seq311`（`rss_main_item/menu_edit`）迁移闭环，已补齐“订阅主列表长按动作面板编辑入口 + 面板结构收敛为 legacy 同义四项（置顶/编辑/禁用/删除）+ 移除扩展入口分组筛选 + 点击后按 sourceUrl 直达订阅源编辑页 + 取消/保存返回均静默”的同义证据；优先级队列 `seq311` 已同步置为 `done`，队列推进到下一项 `seq312(rss_main_item/menu_disable)`。
+- `2026-02-26`：完成 `P7-seq310`（`rss_main_item/menu_top`）迁移闭环，已补齐“订阅主列表长按动作面板置顶入口 + `customOrder=minOrder-1` 静默写库 + 源不存在时静默返回 + 失败日志节点 `rss_main_item.menu_top` 可观测”的同义证据；优先级队列 `seq310` 已同步置为 `done`，队列推进到下一项 `seq311(rss_main_item/menu_edit)`。
+- `2026-02-25`：完成 `P7-seq309`（`rss_favorites/menu_del_all`）迁移闭环，已补齐“收藏夹更多菜单删除所有入口 + legacy 同义确认文案 `确定删除\n<全部>收藏` + 确认后全量清空收藏 + 取消静默 + 异常日志可观测”的同义证据；优先级队列 `seq309` 已同步置为 `done`，队列推进到下一项 `seq310(rss_main_item/menu_top)`。
+- `2026-02-25`：完成 `P7-seq306`（`rss_articles/menu_clear`）迁移闭环，已补齐“RSS 文章列表页更多菜单清除入口 + 按当前 `sourceUrl` 清空文章缓存 + 全流程静默无确认/无成功提示 + 异常日志可观测”的同义证据；优先级队列 `seq306` 已同步置为 `done`，队列推进到下一项 `seq307(rss_favorites/menu_group)`。
+- `2026-02-25`：完成 `P7-seq304`（`rss_articles/menu_switch_layout`）迁移闭环，已补齐“RSS 文章列表页更多菜单切换布局入口 + `articleStyle` 轮换 `0->1->2->0` + 当前源持久化写回 + 流程静默无成功提示 + 异常日志可观测 + 页面布局模式回显”的同义证据；优先级队列 `seq304` 已同步置为 `done`，队列推进到下一项 `seq306(rss_articles/menu_clear)`。
+- `2026-02-25`：完成 `P7-seq303`（`rss_articles/menu_edit_source`）迁移闭环，已补齐“RSS 文章列表页更多菜单编辑源入口 + 按当前 sourceUrl 打开 RSS 源编辑承载 + 仅保存返回刷新标题/分类预览 + 取消返回静默不刷新 + 异常日志可观测”的同义证据；优先级队列 `seq303` 已同步置为 `done`，队列推进到下一项 `seq304(rss_articles/menu_switch_layout)`。
+- `2026-02-25`：完成 `P7-seq302`（`rss_articles/menu_set_source_variable`）迁移闭环，已补齐“RSS 文章列表页更多菜单设置源变量入口 + 顶栏保存式变量编辑承载 + 默认说明文案与 variableComment 叠加 + 保存仅回写 `sourceVariable_<sourceUrl>`（空串可保存）+ 取消静默/成功无提示”的同义证据；优先级队列 `seq302` 已同步置为 `done`，队列推进到下一项 `seq303(rss_articles/menu_edit_source)`。
+- `2026-02-25`：完成 `P7-seq344`（`rss_source_sel/menu_export_selection`）迁移闭环，已补齐“RSS 源管理页多选承载（行级勾选 + 底部批量栏）+ 批量操作导出所选入口 + 默认文件名 `exportRssSource.json` + 取消导出静默返回 + 成功路径可复制”的同义证据；优先级队列 `seq344` 已同步置为 `done`，队列推进到下一项 `seq302(rss_articles/menu_set_source_variable)`。
+- `2026-02-25`：完成 `P7-seq334`（`rss_source_debug/menu_content_src`）迁移闭环，已补齐“订阅源编辑页调试源入口可达 + RSS 调试页更多菜单正文源码入口 + 点击后直接打开源码承载页 + 标题固定 `Html` + 空源码不拦截”的同义证据；优先级队列 `seq334` 已同步置为 `done`，队列推进到下一项 `seq344(rss_source_sel/menu_export_selection)`。
+- `2026-02-25`：完成 `P7-seq331`（`rss_source/menu_import_default`）迁移闭环，已补齐“RSS 源管理页更多菜单导入默认规则入口 + 点击后直接执行默认导入（`deleteDefault(sourceGroup=legado)+insert(default)`）+ 不经过候选导入弹层 + 成功静默返回”的同义证据；优先级队列 `seq331` 已同步置为 `done`，队列推进到下一项 `seq334(rss_source_debug/menu_content_src)`。
+- `2026-02-25`：完成 `P7-seq330`（`rss_source/menu_import_qr`）迁移闭环，已补齐“RSS 源管理页更多菜单二维码导入入口 + 扫码文本直达 RSS 候选导入弹层 + 候选状态（新增/更新/已有）+ 默认勾选新增/更新 + 扫码取消静默返回 + 二维码分支不写 `rssSourceRecordKey` 历史”的同义证据；优先级队列 `seq330` 已同步置为 `done`，队列推进到下一项 `seq331(rss_source/menu_import_default)`。
+- `2026-02-25`：完成 `P7-seq329`（`rss_source/menu_import_onLine`）迁移闭环，已补齐“RSS 源管理页更多菜单网络导入入口 + URL 输入层 + `rssSourceRecordKey` 历史回填/删除 + 仅 http/https 入历史 + 候选状态（新增/更新/已有）+ 默认勾选新增/更新 + 导入成功静默关闭”的同义证据；优先级队列 `seq329` 已同步置为 `done`，队列推进到下一项 `seq330(rss_source/menu_import_qr)`。
+- `2026-02-25`：完成 `P7-seq328`（`rss_source/menu_import_local`）迁移闭环，已补齐“RSS 源管理页更多菜单本地导入入口 + `txt/json` 选档 + 候选状态（新增/更新/已有）+ 默认勾选新增/更新 + 保留策略与自定义分组 + 提交成功静默关闭”的同义证据；优先级队列 `seq328` 已同步置为 `done`，队列推进到下一项 `seq329(rss_source/menu_import_onLine)`。
+- `2026-02-25`：完成 `P7-seq325`（`rss_source/menu_group_login`）迁移闭环，已补齐“RSS 源管理筛选弹层登录分组文案收敛为需要登录 + 点击写入 legacy 同义查询词并即时筛选 + 查询解析兼容旧词需登录”的同义证据；优先级队列 `seq325` 已同步置为 `done`，队列推进到下一项 `seq328(rss_source/menu_import_local)`。
+- `2026-02-25`：完成 `P7-seq318`（`rss_read/menu_login`）迁移闭环，已补齐“RSS 阅读页更多菜单登录入口 + `origin` 命中源的 `loginUrl` 显隐边界 + `loginUi` 分流 + `sourceUrl` 作为登录 key”的同义证据；优先级队列 `seq318` 已同步置为 `done`，队列推进到下一项 `seq325(rss_source/menu_group_login)`。
+- `2026-02-25`：完成 `P7-seq314`（`rss_read/menu_rss_refresh`）迁移闭环，已补齐“RSS 阅读页顶栏一级刷新入口 + 点击后静默刷新触发 + 刷新状态可回归回显 + 页面可继续操作”的同义证据；优先级队列 `seq314` 已同步置为 `done`，队列推进到下一项 `seq318(rss_read/menu_login)`。
+- `2026-02-25`：完成 `P7-seq305`（`rss_articles/menu_read_record`）迁移闭环，已补齐“RSS 文章列表页更多菜单阅读记录入口 + 点击后打开 RSS 阅读记录承载页 + 记录清空确认链路可达 + 成功静默/异常可观测”的同义证据；优先级队列 `seq305` 已同步置为 `done`，队列推进到下一项 `seq314(rss_read/menu_rss_refresh)`。
+- `2026-02-25`：完成 `P7-seq301`（`rss_articles/menu_refresh_sort`）迁移闭环，已补齐“RSS 文章列表页更多菜单刷新分类入口 + 分类缓存清理 + 分类重算回显 + 成功静默/异常可观测”的同义证据；优先级队列 `seq301` 已同步置为 `done`，队列推进到下一项 `seq305(rss_articles/menu_read_record)`。
+- `2026-02-25`：完成 `P7-seq300`（`rss_articles/menu_login`）迁移闭环，已补齐“RSS 文章列表页更多菜单登录入口 + `loginUrl` 显隐边界 + `loginUi` 分流 + `sourceUrl` 作为登录 key”的同义证据；优先级队列 `seq300` 已同步置为 `done`，队列推进到下一项 `seq301(rss_articles/menu_refresh_sort)`。
+- `2026-02-25`：完成 `P8-seq347`（`save/menu_save`）迁移闭环，已补齐“源变量编辑承载顶栏一级保存入口 + 保存后仅回写 `sourceVariable_<bookSourceUrl>` 并关闭 + 取消不落盘 + 全流程无成功提示”的同义证据；优先级队列 `seq347` 已同步置为 `done`，队列推进到下一项 `seq300(rss_articles/menu_login)`。
+- `2026-02-25`：完成 `P8-seq279`（`open_url_confirm/menu_delete_source`）迁移闭环，已补齐“外部跳转确认弹窗‘删除源’入口 + legacy 同义二次确认框 + 按 `sourceUrl` 执行删库与 sourceVariable 清理 + 动作后关闭登录承载页 + 无成功提示 + 异常日志可观测”的同义证据；优先级队列 `seq279` 已同步置为 `done`，队列推进到下一项 `seq347(save/menu_save)`。
+- `2026-02-25`：完成 `P8-seq278`（`open_url_confirm/menu_disable_source`）迁移闭环，已补齐“外部跳转确认弹窗‘禁用源’入口 + 按 `sourceUrl` 静默禁用当前书源 + 动作后关闭登录承载页 + 无成功提示 + 异常日志可观测”的同义证据；优先级队列 `seq278` 已同步置为 `done`，队列推进到下一项 `seq279(open_url_confirm/menu_delete_source)`。
+- `2026-02-25`：完成 `P8-seq255`（`import_source/menu_keep_enable`）迁移闭环，已补齐“导入书源候选弹层策略项‘保留启用状态’切换动作即时持久化回显 + 导入提交仅控制 enabled/enabledExplore 保留边界且不影响保留原名/保留分组”的同义证据；优先级队列 `seq255` 已同步置为 `done`，队列推进到下一项 `seq278(open_url_confirm/menu_disable_source)`。
+- `2026-02-25`：完成 `P8-seq254`（`import_source/menu_keep_group`）迁移闭环，已补齐“导入书源候选弹层策略项文案收敛为‘保留分组’ + 切换动作即时持久化回显 + 导入提交仅控制分组保留边界且不影响保留原名/保留启用状态”的同义证据；优先级队列 `seq254` 已同步置为 `done`，队列推进到下一项 `seq255(import_source/menu_keep_enable)`。
+- `2026-02-25`：完成 `P8-seq253`（`import_source/menu_keep_original_name`）迁移闭环，已补齐“导入书源候选弹层策略项文案收敛为‘保留原名’ + 切换动作即时持久化回显 + 导入提交仅控制名称保留边界且不影响保留分组/保留启用状态”的同义证据；优先级队列 `seq253` 已同步置为 `done`，队列推进到下一项 `seq254(import_source/menu_keep_group)`。
+- `2026-02-25`：完成 `P8-seq251`（`import_source/menu_select_new_source`）迁移闭环，已补齐“导入书源候选弹层同层级动作文案收敛为‘选中新增源’ + 仅新增候选勾选态全选/反选切换 + 空新增集合静默 no-op + 不影响更新/已有候选与提交链路”的同义证据；优先级队列 `seq251` 已同步置为 `done`，队列推进到下一项 `seq252(import_source/menu_select_update_source)`。
+- `2026-02-25`：完成 `P8-seq250`（`import_source/menu_new_group`）迁移闭环，已补齐“导入书源候选弹层同层级‘自定义源分组’入口 + 独立分组设置弹窗（候选分组快捷填充 + 追加开关）+ 标题 `【group】/+【group】` 回显 + 仅对勾选候选生效 + 空分组不改写 + 全流程静默无成功提示”的同义证据；优先级队列 `seq250` 已同步置为 `done`，队列推进到下一项 `seq251(import_source/menu_select_new_source)`。
+- `2026-02-25`：完成 `P8-seq249`（`import_replace/menu_new_group`）迁移闭环，已补齐“替换规则导入候选弹层‘自定义源分组’入口 + 覆盖/追加双策略 + 标题 `【group】/+【group】` 回显 + 仅对勾选候选生效 + 空分组不改写 + 全流程静默无成功提示”的同义证据；优先级队列 `seq249` 已同步置为 `done`，队列推进到下一项 `seq250(import_source/menu_new_group)`。
+- `2026-02-25`：完成 `P8-seq237`（`file_long_click/menu_del`）迁移闭环，已补齐“智能扫描候选条目长按菜单‘删除’入口 + 删除中互斥防重入 + 按删除结果刷新候选与勾选态 + 全流程静默无成功提示”的同义证据；优先级队列 `seq237` 已同步置为 `done`，队列推进到下一项 `seq249(import_replace/menu_new_group)`。
+- `2026-02-25`：完成 `P6-seq183`（`bookshelf_menage_sel/menu_check_selected_interval`）迁移闭环，已补齐“书架管理选中态一级‘选中所选区间’入口 + 当前可见列表区间补选 + 计数即时刷新 + 全流程静默无提示无写库”的同义证据；优先级队列 `seq183` 已同步置为 `done`，队列推进到下一项 `seq240(group_manage/menu_add)`。
+- `2026-02-25`：完成 `P6-seq180`（`bookshelf_menage_sel/menu_add_to_group`）迁移闭环，已补齐“书架管理选中态一级‘加入分组’入口 + 分组多选弹层 + 当前可见选中集批量写入 membership 分组位 + 成功静默停留 + 失败可观测日志”的同义证据；优先级队列 `seq180` 已同步置为 `done`，队列推进到下一项 `seq183(bookshelf_menage_sel/menu_check_selected_interval)`。`P6-seq173` 中“分组位写入待补”差异已在本序号回补闭环。
+- `2026-02-25`：完成 `P6-seq179`（`bookshelf_menage_sel/menu_update_disable`）迁移闭环，已补齐“书架管理选中态一级‘禁止更新’入口 + 当前可见选中集批量写入 `canUpdate=false` + 成功静默停留 + 失败可观测日志”的同义证据；优先级队列 `seq179` 已同步置为 `done`，队列推进到下一项 `seq180(bookshelf_menage_sel/menu_add_to_group)`。保留差异：legacy `removeType(updateError)` 因当前模型无类型位暂未等价复现，待后续类型位迁移序号回补。
+- `2026-02-25`：完成 `P6-seq178`（`bookshelf_menage_sel/menu_update_enable`）迁移闭环，已补齐“书架管理选中态一级‘允许更新’入口 + 当前可见选中集批量写入 `canUpdate=true` + 成功静默停留 + 失败可观测日志”的同义证据；优先级队列 `seq178` 已同步置为 `done`，队列推进到下一项 `seq179(bookshelf_menage_sel/menu_update_disable)`。
+- `2026-02-25`：完成 `P6-seq177`（`bookshelf_menage_sel/menu_del_selection`）迁移闭环，已补齐“书架管理选中态一级‘删除’入口 + 删除确认弹层（含删除源文件开关）+ legacy 同名键 `deleteBookOriginal` 持久化回显 + 选中集批量删书静默完成 + 失败可观测日志”的同义证据；优先级队列 `seq177` 已同步置为 `done`，队列推进到下一项 `seq178(bookshelf_menage_sel/menu_update_enable)`。
+- `2026-02-25`：完成 `P6-seq176`（`bookshelf_manage/menu_open_book_info_by_click_title`）迁移闭环，已补齐“书架管理更多菜单 checkable 开关 + 同名键 `openBookInfoByClickTitle` 持久化 + 开启时书名点击进入详情 + 关闭时书名点击回落勾选切换”的同义证据；优先级队列 `seq176` 已同步置为 `done`，队列推进到下一项 `seq177(bookshelf_menage_sel/menu_del_selection)`。
+- `2026-02-25`：完成 `P6-seq174`（`bookshelf_manage/menu_group_manage`）迁移闭环，已补齐“书架管理页分组弹层首项‘分组管理’入口 + 点击触发分组管理弹窗 + 关闭后分组上下文回刷与选中态兜底”的同义证据；优先级队列 `seq174` 已同步置为 `done`，队列推进到下一项 `seq176(bookshelf_manage/menu_open_book_info_by_click_title)`。
+- `2026-02-25`：完成 `P6-seq182`（`bookshelf_menage_sel/menu_clear_cache`）迁移闭环，已补齐“书架管理页选中态一级‘清理缓存’入口 + 选中集批量清理章节缓存 + 成功统一提示 + 失败可观测日志”的同义证据；优先级队列 `seq182` 已同步置为 `done`，队列推进到下一项 `seq173(bookshelf_manage/menu_book_group)`。
+- `2026-02-25`：完成 `P6-seq181`（`bookshelf_menage_sel/menu_change_source`）迁移闭环，已补齐“书架管理页多选列表 + 选中态一级‘批量换源’入口 + 书源选择页搜索过滤 + 换源间隔(0~9999秒)配置 + 批量执行进度回显与取消中断”的同义证据；优先级队列 `seq181` 已同步置为 `done`，队列推进到下一项 `seq182(bookshelf_menage_sel/menu_clear_cache)`。
 - `2026-02-25`：完成 `P6-seq29`（`book_group_manage/menu_add`）迁移闭环，已补齐“分组管理弹层右上角一级添加入口 + 添加分组结构化编辑弹窗（名称/封面/排序/允许下拉刷新）+ 空名称与上限边界提示 + 封面选择失败可观测日志 + 新增字段入库存储”同义证据；优先级队列 `seq29` 已同步置为 `done`，队列推进到下一项 `seq181(bookshelf_menage_sel/menu_change_source)`。
 - `2026-02-23`：完成阅读页“正文标题居中无效”修复闭环，已补齐“分页画布标题固定段宽布局 + 居中渲染生效 + 标题命中坐标对齐”证据；滚动模式与书源五段链路未受影响。
 - `2026-02-23`：完成 `P6-seq171`（`menu_export`）迁移闭环，已补齐“设置页书签入口 + 所有书签承载页 + 顶栏更多单项‘导出’ + 全量书签按 legado 顺序导出 JSON + 文件名 `bookmark-yyMMddHHmmss.json` + 失败日志可观测 + 取消导出静默返回”的同义证据；`menu_export_md(seq172)` 保持下一序号独立推进。

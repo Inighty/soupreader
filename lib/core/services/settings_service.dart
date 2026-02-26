@@ -32,6 +32,8 @@ class SettingsService {
   static const String _keyChangeSourceLoadToc = 'changeSourceLoadToc';
   static const String _keyChangeSourceGroup = 'searchGroup';
   static const String _keyBatchChangeSourceDelay = 'batchChangeSourceDelay';
+  static const String _keyOpenBookInfoByClickTitle = 'openBookInfoByClickTitle';
+  static const String _keyDeleteBookOriginal = 'deleteBookOriginal';
   static const String _keyBookPageAnimMap = 'book_page_anim_map';
   static const String _keyBookReSegmentMap = 'book_re_segment_map';
   static const String _keyBookImageStyleMap = 'book_image_style_map';
@@ -52,6 +54,9 @@ class SettingsService {
   static const String _keyAudioPlayWakeLock = 'audioPlayWakeLock';
   static const String _keyContentSelectSpeakMod = 'contentSelectSpeakMod';
   static const String _keyEnableReadRecord = 'enableReadRecord';
+  static const String _keyReadRecordSort = 'readRecordSort';
+  static const String _keyBookReadRecordDurationMap =
+      'book_read_record_duration_map';
   static const String _defaultImageStyle = 'DEFAULT';
   static const Set<String> _validImageStyles = <String>{
     'DEFAULT',
@@ -82,6 +87,7 @@ class SettingsService {
   Map<String, String> _bookSimulatedStartDateMap = <String, String>{};
   Map<String, String> _bookRemoteUploadUrlMap = <String, String>{};
   Map<String, String> _bookReaderImageSizeSnapshotMap = <String, String>{};
+  Map<String, int> _bookReadRecordDurationMap = <String, int>{};
   final ValueNotifier<ReadingSettings> _readingSettingsNotifier =
       ValueNotifier(const ReadingSettings());
   final ValueNotifier<AppSettings> _appSettingsNotifier =
@@ -205,6 +211,8 @@ class SettingsService {
         _decodeStringMap(_prefs.getString(_keyBookRemoteUploadUrlMap));
     _bookReaderImageSizeSnapshotMap =
         _decodeStringMap(_prefs.getString(_keyBookReaderImageSizeSnapshotMap));
+    _bookReadRecordDurationMap =
+        _decodeIntMap(_prefs.getString(_keyBookReadRecordDurationMap));
   }
 
   Map<String, bool> _decodeBoolMap(String? rawJson) {
@@ -317,13 +325,26 @@ class SettingsService {
     return _bookCanUpdateMap[key] ?? fallback;
   }
 
-  Future<void> saveBookCanUpdate(String bookId, bool canUpdate) async {
+  Future<void> saveBooksCanUpdate(
+      Iterable<String> bookIds, bool canUpdate) async {
     if (!_isInitialized) return;
-    final key = bookId.trim();
-    if (key.isEmpty) return;
-    _bookCanUpdateMap = Map<String, bool>.from(_bookCanUpdateMap)
-      ..[key] = canUpdate;
+    final normalizedIds = <String>{};
+    for (final rawId in bookIds) {
+      final key = rawId.trim();
+      if (key.isEmpty) continue;
+      normalizedIds.add(key);
+    }
+    if (normalizedIds.isEmpty) return;
+    final nextMap = Map<String, bool>.from(_bookCanUpdateMap);
+    for (final id in normalizedIds) {
+      nextMap[id] = canUpdate;
+    }
+    _bookCanUpdateMap = nextMap;
     await _persistBoolMap(_keyBookCanUpdateMap, _bookCanUpdateMap);
+  }
+
+  Future<void> saveBookCanUpdate(String bookId, bool canUpdate) async {
+    await saveBooksCanUpdate(<String>[bookId], canUpdate);
   }
 
   bool getBookSplitLongChapter(String bookId, {bool fallback = true}) {
@@ -504,6 +525,26 @@ class SettingsService {
     await _prefs.setInt(_keyBatchChangeSourceDelay, normalized);
   }
 
+  bool getOpenBookInfoByClickTitle({bool fallback = true}) {
+    if (!_isInitialized) return fallback;
+    return _prefs.getBool(_keyOpenBookInfoByClickTitle) ?? fallback;
+  }
+
+  Future<void> saveOpenBookInfoByClickTitle(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyOpenBookInfoByClickTitle, enabled);
+  }
+
+  bool getDeleteBookOriginal({bool fallback = false}) {
+    if (!_isInitialized) return fallback;
+    return _prefs.getBool(_keyDeleteBookOriginal) ?? fallback;
+  }
+
+  Future<void> saveDeleteBookOriginal(bool enabled) async {
+    if (!_isInitialized) return;
+    await _prefs.setBool(_keyDeleteBookOriginal, enabled);
+  }
+
   bool getAudioPlayUseWakeLock({bool fallback = false}) {
     if (!_isInitialized) return fallback;
     return _prefs.getBool(_keyAudioPlayWakeLock) ?? fallback;
@@ -528,6 +569,71 @@ class SettingsService {
   Future<void> saveEnableReadRecord(bool enabled) async {
     if (!_isInitialized) return;
     await _prefs.setBool(_keyEnableReadRecord, enabled);
+  }
+
+  int getReadRecordSort({int fallback = 0}) {
+    final normalizedFallback = _normalizeReadRecordSort(fallback);
+    if (!_isInitialized) return normalizedFallback;
+    final value = _prefs.getInt(_keyReadRecordSort) ?? normalizedFallback;
+    return _normalizeReadRecordSort(value);
+  }
+
+  Future<void> saveReadRecordSort(int sortMode) async {
+    if (!_isInitialized) return;
+    await _prefs.setInt(_keyReadRecordSort, _normalizeReadRecordSort(sortMode));
+  }
+
+  int _normalizeReadRecordSort(int value) {
+    if (value == 1 || value == 2) return value;
+    return 0;
+  }
+
+  int getBookReadRecordDurationMs(String bookId, {int fallback = 0}) {
+    if (!_isInitialized) return fallback < 0 ? 0 : fallback;
+    final key = bookId.trim();
+    if (key.isEmpty) return fallback < 0 ? 0 : fallback;
+    final value = _bookReadRecordDurationMap[key];
+    if (value == null) return fallback < 0 ? 0 : fallback;
+    return value < 0 ? 0 : value;
+  }
+
+  Map<String, int> getBookReadRecordDurationSnapshot() {
+    if (!_isInitialized || _bookReadRecordDurationMap.isEmpty) {
+      return const <String, int>{};
+    }
+    return Map<String, int>.unmodifiable(_bookReadRecordDurationMap);
+  }
+
+  Future<void> addBookReadRecordDurationMs(
+    String bookId,
+    int durationMs,
+  ) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty) return;
+    final safeDuration = durationMs < 0 ? 0 : durationMs;
+    if (safeDuration == 0) return;
+    final current = _bookReadRecordDurationMap[key] ?? 0;
+    _bookReadRecordDurationMap = Map<String, int>.from(
+      _bookReadRecordDurationMap,
+    )..[key] = current + safeDuration;
+    await _persistIntMap(
+      _keyBookReadRecordDurationMap,
+      _bookReadRecordDurationMap,
+    );
+  }
+
+  Future<void> clearBookReadRecordDuration(String bookId) async {
+    if (!_isInitialized) return;
+    final key = bookId.trim();
+    if (key.isEmpty || !_bookReadRecordDurationMap.containsKey(key)) return;
+    _bookReadRecordDurationMap = Map<String, int>.from(
+      _bookReadRecordDurationMap,
+    )..remove(key);
+    await _persistIntMap(
+      _keyBookReadRecordDurationMap,
+      _bookReadRecordDurationMap,
+    );
   }
 
   bool getBookReSegment(String bookId, {bool fallback = false}) {

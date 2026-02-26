@@ -2729,6 +2729,7 @@ enum _SearchBookTocMenuAction {
   splitLongChapter,
   exportBookmark,
   exportBookmarkMarkdown,
+  log,
 }
 
 class _SearchBookTocView extends StatefulWidget {
@@ -2800,6 +2801,7 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
       Key('search_book_toc_menu_export_bookmark_action');
   static const Key _menuExportBookmarkMarkdownActionKey =
       Key('search_book_toc_menu_export_markdown_action');
+  static const Key _menuLogActionKey = Key('search_book_toc_menu_log_action');
 
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -2995,6 +2997,12 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
               ),
               child: const Text('导出(MD)'),
             ),
+          CupertinoActionSheetAction(
+            key: _menuLogActionKey,
+            onPressed: () =>
+                Navigator.pop(sheetContext, _SearchBookTocMenuAction.log),
+            child: const Text('日志'),
+          ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(sheetContext),
@@ -3024,6 +3032,9 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
         return;
       case _SearchBookTocMenuAction.exportBookmarkMarkdown:
         await _runExportBookmarkMarkdownAction();
+        return;
+      case _SearchBookTocMenuAction.log:
+        await showAppLogDialog(context);
         return;
     }
   }

@@ -1,7 +1,12 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../core/services/exception_log_service.dart';
 
 class QrScanView extends StatefulWidget {
   final String title;
@@ -16,8 +21,11 @@ class QrScanView extends StatefulWidget {
 }
 
 class _QrScanViewState extends State<QrScanView> {
+  static const String _galleryNode = 'qr_code_scan.action_choose_from_gallery';
+
   late final MobileScannerController _controller;
   bool _handled = false;
+  bool _pickingFromGallery = false;
 
   @override
   void initState() {
@@ -36,13 +44,110 @@ class _QrScanViewState extends State<QrScanView> {
   }
 
   void _onDetect(BarcodeCapture capture) {
-    if (_handled) return;
+    if (_handled || _pickingFromGallery) return;
+    final raw = _firstRawValue(capture);
+    if (raw == null || raw.isEmpty) return;
+    _handled = true;
+    Navigator.of(context).pop(raw);
+  }
+
+  String? _firstRawValue(BarcodeCapture? capture) {
+    if (capture == null) return null;
     for (final code in capture.barcodes) {
       final raw = code.rawValue?.trim();
       if (raw == null || raw.isEmpty) continue;
+      return raw;
+    }
+    return null;
+  }
+
+  Future<String?> _resolvePickedImagePath(PlatformFile file) async {
+    final path = file.path?.trim();
+    if (path != null && path.isNotEmpty) {
+      return path;
+    }
+    final bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      return null;
+    }
+    final dir = await getTemporaryDirectory();
+    final ext = _resolveImageExtension(file.extension);
+    final tempPath =
+        '${dir.path}/qr_scan_${DateTime.now().microsecondsSinceEpoch}.$ext';
+    final tempFile = File(tempPath);
+    await tempFile.writeAsBytes(bytes, flush: true);
+    return tempFile.path;
+  }
+
+  String _resolveImageExtension(String? extension) {
+    final ext = (extension ?? '').trim().toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'bmp':
+      case 'webp':
+      case 'gif':
+      case 'heic':
+      case 'heif':
+        return ext;
+      default:
+        return 'png';
+    }
+  }
+
+  Future<void> _chooseFromGallery() async {
+    if (_handled || _pickingFromGallery) return;
+    setState(() => _pickingFromGallery = true);
+    try {
+      final pickResult = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+      );
+      if (pickResult == null || pickResult.files.isEmpty) {
+        return;
+      }
+      final imagePath = await _resolvePickedImagePath(pickResult.files.first);
+      if (imagePath == null || imagePath.isEmpty) {
+        ExceptionLogService().record(
+          node: _galleryNode,
+          message: '图库图片读取失败',
+          context: <String, dynamic>{
+            'fileName': pickResult.files.first.name,
+          },
+        );
+        return;
+      }
+      String? raw;
+      try {
+        final capture = await _controller.analyzeImage(imagePath);
+        raw = _firstRawValue(capture);
+      } catch (error, stackTrace) {
+        ExceptionLogService().record(
+          node: _galleryNode,
+          message: '图库二维码解析失败',
+          error: error,
+          stackTrace: stackTrace,
+          context: <String, dynamic>{
+            'imagePath': imagePath,
+          },
+        );
+      }
       _handled = true;
+      if (!mounted) return;
       Navigator.of(context).pop(raw);
-      return;
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: _galleryNode,
+        message: '打开图库失败',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _pickingFromGallery = false);
+      }
     }
   }
 
@@ -50,10 +155,21 @@ class _QrScanViewState extends State<QrScanView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: widget.title,
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        onPressed: () => Navigator.of(context).pop(),
-        child: const Text('取消'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed:
+                (_handled || _pickingFromGallery) ? null : _chooseFromGallery,
+            child: Text(_pickingFromGallery ? '处理中' : '图库'),
+          ),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+        ],
       ),
       includeTopSafeArea: true,
       includeBottomSafeArea: false,

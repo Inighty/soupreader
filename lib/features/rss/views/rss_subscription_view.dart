@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
+import '../../../core/services/exception_log_service.dart';
+import '../../../core/services/source_variable_store.dart';
 import '../models/rss_source.dart';
 import '../services/rss_source_manage_helper.dart';
 import '../services/rss_subscription_helper.dart';
@@ -80,7 +82,6 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
             allSources,
             _query,
           );
-          final groups = RssSubscriptionHelper.enabledGroups(allSources);
 
           return Column(
             children: [
@@ -121,7 +122,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
               Expanded(
                 child: visible.isEmpty
                     ? _buildEmptyState(enabledCount)
-                    : _buildList(visible, groups),
+                    : _buildList(visible),
               ),
             ],
           );
@@ -178,7 +179,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
     );
   }
 
-  Widget _buildList(List<RssSource> sources, List<String> groups) {
+  Widget _buildList(List<RssSource> sources) {
     return ListView.separated(
       padding: const EdgeInsets.only(top: 4, bottom: 20),
       itemCount: sources.length,
@@ -186,7 +187,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
       itemBuilder: (context, index) {
         final source = sources[index];
         return GestureDetector(
-          onLongPress: () => _showSourceActions(source, groups),
+          onLongPress: () => _showSourceActions(source),
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
@@ -361,10 +362,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
     }
   }
 
-  Future<void> _showSourceActions(
-    RssSource source,
-    List<String> groups,
-  ) async {
+  Future<void> _showSourceActions(RssSource source) async {
     if (!mounted) return;
     await showCupertinoModalPopup<void>(
       context: context,
@@ -392,14 +390,6 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
             },
             child: const Text('禁用'),
           ),
-          if (groups.isNotEmpty)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _openGroupMenu();
-              },
-              child: Text('分组筛选 (${groups.length})'),
-            ),
           CupertinoActionSheetAction(
             isDestructiveAction: true,
             onPressed: () {
@@ -418,11 +408,30 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
   }
 
   Future<void> _moveToTop(RssSource source) async {
+    final sourceUrl = source.sourceUrl.trim();
+    if (sourceUrl.isEmpty) return;
+    final current = _repo.getByKey(sourceUrl);
+    if (current == null) return;
     final updated = RssSourceManageHelper.moveToTop(
-      source: source,
+      source: current,
       minOrder: _repo.minOrder,
     );
-    await _repo.updateSource(updated);
+    try {
+      await _repo.updateSource(updated);
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'rss_main_item.menu_top',
+        message: 'RSS 主列表置顶失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'sourceUrl': sourceUrl,
+          'sourceName': current.sourceName,
+          'fromOrder': current.customOrder,
+          'toOrder': updated.customOrder,
+        },
+      );
+    }
   }
 
   Future<void> _openEditSource(RssSource source) async {
@@ -435,8 +444,24 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
   }
 
   Future<void> _disableSource(RssSource source) async {
-    final updated = source.copyWith(enabled: false);
-    await _repo.updateSource(updated);
+    final sourceUrl = source.sourceUrl.trim();
+    if (sourceUrl.isEmpty) return;
+    try {
+      final current = _repo.getByKey(sourceUrl);
+      if (current == null) return;
+      await _repo.updateSource(current.copyWith(enabled: false));
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'rss_main_item.menu_disable',
+        message: 'RSS 主列表禁用源失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'sourceUrl': sourceUrl,
+          'sourceName': source.sourceName,
+        },
+      );
+    }
   }
 
   Future<void> _deleteSource(RssSource source) async {
@@ -444,8 +469,8 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('删除订阅源'),
-        content: Text('\n确定删除：${source.sourceName}'),
+        title: const Text('提醒'),
+        content: Text('确定删除\n${source.sourceName}'),
         actions: [
           CupertinoDialogAction(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -459,8 +484,26 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
         ],
       ),
     );
-    if (confirmed == true) {
-      await _repo.deleteSource(source.sourceUrl);
+    if (confirmed != true) return;
+    final sourceUrl = source.sourceUrl.trim();
+    if (sourceUrl.isEmpty) return;
+
+    final current = _repo.getByKey(sourceUrl);
+    if (current == null) return;
+    try {
+      await _repo.deleteSourceWithArticles(sourceUrl);
+      await SourceVariableStore.removeVariable(sourceUrl);
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'rss_main_item.menu_del',
+        message: 'RSS 主列表删除订阅源失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'sourceUrl': sourceUrl,
+          'sourceName': current.sourceName,
+        },
+      );
     }
   }
 

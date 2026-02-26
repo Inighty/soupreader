@@ -52,6 +52,7 @@ import '../../search/services/search_book_info_refresh_helper.dart';
 import '../../search/models/search_scope.dart';
 import '../../search/models/search_scope_group_helper.dart';
 import '../../search/views/search_book_info_view.dart';
+import '../../settings/views/app_help_dialog.dart';
 import '../../settings/views/app_log_dialog.dart';
 import '../../settings/views/exception_logs_view.dart';
 import '../models/reading_settings.dart';
@@ -364,6 +365,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   );
   static const int _scrollUiSyncIntervalMs = 16;
   static const int _scrollSaveProgressIntervalMs = 450;
+  static const int _readRecordPersistIntervalMs = 5000;
+  static const int _readRecordPersistMinChunkMs = 1000;
   static const int _scrollPreloadIntervalMs = 80;
   static const double _scrollPreloadExtent = 280.0;
   static const int _chapterLoadImageWarmupMaxProbeCount = 8;
@@ -455,6 +458,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   DateTime _lastScrollProgressSyncAt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastScrollUiSyncAt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastScrollPreloadCheckAt = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastReadRecordAccumulatedAt = DateTime.now();
+  DateTime _lastReadRecordPersistAt = DateTime.fromMillisecondsSinceEpoch(0);
+  int _pendingReadRecordDurationMs = 0;
   bool _programmaticScrollInFlight = false;
   double _scrollAnchorWithinViewport = 32.0;
   String? _readStyleBackgroundDirectoryPath;
@@ -552,6 +558,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _autoPager.setMode(_settings.pageTurnMode == PageTurnMode.scroll
         ? AutoPagerMode.scroll
         : AutoPagerMode.page);
+    _lastReadRecordAccumulatedAt = DateTime.now();
+    _lastReadRecordPersistAt = DateTime.fromMillisecondsSinceEpoch(0);
+    _pendingReadRecordDurationMs = 0;
     _readAloudService = ReadAloudService(
       onStateChanged: _handleReadAloudStateChanged,
       onMessage: _handleReadAloudMessage,
@@ -654,7 +663,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _settingsService.readingSettingsListenable
         .removeListener(_handleReadingSettingsChanged);
     _pageFactory.removeContentChangedListener(_handlePageFactoryContentChanged);
-    _saveProgress();
+    unawaited(_saveProgress(forcePersistReadRecord: true));
     _scrollController.removeListener(_handleScrollControllerTick);
     _scrollController.dispose();
     _keyboardFocusNode.dispose();
@@ -953,8 +962,48 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return _chapters.sublist(0, count);
   }
 
+  Future<void> _collectReadRecordDuration({
+    required bool enableReadRecord,
+    bool forcePersist = false,
+  }) async {
+    final now = DateTime.now();
+    final elapsedMs =
+        now.difference(_lastReadRecordAccumulatedAt).inMilliseconds;
+    _lastReadRecordAccumulatedAt = now;
+    if (enableReadRecord && elapsedMs > 0) {
+      _pendingReadRecordDurationMs += elapsedMs;
+    }
+
+    if (_pendingReadRecordDurationMs <= 0) {
+      return;
+    }
+
+    final reachedPersistInterval =
+        now.difference(_lastReadRecordPersistAt).inMilliseconds >=
+            _readRecordPersistIntervalMs;
+    final reachedMinChunk =
+        _pendingReadRecordDurationMs >= _readRecordPersistMinChunkMs;
+    if (!forcePersist && !(reachedPersistInterval && reachedMinChunk)) {
+      return;
+    }
+
+    final durationToPersist = _pendingReadRecordDurationMs;
+    _pendingReadRecordDurationMs = 0;
+    _lastReadRecordPersistAt = now;
+    await _settingsService.addBookReadRecordDurationMs(
+      widget.bookId,
+      durationToPersist,
+    );
+  }
+
   /// 保存进度：章节 + 滚动偏移
-  Future<void> _saveProgress() async {
+  Future<void> _saveProgress({bool forcePersistReadRecord = false}) async {
+    final enableReadRecord = _settingsService.enableReadRecord;
+    await _collectReadRecordDuration(
+      enableReadRecord: enableReadRecord,
+      forcePersist: forcePersistReadRecord,
+    );
+
     final totalReadableChapters = _effectiveReadableChapterCount();
     if (totalReadableChapters <= 0) return;
 
@@ -963,7 +1012,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         _currentChapterIndex.clamp(0, readableMaxIndex).toInt();
     final progress = (safeChapterIndex + 1) / totalReadableChapters;
     final chapterProgress = _getChapterProgress();
-    final enableReadRecord = _settingsService.enableReadRecord;
 
     // 保存到书籍库
     await _bookRepo.updateReadProgress(
@@ -993,6 +1041,60 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return _scrollSegmentKeys.putIfAbsent(
       chapterIndex,
       () => GlobalKey(debugLabel: 'scroll_segment_$chapterIndex'),
+    );
+  }
+
+  double _resolveScrollTopSystemInset(MediaQueryData mediaQuery) {
+    if (_settings.showStatusBar) {
+      return mediaQuery.padding.top;
+    }
+    if (_settings.paddingDisplayCutouts) {
+      return mediaQuery.viewPadding.top;
+    }
+    return 0.0;
+  }
+
+  double _resolveScrollBottomSystemInset(MediaQueryData mediaQuery) {
+    if (_settings.hideNavigationBar) {
+      if (_settings.paddingDisplayCutouts) {
+        return mediaQuery.viewPadding.bottom;
+      }
+      return 0.0;
+    }
+    return mediaQuery.padding.bottom;
+  }
+
+  double _resolveScrollHeaderSlotHeight() {
+    if (!_settings.shouldShowHeader(showStatusBar: _settings.showStatusBar)) {
+      return 0.0;
+    }
+    return PagedReaderWidget.resolveHeaderSlotHeight(
+      settings: _settings,
+      showStatusBar: _settings.showStatusBar,
+    );
+  }
+
+  double _resolveScrollFooterSlotHeight() {
+    if (!_settings.shouldShowFooter()) {
+      return 0.0;
+    }
+    return PagedReaderWidget.resolveFooterSlotHeight(
+      settings: _settings,
+    );
+  }
+
+  EdgeInsets _resolveScrollContentInsets(MediaQueryData mediaQuery) {
+    final leftInset =
+        _settings.paddingDisplayCutouts ? mediaQuery.padding.left : 0.0;
+    final rightInset =
+        _settings.paddingDisplayCutouts ? mediaQuery.padding.right : 0.0;
+    return EdgeInsets.fromLTRB(
+      leftInset,
+      _resolveScrollTopSystemInset(mediaQuery) +
+          _resolveScrollHeaderSlotHeight(),
+      rightInset,
+      _resolveScrollBottomSystemInset(mediaQuery) +
+          _resolveScrollFooterSlotHeight(),
     );
   }
 
@@ -1314,8 +1416,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (viewportRenderObject is! RenderBox || !viewportRenderObject.hasSize) {
       return;
     }
-    final topInset = MediaQuery.of(context).padding.top;
-    final targetGlobalAnchor = topInset + 110.0;
+    final mediaQuery = MediaQuery.of(context);
+    final targetGlobalAnchor = _resolveScrollTopSystemInset(mediaQuery) +
+        _resolveScrollHeaderSlotHeight() +
+        110.0;
     final viewportTop = viewportRenderObject.localToGlobal(Offset.zero).dy;
     final withinViewport = (targetGlobalAnchor - viewportTop)
         .clamp(0.0, viewportRenderObject.size.height)
@@ -3097,8 +3201,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _settings.fontFamilyIndex,
       _settings.textFullJustify,
       _settings.showStatusBar,
+      _settings.hideNavigationBar,
+      _settings.paddingDisplayCutouts,
       _settings.headerMode,
       _settings.footerMode,
+      _settings.headerPaddingTop,
+      _settings.headerPaddingBottom,
+      _settings.footerPaddingTop,
+      _settings.footerPaddingBottom,
+      _settings.showHeaderLine,
+      _settings.showFooterLine,
+      _resolveScrollHeaderSlotHeight().toStringAsFixed(2),
+      _resolveScrollFooterSlotHeight().toStringAsFixed(2),
     ]);
   }
 
@@ -3119,7 +3233,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final titleBottomSpacing = _settings.titleBottomSpacing > 0
         ? _settings.titleBottomSpacing
         : _settings.paragraphSpacing * 1.5;
-    final showFooter = _settings.shouldShowFooter();
 
     final snapshot = ScrollPageStepCalculator.buildLayoutSnapshot(
       title: _currentTitle,
@@ -3127,7 +3240,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       showTitle: _settings.titleMode != 2,
       maxWidth: contentWidth,
       paddingTop: _settings.paddingTop,
-      paddingBottom: showFooter ? 30.0 : _settings.paddingBottom.toDouble(),
+      paddingBottom: _settings.paddingBottom.toDouble(),
       paragraphSpacing: _settings.paragraphSpacing,
       titleTopSpacing: titleTopSpacing,
       titleBottomSpacing: titleBottomSpacing,
@@ -3168,13 +3281,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final currentOffset = _scrollController.offset;
     final maxOffset = _scrollController.position.maxScrollExtent;
 
-    final screenSize = MediaQuery.of(context).size;
-    final safePadding = MediaQuery.of(context).padding;
-    final contentWidth = screenSize.width -
-        safePadding.left -
-        safePadding.right -
-        _settings.paddingLeft -
-        _settings.paddingRight;
+    final contentWidth = _scrollBodyWidth();
     final snapshot = _ensureScrollLayoutSnapshot(contentWidth);
     final stepResult = up
         ? ScrollPageStepCalculator.computePrevStep(
@@ -5308,25 +5415,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   /// 滚动模式内容（跨章节连续滚动，对齐 legado）
   Widget _buildScrollContent() {
-    final applyCutoutPadding = _settings.paddingDisplayCutouts;
-    final safeAreaTop = _settings.showStatusBar || applyCutoutPadding;
+    final scrollInsets = _resolveScrollContentInsets(MediaQuery.of(context));
     if (_scrollSegments.isEmpty) {
-      return SafeArea(
-        top: safeAreaTop,
-        left: applyCutoutPadding,
-        right: applyCutoutPadding,
-        bottom: false,
+      return Padding(
+        padding: scrollInsets,
         child: Center(
           child: CupertinoActivityIndicator(),
         ),
       );
     }
 
-    return SafeArea(
-      top: safeAreaTop,
-      left: applyCutoutPadding,
-      right: applyCutoutPadding,
-      bottom: false,
+    return Padding(
+      padding: scrollInsets,
       child: NotificationListener<ScrollNotification>(
         onNotification: (notification) {
           if (notification.metrics.axis != Axis.vertical) {
@@ -5403,9 +5503,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           left: _settings.paddingLeft,
           right: _settings.paddingRight,
           top: _settings.paddingTop,
-          bottom: isTailSegment
-              ? (_settings.shouldShowFooter() ? 30 : _settings.paddingBottom)
-              : _settings.paddingBottom,
+          bottom: _settings.paddingBottom,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -9233,11 +9331,35 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         await _openEffectiveReplacesFromMenu();
         return;
       case ReaderLegacyReadMenuAction.log:
-        await _openExceptionLogsFromReader();
+        await showAppLogDialog(context);
         return;
       case ReaderLegacyReadMenuAction.help:
-        _showToast('阅读菜单帮助：顶部为书籍与书源动作，底部可进入目录/朗读/界面/设置。');
+        await _openReadMenuHelpFromMenu();
         return;
+    }
+  }
+
+  Future<void> _openReadMenuHelpFromMenu() async {
+    try {
+      final markdownText =
+          await rootBundle.loadString('assets/web/help/md/readMenuHelp.md');
+      if (!mounted) return;
+      await showAppHelpDialog(context, markdownText: markdownText);
+    } catch (error) {
+      if (!mounted) return;
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('帮助'),
+          content: Text('帮助文档加载失败：$error'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -9318,9 +9440,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       return;
     }
 
+    final source = _resolveCurrentSource();
     await Navigator.of(context).push(
       CupertinoPageRoute<void>(
-        builder: (_) => SourceWebVerifyView(initialUrl: chapterUrl),
+        builder: (_) => SourceWebVerifyView(
+          initialUrl: chapterUrl,
+          sourceOrigin: source?.bookSourceUrl ?? (_currentSourceUrl ?? ''),
+          sourceName: source?.bookSourceName ?? '',
+        ),
       ),
     );
   }
@@ -9624,7 +9751,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       if (ReaderSourceActionHelper.isAbsoluteHttpUrl(output)) {
         await Navigator.of(context).push(
           CupertinoPageRoute<void>(
-            builder: (_) => SourceWebVerifyView(initialUrl: output.trim()),
+            builder: (_) => SourceWebVerifyView(
+              initialUrl: output.trim(),
+              sourceOrigin: source.bookSourceUrl,
+              sourceName: source.bookSourceName,
+            ),
           ),
         );
         return;

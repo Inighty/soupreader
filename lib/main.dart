@@ -10,6 +10,7 @@ import 'app/theme/shadcn_theme.dart';
 import 'core/database/database_service.dart';
 import 'core/database/repositories/book_repository.dart';
 import 'core/database/repositories/rss_article_repository.dart';
+import 'core/database/repositories/rss_star_repository.dart';
 import 'core/database/repositories/rss_source_repository.dart';
 import 'core/database/repositories/replace_rule_repository.dart';
 import 'core/database/repositories/source_repository.dart';
@@ -88,6 +89,9 @@ Future<BootFailure?> _bootstrapApp() async {
     });
     await _runBootStep('RssArticleRepository.bootstrap', () async {
       await RssArticleRepository.bootstrap(DatabaseService());
+    });
+    await _runBootStep('RssStarRepository.bootstrap', () async {
+      await RssStarRepository.bootstrap(DatabaseService());
     });
     await _runBootStep('RssReadRecordRepository.bootstrap', () async {
       await RssReadRecordRepository.bootstrap(DatabaseService());

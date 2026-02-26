@@ -41,10 +41,16 @@ class ImportService {
     return p.normalize(text);
   }
 
-  Future<ImportDirectorySelectionResult> selectImportDirectory() async {
+  Future<ImportDirectorySelectionResult> selectImportDirectory({
+    String? initialDirectory,
+  }) async {
     try {
+      final normalizedInitialDirectory =
+          (initialDirectory?.trim().isNotEmpty ?? false)
+              ? p.normalize(initialDirectory!.trim())
+              : getSavedImportDirectory();
       final selected = await FilePicker.platform.getDirectoryPath(
-        initialDirectory: getSavedImportDirectory(),
+        initialDirectory: normalizedInitialDirectory,
       );
       final normalized = (selected ?? '').trim();
       if (normalized.isEmpty) {
@@ -72,6 +78,64 @@ class ImportService {
         stackTrace: stackTrace,
       );
       return ImportDirectorySelectionResult.error(error.toString());
+    }
+  }
+
+  Future<ImportDirectoryCreateResult> createImportDirectory({
+    required String parentDirectoryPath,
+    required String folderName,
+  }) async {
+    final normalizedParent = p.normalize(parentDirectoryPath.trim());
+    final normalizedName = folderName.trim();
+    if (normalizedName.isEmpty) {
+      return ImportDirectoryCreateResult.error('文件夹名不能为空');
+    }
+    if (normalizedName == '.' || normalizedName == '..') {
+      return ImportDirectoryCreateResult.error('非法文件夹名');
+    }
+    if (normalizedName.contains(RegExp(r'[\\/]'))) {
+      return ImportDirectoryCreateResult.error('文件夹名不能包含路径分隔符');
+    }
+
+    try {
+      final parentDirectory = Directory(normalizedParent);
+      if (!await parentDirectory.exists()) {
+        return ImportDirectoryCreateResult.error('父文件夹不存在');
+      }
+      if (!await _isAllowedImportDirectory(normalizedParent)) {
+        return ImportDirectoryCreateResult.error('请选择应用目录之外的文件夹');
+      }
+
+      final normalizedTarget =
+          p.normalize(p.join(normalizedParent, normalizedName));
+      if (normalizedTarget == normalizedParent ||
+          !p.isWithin(normalizedParent, normalizedTarget)) {
+        return ImportDirectoryCreateResult.error('非法文件夹名');
+      }
+
+      final targetDirectory = Directory(normalizedTarget);
+      if (!await targetDirectory.exists()) {
+        await targetDirectory.create(recursive: false);
+      }
+      if (!await targetDirectory.exists()) {
+        return ImportDirectoryCreateResult.error('创建文件夹失败');
+      }
+      if (!await _isAllowedImportDirectory(normalizedTarget)) {
+        return ImportDirectoryCreateResult.error('请选择应用目录之外的文件夹');
+      }
+      await _database.putSetting(_importBookPathKey, normalizedTarget);
+
+      return ImportDirectoryCreateResult.success(
+        directoryPath: normalizedTarget,
+      );
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'bookshelf.import.create_folder.failed',
+        message: '创建导入文件夹失败',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return ImportDirectoryCreateResult.error(error.toString());
     }
   }
 
@@ -544,6 +608,34 @@ class ImportDirectorySelectionResult {
 
   factory ImportDirectorySelectionResult.error(String message) {
     return ImportDirectorySelectionResult._(
+      success: false,
+      errorMessage: message,
+    );
+  }
+}
+
+class ImportDirectoryCreateResult {
+  final bool success;
+  final String? errorMessage;
+  final String? directoryPath;
+
+  ImportDirectoryCreateResult._({
+    required this.success,
+    this.errorMessage,
+    this.directoryPath,
+  });
+
+  factory ImportDirectoryCreateResult.success({
+    required String directoryPath,
+  }) {
+    return ImportDirectoryCreateResult._(
+      success: true,
+      directoryPath: directoryPath,
+    );
+  }
+
+  factory ImportDirectoryCreateResult.error(String message) {
+    return ImportDirectoryCreateResult._(
       success: false,
       errorMessage: message,
     );

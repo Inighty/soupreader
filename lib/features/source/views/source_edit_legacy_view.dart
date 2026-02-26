@@ -1396,40 +1396,83 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     if (!mounted) return;
 
     final controller = TextEditingController(text: current);
-    final result = await showCupertinoDialog<String>(
+    final result = await showCupertinoModalPopup<String>(
       context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('设置源变量'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Column(
-            children: [
-              Text(
-                note,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: CupertinoColors.secondaryLabel.resolveFrom(context),
+      builder: (popupContext) => CupertinoPopupSurface(
+        isSurfacePainted: true,
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: MediaQuery.of(popupContext).size.height * 0.78,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+                  child: Row(
+                    children: [
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        onPressed: () => Navigator.pop(popupContext),
+                        child: const Text('取消'),
+                      ),
+                      const Expanded(
+                        child: Text(
+                          '设置源变量',
+                          maxLines: 1,
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        onPressed: () =>
+                            Navigator.pop(popupContext, controller.text),
+                        child: const Text('保存'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              CupertinoTextField(
-                controller: controller,
-                maxLines: 8,
-                placeholder: '输入变量 JSON 或文本',
-              ),
-            ],
+                Container(
+                  height: 0.5,
+                  color: CupertinoColors.separator.resolveFrom(popupContext),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          note,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: CupertinoColors.secondaryLabel
+                                .resolveFrom(popupContext),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: CupertinoTextField(
+                            controller: controller,
+                            minLines: null,
+                            maxLines: null,
+                            expands: true,
+                            textAlignVertical: TextAlignVertical.top,
+                            placeholder: '输入变量 JSON 或文本',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext, controller.text),
-            child: const Text('保存'),
-          ),
-        ],
       ),
     );
     controller.dispose();

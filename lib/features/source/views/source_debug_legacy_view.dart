@@ -3,7 +3,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../core/database/database_service.dart';
+import '../../../core/database/repositories/source_repository.dart';
+import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/qr_scan_service.dart';
+import '../../../core/services/source_variable_store.dart';
 import '../../settings/views/app_help_dialog.dart';
 import '../models/book_source.dart';
 import '../services/rule_parser_engine.dart';
@@ -57,6 +61,8 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
   late final TextEditingController _debugKeyCtrl;
   late final FocusNode _debugKeyFocusNode;
   late final SourceExploreKindsService _exploreKindsService;
+  late final SourceRepository _sourceRepo;
+  late final ExceptionLogService _exceptionLogService;
 
   List<SourceExploreKind> _exploreKinds = const <SourceExploreKind>[];
   int _selectedExploreIndex = 0;
@@ -78,6 +84,8 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
     _debugKeyFocusNode = FocusNode();
     _debugKeyFocusNode.addListener(_onDebugKeyFocusChanged);
     _exploreKindsService = SourceExploreKindsService();
+    _sourceRepo = SourceRepository(DatabaseService());
+    _exceptionLogService = ExceptionLogService();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadExploreKinds();
     });
@@ -436,6 +444,22 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
             },
             child: const Text('帮助'),
           ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () async {
+              Navigator.pop(popupContext);
+              await _disableCurrentSourceByVerificationCodeRule();
+            },
+            child: const Text('禁用源'),
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () async {
+              Navigator.pop(popupContext);
+              await _confirmDeleteCurrentSourceByVerificationCodeRule();
+            },
+            child: const Text('删除源'),
+          ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(popupContext),
@@ -443,6 +467,75 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
         ),
       ),
     );
+  }
+
+  Future<void> _disableCurrentSourceByVerificationCodeRule() async {
+    final sourceUrl = widget.source.bookSourceUrl.trim();
+    try {
+      final current = _sourceRepo.getSourceByUrl(sourceUrl);
+      if (current != null) {
+        await _sourceRepo.updateSource(current.copyWith(enabled: false));
+      }
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: 'source.debug.verification_code.menu_disable_source',
+        message: '禁用书源失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'sourceKey': sourceUrl,
+          'sourceName': widget.source.bookSourceName,
+        },
+      );
+    }
+  }
+
+  Future<void> _confirmDeleteCurrentSourceByVerificationCodeRule() async {
+    if (!mounted) return;
+    final sourceName = widget.source.bookSourceName.trim();
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('提醒'),
+        content: Text('是否确认删除？\n$sourceName'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _deleteCurrentSourceByVerificationCodeRule();
+  }
+
+  Future<void> _deleteCurrentSourceByVerificationCodeRule() async {
+    final sourceUrl = widget.source.bookSourceUrl.trim();
+    try {
+      await _sourceRepo.deleteSource(sourceUrl);
+      await SourceVariableStore.removeVariable(sourceUrl);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: 'source.debug.verification_code.menu_delete_source',
+        message: '删除书源失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'sourceKey': sourceUrl,
+          'sourceName': widget.source.bookSourceName,
+        },
+      );
+    }
   }
 
   Future<void> _showDebugHelp() async {
@@ -670,6 +763,12 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
+            onPressed: _running ? null : _runCurrentKeyIfNotEmpty,
+            child: const Icon(CupertinoIcons.check_mark),
+          ),
           CupertinoButton(
             padding: EdgeInsets.zero,
             minimumSize: const Size(30, 30),
