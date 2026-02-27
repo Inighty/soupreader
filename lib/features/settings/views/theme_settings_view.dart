@@ -179,8 +179,7 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
     final brightness = isNightTheme ? Brightness.dark : Brightness.light;
     final theme = AppCupertinoTheme.build(brightness);
     final accent = theme.textTheme.actionTextStyle.color ?? theme.primaryColor;
-    final bottomBackground =
-        theme.barBackgroundColor ?? theme.scaffoldBackgroundColor;
+    final bottomBackground = theme.barBackgroundColor;
     return (
       primaryColor: _toHexColor(theme.primaryColor),
       accentColor: _toHexColor(accent),

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -242,9 +243,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
           ),
           const SizedBox(height: 10),
           CupertinoButton(
-            onPressed: noEnabled
-                ? _openSourceSettings
-                : () => _setQuery(''),
+            onPressed: noEnabled ? _openSourceSettings : () => _setQuery(''),
             child: Text(action),
           ),
         ],
@@ -282,8 +281,8 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color:
-              CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
+          color: CupertinoColors.secondarySystemGroupedBackground
+              .resolveFrom(context),
           borderRadius: BorderRadius.circular(12),
         ),
         child: CupertinoListTile.notched(
