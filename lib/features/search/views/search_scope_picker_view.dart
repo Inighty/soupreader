@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../../../app/theme/cupertino_theme_adapter.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../models/search_scope.dart';
 import '../models/search_scope_group_helper.dart';
@@ -90,8 +90,8 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final theme = CupertinoTheme.of(context);
+    final tokens = AppCupertinoThemeAdapter.resolve(context);
 
     return AppCupertinoPageScaffold(
       title: '搜索范围',
@@ -130,15 +130,15 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
           ),
           Expanded(
             child: _mode == _SearchScopeMode.group
-                ? _buildGroupList(theme, scheme)
-                : _buildSourceList(theme, scheme),
+                ? _buildGroupList(theme, tokens)
+                : _buildSourceList(theme, tokens),
           ),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
             decoration: BoxDecoration(
               border: Border(
-                top: BorderSide(color: scheme.border, width: 1),
+                top: BorderSide(color: tokens.border, width: 1),
               ),
             ),
             child: Row(
@@ -173,13 +173,45 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
     );
   }
 
-  Widget _buildGroupList(ShadThemeData theme, ShadColorScheme scheme) {
+  Widget _buildScopeOptionTile({
+    Key? key,
+    required AppThemeTokens tokens,
+    required bool selected,
+    required VoidCallback onPressed,
+    required Widget child,
+  }) {
+    return CupertinoButton(
+      key: key,
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      pressedOpacity: 0.72,
+      onPressed: onPressed,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+        decoration: BoxDecoration(
+          color:
+              selected ? tokens.primary.withValues(alpha: 0.08) : tokens.card,
+          borderRadius: tokens.controlRadius,
+          border: Border.all(
+            color: selected
+                ? tokens.primary.withValues(alpha: 0.42)
+                : tokens.border.withValues(alpha: 0.72),
+            width: 0.8,
+          ),
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildGroupList(CupertinoThemeData theme, AppThemeTokens tokens) {
     if (_groups.isEmpty) {
       return Center(
         child: Text(
           '没有可选分组',
-          style: theme.textTheme.muted.copyWith(
-            color: scheme.mutedForeground,
+          style: theme.textTheme.textStyle.copyWith(
+            color: tokens.mutedForeground,
           ),
         ),
       );
@@ -191,47 +223,47 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
       itemBuilder: (context, index) {
         final group = _groups[index];
         final selected = _selectedGroups.contains(group);
-        return GestureDetector(
+        return _buildScopeOptionTile(
           key: ValueKey('group-$group'),
-          onTap: () => _toggleGroup(group),
-          child: ShadCard(
-            padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    group,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.p.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+          tokens: tokens,
+          selected: selected,
+          onPressed: () => _toggleGroup(group),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  group,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.textStyle.copyWith(
+                    color: tokens.cardForeground,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Icon(
-                  selected
-                      ? CupertinoIcons.check_mark_circled_solid
-                      : CupertinoIcons.circle,
-                  size: 20,
-                  color: selected ? scheme.primary : scheme.mutedForeground,
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 10),
+              Icon(
+                selected
+                    ? CupertinoIcons.check_mark_circled_solid
+                    : CupertinoIcons.circle,
+                size: 20,
+                color: selected ? tokens.primary : tokens.mutedForeground,
+              ),
+            ],
           ),
         );
       },
     );
   }
 
-  Widget _buildSourceList(ShadThemeData theme, ShadColorScheme scheme) {
+  Widget _buildSourceList(CupertinoThemeData theme, AppThemeTokens tokens) {
     final filtered = _filteredSources;
     if (filtered.isEmpty) {
       return Center(
         child: Text(
           '未找到匹配书源',
-          style: theme.textTheme.muted.copyWith(
-            color: scheme.mutedForeground,
+          style: theme.textTheme.textStyle.copyWith(
+            color: tokens.mutedForeground,
           ),
         ),
       );
@@ -243,33 +275,33 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
       itemBuilder: (context, index) {
         final source = filtered[index];
         final selected = _selectedSource?.bookSourceUrl == source.bookSourceUrl;
-        return GestureDetector(
+        return _buildScopeOptionTile(
           key: ValueKey(source.bookSourceUrl),
-          onTap: () => _toggleSource(source),
-          child: ShadCard(
-            padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    source.bookSourceName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.p.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+          tokens: tokens,
+          selected: selected,
+          onPressed: () => _toggleSource(source),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  source.bookSourceName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.textStyle.copyWith(
+                    color: tokens.cardForeground,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Icon(
-                  selected
-                      ? CupertinoIcons.check_mark_circled_solid
-                      : CupertinoIcons.circle,
-                  size: 20,
-                  color: selected ? scheme.primary : scheme.mutedForeground,
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 10),
+              Icon(
+                selected
+                    ? CupertinoIcons.check_mark_circled_solid
+                    : CupertinoIcons.circle,
+                size: 20,
+                color: selected ? tokens.primary : tokens.mutedForeground,
+              ),
+            ],
           ),
         );
       },

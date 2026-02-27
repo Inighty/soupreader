@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../../core/utils/file_picker_save_compat.dart';
 import '../../../core/utils/legado_json.dart';
 import '../models/replace_rule.dart';
 
@@ -122,7 +123,8 @@ class ReplaceRuleImportExportService {
       final request = await httpClient.getUrl(Uri.parse(url));
       final response = await request.close();
       if (response.statusCode != 200) {
-        return ReplaceRuleImportResult.error('HTTP 请求失败: ${response.statusCode}');
+        return ReplaceRuleImportResult.error(
+            'HTTP 请求失败: ${response.statusCode}');
       }
       final content = await response.transform(utf8.decoder).join();
       return importFromJson(content);
@@ -145,19 +147,16 @@ class ReplaceRuleImportExportService {
         return null;
       }
 
-      final outputPath = await FilePicker.platform.saveFile(
+      final outputPath = await saveFileWithTextCompat(
         dialogTitle: '导出替换净化规则',
         fileName: 'replaceRule.json',
-        allowedExtensions: ['json'],
-        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        text: jsonString,
       );
       if (outputPath == null) return null;
-
-      await File(outputPath).writeAsString(jsonString);
       return outputPath;
     } catch (_) {
       return null;
     }
   }
 }
-

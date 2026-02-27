@@ -4,7 +4,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_cover_image.dart';
@@ -1689,8 +1688,10 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   @override
   Widget build(BuildContext context) {
-    return AppCupertinoPageScaffold(
+    final page = AppCupertinoPageScaffold(
       title: '书架',
+      useSliverNavigationBar: true,
+      sliverScrollController: _scrollController,
       middle: _buildBookshelfMiddleTitle(),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1709,9 +1710,37 @@ class _BookshelfViewState extends State<BookshelfView> {
           ),
         ],
       ),
-      child: _initError != null
-          ? _buildInitError()
-          : (_books.isEmpty ? _buildEmptyState() : _buildBookList()),
+      child: const SizedBox.shrink(),
+      sliverBodyBuilder: (_) => _buildBodySliver(),
+    );
+    return _wrapWithFastScroller(page);
+  }
+
+  Widget _buildBodySliver() {
+    if (_initError != null) {
+      return SliverSafeArea(
+        top: false,
+        bottom: true,
+        sliver: SliverFillRemaining(
+          hasScrollBody: false,
+          child: _buildInitError(),
+        ),
+      );
+    }
+    if (_books.isEmpty) {
+      return SliverSafeArea(
+        top: false,
+        bottom: true,
+        sliver: SliverFillRemaining(
+          hasScrollBody: false,
+          child: _buildEmptyState(),
+        ),
+      );
+    }
+    return SliverSafeArea(
+      top: false,
+      bottom: true,
+      sliver: _buildBookList(),
     );
   }
 
@@ -1735,28 +1764,47 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   Widget _buildEmptyState() {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final theme = CupertinoTheme.of(context);
+    final secondaryLabel = CupertinoColors.secondaryLabel.resolveFrom(context);
 
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            LucideIcons.bookOpen,
+            CupertinoIcons.book,
             size: 52,
-            color: scheme.mutedForeground,
+            color: secondaryLabel,
           ),
           const SizedBox(height: 16),
           Text(
             '书架空空如也',
-            style: theme.textTheme.h4,
+            style: theme.textTheme.navTitleTextStyle.copyWith(
+              color: CupertinoColors.label.resolveFrom(context),
+            ),
           ),
           const SizedBox(height: 24),
-          ShadButton(
+          CupertinoButton(
+            color: theme.primaryColor,
             onPressed: _importLocalBook,
-            leading: const Icon(LucideIcons.fileUp),
-            child: const Text('导入本地书籍'),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  CupertinoIcons.doc,
+                  size: 17,
+                  color: CupertinoColors.white,
+                ),
+                SizedBox(width: 6),
+                Text(
+                  '导入本地书籍',
+                  style: TextStyle(
+                    color: CupertinoColors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1765,13 +1813,14 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   Widget _buildBookList() {
     if (_isGridView) {
-      return _buildGridView();
+      return _buildGridSliver();
     } else {
-      return _buildListView();
+      return _buildListSliver();
     }
   }
 
   Widget _wrapWithFastScroller(Widget child) {
+    if (_initError != null || _books.isEmpty) return child;
     if (!_settingsService.appSettings.bookshelfShowFastScroller) {
       return child;
     }
@@ -1782,23 +1831,22 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
   }
 
-  Widget _buildGridView() {
-    return Padding(
+  Widget _buildGridSliver() {
+    return SliverPadding(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 16),
-      child: _wrapWithFastScroller(
-        GridView.builder(
-          controller: _scrollController,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: _gridCrossAxisCount,
-            childAspectRatio: 0.56,
-            crossAxisSpacing: 2,
-            mainAxisSpacing: 6,
-          ),
-          itemCount: _books.length,
-          itemBuilder: (context, index) {
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _gridCrossAxisCount,
+          childAspectRatio: 0.56,
+          crossAxisSpacing: 2,
+          mainAxisSpacing: 6,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
             final book = _books[index];
             return _buildBookCard(book);
           },
+          childCount: _books.length,
         ),
       ),
     );
@@ -1919,170 +1967,193 @@ class _BookshelfViewState extends State<BookshelfView> {
     return _updatingBookIds.contains(book.id);
   }
 
-  Widget _buildListView() {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+  BoxDecoration _buildListCardDecoration() {
+    return BoxDecoration(
+      color:
+          CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: CupertinoColors.separator
+            .resolveFrom(context)
+            .withValues(alpha: 0.35),
+      ),
+    );
+  }
+
+  TextStyle _buildListTitleStyle() {
+    return CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+          color: CupertinoColors.label.resolveFrom(context),
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        );
+  }
+
+  TextStyle _buildListMetaStyle() {
+    return CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+          color: CupertinoColors.secondaryLabel.resolveFrom(context),
+          fontSize: 12,
+        );
+  }
+
+  Widget _buildListSliver() {
+    final theme = CupertinoTheme.of(context);
+    final metaTextStyle = _buildListMetaStyle();
+    final titleTextStyle = _buildListTitleStyle();
+    final secondaryLabel = CupertinoColors.secondaryLabel.resolveFrom(context);
     final showLastUpdateTime =
         _settingsService.appSettings.bookshelfShowLastUpdateTime;
+    final sliverItemCount = _books.isEmpty ? 0 : _books.length * 2 - 1;
 
-    return _wrapWithFastScroller(
-      ListView.separated(
-        controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        itemCount: _books.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, index) {
-          final book = _books[index];
-          final readAgo = _formatReadAgo(book.lastReadTime);
-          final isUpdating = _isUpdating(book);
-          return GestureDetector(
-            onTap: () => _openReader(book),
-            onLongPress: () => _onBookLongPress(book),
-            child: ShadCard(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppCoverImage(
-                    urlOrPath: book.coverUrl,
-                    title: book.title,
-                    author: book.author,
-                    width: 66,
-                    height: 90,
-                    borderRadius: 8,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                book.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.p.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: scheme.foreground,
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            if (index.isOdd) return const SizedBox(height: 8);
+            final book = _books[index ~/ 2];
+            final readAgo = _formatReadAgo(book.lastReadTime);
+            final isUpdating = _isUpdating(book);
+            return GestureDetector(
+              onTap: () => _openReader(book),
+              onLongPress: () => _onBookLongPress(book),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                decoration: _buildListCardDecoration(),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppCoverImage(
+                      urlOrPath: book.coverUrl,
+                      title: book.title,
+                      author: book.author,
+                      width: 66,
+                      height: 90,
+                      borderRadius: 8,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  book.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: titleTextStyle,
                                 ),
                               ),
-                            ),
-                            if (book.isReading)
-                              Container(
-                                margin: const EdgeInsets.only(left: 6),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 1,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: scheme.primary.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  book.progressText,
-                                  style: theme.textTheme.small.copyWith(
-                                    color: scheme.primary,
-                                    fontWeight: FontWeight.w600,
+                              if (book.isReading)
+                                Container(
+                                  margin: const EdgeInsets.only(left: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: theme.primaryColor
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    book.progressText,
+                                    style: metaTextStyle.copyWith(
+                                      color: theme.primaryColor,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            Icon(
-                              CupertinoIcons.person,
-                              size: 13,
-                              color: scheme.mutedForeground,
-                            ),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                book.author.trim().isEmpty
-                                    ? '未知作者'
-                                    : book.author,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.small.copyWith(
-                                  color: scheme.mutedForeground,
-                                ),
-                              ),
-                            ),
-                            if (showLastUpdateTime && readAgo != null)
-                              Text(
-                                readAgo,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.small.copyWith(
-                                  color: scheme.mutedForeground,
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            Icon(
-                              CupertinoIcons.clock,
-                              size: 13,
-                              color: scheme.mutedForeground,
-                            ),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                _buildReadLine(book),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.small.copyWith(
-                                  color: scheme.mutedForeground,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            Icon(
-                              CupertinoIcons.book,
-                              size: 13,
-                              color: scheme.mutedForeground,
-                            ),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                _buildLatestLine(book),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.small.copyWith(
-                                  color: scheme.mutedForeground,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: isUpdating
-                        ? const CupertinoActivityIndicator(radius: 8)
-                        : Icon(
-                            LucideIcons.chevronRight,
-                            size: 16,
-                            color: scheme.mutedForeground,
+                            ],
                           ),
-                  ),
-                ],
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              Icon(
+                                CupertinoIcons.person,
+                                size: 13,
+                                color: secondaryLabel,
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  book.author.trim().isEmpty
+                                      ? '未知作者'
+                                      : book.author,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: metaTextStyle,
+                                ),
+                              ),
+                              if (showLastUpdateTime && readAgo != null)
+                                Text(
+                                  readAgo,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: metaTextStyle,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              Icon(
+                                CupertinoIcons.clock,
+                                size: 13,
+                                color: secondaryLabel,
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  _buildReadLine(book),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: metaTextStyle,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              Icon(
+                                CupertinoIcons.book,
+                                size: 13,
+                                color: secondaryLabel,
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  _buildLatestLine(book),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: metaTextStyle,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: isUpdating
+                          ? const CupertinoActivityIndicator(radius: 8)
+                          : Icon(
+                              CupertinoIcons.chevron_forward,
+                              size: 16,
+                              color: secondaryLabel,
+                            ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+          childCount: sliverItemCount,
+        ),
       ),
     );
   }

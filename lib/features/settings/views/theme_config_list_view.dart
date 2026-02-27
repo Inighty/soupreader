@@ -73,10 +73,9 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
   }
 
   Future<void> _applyConfig(ThemeConfigEntry config) async {
-    final targetMode =
-        config.isNightTheme ? AppAppearanceMode.dark : AppAppearanceMode.light;
-    await _settingsService.saveAppSettings(
-      _settingsService.appSettings.copyWith(appearanceMode: targetMode),
+    final modeText = config.isNightTheme ? '深色' : '浅色';
+    await _showMessage(
+      '主题应用不再修改主题模式（目标：$modeText），请在“我的-主题模式”中切换。',
     );
   }
 

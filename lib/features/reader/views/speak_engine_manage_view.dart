@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../core/utils/file_picker_save_compat.dart';
 import 'http_tts_rule_edit_view.dart';
 import '../models/http_tts_rule.dart';
 import '../services/http_tts_rule_store.dart';
@@ -189,18 +190,17 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
     if (_exporting) return;
     setState(() => _exporting = true);
     try {
-      final outputPath = await FilePicker.platform.saveFile(
+      final jsonText = HttpTtsRule.listToJsonText(_rules);
+      final outputPath = await saveFileWithTextCompat(
         dialogTitle: '导出',
         fileName: 'httpTts.json',
-        type: FileType.custom,
         allowedExtensions: const ['json'],
+        text: jsonText,
       );
       if (outputPath == null || outputPath.trim().isEmpty) {
         return;
       }
       final normalizedPath = outputPath.trim();
-      final jsonText = HttpTtsRule.listToJsonText(_rules);
-      await File(normalizedPath).writeAsString(jsonText, flush: true);
       if (!mounted) return;
       await _showExportPathDialog(normalizedPath);
     } catch (error) {

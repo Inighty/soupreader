@@ -18,6 +18,7 @@ import '../database/repositories/source_repository.dart';
 import 'backup_restore_ignore_service.dart';
 import 'settings_service.dart';
 import '../models/app_settings.dart';
+import '../utils/file_picker_save_compat.dart';
 
 /// 备份/恢复服务
 ///
@@ -78,20 +79,17 @@ class BackupService {
     try {
       final data = _buildBackupData(includeOnlineCache: includeOnlineCache);
       final jsonString = const JsonEncoder.withIndent('  ').convert(data);
-
-      final outputPath = await FilePicker.platform.saveFile(
+      final outputPath = await saveFileWithTextCompat(
         dialogTitle: '导出备份',
         fileName:
             'soupreader_backup_${DateTime.now().millisecondsSinceEpoch}.json',
-        allowedExtensions: ['json'],
-        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        text: jsonString,
       );
 
       if (outputPath == null) {
         return const BackupExportResult(cancelled: true);
       }
-
-      await File(outputPath).writeAsString(jsonString);
       return BackupExportResult(
         success: true,
         filePath: outputPath,

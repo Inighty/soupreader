@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show SelectableText;
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
@@ -775,7 +774,7 @@ class _AppUpdateInfo {
   });
 }
 
-class _AppUpdateDialog extends StatelessWidget {
+class _AppUpdateDialog extends StatefulWidget {
   final _AppUpdateInfo updateInfo;
   final Future<void> Function() onDownload;
 
@@ -783,6 +782,25 @@ class _AppUpdateDialog extends StatelessWidget {
     required this.updateInfo,
     required this.onDownload,
   });
+
+  @override
+  State<_AppUpdateDialog> createState() => _AppUpdateDialogState();
+}
+
+class _AppUpdateDialogState extends State<_AppUpdateDialog> {
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -816,7 +834,7 @@ class _AppUpdateDialog extends StatelessWidget {
                         ),
                         Expanded(
                           child: Text(
-                            updateInfo.tagName,
+                            widget.updateInfo.tagName,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               fontSize: 17,
@@ -827,7 +845,7 @@ class _AppUpdateDialog extends StatelessWidget {
                         CupertinoButton(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           minSize: 30,
-                          onPressed: onDownload,
+                          onPressed: widget.onDownload,
                           child: const Text('下载'),
                         ),
                       ],
@@ -837,12 +855,16 @@ class _AppUpdateDialog extends StatelessWidget {
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(14, 10, 14, 18),
-                      child: SelectableText(
-                        updateInfo.updateBody,
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 1.48,
-                          color: bodyColor,
+                      child: SelectableRegion(
+                        focusNode: _focusNode,
+                        selectionControls: cupertinoTextSelectionControls,
+                        child: Text(
+                          widget.updateInfo.updateBody,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.48,
+                            color: bodyColor,
+                          ),
                         ),
                       ),
                     ),

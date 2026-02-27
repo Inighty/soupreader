@@ -4,9 +4,7 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 import 'app/theme/cupertino_theme.dart';
-import 'app/theme/shadcn_theme.dart';
 import 'core/database/database_service.dart';
 import 'core/database/repositories/book_repository.dart';
 import 'core/database/repositories/rss_article_repository.dart';
@@ -267,6 +265,8 @@ class _SoupReaderAppState extends State<SoupReaderApp>
         return Brightness.light;
       case AppAppearanceMode.dark:
         return Brightness.dark;
+      case AppAppearanceMode.eInk:
+        return Brightness.light;
     }
   }
 
@@ -282,49 +282,33 @@ class _SoupReaderAppState extends State<SoupReaderApp>
   @override
   Widget build(BuildContext context) {
     final brightness = _effectiveBrightness;
-    final shadTheme = brightness == Brightness.dark
-        ? AppShadcnTheme.dark()
-        : AppShadcnTheme.light();
+    final cupertinoTheme = AppCupertinoTheme.build(brightness);
 
-    return ShadApp.custom(
-      // 直接根据设置计算后的亮度提供主题，避免依赖 Material ThemeMode。
-      theme: shadTheme,
-      darkTheme: shadTheme,
-      appBuilder: (context) {
-        final shad = ShadTheme.of(context);
-        final cupertinoTheme = CupertinoTheme.of(context).copyWith(
-          barBackgroundColor:
-              shad.colorScheme.background.withValues(alpha: 0.92),
-        );
-
-        return CupertinoApp(
-          title: 'SoupReader',
-          debugShowCheckedModeBanner: false,
-          theme: cupertinoTheme,
-          localizationsDelegates: const [
-            GlobalMaterialLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-          ],
-          supportedLocales: const [
-            Locale('zh', 'CN'),
-            Locale('en', 'US'),
-          ],
-          home: _bootFailure == null
-              ? MainScreen(
-                  brightness: brightness,
-                  appSettings: _settingsReady
-                      ? _settingsService.appSettings
-                      : const AppSettings(),
-                )
-              : _BootFailureView(
-                  failure: _bootFailure!,
-                  retrying: _bootRetrying,
-                  onRetry: _retryBoot,
-                ),
-          builder: (context, child) => ShadAppBuilder(child: child!),
-        );
-      },
+    return CupertinoApp(
+      title: 'SoupReader',
+      debugShowCheckedModeBanner: false,
+      theme: cupertinoTheme,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('zh', 'CN'),
+        Locale('en', 'US'),
+      ],
+      home: _bootFailure == null
+          ? MainScreen(
+              brightness: brightness,
+              appSettings: _settingsReady
+                  ? _settingsService.appSettings
+                  : const AppSettings(),
+            )
+          : _BootFailureView(
+              failure: _bootFailure!,
+              retrying: _bootRetrying,
+              onRetry: _retryBoot,
+            ),
     );
   }
 }

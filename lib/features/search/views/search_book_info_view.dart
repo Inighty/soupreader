@@ -9,7 +9,6 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../app/widgets/app_cover_image.dart';
@@ -2204,18 +2203,18 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   }
 
   void _showMessage(String message) {
-    showShadDialog<void>(
+    showCupertinoDialog<void>(
       context: context,
-      builder: (dialogContext) => ShadDialog.alert(
+      builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
-        description: Padding(
+        content: Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Text(message),
         ),
         actions: [
-          ShadButton(
-            child: const Text('好'),
+          CupertinoDialogAction(
             onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('好'),
           ),
         ],
       ),
@@ -2224,8 +2223,16 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    final backgroundColor = CupertinoColors.systemBackground.resolveFrom(
+      context,
+    );
+    final cardColor =
+        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
+    final borderColor = CupertinoColors.separator.resolveFrom(context);
+    final primaryTextColor = CupertinoColors.label.resolveFrom(context);
+    final primaryActionColor = CupertinoColors.activeBlue.resolveFrom(context);
+    final destructiveColor = CupertinoColors.systemRed.resolveFrom(context);
     final warningColor = CupertinoColors.systemOrange.resolveFrom(context);
     final coverUrl = _displayCoverUrl;
 
@@ -2311,7 +2318,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                         child: Container(
                           height: 110,
                           decoration: BoxDecoration(
-                            color: scheme.background,
+                            color: backgroundColor,
                             borderRadius: const BorderRadius.vertical(
                               top: Radius.elliptical(320, 72),
                             ),
@@ -2326,7 +2333,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                           child: Container(
                             padding: const EdgeInsets.all(3),
                             decoration: BoxDecoration(
-                              color: scheme.background,
+                              color: backgroundColor,
                               borderRadius: BorderRadius.circular(10),
                               boxShadow: [
                                 BoxShadow(
@@ -2354,11 +2361,15 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                         Positioned(
                           top: 12,
                           right: 12,
-                          child: ShadCard(
+                          child: _CupertinoCardContainer(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
                               vertical: 8,
                             ),
+                            backgroundColor: cardColor.withValues(alpha: 0.95),
+                            borderColor: borderColor.withValues(alpha: 0.7),
+                            borderWidth: 0.6,
+                            borderRadius: 10,
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -2366,7 +2377,10 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                                 const SizedBox(width: 6),
                                 Text(
                                   '加载中',
-                                  style: theme.textTheme.small,
+                                  style: textStyle.copyWith(
+                                    fontSize: 12,
+                                    color: primaryTextColor,
+                                  ),
                                 ),
                               ],
                             ),
@@ -2385,8 +2399,10 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.h3.copyWith(
-                          color: scheme.foreground,
+                        style: textStyle.copyWith(
+                          fontSize: 23,
+                          height: 1.25,
+                          color: primaryTextColor,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -2396,12 +2412,12 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                           alignment: Alignment.center,
                           child: _StatusChip(
                             label: kind,
-                            color: scheme.primary,
+                            color: primaryActionColor,
                           ),
                         ),
                       ],
                       const SizedBox(height: 12),
-                      ShadCard(
+                      _CupertinoCardContainer(
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                         child: Column(
                           children: [
@@ -2458,15 +2474,16 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      ShadCard(
+                      _CupertinoCardContainer(
                         padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               '简介',
-                              style: theme.textTheme.p.copyWith(
-                                color: scheme.foreground,
+                              style: textStyle.copyWith(
+                                fontSize: 15,
+                                color: primaryTextColor,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -2477,19 +2494,32 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                               overflow: _introExpanded
                                   ? TextOverflow.visible
                                   : TextOverflow.ellipsis,
-                              style: theme.textTheme.small.copyWith(
-                                color: scheme.foreground,
+                              style: textStyle.copyWith(
+                                fontSize: 13,
+                                color: primaryTextColor,
                               ),
                             ),
                             if (_displayIntro.trim().length > 90) ...[
                               const SizedBox(height: 6),
-                              ShadButton.link(
-                                onPressed: () {
-                                  setState(() {
-                                    _introExpanded = !_introExpanded;
-                                  });
-                                },
-                                child: Text(_introExpanded ? '收起简介' : '展开简介'),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: CupertinoButton(
+                                  padding: EdgeInsets.zero,
+                                  minSize: 0,
+                                  onPressed: () {
+                                    setState(() {
+                                      _introExpanded = !_introExpanded;
+                                    });
+                                  },
+                                  child: Text(
+                                    _introExpanded ? '收起简介' : '展开简介',
+                                    style: textStyle.copyWith(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: primaryActionColor,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ],
                           ],
@@ -2504,7 +2534,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                             if (_inBookshelf)
                               _StatusChip(
                                 label: '已在书架',
-                                color: scheme.primary,
+                                color: primaryActionColor,
                               ),
                             if (_switchingSource)
                               _StatusChip(
@@ -2516,26 +2546,29 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                       ],
                       if (_error != null) ...[
                         const SizedBox(height: 10),
-                        ShadCard(
-                          border: ShadBorder.all(
-                              color: scheme.destructive, width: 1),
+                        _CupertinoCardContainer(
+                          borderColor: destructiveColor,
+                          borderWidth: 1,
                           padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                           child: Text(
                             _error!,
-                            style: theme.textTheme.small.copyWith(
-                              color: scheme.destructive,
+                            style: textStyle.copyWith(
+                              fontSize: 13,
+                              color: destructiveColor,
                             ),
                           ),
                         ),
                       ],
                       if (_tocError != null) ...[
                         const SizedBox(height: 10),
-                        ShadCard(
-                          border: ShadBorder.all(color: warningColor, width: 1),
+                        _CupertinoCardContainer(
+                          borderColor: warningColor,
+                          borderWidth: 1,
                           padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                           child: Text(
                             _tocError!,
-                            style: theme.textTheme.small.copyWith(
+                            style: textStyle.copyWith(
+                              fontSize: 13,
                               color: warningColor,
                             ),
                           ),
@@ -2550,10 +2583,10 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           ),
           Container(
             decoration: BoxDecoration(
-              color: scheme.background,
+              color: backgroundColor,
               border: Border(
                 top: BorderSide(
-                  color: scheme.border,
+                  color: borderColor,
                   width: 0.6,
                 ),
               ),
@@ -2567,30 +2600,122 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
             child: Row(
               children: [
                 Expanded(
-                  child: ShadButton.ghost(
+                  child: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minSize: 0,
                     onPressed: _shelfBusy ? null : _toggleShelf,
-                    leading: _shelfBusy
-                        ? const SizedBox.square(
-                            dimension: 14,
-                            child: CupertinoActivityIndicator(radius: 7),
-                          )
-                        : null,
-                    child: Text(_inBookshelf ? '移出书架' : '加入书架'),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: backgroundColor,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.max,
+                          children: [
+                            if (_shelfBusy) ...[
+                              const SizedBox.square(
+                                dimension: 14,
+                                child: CupertinoActivityIndicator(radius: 7),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            Text(
+                              _inBookshelf ? '移出书架' : '加入书架',
+                              style: textStyle.copyWith(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: primaryActionColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: ShadButton(
+                  child: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minSize: 0,
                     onPressed: (_loading || _loadingToc)
                         ? null
                         : () => _openReader(initialChapter: 0),
-                    child: const Text('开始阅读'),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: primaryActionColor,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '开始阅读',
+                            style: textStyle.copyWith(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: CupertinoColors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CupertinoCardContainer extends StatelessWidget {
+  final EdgeInsetsGeometry padding;
+  final Widget child;
+  final Color? backgroundColor;
+  final Color? borderColor;
+  final double borderWidth;
+  final double borderRadius;
+
+  const _CupertinoCardContainer({
+    required this.padding,
+    required this.child,
+    this.backgroundColor,
+    this.borderColor,
+    this.borderWidth = 0.6,
+    this.borderRadius = 12,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedBackground = backgroundColor ??
+        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
+    final resolvedBorder =
+        borderColor ?? CupertinoColors.separator.resolveFrom(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: resolvedBackground,
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(
+          color: resolvedBorder,
+          width: borderWidth,
+        ),
+      ),
+      child: Padding(
+        padding: padding,
+        child: child,
       ),
     );
   }
@@ -2637,8 +2762,12 @@ class _MetaLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    final primaryTextColor = CupertinoColors.label.resolveFrom(context);
+    final secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
+      context,
+    );
+    final borderColor = CupertinoColors.separator.resolveFrom(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -2647,22 +2776,23 @@ class _MetaLine extends StatelessWidget {
           : BoxDecoration(
               border: Border(
                 bottom: BorderSide(
-                  color: scheme.border.withValues(alpha: 0.6),
+                  color: borderColor.withValues(alpha: 0.6),
                   width: 0.5,
                 ),
               ),
             ),
       child: Row(
         children: [
-          Icon(icon, size: 15, color: scheme.mutedForeground),
+          Icon(icon, size: 15, color: secondaryTextColor),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.small.copyWith(
-                color: scheme.foreground,
+              style: textStyle.copyWith(
+                fontSize: 12,
+                color: primaryTextColor,
               ),
             ),
           ),
@@ -2687,7 +2817,7 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -2696,7 +2826,8 @@ class _StatusChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: theme.textTheme.small.copyWith(
+        style: textStyle.copyWith(
+          fontSize: 12,
           color: color,
           fontWeight: FontWeight.w600,
         ),
@@ -3166,8 +3297,14 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    final cardColor =
+        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
+    final borderColor = CupertinoColors.separator.resolveFrom(context);
+    final primaryTextColor = CupertinoColors.label.resolveFrom(context);
+    final secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
+      context,
+    );
     final filtered = _filtered;
     final searchAction = _searchExpanded
         ? CupertinoButton(
@@ -3241,8 +3378,9 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                 '${widget.bookTitle} · ${widget.sourceName}',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.small.copyWith(
-                  color: scheme.mutedForeground,
+                style: textStyle.copyWith(
+                  fontSize: 12,
+                  color: secondaryTextColor,
                 ),
               ),
             ),
@@ -3255,8 +3393,9 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                 _searchQuery.trim().isEmpty
                     ? '共 ${_toc.length} 章'
                     : '匹配 ${filtered.length} 章',
-                style: theme.textTheme.small.copyWith(
-                  color: scheme.mutedForeground,
+                style: textStyle.copyWith(
+                  fontSize: 12,
+                  color: secondaryTextColor,
                 ),
               ),
             ),
@@ -3274,21 +3413,21 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: GestureDetector(
                     onTap: () => Navigator.of(context).pop(entry.key),
-                    child: ShadCard(
+                    child: _CupertinoCardContainer(
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      trailing: Icon(
-                        LucideIcons.chevronRight,
-                        size: 16,
-                        color: scheme.mutedForeground,
-                      ),
+                      backgroundColor: cardColor,
+                      borderColor: borderColor,
+                      borderWidth: 0.6,
+                      borderRadius: 12,
                       child: Row(
                         children: [
                           SizedBox(
                             width: 40,
                             child: Text(
                               '${entry.key + 1}',
-                              style: theme.textTheme.small.copyWith(
-                                color: scheme.mutedForeground,
+                              style: textStyle.copyWith(
+                                fontSize: 12,
+                                color: secondaryTextColor,
                               ),
                             ),
                           ),
@@ -3297,8 +3436,9 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                               displayTitle,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.p.copyWith(
-                                color: scheme.foreground,
+                              style: textStyle.copyWith(
+                                fontSize: 14,
+                                color: primaryTextColor,
                               ),
                             ),
                           ),
@@ -3307,11 +3447,18 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
                               padding: const EdgeInsets.only(left: 8),
                               child: Text(
                                 wordCountLabel,
-                                style: theme.textTheme.small.copyWith(
-                                  color: scheme.mutedForeground,
+                                style: textStyle.copyWith(
+                                  fontSize: 12,
+                                  color: secondaryTextColor,
                                 ),
                               ),
                             ),
+                          const SizedBox(width: 8),
+                          Icon(
+                            CupertinoIcons.chevron_right,
+                            size: 16,
+                            color: secondaryTextColor,
+                          ),
                         ],
                       ),
                     ),

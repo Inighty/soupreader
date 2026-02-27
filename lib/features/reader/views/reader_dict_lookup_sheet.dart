@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show SelectableText;
 import 'package:html/parser.dart' as html_parser;
 
 import '../models/dict_rule.dart';
@@ -23,6 +22,7 @@ class ReaderDictLookupSheet extends StatefulWidget {
 
 class _ReaderDictLookupSheetState extends State<ReaderDictLookupSheet> {
   late final DictRuleStore _dictRuleStore;
+  late final FocusNode _resultFocusNode;
 
   List<DictRule> _rules = const <DictRule>[];
   int _selectedIndex = 0;
@@ -35,7 +35,14 @@ class _ReaderDictLookupSheetState extends State<ReaderDictLookupSheet> {
   void initState() {
     super.initState();
     _dictRuleStore = widget.dictRuleStore ?? DictRuleStore();
+    _resultFocusNode = FocusNode();
     unawaited(_loadRules());
+  }
+
+  @override
+  void dispose() {
+    _resultFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _loadRules() async {
@@ -168,9 +175,13 @@ class _ReaderDictLookupSheetState extends State<ReaderDictLookupSheet> {
     }
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-      child: SelectableText(
-        _displayText,
-        style: const TextStyle(fontSize: 14, height: 1.45),
+      child: SelectableRegion(
+        focusNode: _resultFocusNode,
+        selectionControls: cupertinoTextSelectionControls,
+        child: Text(
+          _displayText,
+          style: const TextStyle(fontSize: 14, height: 1.45),
+        ),
       ),
     );
   }

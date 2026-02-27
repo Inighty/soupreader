@@ -38,15 +38,19 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
     setState(() {});
   }
 
-  Future<void> _toggleLegacyThemeMode() async {
-    final current = _settingsService.appSettings.appearanceMode;
-    final systemBrightness = MediaQuery.platformBrightnessOf(context);
-    final isDark = current == AppAppearanceMode.dark ||
-        (current == AppAppearanceMode.followSystem &&
-            systemBrightness == Brightness.dark);
-    final next = isDark ? AppAppearanceMode.light : AppAppearanceMode.dark;
-    await _settingsService.saveAppSettings(
-      _settingsService.appSettings.copyWith(appearanceMode: next),
+  Future<void> _showThemeModeManagedHint() async {
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('主题模式'),
+        content: const Text('请在“我的-主题模式”中切换主题模式。'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('知道了'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -62,6 +66,8 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
         return '白天';
       case AppAppearanceMode.dark:
         return '夜间';
+      case AppAppearanceMode.eInk:
+        return 'E-Ink';
     }
   }
 
@@ -97,6 +103,8 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
         return '浅色';
       case AppAppearanceMode.dark:
         return '深色';
+      case AppAppearanceMode.eInk:
+        return 'E-Ink';
     }
   }
 
@@ -107,7 +115,7 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
         minSize: 30,
-        onPressed: _toggleLegacyThemeMode,
+        onPressed: _showThemeModeManagedHint,
         child: const Text('主题模式'),
       ),
       child: ListView(

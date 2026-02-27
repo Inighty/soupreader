@@ -1,8 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
-import 'package:file_picker/file_picker.dart';
+
+import '../../../core/utils/file_picker_save_compat.dart';
 
 class SourceDebugExportService {
   Future<bool> exportTextToFile({
@@ -11,15 +12,14 @@ class SourceDebugExportService {
     String dialogTitle = '导出文本',
   }) async {
     try {
-      final outputPath = await FilePicker.platform.saveFile(
+      final outputPath = await saveFileWithTextCompat(
         dialogTitle: dialogTitle,
         fileName: fileName,
-        allowedExtensions: ['txt', 'log'],
-        type: FileType.custom,
+        allowedExtensions: const ['txt', 'log'],
+        text: text,
       );
 
       if (outputPath == null) return false;
-      await File(outputPath).writeAsString(text);
       return true;
     } catch (_) {
       return false;
@@ -32,15 +32,14 @@ class SourceDebugExportService {
     String dialogTitle = '导出调试包',
   }) async {
     try {
-      final outputPath = await FilePicker.platform.saveFile(
+      final outputPath = await saveFileWithTextCompat(
         dialogTitle: dialogTitle,
         fileName: fileName,
-        allowedExtensions: ['json'],
-        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        text: json,
       );
 
       if (outputPath == null) return false;
-      await File(outputPath).writeAsString(json);
       return true;
     } catch (_) {
       return false;
@@ -53,15 +52,6 @@ class SourceDebugExportService {
     String dialogTitle = '导出调试包',
   }) async {
     try {
-      final outputPath = await FilePicker.platform.saveFile(
-        dialogTitle: dialogTitle,
-        fileName: fileName,
-        allowedExtensions: ['zip'],
-        type: FileType.custom,
-      );
-
-      if (outputPath == null) return false;
-
       final archive = Archive();
       for (final entry in files.entries) {
         final path = entry.key.trim();
@@ -72,8 +62,13 @@ class SourceDebugExportService {
 
       final zipData = ZipEncoder().encode(archive);
       if (zipData == null) return false;
-
-      await File(outputPath).writeAsBytes(zipData, flush: true);
+      final outputPath = await saveFileWithBytesCompat(
+        dialogTitle: dialogTitle,
+        fileName: fileName,
+        allowedExtensions: const ['zip'],
+        bytes: Uint8List.fromList(zipData),
+      );
+      if (outputPath == null) return false;
       return true;
     } catch (_) {
       return false;

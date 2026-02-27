@@ -4,12 +4,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart'
-    show ReorderableDragStartListener, ReorderableListView;
 import 'package:flutter/rendering.dart' show RenderBox;
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart'
+    show ReorderableDragStartListener, SliverReorderableList;
 import 'package:share_plus/share_plus.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
@@ -550,8 +549,11 @@ class _SourceListViewState extends State<SourceListView> {
   Widget _buildSourceList(
       List<BookSource> allSources, List<BookSource> visible) {
     final reorderEnabled = _canManualReorder;
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final titleColor = CupertinoColors.label.resolveFrom(context);
+    final titleStyle = CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+          fontWeight: FontWeight.w600,
+          color: titleColor,
+        );
 
     Widget buildItem(BookSource source, int index) {
       final selected = _selectedUrls.contains(source.bookSourceUrl);
@@ -639,10 +641,7 @@ class _SourceListViewState extends State<SourceListView> {
                                   displayName,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.p.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: scheme.foreground,
-                                  ),
+                                  style: titleStyle,
                                 ),
                               ),
                             ],
@@ -701,7 +700,7 @@ class _SourceListViewState extends State<SourceListView> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        ShadSwitch(
+                        CupertinoSwitch(
                           value: source.enabled,
                           onChanged: (value) async {
                             await _sourceRepo
@@ -763,22 +762,27 @@ class _SourceListViewState extends State<SourceListView> {
     }
 
     if (reorderEnabled) {
-      return ReorderableListView.builder(
+      return CustomScrollView(
         key: _listViewportKey,
-        scrollController: _listScrollController,
-        buildDefaultDragHandles: false,
-        padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
-        itemCount: visible.length,
-        onReorder: (oldIndex, newIndex) async {
-          await _onReorderVisible(visible, oldIndex, newIndex);
-        },
-        itemBuilder: (context, index) {
-          final source = visible[index];
-          return KeyedSubtree(
-            key: ValueKey(source.bookSourceUrl),
-            child: buildItem(source, index),
-          );
-        },
+        controller: _listScrollController,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
+            sliver: SliverReorderableList(
+              itemCount: visible.length,
+              onReorder: (oldIndex, newIndex) async {
+                await _onReorderVisible(visible, oldIndex, newIndex);
+              },
+              itemBuilder: (context, index) {
+                final source = visible[index];
+                return KeyedSubtree(
+                  key: ValueKey(source.bookSourceUrl),
+                  child: buildItem(source, index),
+                );
+              },
+            ),
+          ),
+        ],
       );
     }
 
@@ -1063,24 +1067,35 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Widget _buildEmptyState() {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final textTheme = CupertinoTheme.of(context).textTheme;
+    final labelColor = CupertinoColors.label.resolveFrom(context);
+    final secondaryColor = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final tertiaryColor = CupertinoColors.tertiaryLabel.resolveFrom(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            LucideIcons.cloudDownload,
+            CupertinoIcons.cloud_download,
             size: 52,
-            color: scheme.mutedForeground,
+            color: tertiaryColor,
           ),
           const SizedBox(height: 16),
-          Text('暂无书源', style: theme.textTheme.h4),
+          Text(
+            '暂无书源',
+            style: textTheme.textStyle.copyWith(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: labelColor,
+            ),
+          ),
           const SizedBox(height: 8),
           Text(
             '点击右上角更多导入书源',
-            style:
-                theme.textTheme.muted.copyWith(color: scheme.mutedForeground),
+            style: textTheme.textStyle.copyWith(
+              fontSize: 14,
+              color: secondaryColor,
+            ),
           ),
         ],
       ),

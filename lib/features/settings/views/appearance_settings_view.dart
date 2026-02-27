@@ -33,6 +33,22 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
     setState(() => _settings = _settingsService.appSettings);
   }
 
+  Future<void> _showThemeModeManagedHint() async {
+    await showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('外观开关'),
+        content: const Text('请在“我的-主题模式”中切换主题模式。'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('知道了'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final systemBrightness = MediaQuery.platformBrightnessOf(context);
@@ -54,41 +70,14 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
                 title: const Text('跟随系统外观'),
                 trailing: CupertinoSwitch(
                   value: followSystem,
-                  onChanged: (value) async {
-                    if (value) {
-                      await _settingsService.saveAppSettings(
-                        _settings.copyWith(
-                          appearanceMode: AppAppearanceMode.followSystem,
-                        ),
-                      );
-                      return;
-                    }
-
-                    await _settingsService.saveAppSettings(
-                      _settings.copyWith(
-                        appearanceMode: systemBrightness == Brightness.dark
-                            ? AppAppearanceMode.dark
-                            : AppAppearanceMode.light,
-                      ),
-                    );
-                  },
+                  onChanged: (_) => _showThemeModeManagedHint(),
                 ),
               ),
               CupertinoListTile.notched(
                 title: const Text('深色模式'),
                 trailing: CupertinoSwitch(
                   value: effectiveIsDark,
-                  onChanged: followSystem
-                      ? null
-                      : (value) async {
-                          await _settingsService.saveAppSettings(
-                            _settings.copyWith(
-                              appearanceMode: value
-                                  ? AppAppearanceMode.dark
-                                  : AppAppearanceMode.light,
-                            ),
-                          );
-                        },
+                  onChanged: (_) => _showThemeModeManagedHint(),
                 ),
               ),
             ],

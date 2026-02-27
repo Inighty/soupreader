@@ -224,15 +224,38 @@ class SettingsService {
     );
     _readingSettingsNotifier.value = _readingSettings;
 
+    var needsAppSettingsRewrite = false;
     final appJson = _prefs.getString(_keyAppSettings);
     if (appJson != null) {
       try {
-        _appSettings = AppSettings.fromJson(json.decode(appJson));
+        final decoded = json.decode(appJson);
+        if (decoded is Map<String, dynamic>) {
+          final decodedAppSettings = _decodeAppSettings(decoded);
+          _appSettings = decodedAppSettings.settings;
+          needsAppSettingsRewrite = decodedAppSettings.needsRewrite;
+        } else if (decoded is Map) {
+          final decodedAppSettings = _decodeAppSettings(
+            decoded.map((key, value) => MapEntry('$key', value)),
+          );
+          _appSettings = decodedAppSettings.settings;
+          needsAppSettingsRewrite = true;
+        } else {
+          _appSettings = const AppSettings();
+          needsAppSettingsRewrite = true;
+        }
       } catch (_) {
         _appSettings = const AppSettings();
+        needsAppSettingsRewrite = true;
       }
     } else {
       _appSettings = const AppSettings();
+      needsAppSettingsRewrite = true;
+    }
+    if (needsAppSettingsRewrite) {
+      await _prefs.setString(
+        _keyAppSettings,
+        json.encode(_appSettings.toJson()),
+      );
     }
     _appSettingsNotifier.value = _appSettings;
 
@@ -266,6 +289,41 @@ class SettingsService {
         _decodeStringMap(_prefs.getString(_keyBookReaderImageSizeSnapshotMap));
     _bookReadRecordDurationMap =
         _decodeIntMap(_prefs.getString(_keyBookReadRecordDurationMap));
+  }
+
+  _DecodedAppSettings _decodeAppSettings(Map<String, dynamic> rawJson) {
+    final settings = AppSettings.fromJson(rawJson);
+    final normalizedModeValue =
+        resolveAppAppearanceModeLegacyValueFromJson(rawJson);
+    final parsedThemeMode =
+        tryParseAppAppearanceModeLegacyValue(rawJson['themeMode']);
+    final parsedAppearanceMode =
+        tryParseAppAppearanceModeLegacyValue(rawJson['appearanceMode']);
+    final hasThemeMode = rawJson.containsKey('themeMode');
+    final hasAppearanceMode = rawJson.containsKey('appearanceMode');
+    final isValidThemeMode = parsedThemeMode != null &&
+        isValidAppAppearanceModeLegacyValue(parsedThemeMode);
+    final isValidAppearanceMode = parsedAppearanceMode != null &&
+        isValidAppAppearanceModeLegacyValue(parsedAppearanceMode);
+    final validThemeModeValue = isValidThemeMode ? parsedThemeMode : null;
+    final validAppearanceModeValue =
+        isValidAppearanceMode ? parsedAppearanceMode : null;
+    final isLegacyThreeValueConfig = !hasThemeMode &&
+        validAppearanceModeValue != null &&
+        validAppearanceModeValue <= appAppearanceModeLegacyTriValueMax;
+    final themeModeNeedsNormalize = !hasThemeMode ||
+        validThemeModeValue == null ||
+        validThemeModeValue != normalizedModeValue;
+    final appearanceModeNeedsNormalize = !hasAppearanceMode ||
+        validAppearanceModeValue == null ||
+        validAppearanceModeValue != normalizedModeValue;
+
+    return _DecodedAppSettings(
+      settings: settings,
+      needsRewrite: isLegacyThreeValueConfig ||
+          themeModeNeedsNormalize ||
+          appearanceModeNeedsNormalize,
+    );
   }
 
   Map<String, bool> _decodeBoolMap(String? rawJson) {
@@ -1084,9 +1142,18 @@ class SettingsService {
   }
 
   Future<void> saveAppSettings(AppSettings settings) async {
-    _appSettings = settings;
-    _appSettingsNotifier.value = settings;
-    await _prefs.setString(_keyAppSettings, json.encode(settings.toJson()));
+    final normalizedAppearanceMode = appAppearanceModeFromLegacyValue(
+      appAppearanceModeToLegacyValue(settings.appearanceMode),
+    );
+    final normalizedSettings = settings.copyWith(
+      appearanceMode: normalizedAppearanceMode,
+    );
+    _appSettings = normalizedSettings;
+    _appSettingsNotifier.value = normalizedSettings;
+    await _prefs.setString(
+      _keyAppSettings,
+      json.encode(normalizedSettings.toJson()),
+    );
   }
 
   Future<void> _saveAppSettingsPatch(
@@ -1383,4 +1450,14 @@ class SettingsService {
     if (value == null) return 0.0;
     return value.clamp(0.0, 1.0).toDouble();
   }
+}
+
+class _DecodedAppSettings {
+  final AppSettings settings;
+  final bool needsRewrite;
+
+  const _DecodedAppSettings({
+    required this.settings,
+    required this.needsRewrite,
+  });
 }

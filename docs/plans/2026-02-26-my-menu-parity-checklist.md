@@ -1,340 +1,157 @@
-# 2026-02-26 「我的」菜单逐项对照台账（MY-18）
+# 2026-02-26 我的菜单同义核对清单（唯一基线）
 
 - 状态: `active`
-- 关联计划: `PLANS.md` -> `2026-02-26 legado「我的」全量迁移（除 Web 服务）` -> `MY-18`
-- 对照口径: 迁移级别（除 UI 风格差异外，交互语义、状态流转、边界处理同义）
-- 记录规则: 每条必须包含 `legado 对照项`、`当前实现文件`、`检查维度`（入口/状态/异常/文案/排版/交互触发）、`结论`、`原因`、`处理动作`
+- 基线来源:
+  - `docs/plans/2026-02-26-my-menu-id-diff.md`
+  - `../legado/app/src/main/res/xml/pref_main.xml`
+  - `../legado/app/src/main/res/menu/main_my.xml`
+- 使用规则:
+  - 后续实现任务仅以本清单和 ID 台账为准。
+  - 未完成本清单逐项回填前，不得使用“完全一致/已一致”结论。
 
-## P0（核心链路）
+## 1. 执行顺序（核心项串行依赖）
 
-### P0-01 书源管理全链路
-- legado 对照项:
-  - `/home/server/legado/app/src/main/res/menu/book_source.xml`
-  - `/home/server/legado/app/src/main/res/menu/book_source_sel.xml`
-  - `/home/server/legado/app/src/main/res/menu/book_source_item.xml`
-  - `/home/server/legado/app/src/main/res/menu/source_sub_item.xml`
-  - `/home/server/legado/app/src/main/res/menu/source_edit.xml`
-  - `/home/server/legado/app/src/main/res/menu/book_source_debug.xml`
-  - `/home/server/legado/app/src/main/res/menu/import_source.xml`
-- 当前实现文件:
-  - `lib/features/source/views/source_list_view.dart`
-  - `lib/features/source/views/source_edit_legacy_view.dart`
-  - `lib/features/source/views/source_debug_legacy_view.dart`
-- 检查维度:
-  - 入口: 一级入口、顶栏菜单、选中态菜单、条目菜单、编辑/调试/导入入口均可达。
-  - 状态: 排序/分组/启用态/发现态/选中态流转与持久化同义。
-  - 异常: 导入失败、删除取消、调试帮助失败分支均有可观测提示。
-  - 文案: 菜单标题、确认文案与 legacy 业务语义一致。
-  - 排版: 顶栏、列表、底栏分层与交互热区同义。
-  - 交互触发: 点击/长按/更多/二次确认的触发路径与 legacy 同义。
-- 结论: `已同义`
-- 原因: `MY-03~MY-06` 已收口排序顺序、删除链路与扩展菜单移除，菜单结构与触发逻辑已对齐。
-- 处理动作: 维持现状；在 `MY-19` 按手工路径补最终回归证据。
+1. 本轮范围仅核心未完成差异项：`D-03`、`D-04`。
+2. `D-01`、`D-02`、`D-05` 已接通，状态统一为 `A-已接通（待终验）`，不再进入“回补实现”分支。
+3. 串行：先执行 `D-03`（主题底层配置链路），`D-03` 未闭环时 `D-04` 统一 `blocked`。
+4. 串行：执行 `D-04`（Other 非 Web 键闭环）。
+5. 串行：统一手工回归与证据回填后收口（含 `D-01`、`D-02`、`D-05` 终验）。
+6. 全程保持 `EX-01 blocked`，Web 服务仅占位验证，不进入实现分支。
 
-### P0-02 TXT 目录规则
-- legado 对照项:
-  - `/home/server/legado/app/src/main/res/menu/txt_toc_rule.xml`
-  - `/home/server/legado/app/src/main/res/menu/txt_toc_rule_sel.xml`
-  - `/home/server/legado/app/src/main/res/menu/txt_toc_rule_item.xml`
-  - `/home/server/legado/app/src/main/res/menu/txt_toc_rule_edit.xml`
-- 当前实现文件:
-  - `lib/features/reader/views/txt_toc_rule_manage_view.dart`
-  - `lib/features/reader/views/txt_toc_rule_edit_view.dart`
-  - `lib/features/reader/services/txt_toc_rule_store.dart`
-  - `assets/web/help/md/txtTocRuleHelp.md`
-- 检查维度:
-  - 入口: 顶栏、选中态、条目、编辑页菜单入口齐全。
-  - 状态: 启用态、选中态、批量删除后的列表刷新状态一致。
-  - 异常: 导入失败、帮助加载失败、删除取消均有提示。
-  - 文案: `帮助/复制规则/粘贴规则/删除确认` 文案同义。
-  - 排版: 选中态底栏新增主删除后层级与热区保持一致。
-  - 交互触发: `menu_help/menu_copy_rule`、批量删除触发链路已闭环。
-- 结论: `已同义`
-- 原因: `MY-07` 已补齐缺失菜单项与批量删除执行链路。
-- 处理动作: 维持现状；`MY-19` 补充导入与帮助加载手工回归证据。
+## 2. 一级入口核对清单（`my_menu_*` 14 项）
 
-### P0-03 替换规则
-- legado 对照项:
-  - `/home/server/legado/app/src/main/res/menu/replace_rule.xml`
-  - `/home/server/legado/app/src/main/res/menu/replace_rule_sel.xml`
-  - `/home/server/legado/app/src/main/res/menu/replace_rule_item.xml`
-  - `/home/server/legado/app/src/main/res/menu/replace_edit.xml`
-- 当前实现文件:
-  - `lib/features/replace/views/replace_rule_list_view.dart`
-  - `lib/features/replace/views/replace_rule_edit_view.dart`
-  - `lib/core/database/repositories/replace_rule_repository.dart`
-  - `assets/web/help/md/replaceRuleHelp.md`
-- 检查维度:
-  - 入口: 顶栏、选中态、条目、编辑页菜单入口齐全且顺序同义。
-  - 状态: 选中态批量操作、排序位次、分组筛选状态一致。
-  - 异常: 导入失败、帮助加载失败、删除取消分支可观测。
-  - 文案: 移除非 legacy 扩展文案后语义一致。
-  - 排版: 选中态与条目动作布局保持同层级热区。
-  - 交互触发: 批量删除、复制/粘贴规则、帮助入口触发一致。
-- 结论: `已同义`
-- 原因: `MY-08` 已收口菜单集合并补齐 `menu_help/menu_copy_rule` 与批量删除。
-- 处理动作: 维持现状；`MY-19` 回归核对“导入/帮助/批量操作”三条路径。
+| # | `my_menu_*` | legacy key | 一级入口验收口径 | 关键二级链路验收口径 | 当前判定 | 后续动作 |
+|---|---|---|---|---|---|---|
+| 1 | `my_menu_bookSourceManage` | `bookSourceManage` | 顺序、标题、可达性同义 | `book_source.xml` + `book_source_sel.xml` 动作可达 | `A-已接通` | 终验回归 |
+| 2 | `my_menu_txtTocRuleManage` | `txtTocRuleManage` | 顺序、标题、可达性同义 | `txt_toc_rule.xml` + `txt_toc_rule_sel.xml` 动作可达 | `A-已接通` | 终验回归 |
+| 3 | `my_menu_replaceManage` | `replaceManage` | 顺序、标题、可达性同义 | `replace_rule.xml` + `replace_rule_sel.xml` 动作可达 | `A-已接通` | 终验回归 |
+| 4 | `my_menu_dictRuleManage` | `dictRuleManage` | 顺序、标题、可达性同义 | `dict_rule.xml` + `dict_rule_sel.xml` 动作可达 | `A-已接通` | 终验回归 |
+| 5 | `my_menu_themeMode` | `themeMode` | 主题模式入口同义 | `themeMode` 单入口；值域/状态流转/持久化同义（含 `E-Ink(3)`） | `A-已接通（D-01）` | 待终验 |
+| 6 | `my_menu_webService` | `webService` | 保留入口但不误导 | 不进入服务实现，仅占位提示 | `EX-01 blocked` | 仅占位验证（不进入 webService 实现） |
+| 7 | `my_menu_web_dav_setting` | `web_dav_setting` | 入口同义 | `backup_restore` 页面关键动作同义：help/log + `web_dav_restore` 点击云端/长按本地 + `import_old` | `A-已接通（D-02）` | 待终验 |
+| 8 | `my_menu_theme_setting` | `theme_setting` | 入口同义 | `theme_config` 底层主题项与持久化回显同义 | `D-03` | 回补实现 |
+| 9 | `my_menu_setting` | `setting` | 入口同义 | `pref_config_other` 全量键同义（Web 仅按 `EX-01` 保持边界） | `D-04` | 回补实现 |
+| 10 | `my_menu_bookmark` | `bookmark` | 入口同义 | `bookmark.xml` 导出链路同义 | `A-已接通` | 终验回归 |
+| 11 | `my_menu_readRecord` | `readRecord` | 入口同义 | `book_read_record.xml` 排序/记录开关同义 | `A-已接通` | 终验回归 |
+| 12 | `my_menu_fileManage` | `fileManage` | 入口同义 | `file_long_click.xml` 长按删除链路同义 | `A-已接通` | 终验回归 |
+| 13 | `my_menu_about` | `about` | 入口同义 | `about.xml(menu+xml)` 入口链路同义 | `A-已接通` | 终验回归 |
+| 14 | `my_menu_exit` | `exit` | 入口同义 | 退出触发语义与边界处理同义 | `A-已接通（D-05）` | 待终验 |
 
-### P0-04 字典规则
-- legado 对照项:
-  - `/home/server/legado/app/src/main/res/menu/dict_rule.xml`
-  - `/home/server/legado/app/src/main/res/menu/dict_rule_sel.xml`
-  - `/home/server/legado/app/src/main/res/menu/dict_rule_edit.xml`
-- 当前实现文件:
-  - `lib/features/reader/views/dict_rule_manage_view.dart`
-  - `lib/features/reader/views/dict_rule_edit_view.dart`
-  - `lib/features/reader/services/dict_rule_store.dart`
-  - `assets/web/help/md/dictRuleHelp.md`
-- 检查维度:
-  - 入口: 顶栏、选中态、编辑页菜单入口齐全且顺序同义。
-  - 状态: 启用态与选中态批量操作流转一致。
-  - 异常: 导入失败、帮助加载失败、剪贴板格式错误均可观测。
-  - 文案: 帮助、复制/粘贴、删除确认语义一致。
-  - 排版: 列表与选中态底栏布局同义。
-  - 交互触发: `menu_help/menu_copy_rule`、批量删除触发链路同义。
-- 结论: `已同义`
-- 原因: `MY-09` 已补齐缺失入口、菜单顺序与批量删除链路。
-- 处理动作: 维持现状；`MY-19` 执行手工路径补证据。
+## 3. 状态锚点（当前实现复核）
 
-### MY-19 终验证据位（P0）
-- 入口: `我的 -> 书源管理 / TXT目录规则 / 替换净化 / 字典规则`（待回填）
-- 步骤: `待回填（按 P0-01~P0-04 逐条执行主链路 + 关键菜单动作）`
-- 结果: `待回填（记录是否同义、是否存在偏差）`
-- 异常分支: `待回填（导入失败/帮助加载失败/删除取消等分支）`
-- 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-01-book-source.md`、`docs/plans/evidence/2026-02-26-my-menu-final-regression/R-02-txt-toc-rule.md`、`docs/plans/evidence/2026-02-26-my-menu-final-regression/R-03-replace-rule.md`、`docs/plans/evidence/2026-02-26-my-menu-final-regression/R-04-dict-rule.md`
-- 处理动作: `待回填（同义=维持；差异=登记原因/影响并回补计划）`
+### 3.1 已接通待终验（不进入本轮回补）
 
-## P1（设置链路）
+### D-01（`themeMode`）
+- 当前判定: `A-已接通（待终验）`
+- 复核结论:
+  1. `settings_view.dart` 的 `_pickThemeMode` 已承接 `0/1/2/3` 四值（含 `E-Ink`）并持久化写入。
+  2. `theme_settings_view.dart`、`appearance_settings_view.dart`、`theme_config_list_view.dart` 均改为提示“到我的-主题模式切换”，不再并行写 `appearanceMode`。
+- 终验重点:
+  1. 四值切换后的摘要展示、重启回显与备份恢复回显保持一致。
+  2. 不出现隐式降级到三态的回退路径。
 
-### P1-01 备份与恢复（含 WebDav）
-- legado 对照项:
-  - `/home/server/legado/app/src/main/res/xml/pref_config_backup.xml`
-  - `/home/server/legado/app/src/main/res/menu/backup_restore.xml`
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/config/BackupConfigFragment.kt`
-  - `/home/server/legado/app/src/main/java/io/legado/app/help/AppWebDav.kt`
-- 当前实现文件:
-  - `lib/features/settings/views/backup_settings_view.dart`
-  - `lib/core/services/settings_service.dart`
-  - `lib/core/services/backup_service.dart`
-  - `lib/core/services/backup_restore_ignore_service.dart`
-  - `lib/core/services/webdav_service.dart`
-  - `lib/core/models/backup_restore_ignore_config.dart`
-- 检查维度:
-  - 入口: `menu_help/menu_log/web_dav_backup/web_dav_restore/restoreIgnore` 等入口均可达。
-  - 状态: 设备名、备份路径、同步增强、忽略项配置可持久化并回显。
-  - 异常: WebDav 失败可观测且可回退本地恢复，导入失败有提示。
-  - 文案: 备份/恢复/忽略项说明与 legacy 语义一致。
-  - 排版: 备份恢复分组结构和条目层级同义。
-  - 交互触发: 本地导入、WebDav 上传下载、失败回退链路闭环。
-- 结论: `已同义`
-- 原因: `MY-10` 四个阶段已补齐菜单、配置项、忽略配置与 WebDav 恢复边界。
-- 处理动作: 维持现状；`MY-19` 重点回归“远端恢复失败回退本地恢复”分支。
+### D-02（`web_dav_setting`）
+- 当前判定: `A-已接通（待终验）`
+- 复核结论:
+  1. `backup_settings_view.dart` 已提供 `help/log` 顶栏动作。
+  2. `web_dav_restore` 已对齐“点击云端恢复 + 长按本地恢复”双语义。
+  3. `import_old` 独立入口与旧版目录导入链路已接通。
+- 终验重点:
+  1. WebDav 成功/失败场景下，双语义入口与兜底提示一致。
+  2. 旧版导入的成功/失败提示与计数回显一致。
 
-### P1-02 主题设置全链路
-- legado 对照项:
-  - `/home/server/legado/app/src/main/res/xml/pref_config_theme.xml`
-  - `/home/server/legado/app/src/main/res/xml/pref_config_cover.xml`
-  - `/home/server/legado/app/src/main/res/xml/pref_config_welcome.xml`
-  - `/home/server/legado/app/src/main/res/menu/theme_config.xml`
-  - `/home/server/legado/app/src/main/res/menu/theme_list.xml`
-- 当前实现文件:
-  - `lib/features/settings/views/settings_view.dart`
-  - `lib/features/settings/views/theme_settings_view.dart`
-  - `lib/features/settings/views/theme_config_list_view.dart`
-  - `lib/features/settings/views/cover_config_view.dart`
-  - `lib/features/settings/views/welcome_style_settings_view.dart`
-  - `lib/features/settings/views/reading_interface_settings_hub_view.dart`
-  - `lib/features/settings/services/theme_config_service.dart`
-  - `lib/features/settings/models/theme_config_entry.dart`
-- 检查维度:
-  - 入口: 主题主页、主题模式、主题列表、封面设置、启动界面样式入口齐全。
-  - 状态: 主题模式切换、主题列表应用/删除、封面/欢迎页配置持久化一致。
-  - 异常: 导入失败、资源缺失、规则校验失败均有提示。
-  - 文案: 一级入口与菜单动作文案对齐 legacy 语义。
-  - 排版: 主题主页与子页分组层级同义。
-  - 交互触发: 顶栏切换、条目应用、条目分享/删除确认、规则编辑触发一致。
-- 结论: `已同义`
-- 原因: `MY-11~MY-12` 已收口入口路由、主题列表动作、封面/欢迎页配置与结构化规则编辑。
-- 处理动作: 维持现状；`MY-19` 回归主题模式切换与封面/欢迎页依赖联动。
+### D-05（`exit`）
+- 当前判定: `A-已接通（待终验）`
+- 复核结论:
+  1. `my_menu_exit` 维持“点击即退出”，当前实现为 `SystemNavigator.pop()` 且无确认分支。
+- 终验重点:
+  1. 与 legacy `activity?.finish()` 的生命周期边界（前后台、返回栈）同义。
 
-### P1-03 其它设置全链路
-- legado 对照项:
-  - `/home/server/legado/app/src/main/res/xml/pref_config_other.xml`
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/config/OtherConfigFragment.kt`
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/config/CheckSourceConfig.kt`
-- 当前实现文件:
-  - `lib/features/settings/views/other_settings_view.dart`
-  - `lib/features/settings/views/storage_settings_view.dart`
-  - `lib/features/settings/views/check_source_settings_view.dart`
-  - `lib/features/settings/views/direct_link_upload_config_view.dart`
-  - `lib/core/models/app_settings.dart`
-  - `lib/core/services/settings_service.dart`
-  - `lib/features/settings/services/other_source_settings_service.dart`
-  - `lib/features/settings/services/check_source_settings_service.dart`
-  - `lib/features/settings/services/other_maintenance_service.dart`
-- 检查维度:
-  - 入口: 基本设置、源设置、缓存维护、调试开关入口齐全；Web 服务项保留禁用说明。
-  - 状态: 新增数值项与开关项可持久化并正确回显。
-  - 异常: 输入越界、目录选择失败、维护动作失败均可观测。
-  - 文案: 标题、摘要、操作提示与 legacy 语义一致。
-  - 排版: 分组层级与热区布局保持同义。
-  - 交互触发: 编辑弹层、确认保存、维护动作二次确认链路完整。
-- 结论: `已同义`
-- 原因: `MY-13` 三阶段已完成基础设置、源设置、缓存维护项的收口并移除非同义占位入口。
-- 处理动作: 维持现状；`MY-19` 重点回归校验设置联动与维护动作提示。
+### 3.2 待实现差异（本轮唯一实现基线）
 
-### MY-19 终验证据位（P1）
-- 入口: `我的 -> 备份与恢复 / 主题设置 / 其它设置`（待回填）
-- 步骤: `待回填（按 P1-01~P1-03 执行关键配置编辑、保存与重进回显）`
-- 结果: `待回填（记录持久化、回显、联动结果）`
-- 异常分支: `待回填（WebDav 失败回退、导入失败、输入越界等分支）`
-- 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-05-backup-restore.md`、`docs/plans/evidence/2026-02-26-my-menu-final-regression/R-06-theme-settings.md`、`docs/plans/evidence/2026-02-26-my-menu-final-regression/R-07-other-settings.md`
-- 处理动作: `待回填（同义=维持；差异=登记原因/影响并回补计划）`
+### D-03（`theme_setting`）
+- 当前实现状态:
+  1. `theme_settings_view.dart` 仍以导航枢纽为主，`theme_config` 底层项不可编辑。
+  2. `app_settings.dart`、`settings_service.dart` 未完整覆盖 `launcherIcon/transparentStatusBar/immNavigationBar/barElevation/fontScale` 等键的持久化与回显。
+  3. legacy `pref_config_theme.xml` 的背景图与“保存主题配置”链路尚未等价承接。
+- 目标状态:
+  1. 在 `theme_setting` 下补齐 legacy 主题底层项编辑能力（背景图、`barElevation`、`fontScale`、日夜主题保存等）。
+  2. 补齐底层键读写与回显，保持页面生命周期语义同义。
+  3. 主题模式写入口保持 `D-01` 已收敛状态，不新增并行写入口。
+- 本轮 owner 与落地文件:
+  - owner: `MY-22`
+  - 目标文件: `lib/features/settings/views/theme_settings_view.dart`
+  - 目标文件: `lib/features/settings/views/appearance_settings_view.dart`
+  - 目标文件: `lib/core/models/app_settings.dart`
+  - 目标文件: `lib/core/services/settings_service.dart`
+  - legacy 锚点: `../legado/app/src/main/res/xml/pref_config_theme.xml:5-170`、`../legado/app/src/main/res/menu/theme_config.xml:5-8`、`../legado/app/src/main/java/io/legado/app/ui/config/ThemeConfigFragment.kt:74`、`../legado/app/src/main/java/io/legado/app/ui/config/ThemeConfigFragment.kt:122`、`../legado/app/src/main/java/io/legado/app/ui/config/ThemeConfigFragment.kt:166`、`../legado/app/src/main/java/io/legado/app/ui/config/ThemeConfigFragment.kt:215`、`../legado/app/src/main/java/io/legado/app/ui/config/ThemeConfigFragment.kt:238`
+- 阻塞边界:
+  - 本项未闭环前，`D-04` 维持 `blocked`。
+  - 本项只覆盖 `theme_setting`，不并入 `pref_config_other` / Web 服务需求。
 
-## P2（辅助链路）
+### D-04（`setting`）
+- 当前实现状态:
+  1. `other_settings_view.dart` 仅覆盖基本/源设置/缓存维护/调试子集。
+  2. `app_settings.dart`、`settings_service.dart` 未覆盖 `Cronet/antiAlias/mediaButtonOnExit/readAloudByMediaButton/ignoreAudioFocus/autoClearExpired/showAddToShelfAlert/updateToVariant/showMangaUi` 等键。
+  3. Web 区仍为静态占位，`webPort/webServiceWakeLock` 未接入运行态联动。
+- 目标状态:
+  1. 补齐非 Web 服务缺口键的“可配置 + 持久化 + 回显”闭环。
+  2. `webPort/webServiceWakeLock` 仅保留语义锚点与占位提示，遵循 `EX-01`，不实现运行态。
+  3. 禁止新增 `WebService.start/stop`、运行地址摘要、端口改动触发重启等能力。
+- 本轮 owner 与落地文件:
+  - owner: `MY-23`
+  - 目标文件: `lib/features/settings/views/other_settings_view.dart`
+  - 目标文件: `lib/core/models/app_settings.dart`
+  - 目标文件: `lib/core/services/settings_service.dart`
+  - legacy 锚点: `../legado/app/src/main/res/xml/pref_config_other.xml:62-226`、`../legado/app/src/main/res/xml/pref_config_other.xml:73`、`../legado/app/src/main/res/xml/pref_config_other.xml:178`、`../legado/app/src/main/java/io/legado/app/ui/config/OtherConfigFragment.kt:60`、`../legado/app/src/main/java/io/legado/app/ui/config/OtherConfigFragment.kt:88`、`../legado/app/src/main/java/io/legado/app/ui/config/OtherConfigFragment.kt:114`、`../legado/app/src/main/java/io/legado/app/ui/config/OtherConfigFragment.kt:175`、`../legado/app/src/main/java/io/legado/app/service/WebService.kt:62`
+- 阻塞边界:
+  - 本项依赖 `D-03` 已闭环；`D-03` 未完成时，`D-04` 维持 `blocked`。
+  - 本项严格遵循 `EX-01 blocked`，不得接线 Web 服务启停、地址摘要、端口重启。
+  - 仅允许记录与展示 Web 相关键语义，不接入运行时生效链路。
 
-### P2-01 书签
-- legado 对照项:
-  - `/home/server/legado/app/src/main/res/menu/bookmark.xml`
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/book/bookmark/AllBookmarkActivity.kt`
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/book/bookmark/BookmarkDialog.kt`
-- 当前实现文件:
-  - `lib/features/reader/views/all_bookmark_view.dart`
-  - `lib/features/reader/services/reader_bookmark_export_service.dart`
-- 检查维度:
-  - 入口: 顶栏 `导出/导出(MD)` 与条目点击详情入口可达。
-  - 状态: 导出结果、详情展示与定位阅读状态流转正常。
-  - 异常: 导出失败、定位失败均有提示与日志节点。
-  - 文案: 导出与确认提示语义同义。
-  - 排版: 列表与详情弹层信息层级清晰，空态布局一致。
-  - 交互触发: `导出 JSON/MD -> 条目详情 -> 定位阅读` 链路完整。
-- 结论: `已同义`
-- 原因: `MY-14` 已收口菜单与条目点击闭环，并补齐日志可观测性。
-- 处理动作: 维持现状；`MY-19` 回归导出后文件与定位阅读路径。
+## 4. 关键二级链路核对矩阵
 
-### P2-02 阅读记录
-- legado 对照项:
-  - `/home/server/legado/app/src/main/res/menu/book_read_record.xml`
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/about/ReadRecordActivity.kt`
-- 当前实现文件:
-  - `lib/features/bookshelf/views/reading_history_view.dart`
-  - `lib/core/services/settings_service.dart`
-- 检查维度:
-  - 入口: 搜索、总阅读时长、清空、条目动作入口齐全。
-  - 状态: 排序/开关勾选态、搜索过滤态、清空后的状态回落一致。
-  - 异常: 全量清理与单条删除均有二次确认及取消分支。
-  - 文案: 搜索、清空、删除确认文案语义同义。
-  - 排版: 搜索区、统计区、列表区在加载/空态/成功态层级一致。
-  - 交互触发: 排序切换、清空、单条删除、继续阅读触发链路完整。
-- 结论: `已同义`
-- 原因: `MY-15` 已补齐搜索、总时长、清空与单条确认逻辑。
-- 处理动作: 维持现状；`MY-19` 回归排序/开关/清理边界。
+| 模块 | legacy 关键文件 | 必核对动作 | 当前判定 |
+|---|---|---|---|
+| 书源管理 | `book_source.xml` `book_source_sel.xml` | 排序/分组/导入/帮助/批量动作 | `A-已接通` |
+| TXT目录规则 | `txt_toc_rule.xml` `txt_toc_rule_sel.xml` | 新建/导入/帮助/批量启停与导出 | `A-已接通` |
+| 替换规则 | `replace_rule.xml` `replace_rule_sel.xml` | 分组/导入/帮助/批量启停与置顶置底导出 | `A-已接通` |
+| 字典规则 | `dict_rule.xml` `dict_rule_sel.xml` | 新建/导入默认与多源导入/帮助/批量导出 | `A-已接通` |
+| 备份恢复 | `pref_config_backup.xml` `backup_restore.xml` | WebDav 配置 + `web_dav_restore` 点击云端/长按本地 + `import_old` 独立入口 + 失败回退链路 | `A-已接通（D-02 待终验）` |
+| 主题设置 | `pref_config_theme.xml` `theme_config.xml` | `barElevation/fontScale/背景图/日夜主题保存` 等主题底层项 | `D-03` |
+| 其它设置 | `pref_config_other.xml` | 基本/源设置/缓存维护/调试全量键；Web 服务仅记录边界（`webPort/webServiceWakeLock`），本轮不实现运行态 | `D-04` |
+| 书签 | `bookmark.xml` | 导出 JSON/MD | `A-已接通` |
+| 阅读记录 | `book_read_record.xml` | 排序三态 + 开启记录 | `A-已接通` |
+| 关于 | `about.xml(menu)` `about.xml(xml)` | 分享/评分 + about 列表入口 | `A-已接通` |
+| 文件管理 | `file_long_click.xml` | 长按删除与状态刷新 | `A-已接通` |
 
-### P2-03 关于与诊断
-- legado 对照项:
-  - `/home/server/legado/app/src/main/res/xml/about.xml`
-  - `/home/server/legado/app/src/main/res/menu/about.xml`
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/about/AboutFragment.kt`
-- 当前实现文件:
-  - `lib/features/settings/views/about_settings_view.dart`
-  - `lib/features/settings/views/exception_logs_view.dart`
-  - `lib/features/settings/views/app_help_dialog.dart`
-  - `assets/docs/update_log.md`
-  - `assets/docs/privacy_policy.md`
-  - `assets/docs/disclaimer.md`
-  - `assets/docs/LICENSE.md`
-  - `pubspec.yaml`
-- 检查维度:
-  - 入口: 顶栏 `分享/评分` 与 9 个 about 列表入口均可达。
-  - 状态: 更新日志版本摘要、崩溃日志摘要、日志落盘结果状态可观测。
-  - 异常: 市场跳转失败、文档加载失败、日志写入失败均有提示。
-  - 文案: about 入口文案与 legacy 业务语义一致。
-  - 排版: `关于/其它` 分组层级同义，弹层布局保持一致。
-  - 交互触发: 文档展示、日志清理、保存日志、创建堆转储触发链路完整。
-- 结论: `已同义`
-- 原因: `MY-16` 已补齐菜单结构、文档资源与诊断动作闭环。
-- 处理动作: 维持现状；`MY-19` 回归日志落盘与文档入口可达性。
+## 5. blocked 记录（AGENTS 1.1.2）
 
-### P2-04 文件管理
-- legado 对照项:
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/file/FileManageActivity.kt`
-  - `/home/server/legado/app/src/main/res/menu/file_chooser.xml`
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/file/FilePickerDialog.kt`
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/file/FilePickerViewModel.kt`
-  - `/home/server/legado/app/src/main/res/menu/file_long_click.xml`
-- 当前实现文件:
-  - `lib/features/settings/views/file_manage_view.dart`
-  - `lib/features/settings/views/settings_view.dart`
-- 检查维度:
-  - 入口: 一级 `fileManage` 入口可达；顶栏新增 `新建文件夹`，同义对齐 `file_chooser.xml/menu_create`。
-  - 状态: 路径切换、列表刷新、删除后刷新、创建成功后刷新并可见新目录一致。
-  - 异常: 空名称、名称非法、名称已存在、IO 异常、删除失败分支均具备可观测提示。
-  - 文案: `新建文件夹/文件夹名/文件夹名不能为空/文件夹名非法/名称已存在` 与 legacy 业务语义一致。
-  - 排版: 路径栏、列表区、空态布局同层级。
-  - 交互触发: 条目点击、长按菜单删除、顶栏创建文件夹（输入 -> 校验 -> 创建 -> 刷新）链路同义。
-- 结论: `已同义`
-- 原因: 在 `MY-17` 基础上补齐 legacy `menu_create` 语义，新增顶栏创建入口与校验/刷新/失败提示闭环。
-- 处理动作:
-  - 代码已落地：`file_manage_view.dart` 新增顶栏“新建文件夹”动作、输入弹窗、名称校验与创建后刷新。
-  - 命令核验：`rg -n "新建文件夹|_showCreateFolderDialog|_createFolder|文件夹名不能为空|名称已存在" lib/features/settings/views/file_manage_view.dart`。
-  - 冒烟验证：`flutter test test/widget_test.dart --plain-name "App launches correctly"` 通过。
-  - `MY-19` 继续补手工路径终验（目录层级切换 + 新建/删除边界）。
+### EX-01（Web服务）
+- 状态: `blocked`
+- 执行结论: `仅占位，不实现`（本轮不得新增任何 WebService 运行态能力）。
+- 原因: 当前未具备 legacy 同义的服务启停、地址摘要与长按地址动作能力。
+- 执行边界: `仅占位验证，不进入 webService 实现。`
+- 执行边界补充: `D-04` 中仅保留 `webPort/webServiceWakeLock` 的 legacy 锚点记录，不接入端口修改触发服务重启链路。
+- 排除项（本轮禁止实现）:
+  1. `WebService.start/stop` 运行态接线与开关联动。
+  2. 运行地址摘要展示与长按“复制地址/浏览器打开”。
+  3. `webPort` 可编辑并触发服务重启。
+  4. `webServiceWakeLock` 的持久化生效链路。
+- 影响范围:
+  - 一级入口 `my_menu_webService`。
+  - Web 相关配置项无法形成完整运行闭环。
+- 替代方案: 保留入口和“范围外”提示，不暴露伪可用能力。
+- 回补计划:
+  1. 建立 Web 服务运行态与地址态模型。
+  2. 对齐开关启停与摘要文案。
+  3. 对齐长按“复制地址/浏览器打开”。
+  4. 完成回归证据后解除 `blocked`。
 
-### P2-05 退出（exit）
-- legado 对照项:
-  - `/home/server/legado/app/src/main/res/xml/pref_main.xml` -> `exit`
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/main/my/MyFragment.kt`
-- 当前实现文件:
-  - `lib/features/settings/views/settings_view.dart`
-- 检查维度:
-  - 入口: `我的` 一级菜单 `退出` 入口可达并位于 `其它` 分组。
-  - 状态: 触发后弹出确认对话框，`取消` 返回当前页，`退出` 触发应用退出。
-  - 异常: 连续点击入口、对话框关闭、取消返回分支均可观测且不崩溃。
-  - 文案: `退出/确定退出应用吗？/取消/退出` 与 legacy 业务语义一致。
-  - 排版: `CupertinoAlertDialog` 标题、正文、按钮层级与 legacy 退出确认语义同义。
-  - 交互触发: `点击退出 -> 确认弹窗 -> 取消返回 或 确认退出` 链路闭环。
-- 结论: `已同义`
-- 原因: `settings_view.dart` 已实现 `_confirmExit` 并绑定一级菜单 `退出`，流程与 legacy `exit` 语义一致。
-- 处理动作: 维持现状；在 `MY-19` 终验补齐“取消返回/确认退出”双分支证据。
+## 6. 交付验收门槛（给后续实现任务）
 
-### MY-19 终验证据位（P2）
-- 入口: `我的 -> 书签 / 阅读记录 / 关于 / 文件管理 / 退出`（待回填）
-- 步骤: `待回填（按 P2-01~P2-05 覆盖导出、清理、日志、文件操作、退出确认）`
-- 结果: `待回填（记录主流程可达性与结果提示）`
-- 异常分支: `待回填（导出失败、删除取消、文档加载失败、退出取消分支）`
-- 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-08-bookmark.md`、`docs/plans/evidence/2026-02-26-my-menu-final-regression/R-09-read-record.md`、`docs/plans/evidence/2026-02-26-my-menu-final-regression/R-10-file-manage.md`、`docs/plans/evidence/2026-02-26-my-menu-final-regression/R-11-about.md`、`docs/plans/evidence/2026-02-26-my-menu-final-regression/R-12-exit.md`
-- 处理动作: `待回填（同义=维持；差异=登记原因/影响并回补计划）`
-
-## EX-01（迁移例外）
-
-### EX-01 webService（用户明确排除）
-- legado 对照项:
-  - `/home/server/legado/app/src/main/res/xml/pref_main.xml` -> `webService`
-  - `/home/server/legado/app/src/main/java/io/legado/app/ui/main/my/MyFragment.kt`
-- 当前实现文件:
-  - `lib/features/settings/views/settings_view.dart`
-  - `PLANS.md`（`迁移例外与阻塞` 章节）
-- 检查维度:
-  - 入口: 一级菜单保留 `Web 服务` 入口语义。
-  - 状态: 功能实现状态保持 `blocked`，不进入扩展开发。
-  - 异常: 点击后给出“本轮迁移范围外”提示，避免无反馈。
-  - 文案: 占位文案明确排除范围，不误导为可用功能。
-  - 排版: 入口位置与菜单层级保持同义，不插入额外扩展入口。
-  - 交互触发: 点击只触发范围提示，不触发服务启动或配置流程。
-- 结论: `blocked（占位验证）`
-- 原因: 需求已明确“除 Web 服务外”，按规则 `EX-01` 必须保持冻结并仅做占位验证。
-- 处理动作: 保持 `blocked`；仅验证入口占位提示与重复点击稳定性，待需求方明确“开始做扩展功能”后再单独立项回补。
-
-### MY-19 终验证据位（EX-01）
-- 入口: `我的 -> Web服务`（仅占位入口）
-- 步骤: `仅点击入口验证“范围外占位提示”语义；重复点击与返回重进后再次点击，确认 blocked 状态稳定；不执行 webService 启停、配置、网络流程`
-- 结果: `blocked（占位验证）`
-- 异常分支: `重复点击、返回重进后仍仅提示占位；blocked 状态不变化；未进入 webService 实现链路`
-- 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-13-ex-01.md`（仅记录 `blocked` 占位提示与重复点击稳定性证据；禁止记录 webService 实现流程证据）
-- 处理动作: `保持 blocked，仅维护占位提示语义与重复点击稳定性验证；待需求方明确解锁扩展后再单独立项实现 webService`
-
-## 执行与回填约束
-
-- 当前台账用于 `MY-18` 执行，更新结论时必须同步改写对应条目的“原因/处理动作”。
-- 对于 `结论=差异` 的条目，未记录可执行处理动作前，不得标记 `MY-18` 完成。
-- 本台账完成后，在 `MY-19` 统一回归中补齐手工路径证据，再执行提交前唯一一次 `flutter analyze`。
+1. 14 个 `my_menu_*` 均有结论（`A` / `D` / `blocked`），不得留空。
+2. 所有 `D-*` 项必须带可执行回补动作与回归路径。
+3. `EX-01` 必须保持 `blocked`，直到需求方明确解锁。
+4. `D-03 -> D-04` 必须按序完成；`D-01`、`D-02`、`D-05` 仅进入终验回归，不再作为回补实现链路。
+5. 终验阶段需回填手工回归证据，再执行提交前检查。

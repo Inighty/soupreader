@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/qr_scan_service.dart';
+import '../../../core/utils/file_picker_save_compat.dart';
 import '../../settings/views/app_help_dialog.dart';
 import '../models/txt_toc_rule.dart';
 import '../services/txt_toc_rule_store.dart';
@@ -521,18 +522,17 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
     if (selectedRules.isEmpty) return;
     setState(() => _exportingSelection = true);
     try {
-      final outputPath = await FilePicker.platform.saveFile(
+      final jsonText = TxtTocRule.listToJsonText(selectedRules);
+      final outputPath = await saveFileWithTextCompat(
         dialogTitle: '导出所选',
         fileName: 'exportTxtTocRule.json',
-        type: FileType.custom,
         allowedExtensions: const ['json'],
+        text: jsonText,
       );
       if (outputPath == null || outputPath.trim().isEmpty) {
         return;
       }
       final normalizedPath = outputPath.trim();
-      final jsonText = TxtTocRule.listToJsonText(selectedRules);
-      await _writeExportText(normalizedPath, jsonText);
       if (!mounted) return;
       await _showExportPathDialog(normalizedPath);
     } catch (error, stackTrace) {
@@ -547,15 +547,6 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
       if (!mounted) return;
       setState(() => _exportingSelection = false);
     }
-  }
-
-  Future<void> _writeExportText(String outputPath, String text) async {
-    final uri = Uri.tryParse(outputPath);
-    if (uri != null && uri.scheme.toLowerCase() == 'file') {
-      await File.fromUri(uri).writeAsString(text, flush: true);
-      return;
-    }
-    await File(outputPath).writeAsString(text, flush: true);
   }
 
   Future<void> _showExportPathDialog(String outputPath) async {

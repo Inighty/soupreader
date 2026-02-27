@@ -31,6 +31,7 @@ class RssSubscriptionView extends StatefulWidget {
 class _RssSubscriptionViewState extends State<RssSubscriptionView> {
   late final RssSourceRepository _repo;
   final TextEditingController _queryController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -41,6 +42,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
   @override
   void dispose() {
     _queryController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -48,85 +50,140 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
 
   @override
   Widget build(BuildContext context) {
-    return AppCupertinoPageScaffold(
-      title: '订阅',
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
+    return StreamBuilder<List<RssSource>>(
+      stream: _repo.watchAllSources(),
+      builder: (context, snapshot) {
+        final allSources = snapshot.data ?? _repo.getAllSources();
+        final enabledCount = allSources.where((e) => e.enabled).length;
+        final visible = RssSubscriptionHelper.filterEnabledSourcesByQuery(
+          allSources,
+          _query,
+        );
+
+        return AppCupertinoPageScaffold(
+          title: '订阅',
+          useSliverNavigationBar: true,
+          sliverScrollController: _scrollController,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(28, 28),
+                onPressed: _openFavorites,
+                child: const Icon(CupertinoIcons.star),
+              ),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(28, 28),
+                onPressed: _openGroupMenu,
+                child: const Icon(CupertinoIcons.folder),
+              ),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(28, 28),
+                onPressed: _openSourceSettings,
+                child: const Icon(CupertinoIcons.settings),
+              ),
+            ],
+          ),
+          child: const SizedBox.shrink(),
+          sliverBodyBuilder: (_) => _buildBodySliver(
+            enabledCount: enabledCount,
+            visible: visible,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBodySliver({
+    required int enabledCount,
+    required List<RssSource> visible,
+  }) {
+    final searchField = Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+      child: CupertinoSearchTextField(
+        controller: _queryController,
+        placeholder: '搜索订阅源',
+        onChanged: (_) => setState(() {}),
+      ),
+    );
+
+    final summaryRow = Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+      child: Row(
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(28, 28),
-            onPressed: _openFavorites,
-            child: const Icon(CupertinoIcons.star),
+          Expanded(
+            child: Text(
+              _query.isEmpty ? '启用订阅源' : '筛选：$_query',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: CupertinoColors.secondaryLabel,
+                fontSize: 12,
+              ),
+            ),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(28, 28),
-            onPressed: _openGroupMenu,
-            child: const Icon(CupertinoIcons.folder),
-          ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(28, 28),
-            onPressed: _openSourceSettings,
-            child: const Icon(CupertinoIcons.settings),
+          Text(
+            '${visible.length} / $enabledCount',
+            style: const TextStyle(
+              color: CupertinoColors.secondaryLabel,
+              fontSize: 12,
+            ),
           ),
         ],
       ),
-      child: StreamBuilder<List<RssSource>>(
-        stream: _repo.watchAllSources(),
-        builder: (context, snapshot) {
-          final allSources = snapshot.data ?? _repo.getAllSources();
-          final enabledCount = allSources.where((e) => e.enabled).length;
-          final visible = RssSubscriptionHelper.filterEnabledSourcesByQuery(
-            allSources,
-            _query,
-          );
+    );
 
-          return Column(
+    final ruleEntry = _buildRuleSubscriptionEntry();
+
+    if (visible.isEmpty) {
+      return SliverSafeArea(
+        top: false,
+        bottom: true,
+        sliver: SliverFillRemaining(
+          hasScrollBody: false,
+          child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                child: CupertinoSearchTextField(
-                  controller: _queryController,
-                  placeholder: '搜索订阅源',
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _query.isEmpty ? '启用订阅源' : '筛选：$_query',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: CupertinoColors.secondaryLabel,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '${visible.length} / $enabledCount',
-                      style: const TextStyle(
-                        color: CupertinoColors.secondaryLabel,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              _buildRuleSubscriptionEntry(),
-              Expanded(
-                child: visible.isEmpty
-                    ? _buildEmptyState(enabledCount)
-                    : _buildList(visible),
-              ),
+              searchField,
+              summaryRow,
+              ruleEntry,
+              Expanded(child: _buildEmptyState(enabledCount)),
             ],
-          );
-        },
+          ),
+        ),
+      );
+    }
+
+    final listPartCount = visible.length * 2 - 1;
+    final listStartIndex = 4;
+    final bottomSpacerIndex = listStartIndex + listPartCount;
+
+    return SliverSafeArea(
+      top: false,
+      bottom: true,
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            if (index == 0) return searchField;
+            if (index == 1) return summaryRow;
+            if (index == 2) return ruleEntry;
+            if (index == 3) return const SizedBox(height: 4);
+            if (index == bottomSpacerIndex) {
+              return const SizedBox(height: 20);
+            }
+
+            final local = index - listStartIndex;
+            if (local.isOdd) {
+              return const SizedBox(height: 8);
+            }
+            final sourceIndex = local ~/ 2;
+            final source = visible[sourceIndex];
+            return _buildSourceItem(source);
+          },
+          childCount: bottomSpacerIndex + 1,
+        ),
       ),
     );
   }
@@ -179,45 +236,37 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
     );
   }
 
-  Widget _buildList(List<RssSource> sources) {
-    return ListView.separated(
-      padding: const EdgeInsets.only(top: 4, bottom: 20),
-      itemCount: sources.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final source = sources[index];
-        return GestureDetector(
-          onLongPress: () => _showSourceActions(source),
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: CupertinoColors.secondarySystemGroupedBackground
-                  .resolveFrom(context),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: CupertinoListTile.notched(
-              leading: _buildSourceIcon(source),
-              title: Text(source.sourceName),
-              subtitle: source.sourceGroup?.trim().isNotEmpty == true
-                  ? Text(
-                      source.sourceGroup!.trim(),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: CupertinoColors.secondaryLabel,
-                      ),
-                    )
-                  : null,
-              additionalInfo: Text(
-                source.sourceUrl,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12),
-              ),
-              onTap: () => _openSource(source),
-            ),
+  Widget _buildSourceItem(RssSource source) {
+    return GestureDetector(
+      onLongPress: () => _showSourceActions(source),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color:
+              CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: CupertinoListTile.notched(
+          leading: _buildSourceIcon(source),
+          title: Text(source.sourceName),
+          subtitle: source.sourceGroup?.trim().isNotEmpty == true
+              ? Text(
+                  source.sourceGroup!.trim(),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: CupertinoColors.secondaryLabel,
+                  ),
+                )
+              : null,
+          additionalInfo: Text(
+            source.sourceUrl,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12),
           ),
-        );
-      },
+          onTap: () => _openSource(source),
+        ),
+      ),
     );
   }
 

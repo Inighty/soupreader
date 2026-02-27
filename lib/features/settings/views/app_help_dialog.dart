@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show SelectableText;
 
 Future<void> showAppHelpDialog(
   BuildContext context, {
@@ -17,7 +16,7 @@ Future<void> showAppHelpDialog(
   );
 }
 
-class _AppHelpDialog extends StatelessWidget {
+class _AppHelpDialog extends StatefulWidget {
   final String title;
   final String markdownText;
 
@@ -25,6 +24,25 @@ class _AppHelpDialog extends StatelessWidget {
     required this.title,
     required this.markdownText,
   });
+
+  @override
+  State<_AppHelpDialog> createState() => _AppHelpDialogState();
+}
+
+class _AppHelpDialogState extends State<_AppHelpDialog> {
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +71,7 @@ class _AppHelpDialog extends StatelessWidget {
                         const SizedBox(width: 48),
                         Expanded(
                           child: Text(
-                            title,
+                            widget.title,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               fontSize: 17,
@@ -74,12 +92,18 @@ class _AppHelpDialog extends StatelessWidget {
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(14, 10, 14, 18),
-                      child: SelectableText(
-                        markdownText.trim().isEmpty ? '暂无内容' : markdownText,
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 1.48,
-                          color: bodyColor,
+                      child: SelectableRegion(
+                        focusNode: _focusNode,
+                        selectionControls: cupertinoTextSelectionControls,
+                        child: Text(
+                          widget.markdownText.trim().isEmpty
+                              ? '暂无内容'
+                              : widget.markdownText,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.48,
+                            color: bodyColor,
+                          ),
                         ),
                       ),
                     ),

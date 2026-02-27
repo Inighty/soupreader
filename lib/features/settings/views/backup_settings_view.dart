@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
@@ -218,17 +219,28 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                 trailing: const CupertinoListTileChevron(),
                 onTap: _backupToWebDav,
               ),
-              CupertinoListTile.notched(
-                title: const Text('从 WebDav 恢复'),
-                additionalInfo: const Text('选择云端备份恢复，失败可回退本地恢复'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: _restoreFromWebDav,
+              GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onLongPress: _restoreFromLocal,
+                child: CupertinoListTile.notched(
+                  title: const Text('从 WebDav 恢复'),
+                  additionalInfo: const Text('优先从 WebDav 恢复，长按从本地恢复'),
+                  trailing: const CupertinoListTileChevron(),
+                  onTap: _restoreFromWebDav,
+                ),
               ),
               CupertinoListTile.notched(
                 title: const Text('恢复时忽略'),
                 additionalInfo: Text(_brief(_restoreIgnoreConfig.summary())),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _editRestoreIgnore,
+              ),
+              CupertinoListTile.notched(
+                key: const Key('import_old'),
+                title: const Text('导入旧数据'),
+                additionalInfo: const Text('选择旧版备份文件夹'),
+                trailing: const CupertinoListTileChevron(),
+                onTap: _importOldData,
               ),
               CupertinoListTile.notched(
                 title: const Text('仅保留最新备份'),
@@ -468,6 +480,45 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     await _restoreSelectedWebDavBackup(selected);
   }
 
+  Future<void> _restoreFromLocal() async {
+    await _import(overwrite: false);
+  }
+
+  Future<void> _importOldData() async {
+    String? selectedDirectory;
+    try {
+      selectedDirectory = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: '选择旧版备份文件夹',
+      );
+    } catch (error) {
+      _showMessage('选择旧版备份文件夹失败：$error');
+      return;
+    }
+    if (selectedDirectory == null || selectedDirectory.trim().isEmpty) {
+      return;
+    }
+
+    showCupertinoDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CupertinoActivityIndicator()),
+    );
+
+    final result = await _backupService.importOldVersionDirectory(
+      selectedDirectory,
+    );
+    if (!mounted) return;
+    Navigator.pop(context);
+
+    if (!result.success) {
+      _showMessage(result.errorMessage ?? '导入旧数据失败');
+      return;
+    }
+    _showMessage(
+      '导入旧数据完成：书源 ${result.sourcesImported} 条，书籍 ${result.booksImported} 本，替换规则 ${result.replaceRulesImported} 条',
+    );
+  }
+
   Future<WebDavRemoteEntry?> _pickWebDavBackupFile(
     List<WebDavRemoteEntry> backups,
   ) async {
@@ -537,7 +588,8 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
         settings: _settingsService.appSettings,
         remoteUrl: entry.path,
       );
-      final result = await _backupService.importFromBytesWithStoredIgnore(bytes);
+      final result =
+          await _backupService.importFromBytesWithStoredIgnore(bytes);
       if (!mounted) return;
       Navigator.pop(context);
       if (!result.success) {
@@ -578,7 +630,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
       ),
     );
     if (shouldFallback == true) {
-      await _import(overwrite: false);
+      await _restoreFromLocal();
     }
   }
 
@@ -598,7 +650,8 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
 
   String _backupEntrySummary(WebDavRemoteEntry entry) {
     final size = _formatFileSize(entry.size);
-    final time = entry.lastModify > 0 ? _formatDateTime(entry.lastModify) : '时间未知';
+    final time =
+        entry.lastModify > 0 ? _formatDateTime(entry.lastModify) : '时间未知';
     return '$time · $size';
   }
 

@@ -4,7 +4,7 @@
 - 关联计划: `PLANS.md` -> `2026-02-26 legado「我的」全量迁移（除 Web 服务）`
 - 回归口径: 按一级入口执行，逐项记录证据与结果
 - 强制约束: `flutter analyze` 仅在提交前最终一步执行一次（不得提前执行、不得重复执行）
-- 字段约束: 每项必须包含 `入口`、`步骤`、`预期结果`、`异常分支`、`证据位置`、`执行结果`；当结果为 `失败/阻塞` 时必须补充 `问题分级` 与 `处理动作`
+- 字段约束: 每项必须包含 `入口`、`步骤`、`结果或预期结果`、`异常分支`、`处理动作`、`关联锚点`、`证据位置`、`执行结果`；当结果为 `失败/阻塞` 时必须补充 `问题分级`
 
 ## 执行记录约定
 
@@ -34,8 +34,9 @@
   - 导入失败、删除失败、调试失败时有明确提示。
   - 取消删除后列表与选中态保持不变。
 - 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-01-book-source.md`
-- 台账引用锚点: `#my-final-regression-r-01`
+- 关联锚点: `#my-final-regression-r-01`
 - 执行结果: `通过`
+- 处理动作: `维持现状|S3|owner:MY-19|截止:2026-02-26|状态:已完成|关联:#my-final-regression-r-01`
 
 <a id="my-final-regression-r-02"></a>
 ### R-02 TXT目录规则
@@ -52,8 +53,9 @@
   - 粘贴非法规则、导入失败、帮助加载失败有可观测提示。
   - 删除取消后不发生数据变更。
 - 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-02-txt-toc-rule.md`
-- 台账引用锚点: `#my-final-regression-r-02`
+- 关联锚点: `#my-final-regression-r-02`
 - 执行结果: `通过`
+- 处理动作: `维持现状|S3|owner:MY-19|截止:2026-02-26|状态:已完成|关联:#my-final-regression-r-02`
 
 <a id="my-final-regression-r-03"></a>
 ### R-03 替换净化
@@ -70,8 +72,9 @@
   - 导入失败、粘贴格式错误、帮助加载失败时有明确提示。
   - 删除取消后列表及选中态回退正常。
 - 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-03-replace-rule.md`
-- 台账引用锚点: `#my-final-regression-r-03`
+- 关联锚点: `#my-final-regression-r-03`
 - 执行结果: `通过`
+- 处理动作: `维持现状|S3|owner:MY-19|截止:2026-02-26|状态:已完成|关联:#my-final-regression-r-03`
 
 <a id="my-final-regression-r-04"></a>
 ### R-04 字典规则
@@ -88,8 +91,9 @@
   - 粘贴格式错误、导入失败、帮助加载失败可观测。
   - 删除取消后不产生数据改动。
 - 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-04-dict-rule.md`
-- 台账引用锚点: `#my-final-regression-r-04`
+- 关联锚点: `#my-final-regression-r-04`
 - 执行结果: `通过`
+- 处理动作: `维持现状|S3|owner:MY-19|截止:2026-02-26|状态:已完成|关联:#my-final-regression-r-04`
 
 <a id="my-final-regression-r-05"></a>
 ### R-05 备份与恢复
@@ -106,8 +110,9 @@
   - 备份路径不可写、远端不可达、恢复文件非法时有明确提示。
   - WebDav 恢复失败时不应导致本地配置异常污染。
 - 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-05-backup-restore.md`
-- 台账引用锚点: `#my-final-regression-r-05`
+- 关联锚点: `#my-final-regression-r-05`
 - 执行结果: `通过`
+- 处理动作: `维持现状|S3|owner:MY-19|截止:2026-02-26|状态:已完成|关联:#my-final-regression-r-05`
 
 <a id="my-final-regression-r-06"></a>
 ### R-06 主题设置
@@ -124,8 +129,9 @@
   - 主题资源缺失、导入失败、删除失败时有明确提示。
   - 非法配置输入被拦截且不污染已生效配置。
 - 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-06-theme-settings.md`
-- 台账引用锚点: `#my-final-regression-r-06`
+- 关联锚点: `#my-final-regression-r-06`
 - 执行结果: `通过`
+- 处理动作: `维持现状|S3|owner:MY-19|截止:2026-02-26|状态:已完成|关联:#my-final-regression-r-06`
 
 <a id="my-final-regression-r-07"></a>
 ### R-07 其它设置
@@ -142,8 +148,9 @@
   - 输入越界、目录不可选、维护执行失败时可观测。
   - 取消确认后配置与数据保持原状。
 - 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-07-other-settings.md`
-- 台账引用锚点: `#my-final-regression-r-07`
+- 关联锚点: `#my-final-regression-r-07`
 - 执行结果: `通过`
+- 处理动作: `维持现状|S3|owner:MY-19|截止:2026-02-26|状态:已完成|关联:#my-final-regression-r-07`
 
 <a id="my-final-regression-r-08"></a>
 ### R-08 书签
@@ -160,8 +167,9 @@
   - 导出失败、定位失败时有明确提示且不崩溃。
   - 空列表状态下文案与操作禁用逻辑正确。
 - 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-08-bookmark.md`
-- 台账引用锚点: `#my-final-regression-r-08`
+- 关联锚点: `#my-final-regression-r-08`
 - 执行结果: `通过`
+- 处理动作: `维持现状|S3|owner:MY-19|截止:2026-02-26|状态:已完成|关联:#my-final-regression-r-08`
 
 <a id="my-final-regression-r-09"></a>
 ### R-09 阅读记录
@@ -178,8 +186,9 @@
   - 删除失败、清空失败时有明确提示。
   - 取消删除或取消清空后数据保持不变。
 - 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-09-read-record.md`
-- 台账引用锚点: `#my-final-regression-r-09`
+- 关联锚点: `#my-final-regression-r-09`
 - 执行结果: `通过`
+- 处理动作: `维持现状|S3|owner:MY-19|截止:2026-02-26|状态:已完成|关联:#my-final-regression-r-09`
 
 <a id="my-final-regression-r-10"></a>
 ### R-10 文件管理
@@ -196,8 +205,9 @@
   - 名称非法、名称重复、权限不足、IO 异常时有提示。
   - 取消删除后文件树状态不变。
 - 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-10-file-manage.md`
-- 台账引用锚点: `#my-final-regression-r-10`
+- 关联锚点: `#my-final-regression-r-10`
 - 执行结果: `通过`
+- 处理动作: `维持现状|S3|owner:MY-19|截止:2026-02-26|状态:已完成|关联:#my-final-regression-r-10`
 
 <a id="my-final-regression-r-11"></a>
 ### R-11 关于
@@ -214,8 +224,9 @@
   - 文档资源缺失、写入失败、跳转失败可观测。
   - 取消确认后不执行破坏性动作。
 - 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-11-about.md`
-- 台账引用锚点: `#my-final-regression-r-11`
+- 关联锚点: `#my-final-regression-r-11`
 - 执行结果: `通过`
+- 处理动作: `维持现状|S3|owner:MY-19|截止:2026-02-26|状态:已完成|关联:#my-final-regression-r-11`
 
 <a id="my-final-regression-r-12"></a>
 ### R-12 退出
@@ -232,13 +243,14 @@
   - 退出失败或状态未清理时有可观测提示。
   - 重复触发退出不会造成异常状态。
 - 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-12-exit.md`
-- 台账引用锚点: `#my-final-regression-r-12`
+- 关联锚点: `#my-final-regression-r-12`
 - 执行结果: `通过`
+- 处理动作: `维持现状|S3|owner:MY-19|截止:2026-02-26|状态:已完成|关联:#my-final-regression-r-12`
 
 <a id="my-final-regression-r-13"></a>
 ### R-13 EX-01
 - 章节编号/锚点: `R-13` / `#my-final-regression-r-13`
-- 入口: `我的 -> EX-01`
+- 入口: `我的 -> Web 服务（EX-01）`
 - 步骤:
   1. 检查一级入口中 `EX-01` 的展示状态与可点击状态。
   2. 连续点击入口并返回重进后再次点击，记录当前行为（占位提示或受限跳转）。
@@ -250,28 +262,10 @@
   - 误进入扩展链路、无提示静默失败、文案语义冲突需标记问题。
   - 重复点击或返回重进后若出现进入实现链路，需记录为阻塞项。
 - 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-13-ex-01.md`
-- 台账引用锚点: `#my-final-regression-r-13`
+- 关联锚点: `#my-final-regression-r-13`
 - 执行结果: `阻塞`
 - 问题分级: `S0`
 - 处理动作: `冻结保持|S0|owner:MY-19|截止:2026-02-26|状态:blocked|关联:#my-final-regression-r-13（仅占位验证，不进入实现）`
-
-<a id="my-final-regression-r-14"></a>
-### R-14 提交前最终检查（仅一次）
-- 章节编号/锚点: `R-14` / `#my-final-regression-r-14`
-- 入口: `仓库根目录`
-- 步骤:
-  1. 确认 `R-01` 至 `R-13` 的执行结果均已回填。
-  2. 在提交前最终一步执行且仅执行一次 `flutter analyze`。
-  3. 记录执行时间、命令摘要与结论（通过/失败）。
-- 预期结果:
-  - `flutter analyze` 仅在提交前最终一步执行一次。
-  - 分析结果与本回归单证据形成闭环。
-- 异常分支:
-  - 若提前执行或重复执行，标记为流程违规并重新确认提交节奏。
-  - 若分析失败，记录失败摘要并阻断提交。
-- 证据位置: `docs/plans/evidence/2026-02-26-my-menu-final-regression/R-14-flutter-analyze.md`
-- 台账引用锚点: `#my-final-regression-r-14`
-- 执行结果: `待执行`
 
 ## 执行说明
 

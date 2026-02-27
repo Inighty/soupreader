@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
@@ -58,59 +57,37 @@ class _ReadingInterfaceSettingsHubViewState
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
-
     return AppCupertinoPageScaffold(
       title: '阅读界面样式',
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
-          Text(
-            '阅读样式与排版',
-            style: theme.textTheme.small.copyWith(
-              color: scheme.mutedForeground,
-              fontWeight: FontWeight.w600,
-            ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('阅读样式与排版'),
+            children: [
+              _buildItem(
+                title: '样式与排版',
+                description: '字体 / 排版',
+                onTap: _openPreferences,
+              ),
+              _buildItem(
+                title: '页眉页脚与标题',
+                description: '标题间距 / 内容位 / 分割线',
+                onTap: _openTipSettings,
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          ShadCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                _buildItem(
-                  title: '样式与排版',
-                  info: '字体 / 排版',
-                  onTap: _openPreferences,
-                ),
-                const ShadSeparator.horizontal(
-                  margin: EdgeInsets.symmetric(horizontal: 12),
-                ),
-                _buildItem(
-                  title: '页眉页脚与标题',
-                  info: '标题间距 / 内容位 / 分割线',
-                  onTap: _openTipSettings,
-                ),
-              ],
-            ),
+          CupertinoListSection.insetGrouped(
+            header: const Text('排版细项'),
+            children: [
+              _buildItem(
+                title: '排版与边距（高级）',
+                description: '标题/正文/边距滑杆',
+                onTap: _openTypographyDialog,
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
-          Text(
-            '排版细项',
-            style: theme.textTheme.small.copyWith(
-              color: scheme.mutedForeground,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          ShadCard(
-            padding: EdgeInsets.zero,
-            child: _buildItem(
-              title: '排版与边距（高级）',
-              info: '标题/正文/边距滑杆',
-              onTap: _openTypographyDialog,
-            ),
-          ),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -118,57 +95,26 @@ class _ReadingInterfaceSettingsHubViewState
 
   Widget _buildItem({
     required String title,
-    required String info,
+    required String description,
     required VoidCallback onTap,
   }) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
-    final infoText = info.trim();
-
-    return SizedBox(
-      width: double.infinity,
-      child: CupertinoButton(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        alignment: Alignment.centerLeft,
-        onPressed: onTap,
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.p.copyWith(
-                      color: scheme.foreground,
-                    ),
-                  ),
-                  if (infoText.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      infoText,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.small.copyWith(
-                        color: scheme.mutedForeground,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              LucideIcons.chevronRight,
-              size: 16,
-              color: scheme.mutedForeground,
-            ),
-          ],
+    return CupertinoListTile.notched(
+      title: Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        description.trim(),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 12,
+          color: CupertinoColors.secondaryLabel,
         ),
       ),
+      trailing: const CupertinoListTileChevron(),
+      onTap: onTap,
     );
   }
 }

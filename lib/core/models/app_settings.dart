@@ -6,6 +6,102 @@ enum AppAppearanceMode {
   followSystem,
   light,
   dark,
+  eInk,
+}
+
+const int appAppearanceModeFollowSystemValue = 0;
+const int appAppearanceModeLightValue = 1;
+const int appAppearanceModeDarkValue = 2;
+const int appAppearanceModeEInkValue = 3;
+const int appAppearanceModeLegacyTriValueMax = appAppearanceModeDarkValue;
+const int appAppearanceModeLegacyMaxValue = appAppearanceModeEInkValue;
+
+int appAppearanceModeToLegacyValue(AppAppearanceMode mode) {
+  switch (mode) {
+    case AppAppearanceMode.followSystem:
+      return appAppearanceModeFollowSystemValue;
+    case AppAppearanceMode.light:
+      return appAppearanceModeLightValue;
+    case AppAppearanceMode.dark:
+      return appAppearanceModeDarkValue;
+    case AppAppearanceMode.eInk:
+      return appAppearanceModeEInkValue;
+  }
+}
+
+AppAppearanceMode appAppearanceModeFromLegacyValue(int value) {
+  switch (value) {
+    case appAppearanceModeLightValue:
+      return AppAppearanceMode.light;
+    case appAppearanceModeDarkValue:
+      return AppAppearanceMode.dark;
+    case appAppearanceModeEInkValue:
+      return AppAppearanceMode.eInk;
+    case appAppearanceModeFollowSystemValue:
+    default:
+      return AppAppearanceMode.followSystem;
+  }
+}
+
+bool isValidAppAppearanceModeLegacyValue(int value) {
+  return value >= appAppearanceModeFollowSystemValue &&
+      value <= appAppearanceModeLegacyMaxValue;
+}
+
+int? tryParseAppAppearanceModeLegacyValue(dynamic raw) {
+  if (raw is int) return raw;
+  if (raw is num) return raw.toInt();
+  if (raw is String) {
+    final normalized = raw.trim();
+    if (normalized.isEmpty) return null;
+    final asInt = int.tryParse(normalized);
+    if (asInt != null) return asInt;
+    switch (normalized.toLowerCase()) {
+      case 'followsystem':
+      case 'follow_system':
+      case 'follow-system':
+      case 'system':
+      case 'auto':
+        return appAppearanceModeFollowSystemValue;
+      case 'light':
+      case 'day':
+        return appAppearanceModeLightValue;
+      case 'dark':
+      case 'night':
+        return appAppearanceModeDarkValue;
+      case 'eink':
+      case 'e-ink':
+      case 'e_ink':
+        return appAppearanceModeEInkValue;
+    }
+  }
+  return null;
+}
+
+int resolveAppAppearanceModeLegacyValueFromJson(
+  Map<String, dynamic> sourceJson,
+) {
+  final parsedAppearanceMode =
+      tryParseAppAppearanceModeLegacyValue(sourceJson['appearanceMode']);
+  if (parsedAppearanceMode != null &&
+      isValidAppAppearanceModeLegacyValue(parsedAppearanceMode)) {
+    return parsedAppearanceMode;
+  }
+  final parsedThemeMode =
+      tryParseAppAppearanceModeLegacyValue(sourceJson['themeMode']);
+  if (parsedThemeMode != null &&
+      isValidAppAppearanceModeLegacyValue(parsedThemeMode)) {
+    return parsedThemeMode;
+  }
+  return appAppearanceModeFollowSystemValue;
+}
+
+AppAppearanceMode parseAppAppearanceModeFromJson(
+  Map<String, dynamic> sourceJson,
+) {
+  return appAppearanceModeFromLegacyValue(
+    resolveAppAppearanceModeLegacyValueFromJson(sourceJson),
+  );
 }
 
 enum BookshelfViewMode {
@@ -174,17 +270,6 @@ class AppSettings {
   });
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
-    AppAppearanceMode parseAppearanceMode(dynamic raw) {
-      final index = raw is int
-          ? raw
-          : raw is num
-              ? raw.toInt()
-              : null;
-      if (index == null) return AppAppearanceMode.followSystem;
-      return AppAppearanceMode
-          .values[index.clamp(0, AppAppearanceMode.values.length - 1)];
-    }
-
     BookshelfViewMode parseViewMode(dynamic raw) {
       final index = raw is int
           ? raw
@@ -311,7 +396,7 @@ class AppSettings {
     ).clamp(0, 5);
 
     return AppSettings(
-      appearanceMode: parseAppearanceMode(json['appearanceMode']),
+      appearanceMode: parseAppAppearanceModeFromJson(json),
       wifiOnlyDownload: json['wifiOnlyDownload'] as bool? ?? true,
       autoUpdateSources: json['autoUpdateSources'] as bool? ?? true,
       autoRefresh: parseBoolWithDefault(
@@ -417,8 +502,10 @@ class AppSettings {
   }
 
   Map<String, dynamic> toJson() {
+    final appearanceModeValue = appAppearanceModeToLegacyValue(appearanceMode);
     return {
-      'appearanceMode': appearanceMode.index,
+      'appearanceMode': appearanceModeValue,
+      'themeMode': appearanceModeValue,
       'wifiOnlyDownload': wifiOnlyDownload,
       'autoUpdateSources': autoUpdateSources,
       'autoRefresh': autoRefresh,

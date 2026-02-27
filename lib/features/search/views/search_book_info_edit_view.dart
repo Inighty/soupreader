@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../services/search_book_info_edit_helper.dart';
@@ -73,17 +72,18 @@ class _SearchBookInfoEditViewState extends State<SearchBookInfoEditView> {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
   }) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    final labelColor = CupertinoColors.label.resolveFrom(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: theme.textTheme.small.copyWith(
+          style: textStyle.copyWith(
+            fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: scheme.foreground,
+            color: labelColor,
           ),
         ),
         const SizedBox(height: 6),
@@ -95,6 +95,26 @@ class _SearchBookInfoEditViewState extends State<SearchBookInfoEditView> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         ),
       ],
+    );
+  }
+
+  Widget _buildFormContainer({required Widget child}) {
+    final cardColor =
+        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
+    final borderColor = CupertinoColors.separator.resolveFrom(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: borderColor,
+          width: 0.6,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        child: child,
+      ),
     );
   }
 
@@ -120,8 +140,7 @@ class _SearchBookInfoEditViewState extends State<SearchBookInfoEditView> {
           MediaQuery.paddingOf(context).bottom + 12,
         ),
         children: [
-          ShadCard(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+          _buildFormContainer(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

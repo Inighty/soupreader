@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -307,7 +306,11 @@ class _SearchBookCoverChangeViewState extends State<SearchBookCoverChangeView> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = ShadTheme.of(context).colorScheme;
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    final cardColor =
+        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
+    final cardBorderColor = CupertinoColors.separator.resolveFrom(context);
+    final cardTextColor = CupertinoColors.label.resolveFrom(context);
     final loadingColor = CupertinoColors.activeBlue.resolveFrom(context);
     final candidates = _displayCandidates;
 
@@ -349,10 +352,10 @@ class _SearchBookCoverChangeViewState extends State<SearchBookCoverChangeView> {
                   onTap: () => _selectCandidate(candidate),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: scheme.card,
+                      color: cardColor,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: CupertinoColors.systemGrey4.resolveFrom(context),
+                        color: cardBorderColor,
                       ),
                     ),
                     padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
@@ -378,9 +381,9 @@ class _SearchBookCoverChangeViewState extends State<SearchBookCoverChangeView> {
                           maxLines: 2,
                           textAlign: TextAlign.center,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
+                          style: textStyle.copyWith(
                             fontSize: 12,
-                            color: scheme.foreground,
+                            color: cardTextColor,
                           ),
                         ),
                       ],

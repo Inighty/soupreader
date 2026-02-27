@@ -59,6 +59,8 @@ class _SettingsViewState extends State<SettingsView> {
         return '浅色';
       case AppAppearanceMode.dark:
         return '深色';
+      case AppAppearanceMode.eInk:
+        return 'E-Ink';
     }
   }
 
@@ -81,6 +83,10 @@ class _SettingsViewState extends State<SettingsView> {
         OptionPickerItem<AppAppearanceMode>(
           value: AppAppearanceMode.dark,
           label: '深色',
+        ),
+        OptionPickerItem<AppAppearanceMode>(
+          value: AppAppearanceMode.eInk,
+          label: 'E-Ink',
         ),
       ],
     );
@@ -146,185 +152,177 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  Future<void> _confirmExit() async {
-    final confirmed = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('退出'),
-        content: const Text('\n确定退出应用吗？'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('退出'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    await SystemNavigator.pop();
-  }
-
   @override
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '我的',
+      useSliverNavigationBar: true,
       trailing: _buildHelpAction(),
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
-        children: [
-          CupertinoListSection.insetGrouped(
+      child: const SizedBox.shrink(),
+      sliverBodyBuilder: (_) => _buildBodySliver(context),
+    );
+  }
+
+  Widget _buildBodySliver(BuildContext context) {
+    return SliverSafeArea(
+      top: false,
+      bottom: true,
+      sliver: SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              CupertinoListTile.notched(
-                key: const Key('my_menu_bookSourceManage'),
-                title: const Text('书源管理'),
-                additionalInfo: const Text('创建/导入/编辑/管理书源'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _open(
-                  context,
-                  const SourceListView(),
-                ),
+              CupertinoListSection.insetGrouped(
+                children: [
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_bookSourceManage'),
+                    title: const Text('书源管理'),
+                    additionalInfo: const Text('创建/导入/编辑/管理书源'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => _open(
+                      context,
+                      const SourceListView(),
+                    ),
+                  ),
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_txtTocRuleManage'),
+                    title: const Text('TXT目录规则'),
+                    additionalInfo: const Text('配置 TXT 目录规则'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => _open(
+                      context,
+                      const TxtTocRuleManageView(),
+                    ),
+                  ),
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_replaceManage'),
+                    title: const Text('替换净化'),
+                    additionalInfo: const Text('配置替换规则'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => _open(
+                      context,
+                      const ReplaceRuleListView(),
+                    ),
+                  ),
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_dictRuleManage'),
+                    title: const Text('字典规则'),
+                    additionalInfo: const Text('配置字典规则'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => _open(
+                      context,
+                      const DictRuleManageView(),
+                    ),
+                  ),
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_themeMode'),
+                    title: const Text('主题模式'),
+                    additionalInfo: Text(_themeModeSummary),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: _pickThemeMode,
+                  ),
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_webService'),
+                    title: const Text('Web服务'),
+                    additionalInfo: const Text('Web编辑书源与阅读'),
+                    trailing: CupertinoSwitch(
+                      value: false,
+                      onChanged: (_) => _showWebServiceNotImplemented(),
+                    ),
+                    onTap: _showWebServiceNotImplemented,
+                  ),
+                ],
               ),
-              CupertinoListTile.notched(
-                key: const Key('my_menu_txtTocRuleManage'),
-                title: const Text('TXT目录规则'),
-                additionalInfo: const Text('配置 TXT 目录规则'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _open(
-                  context,
-                  const TxtTocRuleManageView(),
-                ),
+              CupertinoListSection.insetGrouped(
+                header: const Text('设置'),
+                children: [
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_web_dav_setting'),
+                    title: const Text('备份与恢复'),
+                    additionalInfo: const Text('WebDav 设置/导入旧数据'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => _open(
+                      context,
+                      const BackupSettingsView(),
+                    ),
+                  ),
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_theme_setting'),
+                    title: const Text('主题设置'),
+                    additionalInfo: const Text('与界面/颜色相关的一些设置'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => _open(
+                      context,
+                      const ThemeSettingsView(),
+                    ),
+                  ),
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_setting'),
+                    title: const Text('其它设置'),
+                    additionalInfo: const Text('功能相关设置'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => _open(
+                      context,
+                      const OtherSettingsView(),
+                    ),
+                  ),
+                ],
               ),
-              CupertinoListTile.notched(
-                key: const Key('my_menu_replaceManage'),
-                title: const Text('替换净化'),
-                additionalInfo: const Text('配置替换规则'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _open(
-                  context,
-                  const ReplaceRuleListView(),
-                ),
+              CupertinoListSection.insetGrouped(
+                header: const Text('其它'),
+                children: [
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_bookmark'),
+                    title: const Text('书签'),
+                    additionalInfo: const Text('所有书签'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => _open(
+                      context,
+                      const AllBookmarkView(),
+                    ),
+                  ),
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_readRecord'),
+                    title: const Text('阅读记录'),
+                    additionalInfo: const Text('阅读记录汇总'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => _open(
+                      context,
+                      const ReadingHistoryView(),
+                    ),
+                  ),
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_fileManage'),
+                    title: const Text('文件管理'),
+                    additionalInfo: const Text('管理应用私有目录文件'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => _open(
+                      context,
+                      const FileManageView(),
+                    ),
+                  ),
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_about'),
+                    title: const Text('关于'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => _open(
+                      context,
+                      const AboutSettingsView(),
+                    ),
+                  ),
+                  CupertinoListTile.notched(
+                    key: const Key('my_menu_exit'),
+                    title: const Text('退出'),
+                    trailing: const CupertinoListTileChevron(),
+                    onTap: () => SystemNavigator.pop(),
+                  ),
+                ],
               ),
-              CupertinoListTile.notched(
-                key: const Key('my_menu_dictRuleManage'),
-                title: const Text('字典规则'),
-                additionalInfo: const Text('配置字典规则'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _open(
-                  context,
-                  const DictRuleManageView(),
-                ),
-              ),
-              CupertinoListTile.notched(
-                key: const Key('my_menu_themeMode'),
-                title: const Text('主题模式'),
-                additionalInfo: Text(_themeModeSummary),
-                trailing: const CupertinoListTileChevron(),
-                onTap: _pickThemeMode,
-              ),
-              CupertinoListTile.notched(
-                key: const Key('my_menu_webService'),
-                title: const Text('Web服务'),
-                additionalInfo: const Text('Web编辑书源与阅读'),
-                trailing: CupertinoSwitch(
-                  value: false,
-                  onChanged: (_) => _showWebServiceNotImplemented(),
-                ),
-                onTap: _showWebServiceNotImplemented,
-              ),
+              const SizedBox(height: 24),
             ],
           ),
-          CupertinoListSection.insetGrouped(
-            header: const Text('设置'),
-            children: [
-              CupertinoListTile.notched(
-                key: const Key('my_menu_web_dav_setting'),
-                title: const Text('备份与恢复'),
-                additionalInfo: const Text('WebDav 设置/导入旧数据'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _open(
-                  context,
-                  const BackupSettingsView(),
-                ),
-              ),
-              CupertinoListTile.notched(
-                key: const Key('my_menu_theme_setting'),
-                title: const Text('主题设置'),
-                additionalInfo: const Text('与界面/颜色相关的一些设置'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _open(
-                  context,
-                  const ThemeSettingsView(),
-                ),
-              ),
-              CupertinoListTile.notched(
-                key: const Key('my_menu_setting'),
-                title: const Text('其它设置'),
-                additionalInfo: const Text('功能相关设置'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _open(
-                  context,
-                  const OtherSettingsView(),
-                ),
-              ),
-            ],
-          ),
-          CupertinoListSection.insetGrouped(
-            header: const Text('其它'),
-            children: [
-              CupertinoListTile.notched(
-                key: const Key('my_menu_bookmark'),
-                title: const Text('书签'),
-                additionalInfo: const Text('所有书签'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _open(
-                  context,
-                  const AllBookmarkView(),
-                ),
-              ),
-              CupertinoListTile.notched(
-                key: const Key('my_menu_readRecord'),
-                title: const Text('阅读记录'),
-                additionalInfo: const Text('阅读记录汇总'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _open(
-                  context,
-                  const ReadingHistoryView(),
-                ),
-              ),
-              CupertinoListTile.notched(
-                key: const Key('my_menu_fileManage'),
-                title: const Text('文件管理'),
-                additionalInfo: const Text('管理应用私有目录文件'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _open(
-                  context,
-                  const FileManageView(),
-                ),
-              ),
-              CupertinoListTile.notched(
-                key: const Key('my_menu_about'),
-                title: const Text('关于'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () => _open(
-                  context,
-                  const AboutSettingsView(),
-                ),
-              ),
-              CupertinoListTile.notched(
-                key: const Key('my_menu_exit'),
-                title: const Text('退出'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: _confirmExit,
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-        ],
+        ),
       ),
     );
   }

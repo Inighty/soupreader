@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
@@ -1013,9 +1012,82 @@ class _SourceEditViewState extends State<SourceEditView> {
     return CupertinoColors.secondaryLabel.resolveFrom(context);
   }
 
+  Widget _buildCupertinoDebugCard({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: CupertinoColors.secondarySystemGroupedBackground
+            .resolveFrom(context),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: CupertinoColors.separator.resolveFrom(context).withValues(
+                alpha: 0.36,
+              ),
+          width: 0.6,
+        ),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildCupertinoDebugDivider() {
+    return Container(
+      height: 0.5,
+      color: CupertinoColors.separator.resolveFrom(context),
+    );
+  }
+
+  Widget _buildCupertinoGhostButton({
+    required VoidCallback? onPressed,
+    required Widget child,
+    EdgeInsetsGeometry padding =
+        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+  }) {
+    final enabled = onPressed != null;
+    final fillColor =
+        CupertinoColors.systemGrey5.resolveFrom(context).withValues(
+              alpha: enabled ? 1 : 0.65,
+            );
+    final textColor = enabled
+        ? CupertinoTheme.of(context).primaryColor
+        : CupertinoColors.inactiveGray.resolveFrom(context);
+    final borderColor =
+        CupertinoColors.separator.resolveFrom(context).withValues(
+              alpha: enabled ? 0.45 : 0.3,
+            );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: fillColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor, width: 0.6),
+      ),
+      child: CupertinoButton(
+        padding: padding,
+        minimumSize: Size.zero,
+        onPressed: onPressed,
+        child: DefaultTextStyle.merge(
+          style: TextStyle(
+            color: textColor,
+            fontSize: 13,
+          ),
+          child: IconTheme(
+            data: IconThemeData(color: textColor),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDebugOverviewSection() {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final secondaryLabelColor = CupertinoColors.secondaryLabel.resolveFrom(
+      context,
+    );
+    final smallTextStyle =
+        CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+              fontSize: 12,
+              color: secondaryLabelColor,
+            );
     final totalLines = _debugLinesAll.length;
     final hasLines = totalLines > 0;
     final hasError = (_debugError ?? '').trim().isNotEmpty;
@@ -1026,8 +1098,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          child: ShadCard(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: _buildCupertinoDebugCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1036,9 +1107,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                     Expanded(
                       child: Text(
                         '意图：${_currentDebugIntentHint()}',
-                        style: theme.textTheme.small.copyWith(
-                          color: scheme.mutedForeground,
-                        ),
+                        style: smallTextStyle,
                       ),
                     ),
                     Container(
@@ -1055,7 +1124,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                       ),
                       child: Text(
                         _debugStatusText(),
-                        style: theme.textTheme.small.copyWith(
+                        style: smallTextStyle.copyWith(
                           color: statusColor,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1064,13 +1133,11 @@ class _SourceEditViewState extends State<SourceEditView> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                const ShadSeparator.horizontal(),
+                _buildCupertinoDebugDivider(),
                 const SizedBox(height: 8),
                 Text(
                   '日志 $totalLines 行 · 自动跟随 ${_debugAutoFollowLogs ? '开启' : '暂停'}',
-                  style: theme.textTheme.small.copyWith(
-                    color: scheme.mutedForeground,
-                  ),
+                  style: smallTextStyle,
                 ),
                 if (hasError) ...[
                   const SizedBox(height: 8),
@@ -1095,7 +1162,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                       _debugError!.trim(),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.small.copyWith(
+                      style: smallTextStyle.copyWith(
                         color: CupertinoColors.systemRed.resolveFrom(context),
                       ),
                     ),
@@ -1106,7 +1173,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    ShadButton.ghost(
+                    _buildCupertinoGhostButton(
                       onPressed: (hasLines && !_debugAutoFollowLogs)
                           ? () => _scrollDebugToBottom(
                                 forceFollow: true,
@@ -1115,15 +1182,15 @@ class _SourceEditViewState extends State<SourceEditView> {
                           : null,
                       child: const Text('回到最新日志'),
                     ),
-                    ShadButton.ghost(
+                    _buildCupertinoGhostButton(
                       onPressed: hasLines ? _copyDebugConsole : null,
                       child: const Text('复制控制台'),
                     ),
-                    ShadButton.ghost(
+                    _buildCupertinoGhostButton(
                       onPressed: hasLines ? _copyMinimalReproInfo : null,
                       child: const Text('复制复现信息'),
                     ),
-                    ShadButton.ghost(
+                    _buildCupertinoGhostButton(
                       onPressed: hasLines ? _clearDebugConsole : null,
                       child: const Text('清空日志'),
                     ),
@@ -1147,8 +1214,9 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Widget _buildDebugPrimaryInputSection() {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final secondaryLabelColor = CupertinoColors.secondaryLabel.resolveFrom(
+      context,
+    );
 
     return CupertinoListSection.insetGrouped(
       header: const Text('快速输入'),
@@ -1171,16 +1239,20 @@ class _SourceEditViewState extends State<SourceEditView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ShadButton(
+              SizedBox(
                 width: double.infinity,
-                onPressed: _debugLoading ? null : _startLegadoStyleDebug,
-                child: Text(_debugLoading ? '调试运行中…' : '开始调试'),
+                child: CupertinoButton.filled(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  onPressed: _debugLoading ? null : _startLegadoStyleDebug,
+                  child: Text(_debugLoading ? '调试运行中…' : '开始调试'),
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 '输入后按对应链路执行（搜索/详情/发现/目录/正文）。',
-                style: theme.textTheme.small.copyWith(
-                  color: scheme.mutedForeground,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: secondaryLabelColor,
                 ),
               ),
             ],
@@ -1646,7 +1718,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     required String label,
     required VoidCallback onTap,
   }) {
-    return ShadButton.ghost(
+    return _buildCupertinoGhostButton(
       onPressed: onTap,
       child: Text(
         label,

@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/utils/file_picker_save_compat.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 
 typedef ReaderBookmarkSaveFile = Future<String?> Function({
@@ -46,11 +46,13 @@ class ReaderBookmarkExportService {
     ReaderBookmarkCopyText? copyText,
   })  : _saveFile = saveFile ?? _defaultSaveFile,
         _writeFile = writeFile ?? _defaultWriteFile,
-        _copyText = copyText ?? _defaultCopyText;
+        _copyText = copyText ?? _defaultCopyText,
+        _useCompatSaveFile = saveFile == null;
 
   final ReaderBookmarkSaveFile _saveFile;
   final ReaderBookmarkWriteFile _writeFile;
   final ReaderBookmarkCopyText _copyText;
+  final bool _useCompatSaveFile;
 
   Future<ReaderBookmarkExportResult> exportJson({
     required String bookTitle,
@@ -277,16 +279,15 @@ class ReaderBookmarkExportService {
           message: '已复制导出内容到剪贴板',
         );
       }
-      final outputPath = await _saveFile(
+      final normalizedPath = await _saveContent(
         dialogTitle: dialogTitle,
         fileName: fileName,
-        allowedExtensions: <String>[extension],
+        extension: extension,
+        content: content,
       );
-      if (outputPath == null || outputPath.trim().isEmpty) {
+      if (normalizedPath == null) {
         return const ReaderBookmarkExportResult(cancelled: true);
       }
-      final normalizedPath = outputPath.trim();
-      await _writeFile(path: normalizedPath, content: content);
       return ReaderBookmarkExportResult(
         success: true,
         outputPath: normalizedPath,
@@ -297,6 +298,34 @@ class ReaderBookmarkExportService {
         message: '导出失败：$e',
       );
     }
+  }
+
+  Future<String?> _saveContent({
+    required String dialogTitle,
+    required String fileName,
+    required String extension,
+    required String content,
+  }) async {
+    if (_useCompatSaveFile) {
+      return saveFileWithTextCompat(
+        dialogTitle: dialogTitle,
+        fileName: fileName,
+        allowedExtensions: <String>[extension],
+        text: content,
+      );
+    }
+
+    final outputPath = await _saveFile(
+      dialogTitle: dialogTitle,
+      fileName: fileName,
+      allowedExtensions: <String>[extension],
+    );
+    if (outputPath == null || outputPath.trim().isEmpty) {
+      return null;
+    }
+    final normalizedPath = outputPath.trim();
+    await _writeFile(path: normalizedPath, content: content);
+    return normalizedPath;
   }
 
   String _buildTimestampFileName({
@@ -325,14 +354,8 @@ class ReaderBookmarkExportService {
     required String dialogTitle,
     required String fileName,
     required List<String> allowedExtensions,
-  }) {
-    return FilePicker.platform.saveFile(
-      dialogTitle: dialogTitle,
-      fileName: fileName,
-      allowedExtensions: allowedExtensions,
-      type: FileType.custom,
-    );
-  }
+  }) async =>
+      null;
 
   static Future<void> _defaultWriteFile({
     required String path,

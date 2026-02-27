@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -142,8 +141,10 @@ class _DiscoveryExploreResultsViewState
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    final secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
+      context,
+    );
 
     return AppCupertinoPageScaffold(
       title: widget.exploreName,
@@ -158,15 +159,17 @@ class _DiscoveryExploreResultsViewState
                     widget.source.bookSourceName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.small.copyWith(
-                      color: scheme.mutedForeground,
+                    style: textStyle.copyWith(
+                      fontSize: 12,
+                      color: secondaryTextColor,
                     ),
                   ),
                 ),
                 Text(
                   '已加载 ${_results.length}',
-                  style: theme.textTheme.small.copyWith(
-                    color: scheme.mutedForeground,
+                  style: textStyle.copyWith(
+                    fontSize: 12,
+                    color: secondaryTextColor,
                   ),
                 ),
               ],
@@ -181,8 +184,11 @@ class _DiscoveryExploreResultsViewState
   }
 
   Widget _buildBody(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    final secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
+      context,
+    );
+    final destructiveColor = CupertinoColors.systemRed.resolveFrom(context);
 
     if (_results.isEmpty) {
       if (_loading) {
@@ -196,22 +202,42 @@ class _DiscoveryExploreResultsViewState
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  LucideIcons.triangleAlert,
+                  CupertinoIcons.exclamationmark_triangle_fill,
                   size: 42,
-                  color: scheme.destructive,
+                  color: destructiveColor,
                 ),
                 const SizedBox(height: 10),
                 Text(
                   _errorMessage!,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.small.copyWith(
-                    color: scheme.destructive,
+                  style: textStyle.copyWith(
+                    fontSize: 12,
+                    color: destructiveColor,
                   ),
                 ),
                 const SizedBox(height: 12),
-                ShadButton(
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minSize: 0,
                   onPressed: () => _loadMore(forceRefresh: true),
-                  child: const Text('重试'),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.activeBlue.resolveFrom(context),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      child: Text(
+                        '重试',
+                        style: TextStyle(
+                          color: CupertinoColors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -221,8 +247,9 @@ class _DiscoveryExploreResultsViewState
       return Center(
         child: Text(
           '暂无发现内容',
-          style: theme.textTheme.muted.copyWith(
-            color: scheme.mutedForeground,
+          style: textStyle.copyWith(
+            fontSize: 13,
+            color: secondaryTextColor,
           ),
         ),
       );
@@ -242,73 +269,102 @@ class _DiscoveryExploreResultsViewState
   }
 
   Widget _buildResultItem(SearchResult result) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    final cardColor =
+        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
+    final borderColor = CupertinoColors.separator.resolveFrom(context);
+    final primaryTextColor = CupertinoColors.label.resolveFrom(context);
+    final secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
+      context,
+    );
+    final inShelfColor = CupertinoColors.activeBlue.resolveFrom(context);
     final inBookshelf = _addService.isInBookshelf(result);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: GestureDetector(
         onTap: () => _openBookInfo(result),
-        child: ShadCard(
-          padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-          leading: AppCoverImage(
-            urlOrPath: result.coverUrl,
-            title: result.name,
-            author: result.author,
-            width: 40,
-            height: 56,
-            borderRadius: 6,
-            fit: BoxFit.cover,
-            showTextOnPlaceholder: false,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
           ),
-          trailing: Icon(
-            inBookshelf ? LucideIcons.bookCheck : LucideIcons.chevronRight,
-            size: inBookshelf ? 17 : 16,
-            color: inBookshelf ? scheme.primary : scheme.mutedForeground,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                result.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.p.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: scheme.foreground,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppCoverImage(
+                  urlOrPath: result.coverUrl,
+                  title: result.name,
+                  author: result.author,
+                  width: 40,
+                  height: 56,
+                  borderRadius: 6,
+                  fit: BoxFit.cover,
+                  showTextOnPlaceholder: false,
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                result.author.isNotEmpty ? result.author : '未知作者',
-                style: theme.textTheme.small.copyWith(
-                  color: scheme.mutedForeground,
-                ),
-              ),
-              if (result.intro.trim().isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  result.intro.trim(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.small.copyWith(
-                    color: scheme.mutedForeground,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        result.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textStyle.copyWith(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: primaryTextColor,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        result.author.isNotEmpty ? result.author : '未知作者',
+                        style: textStyle.copyWith(
+                          fontSize: 12,
+                          color: secondaryTextColor,
+                        ),
+                      ),
+                      if (result.intro.trim().isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          result.intro.trim(),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: textStyle.copyWith(
+                            fontSize: 12,
+                            color: secondaryTextColor,
+                          ),
+                        ),
+                      ],
+                      if (result.lastChapter.trim().isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '最新: ${result.lastChapter.trim()}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textStyle.copyWith(
+                            fontSize: 12,
+                            color: secondaryTextColor,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-              ],
-              if (result.lastChapter.trim().isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  '最新: ${result.lastChapter.trim()}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.small.copyWith(
-                    color: scheme.mutedForeground,
-                  ),
+                const SizedBox(width: 8),
+                Icon(
+                  inBookshelf
+                      ? CupertinoIcons.book_fill
+                      : CupertinoIcons.chevron_right,
+                  size: inBookshelf ? 17 : 16,
+                  color: inBookshelf ? inShelfColor : secondaryTextColor,
                 ),
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -316,8 +372,11 @@ class _DiscoveryExploreResultsViewState
   }
 
   Widget _buildFooter(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    final secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
+      context,
+    );
+    final destructiveColor = CupertinoColors.systemRed.resolveFrom(context);
 
     if (_loading) {
       return const Padding(
@@ -336,14 +395,39 @@ class _DiscoveryExploreResultsViewState
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: theme.textTheme.small.copyWith(
-                color: scheme.destructive,
+              style: textStyle.copyWith(
+                fontSize: 12,
+                color: destructiveColor,
               ),
             ),
             const SizedBox(height: 8),
-            ShadButton.outline(
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              minSize: 0,
               onPressed: _loadMore,
-              child: const Text('重试加载'),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: CupertinoColors.systemBackground.resolveFrom(context),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: CupertinoColors.separator.resolveFrom(context),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    '重试加载',
+                    style: textStyle.copyWith(
+                      fontSize: 14,
+                      color: CupertinoColors.activeBlue.resolveFrom(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -356,8 +440,9 @@ class _DiscoveryExploreResultsViewState
         child: Center(
           child: Text(
             '没有更多了',
-            style: theme.textTheme.small.copyWith(
-              color: scheme.mutedForeground,
+            style: textStyle.copyWith(
+              fontSize: 12,
+              color: secondaryTextColor,
             ),
           ),
         ),
@@ -369,8 +454,9 @@ class _DiscoveryExploreResultsViewState
       child: Center(
         child: Text(
           '上拉继续加载',
-          style: theme.textTheme.small.copyWith(
-            color: scheme.mutedForeground,
+          style: textStyle.copyWith(
+            fontSize: 12,
+            color: secondaryTextColor,
           ),
         ),
       ),

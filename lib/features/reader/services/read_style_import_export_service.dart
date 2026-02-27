@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../../core/utils/file_picker_save_compat.dart';
 import '../models/reading_settings.dart';
 
 typedef ReadStyleHttpFetcher = Future<Response<List<int>>> Function(Uri uri);
@@ -204,17 +205,16 @@ class ReadStyleImportExportService {
         backgroundImageName: exportBackground?.name,
       );
 
-      final outputPath = await FilePicker.platform.saveFile(
+      final outputPath = await saveFileWithBytesCompat(
         dialogTitle: '导出配置',
         fileName: _buildExportFileName(safeStyle.name),
         allowedExtensions: const ['zip'],
-        type: FileType.custom,
+        bytes: zipBytes,
       );
       if (outputPath == null || outputPath.trim().isEmpty) {
         return const ReadStyleExportResult(cancelled: true);
       }
       final normalizedPath = outputPath.trim();
-      await File(normalizedPath).writeAsBytes(zipBytes, flush: true);
       final warning = (safeStyle.bgType == ReadStyleConfig.bgTypeFile &&
               exportBackground == null)
           ? '背景图文件不存在，已仅导出配置'

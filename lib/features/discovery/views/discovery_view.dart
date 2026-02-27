@@ -3,8 +3,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../../../app/theme/cupertino_theme_adapter.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -475,16 +475,13 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   void _showMessage(String message, {String title = '提示'}) {
-    showShadDialog<void>(
+    showCupertinoDialog<void>(
       context: context,
-      builder: (dialogContext) => ShadDialog.alert(
+      builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),
-        description: Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Text(message),
-        ),
+        content: Text(message),
         actions: [
-          ShadButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('好'),
           ),
@@ -495,9 +492,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
-
     final eligible = _eligibleSources(_allSources);
     final visible = DiscoveryFilterHelper.applyQueryFilter(
         eligible, _searchController.text);
@@ -509,75 +503,109 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
     return AppCupertinoPageScaffold(
       title: '发现',
+      useSliverNavigationBar: true,
+      sliverScrollController: _scrollController,
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
         minimumSize: const Size(28, 28),
         onPressed: _showGroupFilterMenu,
         child: const Icon(CupertinoIcons.square_grid_2x2),
       ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-            child: Column(
-              children: [
-                ShadInput(
-                  controller: _searchController,
-                  placeholder: const Text('搜索书源 / 输入 group:分组'),
-                  leading: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(LucideIcons.search, size: 16),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Text(
-                      '书源 ${visible.length}',
-                      style: theme.textTheme.small.copyWith(
-                        color: scheme.mutedForeground,
-                      ),
-                    ),
-                    if (query.startsWith('group:')) ...[
-                      const SizedBox(width: 10),
-                      Text(
-                        '分组筛选',
-                        style: theme.textTheme.small.copyWith(
-                          color: scheme.primary,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: visible.isEmpty
-                ? (showEmptyMessage
-                    ? _buildEmptyState(
-                        eligibleCount: eligible.length,
-                        query: query,
-                      )
-                    : _buildFilteredNoResultBody())
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    itemCount: visible.length,
-                    itemBuilder: (context, index) =>
-                        _buildSourceItem(visible[index]),
-                  ),
-          ),
-        ],
+      child: const SizedBox.shrink(),
+      sliverBodyBuilder: (_) => _buildBodySliver(
+        eligible: eligible,
+        visible: visible,
+        query: query,
+        showEmptyMessage: showEmptyMessage,
       ),
     );
   }
 
-  Widget _buildFilteredNoResultBody() {
-    return ListView(
-      controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      children: const <Widget>[],
+  Widget _buildBodySliver({
+    required List<BookSource> eligible,
+    required List<BookSource> visible,
+    required String query,
+    required bool showEmptyMessage,
+  }) {
+    final theme = CupertinoTheme.of(context);
+    final tokens = AppCupertinoThemeAdapter.resolve(context);
+
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      child: Column(
+        children: [
+          CupertinoSearchTextField(
+            controller: _searchController,
+            placeholder: '搜索书源 / 输入 group:分组',
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Text(
+                '书源 ${visible.length}',
+                style: theme.textTheme.textStyle.copyWith(
+                  fontSize: 12,
+                  color: tokens.mutedForeground,
+                ),
+              ),
+              if (query.startsWith('group:')) ...[
+                const SizedBox(width: 10),
+                Text(
+                  '分组筛选',
+                  style: theme.textTheme.textStyle.copyWith(
+                    fontSize: 12,
+                    color: tokens.primary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+
+    if (visible.isEmpty) {
+      return SliverSafeArea(
+        top: false,
+        bottom: true,
+        sliver: SliverFillRemaining(
+          hasScrollBody: false,
+          child: Column(
+            children: [
+              header,
+              Expanded(
+                child: showEmptyMessage
+                    ? _buildEmptyState(
+                        eligibleCount: eligible.length,
+                        query: query,
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SliverSafeArea(
+      top: false,
+      bottom: true,
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            if (index == 0) return header;
+            if (index == visible.length + 1) {
+              return const SizedBox(height: 12);
+            }
+            final source = visible[index - 1];
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: _buildSourceItem(source),
+            );
+          },
+          childCount: visible.length + 2,
+        ),
+      ),
     );
   }
 
@@ -585,8 +613,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     required int eligibleCount,
     required String query,
   }) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final theme = CupertinoTheme.of(context);
+    final tokens = AppCupertinoThemeAdapter.resolve(context);
 
     String subtitle;
     if (eligibleCount == 0) {
@@ -602,18 +630,26 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            LucideIcons.compass,
+            CupertinoIcons.compass,
             size: 52,
-            color: scheme.mutedForeground,
+            color: tokens.mutedForeground,
           ),
           const SizedBox(height: 16),
-          Text('暂无发现内容', style: theme.textTheme.h4),
+          Text(
+            '暂无发现内容',
+            style: theme.textTheme.textStyle.copyWith(
+              color: tokens.foreground,
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 8),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: theme.textTheme.muted.copyWith(
-              color: scheme.mutedForeground,
+            style: theme.textTheme.textStyle.copyWith(
+              color: tokens.mutedForeground,
+              fontSize: 14,
             ),
           ),
         ],
@@ -622,8 +658,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   Widget _buildSourceItem(BookSource source) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
+    final theme = CupertinoTheme.of(context);
+    final tokens = AppCupertinoThemeAdapter.resolve(context);
 
     final sourceUrl = source.bookSourceUrl;
     final expanded = _expandedSourceUrl == sourceUrl;
@@ -632,8 +668,16 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: ShadCard(
+      child: Container(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        decoration: BoxDecoration(
+          color: tokens.card,
+          borderRadius: tokens.controlRadius,
+          border: Border.all(
+            color: tokens.border.withValues(alpha: 0.72),
+            width: 0.8,
+          ),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -645,10 +689,10 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                 children: [
                   Icon(
                     expanded
-                        ? LucideIcons.chevronDown
-                        : LucideIcons.chevronRight,
+                        ? CupertinoIcons.chevron_down
+                        : CupertinoIcons.chevron_forward,
                     size: 16,
-                    color: scheme.mutedForeground,
+                    color: tokens.mutedForeground,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -659,9 +703,9 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                           source.bookSourceName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.p.copyWith(
+                          style: theme.textTheme.textStyle.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: scheme.foreground,
+                            color: tokens.foreground,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -669,8 +713,9 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                           source.bookSourceUrl,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.small.copyWith(
-                            color: scheme.mutedForeground,
+                          style: theme.textTheme.textStyle.copyWith(
+                            fontSize: 12,
+                            color: tokens.mutedForeground,
                           ),
                         ),
                         if ((source.bookSourceGroup ?? '')
@@ -681,8 +726,9 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                             '分组: ${source.bookSourceGroup!.trim()}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.small.copyWith(
-                              color: scheme.mutedForeground,
+                            style: theme.textTheme.textStyle.copyWith(
+                              fontSize: 12,
+                              color: tokens.mutedForeground,
                             ),
                           ),
                         ],
@@ -694,7 +740,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
             ),
             if (expanded) ...[
               const SizedBox(height: 10),
-              Container(height: 1, color: scheme.border),
+              Container(height: 1, color: tokens.border),
               const SizedBox(height: 10),
               if (loadingKinds)
                 Row(
@@ -703,8 +749,9 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                     const SizedBox(width: 8),
                     Text(
                       '正在加载发现入口…',
-                      style: theme.textTheme.small.copyWith(
-                        color: scheme.mutedForeground,
+                      style: theme.textTheme.textStyle.copyWith(
+                        fontSize: 12,
+                        color: tokens.mutedForeground,
                       ),
                     ),
                   ],
@@ -712,8 +759,9 @@ class _DiscoveryViewState extends State<DiscoveryView> {
               else if (kinds.isEmpty)
                 Text(
                   '暂无发现入口',
-                  style: theme.textTheme.small.copyWith(
-                    color: scheme.mutedForeground,
+                  style: theme.textTheme.textStyle.copyWith(
+                    fontSize: 12,
+                    color: tokens.mutedForeground,
                   ),
                 )
               else
@@ -727,7 +775,12 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                       }
 
                       final width = _kindWidth(kind.style, maxWidth);
-                      final child = _buildKindChip(source, kind);
+                      final child = _buildKindChip(
+                        source,
+                        kind,
+                        theme: theme,
+                        tokens: tokens,
+                      );
                       if (width == null) {
                         chips.add(child);
                       } else {
@@ -769,25 +822,27 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     return null;
   }
 
-  Widget _buildKindChip(BookSource source, SourceExploreKind kind) {
-    final theme = ShadTheme.of(context);
-    final scheme = theme.colorScheme;
-
+  Widget _buildKindChip(
+    BookSource source,
+    SourceExploreKind kind, {
+    required CupertinoThemeData theme,
+    required AppThemeTokens tokens,
+  }) {
     final title = kind.title.trim().isEmpty ? '发现' : kind.title.trim();
     final url = kind.url?.trim() ?? '';
     final isEnabled = url.isNotEmpty;
     final isError = title.startsWith('ERROR:');
 
     final borderColor = isError
-        ? scheme.destructive
+        ? tokens.destructive
         : isEnabled
-            ? scheme.primary
-            : scheme.border;
+            ? tokens.primary
+            : tokens.border;
     final textColor = isError
-        ? scheme.destructive
+        ? tokens.destructive
         : isEnabled
-            ? scheme.primary
-            : scheme.mutedForeground;
+            ? tokens.primary
+            : tokens.mutedForeground;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -796,14 +851,15 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
           color: textColor.withValues(alpha: 0.09),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: tokens.controlRadius,
           border: Border.all(color: borderColor, width: 1),
         ),
         child: Text(
           title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.small.copyWith(
+          style: theme.textTheme.textStyle.copyWith(
+            fontSize: 12,
             color: textColor,
             fontWeight: FontWeight.w600,
           ),

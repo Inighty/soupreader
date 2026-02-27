@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Colors;
 
 import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
@@ -348,29 +347,14 @@ Future<void> showReaderPaddingConfigDialog(
   required ValueChanged<ReadingSettings> onSettingsChanged,
   required bool isDarkMode,
 }) {
-  return showGeneralDialog<void>(
+  return showCupertinoDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: '边距设置',
-    barrierColor: Colors.transparent,
-    transitionDuration: AppDesignTokens.motionNormal,
-    pageBuilder: (context, animation, secondaryAnimation) {
-      return ReaderPaddingConfigDialog(
-        settings: settings,
-        onSettingsChanged: onSettingsChanged,
-        isDarkMode: isDarkMode,
-      );
-    },
-    transitionBuilder: (context, animation, secondaryAnimation, child) {
-      final curved =
-          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-      return FadeTransition(
-        opacity: curved,
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.96, end: 1.0).animate(curved),
-          child: child,
-        ),
-      );
-    },
+    builder: (context) => ReaderPaddingConfigDialog(
+      settings: settings,
+      onSettingsChanged: onSettingsChanged,
+      isDarkMode: isDarkMode,
+    ),
   );
 }

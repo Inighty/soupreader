@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "done": { "type": "boolean" },
+    "done_reason": { "type": "string" },
+    "goal_summary": { "type": "string" },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "priority": { "type": "integer" },
+          "prompt": { "type": "string" },
+          "verify_cmd": { "type": "string" },
+          "required_paths": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "depends_on": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["id", "title", "priority", "prompt", "verify_cmd", "required_paths", "depends_on"],
+        "additionalProperties": false
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["done", "done_reason", "goal_summary", "tasks", "notes"],
+  "additionalProperties": false
+}

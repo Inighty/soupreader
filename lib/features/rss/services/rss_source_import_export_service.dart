@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../core/utils/file_picker_save_compat.dart';
 import '../../../core/utils/legado_json.dart';
 import '../models/rss_source.dart';
 
@@ -579,11 +580,11 @@ class RssSourceImportExportService {
       final outputFileName = normalizedDefaultFileName.isNotEmpty
           ? normalizedDefaultFileName
           : 'soupreader_rss_${DateTime.now().millisecondsSinceEpoch}.json';
-      final outputPath = await FilePicker.platform.saveFile(
+      final outputPath = await saveFileWithTextCompat(
         dialogTitle: '导出订阅源',
         fileName: outputFileName,
-        allowedExtensions: ['json'],
-        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        text: jsonString,
       );
 
       if (outputPath == null || outputPath.trim().isEmpty) {
@@ -591,7 +592,6 @@ class RssSourceImportExportService {
       }
 
       final normalizedPath = outputPath.trim();
-      await File(normalizedPath).writeAsString(jsonString);
       return RssSourceExportFileResult(
         success: true,
         outputPath: normalizedPath,

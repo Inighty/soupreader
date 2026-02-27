@@ -12,6 +12,7 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
 import '../../../core/services/qr_scan_service.dart';
+import '../../../core/utils/file_picker_save_compat.dart';
 import '../../../core/utils/legado_json.dart';
 import '../../search/models/search_scope_group_helper.dart';
 import '../../settings/views/app_help_dialog.dart';
@@ -1074,20 +1075,19 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     if (selectedRules.isEmpty) return;
     setState(() => _exportingSelection = true);
     try {
-      final outputPath = await FilePicker.platform.saveFile(
+      final jsonText = LegadoJson.encode(
+        selectedRules.map((rule) => rule.toJson()).toList(growable: false),
+      );
+      final outputPath = await saveFileWithTextCompat(
         dialogTitle: '导出所选',
         fileName: 'exportReplaceRule.json',
-        type: FileType.custom,
         allowedExtensions: const ['json'],
+        text: jsonText,
       );
       if (outputPath == null || outputPath.trim().isEmpty) {
         return;
       }
       final normalizedPath = outputPath.trim();
-      final jsonText = LegadoJson.encode(
-        selectedRules.map((rule) => rule.toJson()).toList(growable: false),
-      );
-      await _writeExportText(normalizedPath, jsonText);
       if (!mounted) return;
       await _showExportPathDialog(normalizedPath);
     } catch (error, stackTrace) {
@@ -1594,15 +1594,6 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
 
   bool _looksLikeJson(String value) {
     return value.startsWith('{') || value.startsWith('[');
-  }
-
-  Future<void> _writeExportText(String outputPath, String text) async {
-    final uri = Uri.tryParse(outputPath);
-    if (uri != null && uri.scheme.toLowerCase() == 'file') {
-      await File.fromUri(uri).writeAsString(text, flush: true);
-      return;
-    }
-    await File(outputPath).writeAsString(text, flush: true);
   }
 
   Future<void> _showExportPathDialog(String outputPath) async {

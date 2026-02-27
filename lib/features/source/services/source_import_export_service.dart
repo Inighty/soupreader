@@ -5,6 +5,7 @@ import '../models/book_source.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../../core/utils/file_picker_save_compat.dart';
 import '../../../core/utils/legado_json.dart';
 
 typedef SourceImportHttpFetcher = Future<Response<String>> Function(Uri uri);
@@ -583,13 +584,11 @@ class SourceImportExportService {
   }) async {
     try {
       final jsonString = exportToJson(sources);
-
-      // 尝试保存文件
-      final outputPath = await FilePicker.platform.saveFile(
+      final outputPath = await saveFileWithTextCompat(
         dialogTitle: '导出书源',
         fileName: defaultFileName,
-        allowedExtensions: ['json'],
-        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        text: jsonString,
       );
 
       if (outputPath == null || outputPath.trim().isEmpty) {
@@ -597,7 +596,6 @@ class SourceImportExportService {
       }
 
       final normalizedPath = outputPath.trim();
-      await File(normalizedPath).writeAsString(jsonString);
       return SourceExportFileResult(
         success: true,
         outputPath: normalizedPath,

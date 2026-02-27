@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/utils/file_picker_save_compat.dart';
 import '../models/book.dart';
 
 class BooklistItem {
@@ -139,18 +140,17 @@ class BookshelfImportExportService {
         return BookshelfExportResult.success(hint: '已复制到剪贴板');
       }
 
-      final outputPath = await FilePicker.platform.saveFile(
+      final outputPath = await saveFileWithTextCompat(
         dialogTitle: '导出书单',
         fileName: 'bookshelf.json',
-        allowedExtensions: ['json'],
-        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        text: jsonString,
       );
 
       if (outputPath == null) {
         return BookshelfExportResult.cancelled();
       }
 
-      await File(outputPath).writeAsString(jsonString, encoding: utf8);
       return BookshelfExportResult.success(hint: outputPath);
     } catch (e) {
       return BookshelfExportResult.error('导出书籍出错\n$e');
