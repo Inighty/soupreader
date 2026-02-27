@@ -2,12 +2,25 @@
 
 - 状态: `active`
 - 任务口径: 本轮执行“差异重扫 + 台账回填 + N-01~N-04 可执行迁移口径固化 + N-01~N-04 实施 + N-VAL-01 回归收口（证据回填）”，并补充清退 `lib/` 下残留 `package:flutter/material.dart` 导入（`M-01`）。
-- 本轮实施冻结: 仅执行 `N-01~N-04 -> N-VAL-01` + `M-01`（`lib/` 下 `material.dart` 残留导入清退）；`N-PRE-01` 仅保留为已完成前置能力记录。
+- 本轮实施冻结: 仅执行 `N-01~N-04` 与 `N-VAL-01` 收口链路 + `M-01`（`lib/` 下 `material.dart` 残留导入清退）；`N-PRE-01` 仅保留为已完成前置能力记录。
 - 适用范围: `lib/` UI 迁移（`shadcn_ui`、非 Cupertino 弹窗、核心页面大标题导航）。
 - 强约束:
   - 本台账是本轮唯一执行基线。
   - 迁移级任务先跑差异清单，再开实现分支。
   - 例外项必须按 AGENTS `1.1.2` 记录原因、影响范围、替代方案、回补计划。
+
+## 0. 跨台账状态对齐（2026-02-27，基于当前代码复扫）
+
+- `D-03=done`（owner: `MY-22`，依赖: `无（串行首项）`；5 个子项“入口可操作 + 保存接口调用 + 页面回显”代码证据已回填）
+- `D-04=done`（owner: `MY-23`，依赖: `D-03` 已满足；`pref_config_other` non-Web 键已接线闭环（含 `updateToVariant`），`updateToVariant` 口径以 legado 四值 `default/official/beta_release/beta_releaseA` 为准；Web 区仅只读回显且无可操作入口）
+- `N-01~N-04=done`（大标题导航实现已完成；收口证据已回填至 `R-N01~R-N04`）
+- `N-VAL-01=blocked`（owner: `UI-NAV`，依赖: `C6-T01` 证据终态（`R-N01~R-N04`）；状态定义：证据终态为 `blocked`，待可交互环境回补后再收口）
+- `NAV-DIFF-01=done`（`RssSubscriptionView` 空态 `noEnabled` 分支按钮已对齐为 `_openSourceSettings`，语义为“进入订阅源管理”，不再作为 `N-03` / `N-VAL-01` 前置阻塞）
+- `EX-01=blocked`（仅占位，不进入 `WebService` 运行态实现）
+- 唯一串行依赖固定：`D-03 -> D-04`
+- 顺序约束补充：本台账只承接 UI 导航收口链路（`N-01~N-04` -> `N-VAL-01` 仅作为状态门）；与 my 菜单差异链路并行记录但不改写 `D-03 -> D-04` 唯一串行顺序。
+- `D-03` 证据明细已回填至 `docs/plans/2026-02-26-my-menu-parity-checklist.md` 的 D-03 子项表（白天/夜间背景图、白天/夜间模糊度、日夜主题保存）。
+- `D-04` 复扫结论已回填至 `docs/plans/2026-02-26-my-menu-parity-checklist.md` 的 D-04 差异表（当前无剩余代码项，仅维持 `EX-01 blocked` 边界约束）。
 
 ## 1. 扫描基线与统计（2026-02-27，复扫）
 
@@ -54,7 +67,7 @@ rg -n "package:flutter/material.dart" lib
 - `lib/features/bookshelf/views/bookshelf_view.dart:1693`
 - `lib/features/settings/views/settings_view.dart:159`
 - `lib/features/rss/views/rss_subscription_view.dart:65`
-- `lib/features/discovery/views/discovery_view.dart:505`
+- `lib/features/discovery/views/discovery_view.dart:506`
 - `lib/app/widgets/app_cupertino_page_scaffold.dart:16`
 - `lib/app/widgets/app_cupertino_page_scaffold.dart:31`
 - `lib/app/widgets/app_cupertino_page_scaffold.dart:112`
@@ -62,7 +75,7 @@ rg -n "package:flutter/material.dart" lib
 `C-1. useSliverNavigationBar: true 命中`
 - `lib/features/bookshelf/views/bookshelf_view.dart:1693`
 - `lib/features/settings/views/settings_view.dart:159`
-- `lib/features/discovery/views/discovery_view.dart:505`
+- `lib/features/discovery/views/discovery_view.dart:506`
 - `lib/features/rss/views/rss_subscription_view.dart:65`
 
 `D. CupertinoSliverNavigationBar 命中`
@@ -98,8 +111,8 @@ rg -n "package:flutter/material.dart" lib
 2. 串行：按复扫结果回填 `S-*` / `C-*` 条目状态。`done`
 3. 串行：将 `N-01~N-04` 从待确认描述改为可执行迁移口径并固化验收标准。`done`
 4. 串行前置：`N-PRE-01` 壳层导航能力已具备（`AppCupertinoPageScaffold` 已支持 `useSliverNavigationBar` / `sliverBodyBuilder` / `sliverScrollController`）。`done`
-5. 并行：`N-01~N-04` 四个核心页接入大标题导航（本轮核心实施项）。`in_progress`（`N-01` 已接入壳层能力；`N-02~N-04` 已接入大标题导航，待回归收口）
-6. 串行：`N-VAL-01` 手工回归证据回填并收口（本轮最终收口项）。`pending`（前置实现已具备，待回填证据）
+5. 并行：`N-01~N-04` 四个核心页接入大标题导航（本轮核心实施项）。`done`（`N-01~N-04` 均已接入 `useSliverNavigationBar: true` + `sliverBodyBuilder`，实现侧已完成）
+6. 收口步骤：`N-VAL-01` 手工回归证据回填并收口（本轮最终收口项）。`blocked`（状态：依据 `C6-T01` 证据终态，`R-N01~R-N04` 均为 `blocked`；待可交互环境完成回补后更新）
 
 > Owner 约定
 - `UI-CORE`: 应用壳层/导航容器（`N-PRE-01`）
@@ -143,21 +156,24 @@ rg -n "package:flutter/material.dart" lib
 
 | ID | 文件 | 执行口径 | 对应 legado 锚点 | 负责人 | 依赖关系 | 手工回归路径 | 状态 |
 |---|---|---|---|---|---|---|---|
-| N-01 | `lib/features/bookshelf/views/bookshelf_view.dart` | 已接入大标题壳层能力（`useSliverNavigationBar: true` + `sliverBodyBuilder`），需保持现有 trailing/菜单行为；验收按 `N-AC-01~03` | `../legado/app/src/main/java/io/legado/app/ui/main/MainActivity.kt:141`、`../legado/app/src/main/java/io/legado/app/ui/main/bookshelf/BaseBookshelfFragment.kt:42` | `UI-NAV` | 前置 `N-PRE-01` 已完成；按 1.2 复扫 `shadcn_ui` 已归零；待按 `N-AC-01~03` 完成回归后方可标记 `done` | R-N01: 书架首屏滚动、折叠/展开、侧滑返回校验 + 空态/列表 Cupertino 一致性校验 | `in_progress` |
-| N-02 | `lib/features/discovery/views/discovery_view.dart` | 已接入大标题壳层能力（`useSliverNavigationBar: true` + `sliverBodyBuilder`，单滚动容器驱动折叠）；验收按 `N-AC-01~03`，完成回归后方可标记 `done` | `../legado/app/src/main/java/io/legado/app/ui/main/MainActivity.kt:141`、`../legado/app/src/main/java/io/legado/app/ui/main/explore/ExploreFragment.kt:50` | `UI-NAV` | `N-02/N-03/N-04 -> N-VAL-01`（并行实施，串行收口） | R-N02: 发现页滚动、折叠稳定性、侧滑返回校验 | `in_progress` |
-| N-03 | `lib/features/rss/views/rss_subscription_view.dart` | 已接入大标题壳层能力（`useSliverNavigationBar: true` + `sliverBodyBuilder`，单滚动容器驱动折叠）；验收按 `N-AC-01~03`，完成回归后方可标记 `done` | `../legado/app/src/main/java/io/legado/app/ui/main/MainActivity.kt:141`、`../legado/app/src/main/java/io/legado/app/ui/main/rss/RssFragment.kt:48` | `UI-NAV` | `N-02/N-03/N-04 -> N-VAL-01`（并行实施，串行收口） | R-N03: 订阅页滚动、折叠稳定性、侧滑返回校验 | `in_progress` |
-| N-04 | `lib/features/settings/views/settings_view.dart` | 已接入大标题壳层能力（`useSliverNavigationBar: true` + `sliverBodyBuilder`，单滚动容器驱动折叠）；验收按 `N-AC-01~03`，完成回归后方可标记 `done` | `../legado/app/src/main/java/io/legado/app/ui/main/MainActivity.kt:141`、`../legado/app/src/main/java/io/legado/app/ui/main/my/MyFragment.kt:43` | `UI-NAV` | `N-02/N-03/N-04 -> N-VAL-01`（并行实施，串行收口） | R-N04: 我的页滚动、折叠行为、侧滑返回校验 | `in_progress` |
+| N-01 | `lib/features/bookshelf/views/bookshelf_view.dart` | 已接入大标题壳层能力（`useSliverNavigationBar: true` + `sliverBodyBuilder`），需保持现有 trailing/菜单行为；验收按 `N-AC-01~03` | `../legado/app/src/main/java/io/legado/app/ui/main/MainActivity.kt:141`、`../legado/app/src/main/java/io/legado/app/ui/main/bookshelf/BaseBookshelfFragment.kt:42` | `UI-NAV` | 前置 `N-PRE-01` 已完成；实现侧已完成，证据由 `N-VAL-01` 统一回填 | R-N01: 书架首屏滚动、折叠/展开、侧滑返回校验 + 空态/列表 Cupertino 一致性校验 | `done` |
+| N-02 | `lib/features/discovery/views/discovery_view.dart` | 已接入大标题壳层能力（`useSliverNavigationBar: true` + `sliverBodyBuilder`，单滚动容器驱动折叠）；验收按 `N-AC-01~03` | `../legado/app/src/main/java/io/legado/app/ui/main/MainActivity.kt:141`、`../legado/app/src/main/java/io/legado/app/ui/main/explore/ExploreFragment.kt:50` | `UI-NAV` | 与其余 `N-*` 并行实施已完成，证据由 `N-VAL-01` 统一回填 | R-N02: 发现页滚动、折叠稳定性、侧滑返回校验 | `done` |
+| N-03 | `lib/features/rss/views/rss_subscription_view.dart` | 已接入大标题壳层能力（`useSliverNavigationBar: true` + `sliverBodyBuilder`，单滚动容器驱动折叠）；空态 `noEnabled` 分支按钮已改为调用 `_openSourceSettings`（进入订阅源管理），语义已对齐 legado；验收按 `N-AC-01~03` | `../legado/app/src/main/java/io/legado/app/ui/main/MainActivity.kt:141`、`../legado/app/src/main/java/io/legado/app/ui/main/rss/RssFragment.kt:48` | `UI-NAV` | 与其余 `N-*` 并行实施已完成；`NAV-DIFF-01` 已修复，证据由 `N-VAL-01` 统一回填 | R-N03: 订阅页滚动、折叠稳定性、侧滑返回校验 + 空态 `noEnabled` 按钮语义校验 | `done` |
+| N-04 | `lib/features/settings/views/settings_view.dart` | 已接入大标题壳层能力（`useSliverNavigationBar: true` + `sliverBodyBuilder`，单滚动容器驱动折叠）；验收按 `N-AC-01~03` | `../legado/app/src/main/java/io/legado/app/ui/main/MainActivity.kt:141`、`../legado/app/src/main/java/io/legado/app/ui/main/my/MyFragment.kt:43` | `UI-NAV` | 与其余 `N-*` 并行实施已完成，证据由 `N-VAL-01` 统一回填 | R-N04: 我的页滚动、折叠行为、侧滑返回校验 | `done` |
 
 ### 3.4 导航专项前置与收口条目（状态）
+
+`导航差异复扫结论（2026-02-27）`
+- `NAV-DIFF-01=done`：`RssSubscriptionView` 空态 `noEnabled` 分支按钮已改为 `_openSourceSettings` 进入订阅源管理，与 legado 对照语义一致；该项不再作为 `N-03` 与 `N-VAL-01` 的前置阻塞。
 
 | ID | 条目 | 执行口径 | 负责人 | 状态 |
 |---|---|---|---|---|
 | N-PRE-01 | 壳层导航能力前置 | `AppCupertinoPageScaffold` 已具备 `useSliverNavigationBar` / `sliverBodyBuilder` / `sliverScrollController`，前置能力已满足 | `UI-CORE` | `done` |
-| N-VAL-01 | 导航专项回归收口 | 串行回填 `N-AC-01~03` 与“排版布局一致性”证据，作为 `N-01~N-04` 完成后的唯一收口步骤；当前前置已满足（待回填证据） | `UI-NAV` | `pending` |
+| N-VAL-01 | 导航专项回归收口 | 统一回填 `N-AC-01~03` 与“排版布局一致性”证据；依据 `C6-T01` 证据终态（`R-N01~R-N04`），当前结论为 `blocked`，待可交互环境完成回补后再更新为收口终态 | `UI-NAV` | `blocked（证据终态同步）` |
 
-`本轮依赖链（执行冻结）`
-- `N-01/N-02/N-03/N-04 -> N-VAL-01`
-- `N-02/N-03/N-04(in_progress) -> N-VAL-01(pending)`
+`本轮依赖与收口约束（执行冻结）`
+- 跨台账唯一串行依赖：`D-03 -> D-04`
+- UI 导航专项收口约束：`N-01~N-04` 已完成且 `NAV-DIFF-01` 已修复完成；`N-VAL-01` 已按 `C6-T01` 证据终态同步为 `blocked`，待可交互环境完成回补后再更新。
 
 ## 4. 例外记录（AGENTS 1.1.2）
 
@@ -180,7 +196,7 @@ rg -n "package:flutter/material.dart" lib
 
 1. 任何 UI 改造任务必须先引用本台账 ID（`S-*`/`C-*`/`N-*`）。
 2. 本台账为本轮唯一基线；新增差异需先补录条目再进入实现。
-3. `S-01~S-04` 与 `C-01` 条目维持 `done`；按 1.2 复扫基线（`rg -n "shadcn_ui" lib`）已归零，后续实现以 `N-01~N-04 -> N-VAL-01` 为唯一推进链路。
+3. `S-01~S-04` 与 `C-01` 条目维持 `done`；按 1.2 复扫基线（`rg -n "shadcn_ui" lib`）已归零，后续实现以 `N-01~N-04` 完成后进入 `N-VAL-01` 收口为唯一推进链路。
 4. `N-01~N-04` 必须满足 `N-AC-01~N-AC-03` 后方可标记 `done`。
-5. 导航专项本轮实施冻结为 `N-01~N-04(并行) -> N-VAL-01(串行)`；`N-PRE-01` 为已完成前置记录，不计入本轮实施项。
+5. 导航专项本轮实施冻结为 `N-01~N-04(并行) -> N-VAL-01(统一收口)`；`N-PRE-01` 为已完成前置记录，不计入本轮实施项。
 6. 回归记录必须包含“排版布局一致性”结论，不得只记录功能可用性。

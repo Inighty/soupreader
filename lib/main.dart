@@ -333,8 +333,10 @@ class _MainScreenState extends State<MainScreen> {
   late final CupertinoTabController _tabController;
   final ValueNotifier<int> _bookshelfReselectSignal = ValueNotifier<int>(0);
   final ValueNotifier<int> _discoveryCompressSignal = ValueNotifier<int>(0);
-  int _bookshelfReselectedAt = 0;
-  int _discoveryReselectedAt = 0;
+  final ValueNotifier<int> _rssReselectSignal = ValueNotifier<int>(0);
+  final ValueNotifier<int> _myReselectSignal = ValueNotifier<int>(0);
+  _MainTabId? _lastReselectedTab;
+  int _lastReselectedAt = 0;
   late List<_MainTabSpec> _tabs;
 
   @override
@@ -354,6 +356,8 @@ class _MainScreenState extends State<MainScreen> {
     _tabController.dispose();
     _bookshelfReselectSignal.dispose();
     _discoveryCompressSignal.dispose();
+    _rssReselectSignal.dispose();
+    _myReselectSignal.dispose();
     super.dispose();
   }
 
@@ -377,29 +381,31 @@ class _MainScreenState extends State<MainScreen> {
 
   void _onTabTap(int index) {
     if (index < 0 || index >= _tabs.length) return;
-    final tab = _tabs[index];
-    if (index != _tabController.index) return;
-    switch (tab.id) {
+    if (index != _tabController.index) {
+      // 切换 tab 不属于重按；重置窗口避免跨 tab 误触发。
+      _lastReselectedTab = null;
+      _lastReselectedAt = 0;
+      return;
+    }
+    final tabId = _tabs[index].id;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final isDoubleTap = _lastReselectedTab == tabId &&
+        now - _lastReselectedAt <= _legacyReselectWindow.inMilliseconds;
+    _lastReselectedTab = tabId;
+    _lastReselectedAt = now;
+    if (!isDoubleTap) return;
+    switch (tabId) {
       case _MainTabId.bookshelf:
-        final now = DateTime.now().millisecondsSinceEpoch;
-        if (now - _bookshelfReselectedAt >
-            _legacyReselectWindow.inMilliseconds) {
-          _bookshelfReselectedAt = now;
-        } else {
-          _bookshelfReselectSignal.value++;
-        }
+        _bookshelfReselectSignal.value++;
         return;
       case _MainTabId.discovery:
-        final now = DateTime.now().millisecondsSinceEpoch;
-        if (now - _discoveryReselectedAt >
-            _legacyReselectWindow.inMilliseconds) {
-          _discoveryReselectedAt = now;
-        } else {
-          _discoveryCompressSignal.value++;
-        }
+        _discoveryCompressSignal.value++;
         return;
       case _MainTabId.rss:
+        _rssReselectSignal.value++;
+        return;
       case _MainTabId.my:
+        _myReselectSignal.value++;
         return;
     }
   }
@@ -499,9 +505,13 @@ class _MainScreenState extends State<MainScreen> {
                   compressSignal: _discoveryCompressSignal,
                 );
               case _MainTabId.rss:
-                return const RssSubscriptionView();
+                return RssSubscriptionView(
+                  reselectSignal: _rssReselectSignal,
+                );
               case _MainTabId.my:
-                return const SettingsView();
+                return SettingsView(
+                  reselectSignal: _myReselectSignal,
+                );
             }
           },
         );

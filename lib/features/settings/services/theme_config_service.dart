@@ -35,17 +35,45 @@ class ThemeConfigService {
     if (imported == null) {
       return false;
     }
+    await upsertConfig(imported);
+    return true;
+  }
+
+  /// 保存当前主题快照（同名覆盖），返回可直接用于列表展示的配置项。
+  Future<ThemeConfigEntry?> saveCurrentTheme({
+    required String themeName,
+    required bool isNightTheme,
+    required String primaryColor,
+    required String accentColor,
+    required String backgroundColor,
+    required String bottomBackground,
+  }) async {
+    final current = ThemeConfigEntry.tryCreate(
+      themeName: themeName,
+      isNightTheme: isNightTheme,
+      primaryColor: primaryColor,
+      accentColor: accentColor,
+      backgroundColor: backgroundColor,
+      bottomBackground: bottomBackground,
+    );
+    if (current == null) {
+      return null;
+    }
+    await upsertConfig(current);
+    return current;
+  }
+
+  Future<void> upsertConfig(ThemeConfigEntry config) async {
     final next = List<ThemeConfigEntry>.from(loadConfigs());
     final replaceIndex = next.indexWhere(
-      (config) => config.themeName == imported.themeName,
+      (item) => item.themeName == config.themeName,
     );
     if (replaceIndex >= 0) {
-      next[replaceIndex] = imported;
+      next[replaceIndex] = config;
     } else {
-      next.add(imported);
+      next.add(config);
     }
     await _saveConfigs(next);
-    return true;
   }
 
   String? sharePayloadAt(int index) {

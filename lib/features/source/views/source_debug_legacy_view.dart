@@ -326,7 +326,10 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
       prefix: prefix,
     );
     _setDebugKey(action.nextQuery);
-    if (!action.shouldRun) return;
+    if (!action.shouldRun) {
+      _debugKeyFocusNode.requestFocus();
+      return;
+    }
     _runDebug(action.nextQuery);
   }
 

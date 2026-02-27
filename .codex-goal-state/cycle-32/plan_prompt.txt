@@ -1,0 +1,22 @@
+你是任务规划器。请基于当前仓库状态，把“大目标”拆成“下一批可执行任务”。
+
+大目标：
+根据AGENTS.md修改ui
+
+当前轮次：32 / 120
+每轮最多任务数：6
+
+上一轮队列结果（可为空）：
+rc=125; done_file=.codex-goal-state/cycle-31/queue-state/done.tsv; failed_file=.codex-goal-state/cycle-31/queue-state/failed.tsv
+
+规划要求（必须遵守）：
+1. 如果目标已经完成，输出 done=true 且 tasks=[]。
+2. 如果未完成，输出 done=false，并给出最多 6 条任务。
+3. 每条任务必须是“可落地执行”的编码任务，prompt 要具体，避免泛化指令。
+4. prompt 需包含：改动范围、预期行为、验证方式。
+5. required_paths 必须是仓库内相对路径数组；不确定可留空数组。
+6. verify_cmd 优先给定向验证命令；不要使用 flutter analyze（除非明确是提交前最终验收）。
+7. 任务按 priority 从小到大表示先后顺序，输出时也尽量按该顺序。
+8. 保持中文。
+
+只输出满足 schema 的 JSON。

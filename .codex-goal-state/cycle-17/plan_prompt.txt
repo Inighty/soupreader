@@ -1,13 +1,13 @@
 你是任务规划器。请基于当前仓库状态，把“大目标”拆成“下一批可执行任务”。
 
 大目标：
-迁移 legado 我的菜单（除 web 服务），优先核心功能，完成后再收口细节
+根据AGENTS.md修改ui
 
 当前轮次：17 / 120
 每轮最多任务数：6
 
 上一轮队列结果（可为空）：
-rc=141; done_file=.codex-goal-state/cycle-16/queue-state/done.tsv; failed_file=.codex-goal-state/cycle-16/queue-state/failed.tsv
+rc=125; done_file=.codex-goal-state/cycle-16/queue-state/done.tsv; failed_file=.codex-goal-state/cycle-16/queue-state/failed.tsv
 
 规划要求（必须遵守）：
 1. 如果目标已经完成，输出 done=true 且 tasks=[]。

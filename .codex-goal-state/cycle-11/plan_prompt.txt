@@ -7,7 +7,7 @@
 每轮最多任务数：6
 
 上一轮队列结果（可为空）：
-rc=127; done_file=.codex-goal-state/cycle-10/queue-state/done.tsv; failed_file=.codex-goal-state/cycle-10/queue-state/failed.tsv
+rc=125; done_file=.codex-goal-state/cycle-10/queue-state/done.tsv; failed_file=.codex-goal-state/cycle-10/queue-state/failed.tsv
 
 规划要求（必须遵守）：
 1. 如果目标已经完成，输出 done=true 且 tasks=[]。

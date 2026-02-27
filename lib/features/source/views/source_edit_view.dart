@@ -1973,6 +1973,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     final text = _debugKeyCtrl.text.trim();
     if (text.isEmpty || text.length <= 2) {
       setState(() => _debugKeyCtrl.text = prefix);
+      _debugKeyFocusNode.requestFocus();
       return;
     }
     final next = text.startsWith(prefix) ? text : '$prefix$text';

@@ -20,9 +20,11 @@ class RssSubscriptionView extends StatefulWidget {
   const RssSubscriptionView({
     super.key,
     this.repository,
+    this.reselectSignal,
   });
 
   final RssSourceRepository? repository;
+  final ValueListenable<int>? reselectSignal;
 
   @override
   State<RssSubscriptionView> createState() => _RssSubscriptionViewState();
@@ -32,18 +34,56 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
   late final RssSourceRepository _repo;
   final TextEditingController _queryController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  int? _lastReselectVersion;
 
   @override
   void initState() {
     super.initState();
     _repo = widget.repository ?? RssSourceRepository(DatabaseService());
+    _bindReselectSignal(widget.reselectSignal);
+  }
+
+  @override
+  void didUpdateWidget(covariant RssSubscriptionView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.reselectSignal == widget.reselectSignal) return;
+    _unbindReselectSignal(oldWidget.reselectSignal);
+    _bindReselectSignal(widget.reselectSignal);
   }
 
   @override
   void dispose() {
+    _unbindReselectSignal(widget.reselectSignal);
     _queryController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _bindReselectSignal(ValueListenable<int>? signal) {
+    _lastReselectVersion = signal?.value;
+    signal?.addListener(_onReselectSignalChanged);
+  }
+
+  void _unbindReselectSignal(ValueListenable<int>? signal) {
+    signal?.removeListener(_onReselectSignalChanged);
+  }
+
+  void _onReselectSignalChanged() {
+    final signal = widget.reselectSignal;
+    if (signal == null) return;
+    final version = signal.value;
+    if (_lastReselectVersion == version) return;
+    _lastReselectVersion = version;
+    _scrollToTop();
+  }
+
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   String get _query => _queryController.text.trim();
@@ -203,7 +243,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
           const SizedBox(height: 10),
           CupertinoButton(
             onPressed: noEnabled
-                ? () => Navigator.of(context).maybePop()
+                ? _openSourceSettings
                 : () => _setQuery(''),
             child: Text(action),
           ),

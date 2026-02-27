@@ -179,6 +179,48 @@ SearchFilterMode normalizeSearchFilterMode(SearchFilterMode mode) {
 
 class AppSettings {
   static const String defaultWebDavUrl = 'https://dav.jianguoyun.com/dav/';
+  static const String defaultLauncherIcon = 'ic_launcher';
+  static const String defaultUpdateToVariant = 'default_version';
+  static const String officialUpdateToVariant = 'official_version';
+  static const String betaReleaseUpdateToVariant = 'beta_release_version';
+  static const String betaReleaseAUpdateToVariant = 'beta_releaseA_version';
+  static const Set<String> validUpdateToVariants = <String>{
+    defaultUpdateToVariant,
+    officialUpdateToVariant,
+    betaReleaseUpdateToVariant,
+    betaReleaseAUpdateToVariant,
+  };
+  static const int defaultBarElevation = 4;
+  static const int defaultFontScale = 0;
+  static const int defaultWebPort = 1122;
+  static const int defaultBackgroundImageBlurring = 0;
+  static const int maxBackgroundImageBlurring = 25;
+
+  static bool isValidUpdateToVariant(String value) {
+    return validUpdateToVariants.contains(value.trim());
+  }
+
+  static String normalizeUpdateToVariant(String value) {
+    final normalized = value.trim();
+    if (isValidUpdateToVariant(normalized)) {
+      return normalized;
+    }
+    return defaultUpdateToVariant;
+  }
+
+  static String updateToVariantLabel(String value) {
+    switch (normalizeUpdateToVariant(value)) {
+      case officialUpdateToVariant:
+        return '正式版';
+      case betaReleaseUpdateToVariant:
+        return '测试版';
+      case betaReleaseAUpdateToVariant:
+        return '共存版';
+      case defaultUpdateToVariant:
+      default:
+        return '当前';
+    }
+  }
 
   final AppAppearanceMode appearanceMode;
   final bool wifiOnlyDownload;
@@ -193,9 +235,29 @@ class AppSettings {
   final int bitmapCacheSize;
   final int imageRetainNum;
   final bool replaceEnableDefault;
+  final bool cronet;
+  final bool antiAlias;
+  final bool mediaButtonOnExit;
+  final bool readAloudByMediaButton;
+  final bool ignoreAudioFocus;
+  final bool autoClearExpired;
+  final bool showAddToShelfAlert;
+  final String updateToVariant;
+  final bool showMangaUi;
+  final int webPort;
+  final bool webServiceWakeLock;
   final bool processText;
   final bool recordLog;
   final bool recordHeapDump;
+  final String launcherIcon;
+  final bool transparentStatusBar;
+  final bool immNavigationBar;
+  final int barElevation;
+  final int fontScale;
+  final String backgroundImage;
+  final String backgroundImageNight;
+  final int backgroundImageBlurring;
+  final int backgroundImageNightBlurring;
 
   final BookshelfViewMode bookshelfViewMode;
   final BookshelfSortMode bookshelfSortMode;
@@ -238,9 +300,29 @@ class AppSettings {
     this.bitmapCacheSize = 50,
     this.imageRetainNum = 0,
     this.replaceEnableDefault = true,
+    this.cronet = false,
+    this.antiAlias = false,
+    this.mediaButtonOnExit = true,
+    this.readAloudByMediaButton = false,
+    this.ignoreAudioFocus = false,
+    this.autoClearExpired = true,
+    this.showAddToShelfAlert = true,
+    this.updateToVariant = defaultUpdateToVariant,
+    this.showMangaUi = true,
+    this.webPort = defaultWebPort,
+    this.webServiceWakeLock = false,
     this.processText = true,
     this.recordLog = false,
     this.recordHeapDump = false,
+    this.launcherIcon = defaultLauncherIcon,
+    this.transparentStatusBar = true,
+    this.immNavigationBar = true,
+    this.barElevation = defaultBarElevation,
+    this.fontScale = defaultFontScale,
+    this.backgroundImage = '',
+    this.backgroundImageNight = '',
+    this.backgroundImageBlurring = defaultBackgroundImageBlurring,
+    this.backgroundImageNightBlurring = defaultBackgroundImageBlurring,
     this.bookshelfViewMode = BookshelfViewMode.grid,
     this.bookshelfSortMode = BookshelfSortMode.recentRead,
     this.bookshelfGroupStyle = 0,
@@ -354,6 +436,14 @@ class AppSettings {
       return raw.toString().trim();
     }
 
+    Map<String, dynamic> parseMap(dynamic raw) {
+      if (raw is Map<String, dynamic>) return raw;
+      if (raw is Map) {
+        return raw.map((key, value) => MapEntry('$key', value));
+      }
+      return const <String, dynamic>{};
+    }
+
     bool parseBoolWithDefault(dynamic raw, bool fallback) {
       if (raw is bool) return raw;
       if (raw is num) return raw != 0;
@@ -394,6 +484,11 @@ class AppSettings {
       bookshelfLegacySortIndexFromMode(
           parseSortMode(json['bookshelfSortMode'])),
     ).clamp(0, 5);
+    final themeSetting =
+        parseMap(json['theme_setting'] ?? json['themeSetting']);
+    final parsedLauncherIcon = parseString(
+      json['launcherIcon'] ?? themeSetting['launcherIcon'],
+    );
 
     return AppSettings(
       appearanceMode: parseAppAppearanceModeFromJson(json),
@@ -422,12 +517,72 @@ class AppSettings {
           parseIntWithDefault(json['imageRetainNum'], 0).clamp(0, 999),
       replaceEnableDefault:
           parseBoolWithDefault(json['replaceEnableDefault'], true),
+      cronet: parseBoolWithDefault(json['cronet'] ?? json['Cronet'], false),
+      antiAlias: parseBoolWithDefault(json['antiAlias'], false),
+      mediaButtonOnExit: parseBoolWithDefault(json['mediaButtonOnExit'], true),
+      readAloudByMediaButton:
+          parseBoolWithDefault(json['readAloudByMediaButton'], false),
+      ignoreAudioFocus: parseBoolWithDefault(json['ignoreAudioFocus'], false),
+      autoClearExpired: parseBoolWithDefault(json['autoClearExpired'], true),
+      showAddToShelfAlert:
+          parseBoolWithDefault(json['showAddToShelfAlert'], true),
+      updateToVariant: normalizeUpdateToVariant(
+        parseString(json['updateToVariant'] ?? defaultUpdateToVariant),
+      ),
+      showMangaUi: parseBoolWithDefault(json['showMangaUi'], true),
+      webPort: parseIntWithDefault(json['webPort'], defaultWebPort),
+      webServiceWakeLock:
+          parseBoolWithDefault(json['webServiceWakeLock'], false),
       processText: parseBoolWithDefault(
         json['processText'] ?? json['process_text'],
         true,
       ),
       recordLog: parseBoolWithDefault(json['recordLog'], false),
       recordHeapDump: parseBoolWithDefault(json['recordHeapDump'], false),
+      launcherIcon:
+          parsedLauncherIcon.isEmpty ? defaultLauncherIcon : parsedLauncherIcon,
+      transparentStatusBar: parseBoolWithDefault(
+        json['transparentStatusBar'] ?? themeSetting['transparentStatusBar'],
+        true,
+      ),
+      immNavigationBar: parseBoolWithDefault(
+        json['immNavigationBar'] ?? themeSetting['immNavigationBar'],
+        true,
+      ),
+      barElevation: parseIntWithDefault(
+        json['barElevation'] ?? themeSetting['barElevation'],
+        defaultBarElevation,
+      ).clamp(0, 32),
+      fontScale: parseIntWithDefault(
+        json['fontScale'] ?? themeSetting['fontScale'],
+        defaultFontScale,
+      ).clamp(0, 16),
+      backgroundImage: parseString(
+        json['backgroundImage'] ??
+            json['bgImage'] ??
+            themeSetting['backgroundImage'] ??
+            themeSetting['bgImage'],
+      ),
+      backgroundImageNight: parseString(
+        json['backgroundImageNight'] ??
+            json['bgImageN'] ??
+            themeSetting['backgroundImageNight'] ??
+            themeSetting['bgImageN'],
+      ),
+      backgroundImageBlurring: parseIntWithDefault(
+        json['backgroundImageBlurring'] ??
+            json['bgImageBlurring'] ??
+            themeSetting['backgroundImageBlurring'] ??
+            themeSetting['bgImageBlurring'],
+        defaultBackgroundImageBlurring,
+      ).clamp(0, maxBackgroundImageBlurring),
+      backgroundImageNightBlurring: parseIntWithDefault(
+        json['backgroundImageNightBlurring'] ??
+            json['bgImageNBlurring'] ??
+            themeSetting['backgroundImageNightBlurring'] ??
+            themeSetting['bgImageNBlurring'],
+        defaultBackgroundImageBlurring,
+      ).clamp(0, maxBackgroundImageBlurring),
       bookshelfViewMode: hasLegacyLayoutIndex
           ? bookshelfViewModeFromLayoutIndex(parsedLayoutIndex)
           : parseViewMode(json['bookshelfViewMode']),
@@ -519,10 +674,42 @@ class AppSettings {
       'bitmapCacheSize': bitmapCacheSize,
       'imageRetainNum': imageRetainNum,
       'replaceEnableDefault': replaceEnableDefault,
+      'cronet': cronet,
+      'Cronet': cronet,
+      'antiAlias': antiAlias,
+      'mediaButtonOnExit': mediaButtonOnExit,
+      'readAloudByMediaButton': readAloudByMediaButton,
+      'ignoreAudioFocus': ignoreAudioFocus,
+      'autoClearExpired': autoClearExpired,
+      'showAddToShelfAlert': showAddToShelfAlert,
+      'updateToVariant': updateToVariant,
+      'showMangaUi': showMangaUi,
+      'webPort': webPort,
+      'webServiceWakeLock': webServiceWakeLock,
       'processText': processText,
       'process_text': processText,
       'recordLog': recordLog,
       'recordHeapDump': recordHeapDump,
+      'launcherIcon': launcherIcon,
+      'transparentStatusBar': transparentStatusBar,
+      'immNavigationBar': immNavigationBar,
+      'barElevation': barElevation,
+      'fontScale': fontScale,
+      'backgroundImage': backgroundImage,
+      'backgroundImageNight': backgroundImageNight,
+      'backgroundImageBlurring': backgroundImageBlurring,
+      'backgroundImageNightBlurring': backgroundImageNightBlurring,
+      'theme_setting': {
+        'launcherIcon': launcherIcon,
+        'transparentStatusBar': transparentStatusBar,
+        'immNavigationBar': immNavigationBar,
+        'barElevation': barElevation,
+        'fontScale': fontScale,
+        'backgroundImage': backgroundImage,
+        'backgroundImageNight': backgroundImageNight,
+        'backgroundImageBlurring': backgroundImageBlurring,
+        'backgroundImageNightBlurring': backgroundImageNightBlurring,
+      },
       'bookshelfViewMode': bookshelfViewMode.index,
       'bookshelfSortMode': bookshelfSortMode.index,
       'bookshelfGroupStyle': bookshelfGroupStyle,
@@ -579,9 +766,29 @@ class AppSettings {
     int? bitmapCacheSize,
     int? imageRetainNum,
     bool? replaceEnableDefault,
+    bool? cronet,
+    bool? antiAlias,
+    bool? mediaButtonOnExit,
+    bool? readAloudByMediaButton,
+    bool? ignoreAudioFocus,
+    bool? autoClearExpired,
+    bool? showAddToShelfAlert,
+    String? updateToVariant,
+    bool? showMangaUi,
+    int? webPort,
+    bool? webServiceWakeLock,
     bool? processText,
     bool? recordLog,
     bool? recordHeapDump,
+    String? launcherIcon,
+    bool? transparentStatusBar,
+    bool? immNavigationBar,
+    int? barElevation,
+    int? fontScale,
+    String? backgroundImage,
+    String? backgroundImageNight,
+    int? backgroundImageBlurring,
+    int? backgroundImageNightBlurring,
     BookshelfViewMode? bookshelfViewMode,
     BookshelfSortMode? bookshelfSortMode,
     int? bookshelfGroupStyle,
@@ -626,9 +833,36 @@ class AppSettings {
       imageRetainNum:
           (imageRetainNum ?? this.imageRetainNum).clamp(0, 999).toInt(),
       replaceEnableDefault: replaceEnableDefault ?? this.replaceEnableDefault,
+      cronet: cronet ?? this.cronet,
+      antiAlias: antiAlias ?? this.antiAlias,
+      mediaButtonOnExit: mediaButtonOnExit ?? this.mediaButtonOnExit,
+      readAloudByMediaButton:
+          readAloudByMediaButton ?? this.readAloudByMediaButton,
+      ignoreAudioFocus: ignoreAudioFocus ?? this.ignoreAudioFocus,
+      autoClearExpired: autoClearExpired ?? this.autoClearExpired,
+      showAddToShelfAlert: showAddToShelfAlert ?? this.showAddToShelfAlert,
+      updateToVariant: updateToVariant ?? this.updateToVariant,
+      showMangaUi: showMangaUi ?? this.showMangaUi,
+      webPort: webPort ?? this.webPort,
+      webServiceWakeLock: webServiceWakeLock ?? this.webServiceWakeLock,
       processText: processText ?? this.processText,
       recordLog: recordLog ?? this.recordLog,
       recordHeapDump: recordHeapDump ?? this.recordHeapDump,
+      launcherIcon: launcherIcon ?? this.launcherIcon,
+      transparentStatusBar: transparentStatusBar ?? this.transparentStatusBar,
+      immNavigationBar: immNavigationBar ?? this.immNavigationBar,
+      barElevation: (barElevation ?? this.barElevation).clamp(0, 32).toInt(),
+      fontScale: (fontScale ?? this.fontScale).clamp(0, 16).toInt(),
+      backgroundImage: backgroundImage ?? this.backgroundImage,
+      backgroundImageNight: backgroundImageNight ?? this.backgroundImageNight,
+      backgroundImageBlurring:
+          (backgroundImageBlurring ?? this.backgroundImageBlurring)
+              .clamp(0, maxBackgroundImageBlurring)
+              .toInt(),
+      backgroundImageNightBlurring:
+          (backgroundImageNightBlurring ?? this.backgroundImageNightBlurring)
+              .clamp(0, maxBackgroundImageBlurring)
+              .toInt(),
       bookshelfViewMode: bookshelfViewMode ?? this.bookshelfViewMode,
       bookshelfSortMode: bookshelfSortMode ?? this.bookshelfSortMode,
       bookshelfGroupStyle: bookshelfGroupStyle ?? this.bookshelfGroupStyle,

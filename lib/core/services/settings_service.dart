@@ -293,6 +293,10 @@ class SettingsService {
 
   _DecodedAppSettings _decodeAppSettings(Map<String, dynamic> rawJson) {
     final settings = AppSettings.fromJson(rawJson);
+    final rawUpdateToVariant = rawJson['updateToVariant']?.toString().trim() ??
+        AppSettings.defaultUpdateToVariant;
+    final normalizedUpdateToVariant =
+        AppSettings.normalizeUpdateToVariant(rawUpdateToVariant);
     final normalizedModeValue =
         resolveAppAppearanceModeLegacyValueFromJson(rawJson);
     final parsedThemeMode =
@@ -322,7 +326,8 @@ class SettingsService {
       settings: settings,
       needsRewrite: isLegacyThreeValueConfig ||
           themeModeNeedsNormalize ||
-          appearanceModeNeedsNormalize,
+          appearanceModeNeedsNormalize ||
+          rawUpdateToVariant != normalizedUpdateToVariant,
     );
   }
 
@@ -1145,8 +1150,11 @@ class SettingsService {
     final normalizedAppearanceMode = appAppearanceModeFromLegacyValue(
       appAppearanceModeToLegacyValue(settings.appearanceMode),
     );
+    final normalizedUpdateToVariant =
+        AppSettings.normalizeUpdateToVariant(settings.updateToVariant);
     final normalizedSettings = settings.copyWith(
       appearanceMode: normalizedAppearanceMode,
+      updateToVariant: normalizedUpdateToVariant,
     );
     _appSettings = normalizedSettings;
     _appSettingsNotifier.value = normalizedSettings;
@@ -1224,6 +1232,63 @@ class SettingsService {
     );
   }
 
+  Future<void> saveCronet(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(cronet: enabled),
+    );
+  }
+
+  Future<void> saveAntiAlias(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(antiAlias: enabled),
+    );
+  }
+
+  Future<void> saveMediaButtonOnExit(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(mediaButtonOnExit: enabled),
+    );
+  }
+
+  Future<void> saveReadAloudByMediaButton(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(readAloudByMediaButton: enabled),
+    );
+  }
+
+  Future<void> saveIgnoreAudioFocus(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(ignoreAudioFocus: enabled),
+    );
+  }
+
+  Future<void> saveAutoClearExpired(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(autoClearExpired: enabled),
+    );
+  }
+
+  Future<void> saveShowAddToShelfAlert(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(showAddToShelfAlert: enabled),
+    );
+  }
+
+  Future<void> saveUpdateToVariant(String value) async {
+    final updateToVariant = AppSettings.normalizeUpdateToVariant(value);
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(
+        updateToVariant: updateToVariant,
+      ),
+    );
+  }
+
+  Future<void> saveShowMangaUi(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(showMangaUi: enabled),
+    );
+  }
+
   Future<void> saveProcessText(bool enabled) async {
     await _saveAppSettingsPatch(
       (current) => current.copyWith(processText: enabled),
@@ -1239,6 +1304,66 @@ class SettingsService {
   Future<void> saveRecordHeapDump(bool enabled) async {
     await _saveAppSettingsPatch(
       (current) => current.copyWith(recordHeapDump: enabled),
+    );
+  }
+
+  Future<void> saveLauncherIcon(String value) async {
+    final normalized = value.trim();
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(
+        launcherIcon:
+            normalized.isEmpty ? AppSettings.defaultLauncherIcon : normalized,
+      ),
+    );
+  }
+
+  Future<void> saveTransparentStatusBar(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(transparentStatusBar: enabled),
+    );
+  }
+
+  Future<void> saveImmNavigationBar(bool enabled) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(immNavigationBar: enabled),
+    );
+  }
+
+  Future<void> saveBarElevation(int value) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(barElevation: value),
+    );
+  }
+
+  Future<void> saveFontScale(int value) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(fontScale: value),
+    );
+  }
+
+  Future<void> saveBackgroundImage(String? path) async {
+    final normalized = (path ?? '').trim();
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(backgroundImage: normalized),
+    );
+  }
+
+  Future<void> saveBackgroundImageNight(String? path) async {
+    final normalized = (path ?? '').trim();
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(backgroundImageNight: normalized),
+    );
+  }
+
+  Future<void> saveBackgroundImageBlurring(int value) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(backgroundImageBlurring: value),
+    );
+  }
+
+  Future<void> saveBackgroundImageNightBlurring(int value) async {
+    await _saveAppSettingsPatch(
+      (current) => current.copyWith(backgroundImageNightBlurring: value),
     );
   }
 

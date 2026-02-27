@@ -33,6 +33,29 @@ class ThemeConfigEntry {
     return jsonEncode(toJson());
   }
 
+  /// 从“当前主题快照”构建配置项；用于保存白天/夜间主题。
+  static ThemeConfigEntry? tryCreate({
+    required String themeName,
+    required bool isNightTheme,
+    required String primaryColor,
+    required String accentColor,
+    required String backgroundColor,
+    required String bottomBackground,
+  }) {
+    final config = ThemeConfigEntry(
+      themeName: themeName.trim(),
+      isNightTheme: isNightTheme,
+      primaryColor: primaryColor.trim(),
+      accentColor: accentColor.trim(),
+      backgroundColor: backgroundColor.trim(),
+      bottomBackground: bottomBackground.trim(),
+    );
+    if (!config._validateColors()) {
+      return null;
+    }
+    return config;
+  }
+
   static ThemeConfigEntry? tryParseJsonText(String rawText) {
     final normalized = rawText.trim();
     if (normalized.isEmpty) return null;
@@ -63,7 +86,7 @@ class ThemeConfigEntry {
         bottomBackground == null) {
       return null;
     }
-    final config = ThemeConfigEntry(
+    return tryCreate(
       themeName: themeName,
       isNightTheme: isNightTheme,
       primaryColor: primaryColor,
@@ -71,10 +94,6 @@ class ThemeConfigEntry {
       backgroundColor: backgroundColor,
       bottomBackground: bottomBackground,
     );
-    if (!config._validateColors()) {
-      return null;
-    }
-    return config;
   }
 
   bool _validateColors() {

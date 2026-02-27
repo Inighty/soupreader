@@ -22,7 +22,12 @@ import 'theme_settings_view.dart';
 
 /// 我的页菜单（按 legado `pref_main.xml` 入口顺序迁移）
 class SettingsView extends StatefulWidget {
-  const SettingsView({super.key});
+  const SettingsView({
+    super.key,
+    this.reselectSignal,
+  });
+
+  final ValueListenable<int>? reselectSignal;
 
   @override
   State<SettingsView> createState() => _SettingsViewState();
@@ -30,24 +35,64 @@ class SettingsView extends StatefulWidget {
 
 class _SettingsViewState extends State<SettingsView> {
   final SettingsService _settingsService = SettingsService();
+  final ScrollController _sliverScrollController = ScrollController();
   bool _loadingMyHelp = false;
+  int? _lastReselectVersion;
 
   @override
   void initState() {
     super.initState();
     _settingsService.appSettingsListenable.addListener(_onAppSettingsChanged);
+    _bindReselectSignal(widget.reselectSignal);
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.reselectSignal == widget.reselectSignal) return;
+    _unbindReselectSignal(oldWidget.reselectSignal);
+    _bindReselectSignal(widget.reselectSignal);
   }
 
   @override
   void dispose() {
+    _unbindReselectSignal(widget.reselectSignal);
     _settingsService.appSettingsListenable
         .removeListener(_onAppSettingsChanged);
+    _sliverScrollController.dispose();
     super.dispose();
   }
 
   void _onAppSettingsChanged() {
     if (!mounted) return;
     setState(() {});
+  }
+
+  void _bindReselectSignal(ValueListenable<int>? signal) {
+    _lastReselectVersion = signal?.value;
+    signal?.addListener(_onReselectSignalChanged);
+  }
+
+  void _unbindReselectSignal(ValueListenable<int>? signal) {
+    signal?.removeListener(_onReselectSignalChanged);
+  }
+
+  void _onReselectSignalChanged() {
+    final signal = widget.reselectSignal;
+    if (signal == null) return;
+    final version = signal.value;
+    if (_lastReselectVersion == version) return;
+    _lastReselectVersion = version;
+    _scrollToTop();
+  }
+
+  void _scrollToTop() {
+    if (!_sliverScrollController.hasClients) return;
+    _sliverScrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   String get _themeModeSummary {
@@ -157,6 +202,7 @@ class _SettingsViewState extends State<SettingsView> {
     return AppCupertinoPageScaffold(
       title: '我的',
       useSliverNavigationBar: true,
+      sliverScrollController: _sliverScrollController,
       trailing: _buildHelpAction(),
       child: const SizedBox.shrink(),
       sliverBodyBuilder: (_) => _buildBodySliver(context),

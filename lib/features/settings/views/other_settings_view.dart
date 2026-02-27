@@ -1,7 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -228,6 +229,62 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     await _settingsService.saveDefaultHomePage(selected);
   }
 
+  Future<void> _pickUpdateToVariant() async {
+    final selected = await showCupertinoModalPopup<String>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(sheetContext).pop(
+              AppSettings.defaultUpdateToVariant,
+            ),
+            child: Text(
+              AppSettings.updateToVariantLabel(
+                AppSettings.defaultUpdateToVariant,
+              ),
+            ),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(sheetContext).pop(
+              AppSettings.officialUpdateToVariant,
+            ),
+            child: Text(
+              AppSettings.updateToVariantLabel(
+                AppSettings.officialUpdateToVariant,
+              ),
+            ),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(sheetContext).pop(
+              AppSettings.betaReleaseUpdateToVariant,
+            ),
+            child: Text(
+              AppSettings.updateToVariantLabel(
+                AppSettings.betaReleaseUpdateToVariant,
+              ),
+            ),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.of(sheetContext).pop(
+              AppSettings.betaReleaseAUpdateToVariant,
+            ),
+            child: Text(
+              AppSettings.updateToVariantLabel(
+                AppSettings.betaReleaseAUpdateToVariant,
+              ),
+            ),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(sheetContext).pop(),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (selected == null) return;
+    await _settingsService.saveUpdateToVariant(selected);
+  }
+
   Future<void> _editPreDownloadNum() async {
     await _editBoundedIntSetting(
       title: '预下载',
@@ -314,6 +371,23 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
       return;
     }
     await save(parsed);
+  }
+
+  Widget _buildBooleanTile({
+    required String title,
+    String? additionalInfo,
+    required bool value,
+    required Future<void> Function(bool enabled) save,
+  }) {
+    return CupertinoListTile.notched(
+      title: Text(title),
+      additionalInfo: additionalInfo == null ? null : Text(additionalInfo),
+      trailing: CupertinoSwitch(
+        value: value,
+        onChanged: save,
+      ),
+      onTap: () => save(!value),
+    );
   }
 
   @override
@@ -506,17 +580,82 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               ),
             ],
           ),
+          if (!kIsWeb)
+            CupertinoListSection.insetGrouped(
+              header: const Text('非 Web 其它设置'),
+              children: [
+                _buildBooleanTile(
+                  title: 'Cronet',
+                  additionalInfo: '使用 Cronet 网络组件',
+                  value: _appSettings.cronet,
+                  save: _settingsService.saveCronet,
+                ),
+                _buildBooleanTile(
+                  title: '抗锯齿',
+                  additionalInfo: '绘制图片时抗锯齿',
+                  value: _appSettings.antiAlias,
+                  save: _settingsService.saveAntiAlias,
+                ),
+                _buildBooleanTile(
+                  title: '全程响应耳机按键',
+                  additionalInfo: '即使退出软件也响应耳机按键',
+                  value: _appSettings.mediaButtonOnExit,
+                  save: _settingsService.saveMediaButtonOnExit,
+                ),
+                _buildBooleanTile(
+                  title: '耳机按键启动朗读',
+                  additionalInfo: '通过耳机按键来启动朗读',
+                  value: _appSettings.readAloudByMediaButton,
+                  save: _settingsService.saveReadAloudByMediaButton,
+                ),
+                _buildBooleanTile(
+                  title: '忽略音频焦点',
+                  additionalInfo: '允许与其他应用同时播放音频',
+                  value: _appSettings.ignoreAudioFocus,
+                  save: _settingsService.saveIgnoreAudioFocus,
+                ),
+                _buildBooleanTile(
+                  title: '自动清除过期搜索数据',
+                  additionalInfo: '超过一天的搜索数据',
+                  value: _appSettings.autoClearExpired,
+                  save: _settingsService.saveAutoClearExpired,
+                ),
+                _buildBooleanTile(
+                  title: '返回时提示放入书架',
+                  additionalInfo: '阅读未放入书架的书籍在返回时提示放入书架',
+                  value: _appSettings.showAddToShelfAlert,
+                  save: _settingsService.saveShowAddToShelfAlert,
+                ),
+                CupertinoListTile.notched(
+                  title: const Text('检查更新查找版本'),
+                  additionalInfo: Text(
+                    AppSettings.updateToVariantLabel(
+                      _appSettings.updateToVariant,
+                    ),
+                  ),
+                  trailing: const CupertinoListTileChevron(),
+                  onTap: _pickUpdateToVariant,
+                ),
+                _buildBooleanTile(
+                  title: '漫画浏览',
+                  value: _appSettings.showMangaUi,
+                  save: _settingsService.saveShowMangaUi,
+                ),
+              ],
+            ),
           CupertinoListSection.insetGrouped(
             header: const Text('Web 服务（未启用）'),
             footer: const Text('当前构建排除了 Web 服务，以下配置仅保留说明，不可操作。'),
-            children: const [
+            children: [
               CupertinoListTile.notched(
-                title: Text('Web 端口'),
-                additionalInfo: Text('未启用'),
+                title: const Text('Web 端口'),
+                additionalInfo: Text('未启用（当前: ${_appSettings.webPort}）'),
               ),
               CupertinoListTile.notched(
-                title: Text('WebService 唤醒锁'),
-                additionalInfo: Text('未启用'),
+                title: const Text('WebService 唤醒锁'),
+                additionalInfo: Text(
+                  '未启用（当前: ${_appSettings.webServiceWakeLock ? '开' : '关'}）',
+                ),
               ),
             ],
           ),

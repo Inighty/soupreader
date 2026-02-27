@@ -38,7 +38,6 @@
 - 字体统一使用 `San Francisco`（系统 SF 字体族），保持 iOS 视觉一致。
 - 弹窗统一使用 iOS 风格弹窗（如 `CupertinoAlertDialog`、`CupertinoActionSheet`）。
 - 页面导航必须支持 iOS 滑动返回（侧滑返回）。
-- 导航栏优先使用 iOS 大标题导航（`CupertinoSliverNavigationBar` 或同义实现）。
 - 若暂无等价能力，需记录原因、范围、替代方案。
 - 不符合本规范视为阻塞项。
 - 文档：`https://api.flutter.dev/flutter/cupertino/cupertino-library.html`

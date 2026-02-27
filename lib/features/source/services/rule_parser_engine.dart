@@ -4248,13 +4248,13 @@ class RuleParserEngine {
         ? _buildUrl(
             source.bookSourceUrl,
             urlRule,
-            {'key': keyOrUrl, 'searchKey': keyOrUrl},
+            {'key': keyOrUrl, 'searchKey': keyOrUrl, 'page': '1'},
             jsLib: source.jsLib,
           )
         : _buildUrl(
             source.bookSourceUrl,
             urlRule,
-            const {},
+            const {'page': '1'},
             jsLib: source.jsLib,
           );
 
