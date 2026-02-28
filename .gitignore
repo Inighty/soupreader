@@ -47,13 +47,15 @@ soupreader.code-workspace
 images/
 tool/
 
-# Local planning docs (do not commit)
-docs/DEV_PLAN.md
-docs/DEV_PROGRESS.md
-docs/HAPPY_PARITY_MATRIX.md
+# Root local docs (do not commit)
+/docs/
 
 # Local Codex workspace artifacts
 .codex/
+
+# Local ACE index and queue runner state
+.ace-tool/
+.codex-queue-state/
 
 # Root-level image artifacts
 /*.IMG
