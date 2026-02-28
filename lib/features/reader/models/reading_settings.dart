@@ -47,6 +47,7 @@ class ReadingSettings {
   final bool brightnessViewOnRight; // 亮度侧边栏位置（true:右侧，false:左侧）
   final bool showReadTitleAddition; // 显示阅读标题附加信息（对标 showReadTitleAddition）
   final bool readBarStyleFollowPage; // 阅读菜单样式跟随页面（对标 readBarStyleFollowPage）
+  final bool expandTextMenu; // 展开文本菜单（对标 legado expandTextMenu）
   final int layoutPresetVersion; // 排版预设版本：用于历史默认值迁移
   final ProgressBarBehavior progressBarBehavior; // 进度条行为（页内/章节）
   final bool confirmSkipChapter; // 章节进度条跳转确认（对标 legado）
@@ -178,6 +179,7 @@ class ReadingSettings {
     this.brightnessViewOnRight = false,
     this.showReadTitleAddition = true,
     this.readBarStyleFollowPage = false,
+    this.expandTextMenu = false,
     this.layoutPresetVersion = layoutPresetVersionLegadoV2,
     this.progressBarBehavior = ProgressBarBehavior.page,
     this.confirmSkipChapter = true,
@@ -629,6 +631,7 @@ class ReadingSettings {
       brightnessViewOnRight: _toBool(json['brightnessViewOnRight'], false),
       showReadTitleAddition: _toBool(json['showReadTitleAddition'], true),
       readBarStyleFollowPage: _toBool(json['readBarStyleFollowPage'], false),
+      expandTextMenu: _toBool(json['expandTextMenu'], false),
       layoutPresetVersion: layoutPresetVersion,
       progressBarBehavior:
           _parseProgressBarBehavior(json['progressBarBehavior']),
@@ -773,6 +776,7 @@ class ReadingSettings {
       'brightnessViewOnRight': brightnessViewOnRight,
       'showReadTitleAddition': showReadTitleAddition,
       'readBarStyleFollowPage': readBarStyleFollowPage,
+      'expandTextMenu': expandTextMenu,
       'layoutPresetVersion': layoutPresetVersion,
       'progressBarBehavior': progressBarBehavior.name,
       'confirmSkipChapter': confirmSkipChapter,
@@ -846,9 +850,7 @@ class ReadingSettings {
         : themeIndex.clamp(0, safeReadStyleConfigs.length - 1).toInt();
     final safeNightThemeIndex = safeReadStyleConfigs.isEmpty
         ? (nightThemeIndex < 0 ? 0 : nightThemeIndex)
-        : nightThemeIndex
-            .clamp(0, safeReadStyleConfigs.length - 1)
-            .toInt();
+        : nightThemeIndex.clamp(0, safeReadStyleConfigs.length - 1).toInt();
     final safeEInkThemeIndex = safeReadStyleConfigs.isEmpty
         ? (eInkThemeIndex < 0 ? 0 : eInkThemeIndex)
         : eInkThemeIndex.clamp(0, safeReadStyleConfigs.length - 1).toInt();
@@ -939,6 +941,7 @@ class ReadingSettings {
       brightnessViewOnRight: brightnessViewOnRight,
       showReadTitleAddition: showReadTitleAddition,
       readBarStyleFollowPage: readBarStyleFollowPage,
+      expandTextMenu: expandTextMenu,
       layoutPresetVersion: safeLayoutPresetVersion,
       progressBarBehavior: progressBarBehavior,
       confirmSkipChapter: confirmSkipChapter,
@@ -1121,6 +1124,7 @@ class ReadingSettings {
     bool? brightnessViewOnRight,
     bool? showReadTitleAddition,
     bool? readBarStyleFollowPage,
+    bool? expandTextMenu,
     int? layoutPresetVersion,
     ProgressBarBehavior? progressBarBehavior,
     bool? confirmSkipChapter,
@@ -1235,6 +1239,7 @@ class ReadingSettings {
           showReadTitleAddition ?? this.showReadTitleAddition,
       readBarStyleFollowPage:
           readBarStyleFollowPage ?? this.readBarStyleFollowPage,
+      expandTextMenu: expandTextMenu ?? this.expandTextMenu,
       layoutPresetVersion: layoutPresetVersion ?? this.layoutPresetVersion,
       progressBarBehavior: progressBarBehavior ?? this.progressBarBehavior,
       confirmSkipChapter: confirmSkipChapter ?? this.confirmSkipChapter,
@@ -1656,6 +1661,17 @@ class ClickAction {
 
   static bool isValidAction(int action) => allActions.contains(action);
 
+  static bool isTtsAction(int action) {
+    return action == readAloudPrevParagraph ||
+        action == readAloudNextParagraph ||
+        action == readAloudPauseResume;
+  }
+
+  static List<int> availableActions({required bool excludeTts}) {
+    if (!excludeTts) return allActions;
+    return allActions.where((action) => !isTtsAction(action)).toList();
+  }
+
   static bool hasMenuZone(Map<String, int> config) {
     for (final zone in zoneOrder) {
       if ((config[zone] ?? defaultZoneConfig[zone] ?? showMenu) == showMenu) {
@@ -1677,6 +1693,26 @@ class ClickAction {
       normalized['mc'] = showMenu;
     }
     return normalized;
+  }
+
+  static Map<String, int> normalizeConfigForExclusions(
+    Map<String, int> rawConfig, {
+    required bool excludeTts,
+  }) {
+    final normalized = normalizeConfig(rawConfig);
+    if (!excludeTts) return normalized;
+
+    final adjusted = Map<String, int>.from(normalized);
+    for (final zone in zoneOrder) {
+      final action = adjusted[zone] ?? showMenu;
+      if (isTtsAction(action)) {
+        adjusted[zone] = showMenu;
+      }
+    }
+    if (!hasMenuZone(adjusted)) {
+      adjusted['mc'] = showMenu;
+    }
+    return normalizeConfig(adjusted);
   }
 
   static String getName(int action) {

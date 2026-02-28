@@ -8,9 +8,6 @@ import 'app/theme/cupertino_theme.dart';
 import 'core/config/migration_exclusions.dart';
 import 'core/database/database_service.dart';
 import 'core/database/repositories/book_repository.dart';
-import 'core/database/repositories/rss_article_repository.dart';
-import 'core/database/repositories/rss_star_repository.dart';
-import 'core/database/repositories/rss_source_repository.dart';
 import 'core/database/repositories/replace_rule_repository.dart';
 import 'core/database/repositories/source_repository.dart';
 import 'core/models/app_settings.dart';
@@ -83,17 +80,16 @@ Future<BootFailure?> _bootstrapApp() async {
     await _runBootStep('SourceRepository.bootstrap', () async {
       await SourceRepository.bootstrap(DatabaseService());
     });
-    await _runBootStep('RssSourceRepository.bootstrap', () async {
-      await RssSourceRepository.bootstrap(DatabaseService());
-    });
-    await _runBootStep('RssArticleRepository.bootstrap', () async {
-      await RssArticleRepository.bootstrap(DatabaseService());
-    });
-    await _runBootStep('RssStarRepository.bootstrap', () async {
-      await RssStarRepository.bootstrap(DatabaseService());
-    });
-    await _runBootStep('RssReadRecordRepository.bootstrap', () async {
-      await RssReadRecordRepository.bootstrap(DatabaseService());
+    await _runBootStep('MigrationExclusions.bootstrapRssRepositories',
+        () async {
+      if (MigrationExclusions.excludeRss) {
+        debugPrint(
+          '[boot] skip rss bootstrap (excluded) '
+          'config=${MigrationExclusions.summary()}',
+        );
+        return;
+      }
+      await MigrationExclusions.bootstrapRssRepositories(DatabaseService());
     });
     await _runBootStep('BookRepository.bootstrap', () async {
       await BookRepository.bootstrap(DatabaseService());
@@ -342,11 +338,17 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _tabs = _buildTabs(widget.appSettings);
+    final initialIndex = _resolveInitialTabIndex(
+      _tabs,
+      widget.appSettings.defaultHomePage,
+    );
     _tabController = CupertinoTabController(
-      initialIndex: _resolveInitialTabIndex(
-        _tabs,
-        widget.appSettings.defaultHomePage,
-      ),
+      initialIndex: initialIndex,
+    );
+    debugPrint(
+      '[main-tab] init tabs=${_tabIdsSummary(_tabs)} '
+      'defaultHome=${widget.appSettings.defaultHomePage.name} '
+      'initialIndex=$initialIndex',
     );
   }
 
@@ -364,12 +366,19 @@ class _MainScreenState extends State<MainScreen> {
     final nextTabs = _buildTabs(widget.appSettings);
     if (_sameTabIds(_tabs, nextTabs)) return;
 
+    final oldTabs = _tabIdsSummary(_tabs);
+    final newTabs = _tabIdsSummary(nextTabs);
     final currentIndex = _tabController.index.clamp(0, _tabs.length - 1);
     final currentTabId = _tabs[currentIndex].id;
     final carryIndex = _indexOfTab(nextTabs, currentTabId);
     final nextIndex = carryIndex >= 0
         ? carryIndex
         : _resolveInitialTabIndex(nextTabs, widget.appSettings.defaultHomePage);
+    debugPrint(
+      '[main-tab] tabs changed old=$oldTabs new=$newTabs '
+      'currentIndex=${_tabController.index} carryIndex=$carryIndex '
+      'nextIndex=$nextIndex',
+    );
     _tabs = nextTabs;
     if (_tabController.index != nextIndex) {
       _tabController.index = nextIndex;
@@ -377,13 +386,22 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onTabTap(int index) {
-    if (index < 0 || index >= _tabs.length) return;
+    if (index < 0 || index >= _tabs.length) {
+      debugPrint(
+        '[main-tab] ignore tap: invalid index=$index tabCount=${_tabs.length}',
+      );
+      return;
+    }
     if (index != _tabController.index) return;
     final now = DateTime.now().millisecondsSinceEpoch;
     switch (_tabs[index].id) {
       case _MainTabId.bookshelf:
         if (_shouldTriggerLegacyReselect(_bookshelfReselectedAt, now)) {
           _bookshelfReselectSignal.value++;
+          debugPrint(
+            '[main-tab] reselection triggered: bookshelf -> gotoTop '
+            'signal=${_bookshelfReselectSignal.value}',
+          );
         } else {
           _bookshelfReselectedAt = now;
         }
@@ -391,6 +409,10 @@ class _MainScreenState extends State<MainScreen> {
       case _MainTabId.discovery:
         if (_shouldTriggerLegacyReselect(_discoveryReselectedAt, now)) {
           _discoveryCompressSignal.value++;
+          debugPrint(
+            '[main-tab] reselection triggered: discovery -> compress '
+            'signal=${_discoveryCompressSignal.value}',
+          );
         } else {
           _discoveryReselectedAt = now;
         }
@@ -459,7 +481,12 @@ class _MainScreenState extends State<MainScreen> {
       MainDefaultHomePage.my => _MainTabId.my,
     };
     final direct = _indexOfTab(tabs, target);
-    return direct >= 0 ? direct : 0;
+    if (direct >= 0) return direct;
+    // 迁移排除与显隐开关可能让默认主页不可见，此时回退到首个可见 Tab（书架）。
+    debugPrint(
+      '[main-tab] defaultHome=$homePage is hidden, fallback to index=0',
+    );
+    return 0;
   }
 
   int _indexOfTab(List<_MainTabSpec> tabs, _MainTabId id) {
@@ -475,6 +502,10 @@ class _MainScreenState extends State<MainScreen> {
       if (a[i].id != b[i].id) return false;
     }
     return true;
+  }
+
+  String _tabIdsSummary(List<_MainTabSpec> tabs) {
+    return tabs.map((tab) => tab.id.name).join('>');
   }
 
   @override

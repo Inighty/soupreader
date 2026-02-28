@@ -19,9 +19,9 @@ class ReaderSourceActionHelper {
     bool? currentChapterIsPay,
   }) {
     if (!hasLoginUrl || !hasPayAction) return false;
-    if (currentChapterIsVip == null && currentChapterIsPay == null) {
-      return true;
-    }
+    // 对齐 legado：仅当当前章节明确是 VIP 且未购买时展示“章节购买”入口。
+    // 其中 `isPay != true` 允许 `null`（即未知）视为“未购买”。
+    if (currentChapterIsVip == null) return false;
     return currentChapterIsVip == true && currentChapterIsPay != true;
   }
 

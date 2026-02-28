@@ -64,6 +64,14 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
                 ),
               ),
               CupertinoListTile.notched(
+                title: const Text('展开文本菜单'),
+                trailing: CupertinoSwitch(
+                  value: _settings.expandTextMenu,
+                  onChanged: (v) =>
+                      _update(_settings.copyWith(expandTextMenu: v)),
+                ),
+              ),
+              CupertinoListTile.notched(
                 title: const Text('自动阅读速度'),
                 additionalInfo: Text('${_settings.autoReadSpeed}s'),
                 trailing: const CupertinoListTileChevron(),

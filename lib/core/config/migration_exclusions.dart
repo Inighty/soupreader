@@ -19,6 +19,7 @@ import '../database/repositories/rss_star_repository.dart';
 /// - `--dart-define=SOUPREADER_EXCLUDE_TTS=false`
 /// - `--dart-define=SOUPREADER_EXCLUDE_MANGA=false`
 /// - `--dart-define=SOUPREADER_EXCLUDE_WEBSERVICE=false`
+/// - `--dart-define=SOUPREADER_EXCLUDE_REMOTE_BOOKS=false`
 ///
 /// 注意：
 /// - 这些开关属于“迁移级别”控制，不等同于用户设置（`AppSettings`）里的开关。
@@ -29,6 +30,8 @@ class MigrationExclusions {
   static const String _keyExcludeTts = 'SOUPREADER_EXCLUDE_TTS';
   static const String _keyExcludeManga = 'SOUPREADER_EXCLUDE_MANGA';
   static const String _keyExcludeWebService = 'SOUPREADER_EXCLUDE_WEBSERVICE';
+  static const String _keyExcludeRemoteBooks =
+      'SOUPREADER_EXCLUDE_REMOTE_BOOKS';
 
   /// 订阅源 / RSS（EX-02）。
   static const bool excludeRss = bool.fromEnvironment(
@@ -54,12 +57,19 @@ class MigrationExclusions {
     defaultValue: true,
   );
 
+  /// 远程书籍（WebDav 远端书架能力）。
+  static const bool excludeRemoteBooks = bool.fromEnvironment(
+    _keyExcludeRemoteBooks,
+    defaultValue: true,
+  );
+
   /// 用于启动日志的配置摘要（避免在多个位置重复拼接）。
   static String summary() {
     return 'excludeRss=$excludeRss, '
         'excludeTts=$excludeTts, '
         'excludeManga=$excludeManga, '
-        'excludeWebService=$excludeWebService';
+        'excludeWebService=$excludeWebService, '
+        'excludeRemoteBooks=$excludeRemoteBooks';
   }
 
   /// RSS 仓储集中 bootstrap。
@@ -75,4 +85,3 @@ class MigrationExclusions {
     await RssReadRecordRepository.bootstrap(db);
   }
 }
-

@@ -937,29 +937,29 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
   Future<File?> _buildShareQrPngFile(String payload) async {
     if (kIsWeb) return null;
+    // 对齐 legado `shareWithQr`：二维码承载 `bookUrl#bookJson`，使用高纠错等级降低扫码失败率。
+    final painter = QrPainter(
+      data: payload,
+      version: QrVersions.auto,
+      errorCorrectionLevel: QrErrorCorrectLevel.H,
+      eyeStyle: const QrEyeStyle(
+        eyeShape: QrEyeShape.square,
+        color: CupertinoColors.black,
+      ),
+      dataModuleStyle: const QrDataModuleStyle(
+        dataModuleShape: QrDataModuleShape.square,
+        color: CupertinoColors.black,
+      ),
+    );
+    final imageData = await painter.toImageData(
+      1024,
+      format: ui.ImageByteFormat.png,
+    );
+    final bytes = imageData?.buffer.asUint8List();
+    if (bytes == null || bytes.isEmpty) {
+      return null;
+    }
     try {
-      // 对齐 legado `shareWithQr`：二维码承载 `bookUrl#bookJson`，使用高纠错等级降低扫码失败率。
-      final painter = QrPainter(
-        data: payload,
-        version: QrVersions.auto,
-        errorCorrectionLevel: QrErrorCorrectLevel.H,
-        eyeStyle: const QrEyeStyle(
-          eyeShape: QrEyeShape.square,
-          color: CupertinoColors.black,
-        ),
-        dataModuleStyle: const QrDataModuleStyle(
-          dataModuleShape: QrDataModuleShape.square,
-          color: CupertinoColors.black,
-        ),
-      );
-      final imageData = await painter.toImageData(
-        1024,
-        format: ui.ImageByteFormat.png,
-      );
-      final bytes = imageData?.buffer.asUint8List();
-      if (bytes == null || bytes.isEmpty) {
-        return null;
-      }
       final dir = await getTemporaryDirectory();
       final file = File(
         p.join(
@@ -979,7 +979,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           'payloadLength': payload.length,
         },
       );
-      return null;
+      rethrow;
     }
   }
 
@@ -1001,7 +1001,13 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     final payload = SearchBookInfoShareHelper.buildPayload(snapshot);
     final subject =
         snapshot.title.trim().isEmpty ? '分享' : snapshot.title.trim();
-    final qrFile = await _buildShareQrPngFile(payload);
+    File? qrFile;
+    try {
+      qrFile = await _buildShareQrPngFile(payload);
+    } catch (error) {
+      _showMessage('分享失败：${_resolveShareErrorMessage(error)}');
+      return;
+    }
     if (qrFile == null) {
       ExceptionLogService().record(
         node: 'search_book_info.menu_share_it.qr_file',
@@ -1960,16 +1966,80 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     }
   }
 
+  Map<String, dynamic> _buildMoreActionLogContext({
+    required String actionKey,
+  }) {
+    return <String, dynamic>{
+      'action': actionKey,
+      'bookId': (_bookId ?? '').trim(),
+      'bookName': _displayName,
+      'sourceUrl': _activeResult.sourceUrl,
+      'sourceName': _displaySourceName,
+      'bookUrl': _resolveBookUrl(),
+      'inBookshelf': _inBookshelf,
+      'isLocalBook': _isLocalBook(),
+      'isLocalTxtBook': _isLocalTxtBook(),
+    };
+  }
+
+  /// 详情页菜单动作统一兜底：
+  /// 1) 记录关键错误日志；2) 给用户明确提示；3) 防止异常冒泡导致页面崩溃。
+  Future<void> _executeMoreActionSafely({
+    required String actionKey,
+    required String actionLabel,
+    required Future<void> Function() action,
+  }) async {
+    try {
+      await action();
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'search_book_info.more_action.$actionKey',
+        message: '详情页菜单动作执行失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: _buildMoreActionLogContext(actionKey: actionKey),
+      );
+      if (!mounted) return;
+      _showMessage('$actionLabel失败：${_compactReason(error.toString())}');
+    }
+  }
+
+  Future<void> _runMoreActionAndCloseSheet({
+    required BuildContext sheetContext,
+    required String actionKey,
+    required String actionLabel,
+    required Future<void> Function() action,
+  }) async {
+    final navigator = Navigator.of(sheetContext);
+    if (navigator.canPop()) {
+      navigator.pop();
+    }
+    await _executeMoreActionSafely(
+      actionKey: actionKey,
+      actionLabel: actionLabel,
+      action: action,
+    );
+  }
+
   Future<void> _showMoreActions() async {
     final source = _source;
     final hasLogin = SearchBookInfoMenuHelper.shouldShowLogin(
       loginUrl: source?.loginUrl,
     );
-    final canSetVariable = source != null;
-    final showAllowUpdate = source != null;
+    final showSetVariable = SearchBookInfoMenuHelper.shouldShowSetVariable(
+      hasSource: source != null,
+    );
+    final showAllowUpdate = SearchBookInfoMenuHelper.shouldShowAllowUpdate(
+      hasSource: source != null,
+    );
     const canClearCache = true;
-    final showUpload = _isLocalBook();
-    final showSplitLongChapter = _isLocalTxtBook();
+    final showUpload = SearchBookInfoMenuHelper.shouldShowUpload(
+      isLocalBook: _isLocalBook(),
+    );
+    final showSplitLongChapter =
+        SearchBookInfoMenuHelper.shouldShowSplitLongChapter(
+      isLocalTxtBook: _isLocalTxtBook(),
+    );
 
     await showCupertinoModalPopup<void>(
       context: context,
@@ -1979,68 +2049,104 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           if (showUpload)
             CupertinoActionSheetAction(
               onPressed: () async {
-                Navigator.pop(sheetContext);
-                await _uploadToRemote();
+                await _runMoreActionAndCloseSheet(
+                  sheetContext: sheetContext,
+                  actionKey: 'upload',
+                  actionLabel: '上传 WebDav',
+                  action: _uploadToRemote,
+                );
               },
               child: const Text('上传 WebDav'),
             ),
           CupertinoActionSheetAction(
             onPressed: () async {
-              Navigator.pop(sheetContext);
-              await _triggerRefresh();
+              await _runMoreActionAndCloseSheet(
+                sheetContext: sheetContext,
+                actionKey: 'refresh',
+                actionLabel: '刷新',
+                action: _triggerRefresh,
+              );
             },
             child: const Text('刷新'),
           ),
           if (hasLogin)
             CupertinoActionSheetAction(
               onPressed: () async {
-                Navigator.pop(sheetContext);
-                await _openSourceLogin();
+                await _runMoreActionAndCloseSheet(
+                  sheetContext: sheetContext,
+                  actionKey: 'login',
+                  actionLabel: '登录',
+                  action: _openSourceLogin,
+                );
               },
               child: const Text('登录'),
             ),
           CupertinoActionSheetAction(
             onPressed: () async {
-              Navigator.pop(sheetContext);
-              await _pinBookToTop();
+              await _runMoreActionAndCloseSheet(
+                sheetContext: sheetContext,
+                actionKey: 'top',
+                actionLabel: '置顶',
+                action: _pinBookToTop,
+              );
             },
             child: const Text('置顶'),
           ),
-          if (canSetVariable)
+          if (showSetVariable)
             CupertinoActionSheetAction(
               onPressed: () async {
-                Navigator.pop(sheetContext);
-                await _setSourceVariable();
+                await _runMoreActionAndCloseSheet(
+                  sheetContext: sheetContext,
+                  actionKey: 'set_source_variable',
+                  actionLabel: '设置源变量',
+                  action: _setSourceVariable,
+                );
               },
               child: const Text('设置源变量'),
             ),
-          if (canSetVariable)
+          if (showSetVariable)
             CupertinoActionSheetAction(
               onPressed: () async {
-                Navigator.pop(sheetContext);
-                await _setBookVariable();
+                await _runMoreActionAndCloseSheet(
+                  sheetContext: sheetContext,
+                  actionKey: 'set_book_variable',
+                  actionLabel: '设置书籍变量',
+                  action: _setBookVariable,
+                );
               },
               child: const Text('设置书籍变量'),
             ),
           CupertinoActionSheetAction(
             onPressed: () async {
-              Navigator.pop(sheetContext);
-              await _copyBookUrl();
+              await _runMoreActionAndCloseSheet(
+                sheetContext: sheetContext,
+                actionKey: 'copy_book_url',
+                actionLabel: '拷贝书籍 URL',
+                action: _copyBookUrl,
+              );
             },
             child: const Text('拷贝书籍 URL'),
           ),
           CupertinoActionSheetAction(
             onPressed: () async {
-              Navigator.pop(sheetContext);
-              await _copyTocUrl();
+              await _runMoreActionAndCloseSheet(
+                sheetContext: sheetContext,
+                actionKey: 'copy_toc_url',
+                actionLabel: '拷贝目录 URL',
+                action: _copyTocUrl,
+              );
             },
             child: const Text('拷贝目录 URL'),
           ),
           if (showAllowUpdate)
             CupertinoActionSheetAction(
               onPressed: () async {
-                Navigator.pop(sheetContext);
-                await _toggleAllowUpdate();
+                await _runMoreActionAndCloseSheet(
+                  sheetContext: sheetContext,
+                  actionKey: 'allow_update',
+                  actionLabel: '允许更新',
+                  action: _toggleAllowUpdate,
+                );
               },
               child: _buildCheckableActionLabel(
                 title: '允许更新',
@@ -2050,15 +2156,23 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           if (showSplitLongChapter)
             CupertinoActionSheetAction(
               onPressed: () async {
-                Navigator.pop(sheetContext);
-                await _toggleSplitLongChapter();
+                await _runMoreActionAndCloseSheet(
+                  sheetContext: sheetContext,
+                  actionKey: 'split_long_chapter',
+                  actionLabel: '分割长章节',
+                  action: _toggleSplitLongChapter,
+                );
               },
               child: Text(_splitLongChapter ? '分割长章节：开' : '分割长章节：关'),
             ),
           CupertinoActionSheetAction(
             onPressed: () async {
-              Navigator.pop(sheetContext);
-              await _toggleDeleteAlertEnabled();
+              await _runMoreActionAndCloseSheet(
+                sheetContext: sheetContext,
+                actionKey: 'delete_alert',
+                actionLabel: '删除提醒',
+                action: _toggleDeleteAlertEnabled,
+              );
             },
             child: _buildCheckableActionLabel(
               title: '删除提醒',
@@ -2068,15 +2182,23 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           if (canClearCache)
             CupertinoActionSheetAction(
               onPressed: () async {
-                Navigator.pop(sheetContext);
-                await _clearBookCache();
+                await _runMoreActionAndCloseSheet(
+                  sheetContext: sheetContext,
+                  actionKey: 'clear_cache',
+                  actionLabel: '清理缓存',
+                  action: _clearBookCache,
+                );
               },
               child: const Text('清理缓存'),
             ),
           CupertinoActionSheetAction(
             onPressed: () async {
-              Navigator.pop(sheetContext);
-              await _openAppLogDialog();
+              await _runMoreActionAndCloseSheet(
+                sheetContext: sheetContext,
+                actionKey: 'log',
+                actionLabel: '日志',
+                action: _openAppLogDialog,
+              );
             },
             child: const Text('日志'),
           ),
@@ -2260,6 +2382,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   }
 
   void _showMessage(String message) {
+    if (!mounted) return;
     showCupertinoDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
@@ -2574,7 +2697,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                                       fontWeight: FontWeight.w600,
                                       color: primaryActionColor,
                                     ),
-                                  ), minimumSize: Size(0, 0),
+                                  ),
+                                  minimumSize: Size(0, 0),
                                 ),
                               ),
                             ],
@@ -2692,7 +2816,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                           ],
                         ),
                       ),
-                    ), minimumSize: Size(0, 0),
+                    ),
+                    minimumSize: Size(0, 0),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -2723,7 +2848,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                           ),
                         ),
                       ),
-                    ), minimumSize: Size(0, 0),
+                    ),
+                    minimumSize: Size(0, 0),
                   ),
                 ),
               ],

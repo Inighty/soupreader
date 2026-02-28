@@ -48,7 +48,11 @@ images/
 tool/
 
 # Root local docs (do not commit)
-/docs/
+/docs/*
+!/docs/plans/
+!/docs/plans/evidence/
+!/docs/plans/evidence/2026-02-27-ui-nav-final-regression/
+!/docs/plans/evidence/2026-02-27-ui-nav-final-regression/*.md
 
 # Local Codex workspace artifacts
 .codex/

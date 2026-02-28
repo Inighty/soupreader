@@ -1134,15 +1134,6 @@ class _SourceListViewState extends State<SourceListView> {
             },
           ),
           CupertinoActionSheetAction(
-            child: Text(
-              '${_groupSourcesByDomain ? '✓ ' : ''}按域名分组显示',
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() => _groupSourcesByDomain = !_groupSourcesByDomain);
-            },
-          ),
-          CupertinoActionSheetAction(
             child: const Text('帮助'),
             onPressed: () {
               Navigator.pop(context);
@@ -1230,6 +1221,14 @@ class _SourceListViewState extends State<SourceListView> {
             onPressed: () {
               Navigator.pop(context);
               _showGroupManageSheet();
+            },
+          ),
+          // 对齐 legado：域名分组显示入口位于“分组”菜单内，而非“更多”菜单。
+          CupertinoActionSheetAction(
+            child: Text('${_groupSourcesByDomain ? '✓ ' : ''}按域名分组显示'),
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() => _groupSourcesByDomain = !_groupSourcesByDomain);
             },
           ),
           CupertinoActionSheetAction(

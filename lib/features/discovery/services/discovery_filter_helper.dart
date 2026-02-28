@@ -14,7 +14,6 @@ class DiscoveryFilterHelper {
     // 对齐 legado：仅小写 `group:` 触发分组分支。
     if (raw.startsWith('group:')) {
       final key = raw.substring(6).trim();
-      if (key.isEmpty) return input;
       return input
           .where((source) => _matchesLegacyGroupFilter(
                 source.bookSourceGroup,
@@ -47,7 +46,9 @@ class DiscoveryFilterHelper {
   /// 仅逗号作为分隔符。
   static bool _matchesLegacyGroupFilter(String? rawGroup, String key) {
     final group = rawGroup?.trim();
-    if (group == null || group.isEmpty) return false;
+    if (group == null) return false;
+    // 与 legacy SQL 保持一致：当 key 为空时，不回退“显示全部”，
+    // 仅匹配 group='' / ',%' / '%,' / '%,,%' 这些边界形态。
     if (group == key) return true;
     if (group.startsWith('$key,')) return true;
     if (group.endsWith(',$key')) return true;

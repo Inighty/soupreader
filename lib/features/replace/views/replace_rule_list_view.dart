@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
+import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
 import '../../../core/utils/legado_json.dart';
@@ -37,8 +38,10 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
 
   late final ReplaceRuleRepository _repo;
   final ReplaceRuleImportExportService _io = ReplaceRuleImportExportService();
+  final TextEditingController _searchController = TextEditingController();
 
   String _activeGroupQuery = _groupFilterAll;
+  String _searchQuery = '';
   bool _importingLocal = false;
   bool _importingOnline = false;
   bool _importingQr = false;
@@ -75,7 +78,10 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   @override
-  void dispose() => super.dispose();
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +95,14 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
 
         final groups = _buildGroups(allRules);
         final activeGroupQuery = _resolveActiveGroupQuery(groups);
-        final rules = _filterRulesByGroupQuery(allRules, activeGroupQuery);
+        // 对齐 legado：当搜索关键字非空时，优先走搜索分支（含 `group:` 与“未分组”语义）。
+        final normalizedSearchQuery = _searchQuery.trim();
+        final rules = normalizedSearchQuery.isEmpty
+            ? _filterRulesByGroupQuery(allRules, activeGroupQuery)
+            : _filterRulesBySearchQueryLikeLegado(
+                allRules,
+                normalizedSearchQuery,
+              );
         final selectedCount = _selectedCountIn(rules);
         final totalCount = rules.length;
         final hasSelection = selectedCount > 0;
@@ -143,6 +156,14 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
           ),
           child: Column(
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                child: CupertinoSearchTextField(
+                  controller: _searchController,
+                  placeholder: '替换净化搜索',
+                  onChanged: _onSearchQueryChanged,
+                ),
+              ),
               Expanded(
                 child: rules.isEmpty ? _empty() : _buildList(rules),
               ),
@@ -320,6 +341,14 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     });
   }
 
+  void _onSearchQueryChanged(String value) {
+    setState(() {
+      _searchQuery = value;
+      // 搜索分支与分组分支在 build 中互斥，输入搜索时无需主动改写分组状态。
+      _selectedRuleIds.clear();
+    });
+  }
+
   List<String> _buildGroups(List<ReplaceRule> rules) {
     final groups = <String>{};
     for (final rule in rules) {
@@ -362,8 +391,49 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       return rules.where(_isNoGroupRule).toList(growable: false);
     }
     return rules
-        .where((rule) => (rule.group ?? '').contains(query))
+        .where((rule) => _containsLikeLegacy(rule.group ?? '', query))
         .toList(growable: false);
+  }
+
+  /// 对齐 legado ReplaceRuleActivity.observeReplaceRuleData：
+  /// 1) `未分组` -> flowNoGroup
+  /// 2) `group:xxx` -> flowGroupSearch("%xxx%")
+  /// 3) 其它关键字 -> flowSearch("%key%")（name/group 联合搜索）
+  List<ReplaceRule> _filterRulesBySearchQueryLikeLegado(
+    List<ReplaceRule> rules,
+    String query,
+  ) {
+    final raw = query.trim();
+    if (raw.isEmpty) {
+      return rules;
+    }
+    if (raw == _noGroupLabel) {
+      return rules.where(_isNoGroupRule).toList(growable: false);
+    }
+    if (raw.startsWith('group:')) {
+      final key = raw.substring(6).trim();
+      return rules.where((rule) {
+        final group = rule.group;
+        if (group == null) return false;
+        // legacy SQL `group like '%%'` 会匹配空字符串分组，但不会命中 null。
+        if (key.isEmpty) return true;
+        return _containsLikeLegacy(group, key);
+      }).toList(growable: false);
+    }
+    return rules.where((rule) {
+      final group = rule.group ?? '';
+      return _containsLikeLegacy(group, raw) ||
+          _containsLikeLegacy(rule.name, raw);
+    }).toList(growable: false);
+  }
+
+  /// 近似对齐 SQLite `LIKE '%key%'` 的匹配语义：
+  /// - 空 key 视为命中；
+  /// - 采用不区分大小写的“包含”匹配，避免 Dart `contains` 比 SQL `LIKE` 更严格。
+  bool _containsLikeLegacy(String text, String key) {
+    final normalizedKey = key.trim();
+    if (normalizedKey.isEmpty) return true;
+    return text.toLowerCase().contains(normalizedKey.toLowerCase());
   }
 
   bool _isNoGroupRule(ReplaceRule rule) {
@@ -422,9 +492,30 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   void _applyGroupQuery(String query, BuildContext popupContext) {
     setState(() {
       _activeGroupQuery = query;
+      _searchQuery = '';
       _selectedRuleIds.clear();
     });
+    if (_searchController.text.isNotEmpty) {
+      _searchController.clear();
+    }
     Navigator.pop(popupContext);
+  }
+
+  void _recordViewError({
+    required String node,
+    required String message,
+    required Object error,
+    required StackTrace stackTrace,
+    Map<String, dynamic>? context,
+  }) {
+    ExceptionLogService().record(
+      node: node,
+      message: message,
+      error: error,
+      stackTrace: stackTrace,
+      context: context,
+    );
+    debugPrint('[replace-rule] $node failed: $error');
   }
 
   Future<void> _showGroupManageSheet() async {
@@ -605,8 +696,15 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       if (updates.isEmpty) return;
       await _repo.addRules(updates);
     } catch (error, stackTrace) {
-      debugPrint('AddReplaceRuleGroupError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.group.add',
+        message: '新增替换规则分组失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'group': normalized,
+        },
+      );
     }
   }
 
@@ -634,8 +732,16 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       if (updates.isEmpty) return;
       await _repo.addRules(updates);
     } catch (error, stackTrace) {
-      debugPrint('RenameReplaceRuleGroupError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.group.rename',
+        message: '重命名替换规则分组失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'oldGroup': oldGroup,
+          'newGroup': nextGroup,
+        },
+      );
     }
   }
 
@@ -645,7 +751,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
 
   Set<String> _splitGroupsForGroupMutation(String rawGroup) {
     final groups = <String>{};
-    for (final part in rawGroup.split(',')) {
+    for (final part in rawGroup.split(_groupSplitPattern)) {
       final group = part.trim();
       if (group.isEmpty) {
         continue;
@@ -907,8 +1013,16 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     try {
       await _repo.deleteRule(rule.id);
     } catch (error, stackTrace) {
-      debugPrint('DeleteReplaceRuleError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.delete',
+        message: '删除替换规则失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'ruleId': rule.id,
+          'ruleName': rule.name,
+        },
+      );
     }
   }
 
@@ -948,8 +1062,15 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       await _repo.deleteRulesByIds(targetIds);
       _selectedRuleIds.removeWhere(targetIds.contains);
     } catch (error, stackTrace) {
-      debugPrint('DeleteSelectionReplaceRuleError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.delete_selection',
+        message: '批量删除替换规则失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'count': selectedRules.length,
+        },
+      );
     } finally {
       if (!mounted) return;
       setState(() => _deletingSelection = false);
@@ -968,8 +1089,16 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       }
       await _repo.addRule(rule.copyWith(order: minOrder - 1));
     } catch (error, stackTrace) {
-      debugPrint('TopReplaceRuleError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.move_top',
+        message: '替换规则置顶失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'ruleId': rule.id,
+          'ruleName': rule.name,
+        },
+      );
     }
   }
 
@@ -985,8 +1114,16 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       }
       await _repo.addRule(rule.copyWith(order: maxOrder + 1));
     } catch (error, stackTrace) {
-      debugPrint('BottomReplaceRuleError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.move_bottom',
+        message: '替换规则置底失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'ruleId': rule.id,
+          'ruleName': rule.name,
+        },
+      );
     }
   }
 
@@ -1090,8 +1227,15 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       if (!mounted) return;
       await _showExportPathDialog(normalizedPath);
     } catch (error, stackTrace) {
-      debugPrint('ExportReplaceRuleSelectionError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.export_selection',
+        message: '导出所选替换规则失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'count': selectedRules.length,
+        },
+      );
       if (!mounted) return;
       await _showMessageDialog(
         title: '导出所选',
@@ -1114,8 +1258,15 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
           .toList(growable: false);
       await _repo.addRules(updatedRules);
     } catch (error, stackTrace) {
-      debugPrint('EnableSelectionReplaceRuleError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.enable_selection',
+        message: '批量启用替换规则失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'count': selectedRules.length,
+        },
+      );
     } finally {
       if (!mounted) return;
       setState(() => _enablingSelection = false);
@@ -1133,8 +1284,15 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
           .toList(growable: false);
       await _repo.addRules(updatedRules);
     } catch (error, stackTrace) {
-      debugPrint('DisableSelectionReplaceRuleError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.disable_selection',
+        message: '批量禁用替换规则失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'count': selectedRules.length,
+        },
+      );
     } finally {
       if (!mounted) return;
       setState(() => _disablingSelection = false);
@@ -1162,8 +1320,15 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       }).toList(growable: false);
       await _repo.addRules(updatedRules);
     } catch (error, stackTrace) {
-      debugPrint('TopSelectionReplaceRuleError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.top_selection',
+        message: '批量置顶替换规则失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'count': selectedRules.length,
+        },
+      );
     } finally {
       if (!mounted) return;
       setState(() => _toppingSelection = false);
@@ -1191,8 +1356,15 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       }).toList(growable: false);
       await _repo.addRules(updatedRules);
     } catch (error, stackTrace) {
-      debugPrint('BottomSelectionReplaceRuleError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.bottom_selection',
+        message: '批量置底替换规则失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'count': selectedRules.length,
+        },
+      );
     } finally {
       if (!mounted) return;
       setState(() => _bottomingSelection = false);
@@ -1209,8 +1381,12 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       }
       await _importRulesFromInput(localText);
     } catch (error, stackTrace) {
-      debugPrint('ImportReplaceRuleLocalError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.import_local',
+        message: '本地导入替换规则失败',
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (!mounted) return;
       await _showMessageDialog(
         title: '导入替换规则',
@@ -1237,8 +1413,12 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       }
       await _importRulesFromInput(normalizedInput);
     } catch (error, stackTrace) {
-      debugPrint('ImportReplaceRuleOnlineError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.import_online',
+        message: '网络导入替换规则失败',
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (!mounted) return;
       await _showMessageDialog(
         title: '导入替换规则',
@@ -1265,8 +1445,12 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       }
       await _importRulesFromInput(normalizedInput);
     } catch (error, stackTrace) {
-      debugPrint('ImportReplaceRuleQrError:$error');
-      debugPrint('$stackTrace');
+      _recordViewError(
+        node: 'replace_rule.import_qr',
+        message: '二维码导入替换规则失败',
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (!mounted) return;
       await _showMessageDialog(
         title: '导入替换规则',

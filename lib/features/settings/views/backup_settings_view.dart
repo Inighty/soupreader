@@ -542,12 +542,14 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: _openWebDavHelp,
-            child: const Icon(CupertinoIcons.question_circle, size: 22), minimumSize: Size(30, 30),
+            child: const Icon(CupertinoIcons.question_circle, size: 22),
+            minimumSize: Size(30, 30),
           ),
         CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: _showMoreActions,
-          child: const Icon(CupertinoIcons.ellipsis_circle, size: 22), minimumSize: Size(30, 30),
+          child: const Icon(CupertinoIcons.ellipsis_circle, size: 22),
+          minimumSize: Size(30, 30),
         ),
       ],
     );
@@ -619,7 +621,20 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     if (!mounted) return;
     Navigator.pop(context);
     if (result.cancelled) return;
-    _showMessage(result.success ? '导出成功' : (result.errorMessage ?? '导出失败'));
+    if (result.success) {
+      await _syncBackupCompareBaselineNow(reason: 'export_to_file');
+      _showMessage('导出成功');
+      return;
+    }
+    _exceptionLogService.record(
+      node: 'backup_settings.export_file',
+      message: '导出备份失败',
+      context: <String, dynamic>{
+        'includeOnlineCache': includeOnlineCache,
+        'errorMessage': result.errorMessage,
+      },
+    );
+    _showMessage(result.errorMessage ?? '导出失败');
   }
 
   Future<void> _import({required bool overwrite}) async {
@@ -666,9 +681,20 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     Navigator.pop(context);
     if (result.cancelled) return;
     if (!result.success) {
+      _exceptionLogService.record(
+        node: 'backup_settings.import_file',
+        message: '从文件导入备份失败',
+        context: <String, dynamic>{
+          'overwrite': overwrite,
+          'errorMessage': result.errorMessage,
+        },
+      );
       _showMessage(result.errorMessage ?? '导入失败');
       return;
     }
+    await _syncBackupCompareBaselineNow(
+      reason: overwrite ? 'import_file_overwrite' : 'import_file_merge',
+    );
     _showImportResult(
       result,
       prefix:
@@ -694,8 +720,19 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
         fileName: payload.fileName,
         bytes: payload.bytes,
       );
+      await _syncBackupCompareBaselineNow(reason: 'backup_to_webdav');
       message = 'WebDav 备份成功\n文件：${payload.fileName}\n远端：$remoteUrl';
-    } catch (error) {
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: 'backup_settings.backup_to_webdav',
+        message: '备份到 WebDav 失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'webDavUrl': settings.webDavUrl,
+          'onlyLatestBackup': settings.onlyLatestBackup,
+        },
+      );
       message = 'WebDav 备份失败\n$error';
     }
     if (!mounted) return;
@@ -714,7 +751,18 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     List<WebDavRemoteEntry> backups = const <WebDavRemoteEntry>[];
     try {
       backups = await _webDavService.listBackupFiles(settings: settings);
-    } catch (error) {
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: 'backup_settings.list_webdav_backups',
+        message: '拉取 WebDav 备份列表失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'webDavUrl': settings.webDavUrl,
+          'hasAccount': settings.webDavAccount.trim().isNotEmpty,
+          'hasPassword': settings.webDavPassword.trim().isNotEmpty,
+        },
+      );
       if (!mounted) return;
       Navigator.pop(context);
       await _showWebDavRestoreFallback(error.toString());
@@ -764,9 +812,18 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     Navigator.pop(context);
 
     if (!result.success) {
+      _exceptionLogService.record(
+        node: 'backup_settings.import_legacy_directory',
+        message: '导入旧版数据失败',
+        context: <String, dynamic>{
+          'selectedDirectory': selectedDirectory,
+          'errorMessage': result.errorMessage,
+        },
+      );
       _showMessage(result.errorMessage ?? '导入旧数据失败');
       return;
     }
+    await _syncBackupCompareBaselineNow(reason: 'import_legacy_directory');
     _showMessage(
       '导入旧数据完成：书源 ${result.sourcesImported} 条，书籍 ${result.booksImported} 本，替换规则 ${result.replaceRulesImported} 条',
     );
@@ -812,7 +869,8 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                               ),
                         ),
                       ],
-                    ), minimumSize: Size(44, 44),
+                    ),
+                    minimumSize: Size(44, 44),
                   ),
               ],
             ),
@@ -845,11 +903,22 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
       if (!mounted) return false;
       Navigator.pop(context);
       if (!result.success) {
+        _exceptionLogService.record(
+          node: 'backup_settings.restore_webdav_backup',
+          message: '恢复 WebDav 备份失败',
+          context: <String, dynamic>{
+            'remotePath': entry.path,
+            'displayName': entry.displayName,
+            'errorMessage': result.errorMessage,
+          },
+        );
         await _showWebDavRestoreFallback(result.errorMessage ?? 'WebDav 恢复失败');
         return false;
       }
       if (entry.lastModify > 0) {
         await _settingsService.saveLastSeenWebDavBackupMillis(entry.lastModify);
+      } else {
+        await _syncBackupCompareBaselineNow(reason: 'restore_webdav_backup');
       }
       _showImportResult(
         result,
@@ -857,7 +926,17 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
             'WebDav 恢复完成：书源 ${result.sourcesImported} 条，书籍 ${result.booksImported} 本，章节 ${result.chaptersImported} 章',
       );
       return true;
-    } catch (error) {
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: 'backup_settings.restore_webdav_backup',
+        message: '恢复 WebDav 备份发生异常',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'remotePath': entry.path,
+          'displayName': entry.displayName,
+        },
+      );
       if (!mounted) return false;
       Navigator.pop(context);
       await _showWebDavRestoreFallback(error.toString());
@@ -973,7 +1052,8 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                               size: 18,
                             ),
                         ],
-                      ), minimumSize: Size(34, 34),
+                      ),
+                      minimumSize: Size(34, 34),
                     ),
                 ],
               ),
@@ -1063,7 +1143,20 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     try {
       await _webDavService
           .ensureUploadDirectories(_settingsService.appSettings);
-    } catch (error) {
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: 'backup_settings.test_webdav_connection',
+        message: '测试 WebDav 连接失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'webDavUrl': _settingsService.appSettings.webDavUrl,
+          'hasAccount':
+              _settingsService.appSettings.webDavAccount.trim().isNotEmpty,
+          'hasPassword':
+              _settingsService.appSettings.webDavPassword.trim().isNotEmpty,
+        },
+      );
       message = error.toString();
     } finally {
       if (mounted) {
@@ -1073,6 +1166,28 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
 
     if (!mounted) return;
     _showMessage(message);
+  }
+
+  /// 同步“自动检查新备份”的本地对照时间。
+  ///
+  /// 与 legado `LocalConfig.lastBackup` 语义对齐：
+  /// 本地备份/恢复成功后也要推进对照时间，避免旧远端备份被重复判定为“新备份”。
+  Future<void> _syncBackupCompareBaselineNow({
+    required String reason,
+  }) async {
+    try {
+      await _settingsService.saveLastSeenWebDavBackupMillis(
+        DateTime.now().millisecondsSinceEpoch,
+      );
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: 'backup_settings.sync_compare_baseline',
+        message: '更新自动检查新备份对照时间失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{'reason': reason},
+      );
+    }
   }
 
   String _brief(String value, {String fallback = '未设置'}) {

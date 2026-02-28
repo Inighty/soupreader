@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
+import '../../../core/services/exception_log_service.dart';
 import '../../bookshelf/services/book_add_service.dart';
 import '../../source/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
@@ -34,6 +37,7 @@ class _DiscoveryExploreResultsViewState
 
   final List<SearchResult> _results = <SearchResult>[];
   final Set<String> _seenKeys = <String>{};
+  Set<String> _bookshelfKeys = <String>{};
 
   bool _loading = false;
   bool _hasMore = true;
@@ -46,8 +50,11 @@ class _DiscoveryExploreResultsViewState
     final db = DatabaseService();
     _engine = RuleParserEngine();
     _addService = BookAddService(database: db);
+    _bookshelfKeys = _addService.buildSearchBookshelfKeys();
     _scrollController.addListener(_onScroll);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadMore());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_loadMore(trigger: 'init'));
+    });
   }
 
   @override
@@ -63,35 +70,44 @@ class _DiscoveryExploreResultsViewState
     final position = _scrollController.position;
     if (position.maxScrollExtent <= 0) return;
     if (position.pixels >= position.maxScrollExtent - 220) {
-      _loadMore();
+      unawaited(_loadMore(trigger: 'scroll'));
     }
   }
 
-  Future<void> _loadMore({bool forceRefresh = false}) async {
+  Future<void> _loadMore({
+    bool forceLoad = false,
+    bool resetList = false,
+    String trigger = 'manual',
+  }) async {
     if (_loading) return;
-    if (!forceRefresh && !_hasMore) return;
+    if (!forceLoad && !_hasMore) return;
 
-    if (forceRefresh) {
-      setState(() {
-        _loading = true;
-        _errorMessage = null;
+    final requestPage = resetList ? 1 : _page;
+
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+      if (forceLoad) {
+        // 对齐 legado LoadMoreView.hasMore()：用户点“继续加载/重试”时强制恢复可加载状态。
+        _hasMore = true;
+      }
+      if (resetList) {
         _results.clear();
         _seenKeys.clear();
         _hasMore = true;
         _page = 1;
-      });
-    } else {
-      setState(() {
-        _loading = true;
-        _errorMessage = null;
-      });
-    }
+      }
+    });
 
     try {
+      debugPrint(
+        '[discovery-results] loadMore trigger=$trigger page=$requestPage '
+        'forceLoad=$forceLoad resetList=$resetList source=${widget.source.bookSourceUrl}',
+      );
       final fetched = await _engine.explore(
         widget.source,
         exploreUrlOverride: widget.exploreUrl,
-        page: _page,
+        page: requestPage,
       );
 
       if (!mounted) return;
@@ -110,16 +126,42 @@ class _DiscoveryExploreResultsViewState
         _loading = false;
         if (fetched.isEmpty || added == 0) {
           _hasMore = false;
+          debugPrint(
+            '[discovery-results] no more data page=$requestPage '
+            'fetched=${fetched.length} added=$added',
+          );
         } else {
-          _page++;
+          _page = requestPage + 1;
+          debugPrint(
+            '[discovery-results] loaded page=$requestPage '
+            'fetched=${fetched.length} added=$added nextPage=$_page',
+          );
         }
       });
-    } catch (e) {
+    } catch (e, st) {
+      ExceptionLogService().record(
+        node: 'discovery.explore_results.load_more',
+        message: '发现二级页加载失败',
+        error: e,
+        stackTrace: st,
+        context: <String, dynamic>{
+          'sourceUrl': widget.source.bookSourceUrl,
+          'sourceName': widget.source.bookSourceName,
+          'exploreName': widget.exploreName,
+          'exploreUrl': widget.exploreUrl,
+          'page': requestPage,
+          'trigger': trigger,
+        },
+      );
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _hasMore = false;
         _errorMessage = _compactReason(e.toString());
       });
+      debugPrint(
+        '[discovery-results] load failed page=$requestPage trigger=$trigger error=$e',
+      );
     }
   }
 
@@ -130,13 +172,93 @@ class _DiscoveryExploreResultsViewState
   }
 
   Future<void> _openBookInfo(SearchResult result) async {
-    await Navigator.of(context, rootNavigator: true).push(
-      CupertinoPageRoute<void>(
-        builder: (_) => SearchBookInfoView(result: result),
+    try {
+      await Navigator.of(context, rootNavigator: true).push(
+        CupertinoPageRoute<void>(
+          builder: (_) => SearchBookInfoView(result: result),
+        ),
+      );
+    } catch (e, st) {
+      ExceptionLogService().record(
+        node: 'discovery.explore_results.open_book_info',
+        message: '打开书籍详情失败',
+        error: e,
+        stackTrace: st,
+        context: <String, dynamic>{
+          'bookName': result.name,
+          'bookUrl': result.bookUrl,
+          'sourceUrl': result.sourceUrl,
+        },
+      );
+      if (mounted) {
+        _showMessage('打开详情失败，请稍后重试');
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _bookshelfKeys = _addService.buildSearchBookshelfKeys();
+    });
+  }
+
+  Future<void> _onFooterTap() async {
+    if (_loading) return;
+    if ((_errorMessage ?? '').trim().isNotEmpty) {
+      final retry = await _showLoadErrorDialog(_errorMessage!);
+      if (!retry || !mounted) return;
+      await _loadMore(
+        forceLoad: true,
+        trigger: 'footer_error_retry',
+      );
+      return;
+    }
+    await _loadMore(
+      forceLoad: true,
+      trigger: 'footer_click',
+    );
+  }
+
+  Future<bool> _showLoadErrorDialog(String detail) async {
+    final result = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('加载失败'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(detail),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('取消'),
+            onPressed: () => Navigator.of(ctx).pop(false),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: const Text('重试'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
       ),
     );
-    if (!mounted) return;
-    setState(() {});
+    return result ?? false;
+  }
+
+  void _showMessage(String message, {String title = '提示'}) {
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(message),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('确定'),
+            onPressed: () => Navigator.of(ctx).pop(),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -184,74 +306,8 @@ class _DiscoveryExploreResultsViewState
   }
 
   Widget _buildBody(BuildContext context) {
-    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
-    final secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
-      context,
-    );
-    final destructiveColor = CupertinoColors.systemRed.resolveFrom(context);
-
-    if (_results.isEmpty) {
-      if (_loading) {
-        return const Center(child: CupertinoActivityIndicator());
-      }
-      if (_errorMessage != null) {
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  CupertinoIcons.exclamationmark_triangle_fill,
-                  size: 42,
-                  color: destructiveColor,
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  _errorMessage!,
-                  textAlign: TextAlign.center,
-                  style: textStyle.copyWith(
-                    fontSize: 12,
-                    color: destructiveColor,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: () => _loadMore(forceRefresh: true),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: CupertinoColors.activeBlue.resolveFrom(context),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      child: Text(
-                        '重试',
-                        style: TextStyle(
-                          color: CupertinoColors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ), minimumSize: Size(0, 0),
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-      return Center(
-        child: Text(
-          '暂无发现内容',
-          style: textStyle.copyWith(
-            fontSize: 13,
-            color: secondaryTextColor,
-          ),
-        ),
-      );
+    if (_results.isEmpty && _loading) {
+      return const Center(child: CupertinoActivityIndicator());
     }
 
     return ListView.builder(
@@ -277,7 +333,10 @@ class _DiscoveryExploreResultsViewState
       context,
     );
     final inShelfColor = CupertinoColors.activeBlue.resolveFrom(context);
-    final inBookshelf = _addService.isInBookshelf(result);
+    final inBookshelf = _addService.isInBookshelf(
+      result,
+      bookshelfKeys: _bookshelfKeys,
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -376,6 +435,22 @@ class _DiscoveryExploreResultsViewState
       context,
     );
     final destructiveColor = CupertinoColors.systemRed.resolveFrom(context);
+    final hasError = (_errorMessage ?? '').trim().isNotEmpty;
+
+    if (_results.isEmpty && !_loading && !hasError && !_hasMore) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Center(
+          child: Text(
+            '暂无发现内容',
+            style: textStyle.copyWith(
+              fontSize: 13,
+              color: secondaryTextColor,
+            ),
+          ),
+        ),
+      );
+    }
 
     if (_loading) {
       return const Padding(
@@ -384,50 +459,36 @@ class _DiscoveryExploreResultsViewState
       );
     }
 
-    if (_errorMessage != null) {
+    if (hasError) {
       return Padding(
         padding: const EdgeInsets.only(top: 8, bottom: 12),
-        child: Column(
-          children: [
-            Text(
-              '加载失败：$_errorMessage',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: textStyle.copyWith(
-                fontSize: 12,
-                color: destructiveColor,
+        child: GestureDetector(
+          onTap: () => unawaited(_onFooterTap()),
+          child: Column(
+            children: [
+              Text(
+                '加载失败：点击查看详情并重试',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: textStyle.copyWith(
+                  fontSize: 12,
+                  color: destructiveColor,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              onPressed: _loadMore,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: CupertinoColors.systemBackground.resolveFrom(context),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: CupertinoColors.separator.resolveFrom(context),
-                  ),
+              const SizedBox(height: 4),
+              Text(
+                _errorMessage!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: textStyle.copyWith(
+                  fontSize: 12,
+                  color: secondaryTextColor,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    '重试加载',
-                    style: textStyle.copyWith(
-                      fontSize: 14,
-                      color: CupertinoColors.activeBlue.resolveFrom(context),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ), minimumSize: Size(0, 0),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -449,12 +510,15 @@ class _DiscoveryExploreResultsViewState
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Center(
-        child: Text(
-          '上拉继续加载',
-          style: textStyle.copyWith(
-            fontSize: 12,
-            color: secondaryTextColor,
+      child: GestureDetector(
+        onTap: () => unawaited(_onFooterTap()),
+        child: Center(
+          child: Text(
+            '点击继续加载',
+            style: textStyle.copyWith(
+              fontSize: 12,
+              color: CupertinoColors.activeBlue.resolveFrom(context),
+            ),
           ),
         ),
       ),

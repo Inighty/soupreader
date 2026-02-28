@@ -22,6 +22,7 @@ class ReaderBottomMenuNew extends StatefulWidget {
   final VoidCallback? onReadAloudLongPress;
   final VoidCallback onShowInterfaceSettings;
   final VoidCallback onShowBehaviorSettings;
+  final bool showReadAloud;
   final bool readBarStyleFollowPage;
   final bool readAloudRunning;
   final bool readAloudPaused;
@@ -43,6 +44,7 @@ class ReaderBottomMenuNew extends StatefulWidget {
     this.onReadAloudLongPress,
     required this.onShowInterfaceSettings,
     required this.onShowBehaviorSettings,
+    this.showReadAloud = true,
     this.readBarStyleFollowPage = false,
     this.readAloudRunning = false,
     this.readAloudPaused = false,
@@ -430,16 +432,18 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             onTap: widget.onShowChapterList,
           ),
           const Spacer(flex: 2),
-          _buildTabItem(
-            foreground: foreground,
-            icon: readAloudIcon,
-            label: '朗读',
-            onTap: widget.onShowReadAloud,
-            onLongPress: widget.onReadAloudLongPress,
-            active: readAloudActive,
-            activeColor: accent,
-          ),
-          const Spacer(flex: 2),
+          if (widget.showReadAloud) ...[
+            _buildTabItem(
+              foreground: foreground,
+              icon: readAloudIcon,
+              label: '朗读',
+              onTap: widget.onShowReadAloud,
+              onLongPress: widget.onReadAloudLongPress,
+              active: readAloudActive,
+              activeColor: accent,
+            ),
+            const Spacer(flex: 2),
+          ],
           _buildTabItem(
             foreground: foreground,
             icon: CupertinoIcons.circle_grid_3x3,

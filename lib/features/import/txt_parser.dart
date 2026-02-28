@@ -91,6 +91,7 @@ class TxtParser {
     String filePath, {
     String? forcedCharset,
     String? tocRuleRegex,
+    List<String>? tocRuleRegexCandidates,
   }) async {
     final file = File(filePath);
     if (!await file.exists()) {
@@ -109,6 +110,7 @@ class TxtParser {
       filePath,
       charset: decoded.charset,
       tocRuleRegex: tocRuleRegex,
+      tocRuleRegexCandidates: tocRuleRegexCandidates,
     );
   }
 
@@ -118,6 +120,7 @@ class TxtParser {
     String fileName, {
     String? forcedCharset,
     String? tocRuleRegex,
+    List<String>? tocRuleRegexCandidates,
   }) {
     final decoded = _decodeContent(bytes, forcedCharset: forcedCharset);
     final bookName =
@@ -128,6 +131,7 @@ class TxtParser {
       null,
       charset: decoded.charset,
       tocRuleRegex: tocRuleRegex,
+      tocRuleRegexCandidates: tocRuleRegexCandidates,
     );
   }
 
@@ -139,6 +143,7 @@ class TxtParser {
     String? forcedCharset,
     bool splitLongChapter = true,
     String? tocRuleRegex,
+    List<String>? tocRuleRegexCandidates,
   }) async {
     final file = File(filePath);
     if (!await file.exists()) {
@@ -154,6 +159,7 @@ class TxtParser {
       forcedBookId: bookId,
       splitLongChapter: splitLongChapter,
       tocRuleRegex: tocRuleRegex,
+      tocRuleRegexCandidates: tocRuleRegexCandidates,
     );
   }
 
@@ -355,6 +361,7 @@ class TxtParser {
     String? forcedBookId,
     bool splitLongChapter = true,
     String? tocRuleRegex,
+    List<String>? tocRuleRegexCandidates,
   }) {
     // 清理内容 - 统一换行符
     content = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
@@ -364,6 +371,7 @@ class TxtParser {
       content,
       splitLongChapter: splitLongChapter,
       tocRuleRegex: tocRuleRegex,
+      tocRuleRegexCandidates: tocRuleRegexCandidates,
     );
 
     // 创建书籍
@@ -667,6 +675,7 @@ class TxtParser {
     String content, {
     bool splitLongChapter = true,
     String? tocRuleRegex,
+    List<String>? tocRuleRegexCandidates,
   }) {
     final normalizedRule = (tocRuleRegex ?? '').trim();
     if (normalizedRule.isNotEmpty) {
@@ -680,6 +689,27 @@ class TxtParser {
         splitLongChapter: splitLongChapter,
         allowFallback: false,
       );
+    }
+
+    // 对齐 legado：当外部明确传入“已启用目录规则集合”时，仅在该集合内做自动选优。
+    // 若无有效匹配，直接走“无规则分章”回退，不再使用内置默认规则。
+    if (tocRuleRegexCandidates != null) {
+      final bestMatches = _selectBestMatchesByRuleCandidates(
+        content,
+        tocRuleRegexCandidates,
+      );
+      if (bestMatches.isNotEmpty) {
+        return _splitByMatches(
+          content,
+          bestMatches,
+          splitLongChapter: splitLongChapter,
+          allowFallback: true,
+        );
+      }
+      if (!splitLongChapter) {
+        return _singleChapterFallback(content);
+      }
+      return _splitByLength(content);
     }
 
     var maxMatches = 0;
@@ -705,6 +735,46 @@ class TxtParser {
       splitLongChapter: splitLongChapter,
       allowFallback: true,
     );
+  }
+
+  /// 从候选目录规则里选择“最佳匹配”。
+  ///
+  /// 评分逻辑对齐 legado `TextFile.getTocRule`：
+  /// - 只统计彼此间隔较大的命中（>1000 字符）；
+  /// - 使用 `>=` 处理并列分值（配合 reversed 顺序，保证前置规则优先级更高）。
+  static List<RegExpMatch> _selectBestMatchesByRuleCandidates(
+    String content,
+    List<String> tocRuleRegexCandidates,
+  ) {
+    var bestScore = 1;
+    List<RegExpMatch> bestMatches = const <RegExpMatch>[];
+    for (final rawRule in tocRuleRegexCandidates.reversed) {
+      final normalized = rawRule.trim();
+      if (normalized.isEmpty) continue;
+      final pattern = _compileTocPattern(normalized);
+      if (pattern == null) continue;
+      final matches = _filterValidMatches(pattern.allMatches(content));
+      final score = _countSpacedMatchesLikeLegado(matches);
+      if (score >= bestScore) {
+        bestScore = score;
+        bestMatches = matches;
+      }
+    }
+    return bestMatches;
+  }
+
+  static int _countSpacedMatchesLikeLegado(List<RegExpMatch> matches) {
+    var count = 0;
+    var lastEnd = 0;
+    var hasStart = false;
+    for (final match in matches) {
+      if (!hasStart || match.start - lastEnd > 1000) {
+        count++;
+        lastEnd = match.end;
+        hasStart = true;
+      }
+    }
+    return count;
   }
 
   static RegExp? _compileTocPattern(String rawPattern) {

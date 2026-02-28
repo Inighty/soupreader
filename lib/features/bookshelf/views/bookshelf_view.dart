@@ -11,6 +11,7 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/app_settings.dart';
+import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../import/book_import_file_name_rule_service.dart';
 import '../../import/import_service.dart';
@@ -23,7 +24,6 @@ import '../../source/services/rule_parser_engine.dart';
 import 'cache_export_placeholder_view.dart';
 import 'bookshelf_manage_placeholder_view.dart';
 import 'bookshelf_group_manage_placeholder_dialog.dart';
-import 'remote_books_servers_view.dart';
 import '../services/book_add_service.dart';
 import '../services/bookshelf_book_group_store.dart';
 import '../services/bookshelf_booklist_import_service.dart';
@@ -53,6 +53,8 @@ class BookshelfView extends StatefulWidget {
 class _BookshelfViewState extends State<BookshelfView> {
   static const String _bookGroupMembershipSettingKey =
       'bookshelf.book_group_membership_map';
+  static const String _style1SelectedTabIndexSettingKey =
+      'bookshelf.style1_selected_tab_index';
   bool _isGridView = true;
   int _gridCrossAxisCount = 3;
   // 与 legado 一致：图墙/列表都可展示“更新中”状态。
@@ -83,6 +85,8 @@ class _BookshelfViewState extends State<BookshelfView> {
   Map<String, int> _bookGroupMembershipMap = const <String, int>{};
   // 与 legado style2 一致：根态是独立的 IdRoot，而不是“全部”分组本身。
   int _selectedGroupId = BookshelfBookGroup.idRoot;
+  // 与 legado AppConfig.saveTabPosition 对齐：style1 记录分组页签索引。
+  int _style1SelectedTabIndex = 0;
 
   // 与 legado 对齐：内置分组的语义和顺序需要稳定保底，避免旧数据缺项导致 UI 行为漂移。
   static const List<BookshelfBookGroup> _defaultBookGroups =
@@ -161,6 +165,7 @@ class _BookshelfViewState extends State<BookshelfView> {
           _settingsService.appSettings.bookshelfLayoutIndex);
       _isGridView = initialLayoutIndex > 0;
       _gridCrossAxisCount = _gridColumnsForLayoutIndex(initialLayoutIndex);
+      _style1SelectedTabIndex = _readStyle1SelectedTabIndex();
       _lastExternalReselectVersion = widget.reselectSignal?.value;
       widget.reselectSignal?.addListener(_onExternalReselectSignal);
       _loadBooks();
@@ -355,6 +360,37 @@ class _BookshelfViewState extends State<BookshelfView> {
     return 0;
   }
 
+  int _readStyle1SelectedTabIndex() {
+    final raw = _database.getSetting(
+      _style1SelectedTabIndexSettingKey,
+      defaultValue: 0,
+    );
+    if (raw is int) return math.max(raw, 0);
+    if (raw is num) return math.max(raw.toInt(), 0);
+    if (raw is String) {
+      return math.max(int.tryParse(raw.trim()) ?? 0, 0);
+    }
+    return 0;
+  }
+
+  Future<void> _persistStyle1SelectedTabIndex(int index) async {
+    final normalized = math.max(index, 0);
+    try {
+      await _database.putSetting(_style1SelectedTabIndexSettingKey, normalized);
+      debugPrint('[bookshelf] style1 save tab index=$normalized');
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'bookshelf.style1.save_tab_index',
+        message: '保存 style1 分组页签索引失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'tabIndex': normalized,
+        },
+      );
+    }
+  }
+
   int _resolveCustomGroupMask() {
     var mask = 0;
     for (final group in _bookGroups) {
@@ -418,6 +454,29 @@ class _BookshelfViewState extends State<BookshelfView> {
     return visible;
   }
 
+  /// 与 legado style1 的 TabLayout 数据源一致：复用 `bookGroupDao.show` 语义。
+  List<BookshelfBookGroup> _visibleGroupsForStyle1() {
+    final visible = _visibleGroupsForRoot();
+    if (visible.isNotEmpty) return visible;
+    for (final group in _bookGroups) {
+      if (group.groupId == BookshelfBookGroup.idAll) {
+        return <BookshelfBookGroup>[group];
+      }
+    }
+    return const <BookshelfBookGroup>[];
+  }
+
+  int _resolveStyle1SelectedTabIndex(List<BookshelfBookGroup> groups) {
+    if (groups.isEmpty) return 0;
+    return _style1SelectedTabIndex.clamp(0, groups.length - 1);
+  }
+
+  BookshelfBookGroup? _selectedStyle1GroupOrNull() {
+    final groups = _visibleGroupsForStyle1();
+    if (groups.isEmpty) return null;
+    return groups[_resolveStyle1SelectedTabIndex(groups)];
+  }
+
   /// 与 legado `bookGroupDao.show` 对齐：
   /// 根态只展示“可见且存在匹配书籍”的分组；`全部`分组始终展示。
   bool _shouldShowGroupOnRoot(BookshelfBookGroup group) {
@@ -428,29 +487,43 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   int _resolveSortIndexForCurrentGroup() {
     var sortIndex = _settingsService.appSettings.bookshelfSortIndex;
-    if (!_isStyle2Enabled || _selectedGroupId == BookshelfBookGroup.idRoot) {
+    if (_isStyle2Enabled) {
+      if (_selectedGroupId == BookshelfBookGroup.idRoot) {
+        return sortIndex;
+      }
+      BookshelfBookGroup? selectedGroup;
+      for (final group in _bookGroups) {
+        if (group.groupId == _selectedGroupId) {
+          selectedGroup = group;
+          break;
+        }
+      }
+      if (selectedGroup != null && selectedGroup.bookSort >= 0) {
+        sortIndex = selectedGroup.bookSort;
+      }
       return sortIndex;
     }
-    BookshelfBookGroup? selectedGroup;
-    for (final group in _bookGroups) {
-      if (group.groupId == _selectedGroupId) {
-        selectedGroup = group;
-        break;
-      }
-    }
-    if (selectedGroup != null && selectedGroup.bookSort >= 0) {
-      sortIndex = selectedGroup.bookSort;
+    // style1 每个分组也支持独立排序配置（与 legado BooksFragment 对齐）。
+    final selectedStyle1Group = _selectedStyle1GroupOrNull();
+    if (selectedStyle1Group != null && selectedStyle1Group.bookSort >= 0) {
+      sortIndex = selectedStyle1Group.bookSort;
     }
     return sortIndex;
   }
 
   List<Book> _displayBooks() {
     final source = List<Book>.from(_books);
-    final grouped = _isStyle2Enabled
-        ? (_selectedGroupId == BookshelfBookGroup.idRoot
-            ? source
-            : _filterBooksByGroup(source, _selectedGroupId))
-        : source;
+    late final List<Book> grouped;
+    if (_isStyle2Enabled) {
+      grouped = _selectedGroupId == BookshelfBookGroup.idRoot
+          ? source
+          : _filterBooksByGroup(source, _selectedGroupId);
+    } else {
+      final selectedStyle1Group = _selectedStyle1GroupOrNull();
+      grouped = selectedStyle1Group == null
+          ? source
+          : _filterBooksByGroup(source, selectedStyle1Group.groupId);
+    }
     final sorted = List<Book>.from(grouped);
     _sortBookList(sorted, _resolveSortIndexForCurrentGroup());
     return sorted;
@@ -1068,14 +1141,6 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
     if (!mounted) return;
     _loadBooks();
-  }
-
-  Future<void> _openRemoteBooks() async {
-    await Navigator.of(context, rootNavigator: true).push(
-      CupertinoPageRoute<void>(
-        builder: (_) => const RemoteBooksServersView(),
-      ),
-    );
   }
 
   Future<void> _openBookshelfManage() async {
@@ -1790,13 +1855,6 @@ class _BookshelfViewState extends State<BookshelfView> {
             },
           ),
           CupertinoActionSheetAction(
-            child: const Text('远程书籍'),
-            onPressed: () {
-              Navigator.pop(context);
-              _openRemoteBooks();
-            },
-          ),
-          CupertinoActionSheetAction(
             child: const Text('添加网址'),
             onPressed: () {
               Navigator.pop(context);
@@ -1951,6 +2009,48 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
   }
 
+  void _showBottomHint(String message) {
+    if (!mounted) return;
+    showCupertinoModalPopup<void>(
+      context: context,
+      barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
+      builder: (toastContext) {
+        final navigator = Navigator.of(toastContext);
+        unawaited(Future<void>.delayed(const Duration(milliseconds: 1100), () {
+          if (navigator.mounted && navigator.canPop()) {
+            navigator.pop();
+          }
+        }));
+        return SafeArea(
+          top: false,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 28),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemBackground
+                    .resolveFrom(context)
+                    .withValues(alpha: 0.96),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: CupertinoColors.separator.resolveFrom(context),
+                ),
+              ),
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: CupertinoColors.label.resolveFrom(context),
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   int _waitUpCount(List<Book> books) {
     return books.where((book) {
       if (book.isLocal) return false;
@@ -2045,20 +2145,93 @@ class _BookshelfViewState extends State<BookshelfView> {
         ),
       );
     }
-    if (displayItems.isEmpty) {
+    final contentSliver = displayItems.isEmpty
+        ? SliverFillRemaining(
+            hasScrollBody: false,
+            child: _buildEmptyState(),
+          )
+        : _buildBookList(displayItems);
+    if (_isStyle2Enabled) {
       return SliverSafeArea(
         top: false,
         bottom: true,
-        sliver: SliverFillRemaining(
-          hasScrollBody: false,
-          child: _buildEmptyState(),
-        ),
+        sliver: contentSliver,
       );
     }
     return SliverSafeArea(
       top: false,
       bottom: true,
-      sliver: _buildBookList(displayItems),
+      sliver: SliverMainAxisGroup(
+        slivers: [
+          SliverToBoxAdapter(
+            child: _buildStyle1GroupBar(),
+          ),
+          contentSliver,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStyle1GroupBar() {
+    final groups = _visibleGroupsForStyle1();
+    if (groups.isEmpty) return const SizedBox.shrink();
+    final selectedIndex = _resolveStyle1SelectedTabIndex(groups);
+    final separatorColor = CupertinoColors.separator.resolveFrom(context);
+    final activeColor = CupertinoTheme.of(context).primaryColor;
+    final textColor = CupertinoColors.label.resolveFrom(context);
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: separatorColor, width: 0.5),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: SizedBox(
+        height: 34,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: groups.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final group = groups[index];
+            final selected = index == selectedIndex;
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _onStyle1GroupTap(index, group),
+              onLongPress: () => _onStyle1GroupLongPress(group),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                curve: Curves.easeOut,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? activeColor.withValues(alpha: 0.14)
+                      : CupertinoColors.tertiarySystemGroupedBackground
+                          .resolveFrom(context),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: selected
+                        ? activeColor.withValues(alpha: 0.45)
+                        : separatorColor.withValues(alpha: 0.8),
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  group.groupName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    color: selected ? activeColor : textColor,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -2601,6 +2774,33 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   void _onGroupLongPress(BookshelfBookGroup _) {
     if (!_isStyle2Enabled) return;
+    // 当前迁移阶段以“分组管理”作为分组编辑统一入口。
+    _openBookshelfGroupManageDialog();
+  }
+
+  void _onStyle1GroupTap(int index, BookshelfBookGroup group) {
+    final groups = _visibleGroupsForStyle1();
+    final currentIndex = _resolveStyle1SelectedTabIndex(groups);
+    if (index == currentIndex) {
+      final count = _filterBooksByGroup(_books, group.groupId).length;
+      debugPrint(
+        '[bookshelf] style1 reselect group=${group.groupName} count=$count',
+      );
+      _showBottomHint('${group.groupName}($count)');
+      return;
+    }
+    debugPrint(
+      '[bookshelf] style1 select tab index=$index group=${group.groupName}',
+    );
+    setState(() => _style1SelectedTabIndex = index);
+    _scrollToTop();
+    unawaited(_persistStyle1SelectedTabIndex(index));
+  }
+
+  void _onStyle1GroupLongPress(BookshelfBookGroup group) {
+    debugPrint(
+      '[bookshelf] style1 long press group id=${group.groupId} name=${group.groupName}',
+    );
     // 当前迁移阶段以“分组管理”作为分组编辑统一入口。
     _openBookshelfGroupManageDialog();
   }

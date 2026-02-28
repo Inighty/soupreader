@@ -225,6 +225,17 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         _loadingKindsSources.remove(sourceUrl);
       });
     } catch (e, st) {
+      ExceptionLogService().record(
+        node: 'discovery.load_kinds',
+        message: '加载发现入口失败',
+        error: e,
+        stackTrace: st,
+        context: <String, dynamic>{
+          'sourceUrl': sourceUrl,
+          'sourceName': source.bookSourceName,
+          'forceRefresh': forceRefresh,
+        },
+      );
       if (!mounted) return;
       setState(() {
         _loadingKindsSources.remove(sourceUrl);
@@ -422,7 +433,24 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   Future<void> _refreshSourceKinds(BookSource source) async {
-    await _exploreKindsService.clearExploreKindsCache(source);
+    try {
+      await _exploreKindsService.clearExploreKindsCache(source);
+    } catch (e, st) {
+      ExceptionLogService().record(
+        node: 'discovery.refresh_kinds',
+        message: '刷新发现入口缓存失败',
+        error: e,
+        stackTrace: st,
+        context: <String, dynamic>{
+          'sourceUrl': source.bookSourceUrl,
+          'sourceName': source.bookSourceName,
+        },
+      );
+      if (mounted) {
+        _showMessage('刷新发现入口失败，请稍后重试');
+      }
+      return;
+    }
     if (!mounted) return;
 
     setState(() {

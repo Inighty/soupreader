@@ -1460,10 +1460,12 @@ class SettingsService {
     );
   }
 
-  /// 读取“自动检查新备份”最近一次已提示的远端备份时间（毫秒时间戳）。
+  /// 读取“自动检查新备份”的本地对照时间（毫秒时间戳）。
   ///
   /// 说明：
-  /// - 该值用于避免重复提示同一个 WebDav 备份；
+  /// - 该值用于和远端最新备份时间比较，判断是否需要提示“发现新备份”；
+  /// - 兼容 legado `LocalConfig.lastBackup` 语义：可能来自“已提示远端时间”
+  ///   或“本地备份/恢复完成时间”；
   /// - 读取失败或未初始化时返回 [fallback]；
   /// - 返回值始终保证 `>= 0`。
   int getLastSeenWebDavBackupMillis({int fallback = 0}) {
@@ -1477,7 +1479,7 @@ class SettingsService {
     return value;
   }
 
-  /// 保存“自动检查新备份”最近一次已提示的远端备份时间（毫秒时间戳）。
+  /// 保存“自动检查新备份”的本地对照时间（毫秒时间戳）。
   ///
   /// 约束：负值会被强制归零，避免脏数据导致重复弹窗判断异常。
   Future<void> saveLastSeenWebDavBackupMillis(int millis) async {

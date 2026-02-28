@@ -9,6 +9,7 @@ import '../../core/database/database_service.dart';
 import '../../core/database/repositories/book_repository.dart';
 import '../../core/services/exception_log_service.dart';
 import '../reader/services/reader_charset_service.dart';
+import '../reader/services/txt_toc_rule_store.dart';
 import 'book_import_file_name_rule_service.dart';
 import 'txt_parser.dart';
 import 'epub_parser.dart';
@@ -25,6 +26,7 @@ class ImportService {
   final BookRepository _bookRepo;
   final ChapterRepository _chapterRepo;
   final ReaderCharsetService _charsetService;
+  final TxtTocRuleStore _txtTocRuleStore;
   final BookImportFileNameRuleService _bookImportFileNameRuleService;
 
   ImportService()
@@ -32,6 +34,7 @@ class ImportService {
         _bookRepo = BookRepository(DatabaseService()),
         _chapterRepo = ChapterRepository(DatabaseService()),
         _charsetService = ReaderCharsetService(),
+        _txtTocRuleStore = TxtTocRuleStore(),
         _bookImportFileNameRuleService = BookImportFileNameRuleService();
 
   String? getSavedImportDirectory() {
@@ -385,20 +388,37 @@ class ImportService {
 
   /// 内部：导入 TXT
   Future<ImportResult> _importTxt(PlatformFile file) async {
-    if (file.bytes != null) {
-      final parseResult = TxtParser.importFromBytes(file.bytes!, file.name);
-      return _persistTxtImport(
-        parseResult: parseResult,
-        sourceFileName: file.name,
+    try {
+      final tocRuleRegexCandidates =
+          await _loadEnabledTxtTocRuleRegexCandidates();
+      if (file.bytes != null) {
+        final parseResult = TxtParser.importFromBytes(
+          file.bytes!,
+          file.name,
+          tocRuleRegexCandidates: tocRuleRegexCandidates,
+        );
+        return _persistTxtImport(
+          parseResult: parseResult,
+          sourceFileName: file.name,
+        );
+      }
+      if (file.path != null) {
+        return _importTxtByPath(
+          file.path!,
+          sourceFileName: file.name,
+          tocRuleRegexCandidates: tocRuleRegexCandidates,
+        );
+      }
+      return ImportResult.error('无法读取文件');
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'bookshelf.import.import_txt.failed',
+        message: '导入 TXT 失败',
+        error: error,
+        stackTrace: stackTrace,
       );
+      return ImportResult.error(error.toString());
     }
-    if (file.path != null) {
-      return _importTxtByPath(
-        file.path!,
-        sourceFileName: file.name,
-      );
-    }
-    return ImportResult.error('无法读取文件');
   }
 
   /// 内部：导入 EPUB
@@ -423,9 +443,13 @@ class ImportService {
   Future<ImportResult> _importTxtByPath(
     String filePath, {
     required String sourceFileName,
+    List<String>? tocRuleRegexCandidates,
   }) async {
     try {
-      final parseResult = await TxtParser.importFromFile(filePath);
+      final parseResult = await TxtParser.importFromFile(
+        filePath,
+        tocRuleRegexCandidates: tocRuleRegexCandidates,
+      );
       return _persistTxtImport(
         parseResult: parseResult,
         sourceFileName: sourceFileName,
@@ -438,6 +462,49 @@ class ImportService {
         stackTrace: stackTrace,
       );
       return ImportResult.error(error.toString());
+    }
+  }
+
+  Future<List<String>?> _loadEnabledTxtTocRuleRegexCandidates() async {
+    try {
+      final enabledRules = await _txtTocRuleStore.loadEnabledRules();
+      final candidates = <String>[];
+      for (final rule in enabledRules) {
+        final regex = rule.rule.trim();
+        if (regex.isEmpty) continue;
+        if (!_isValidRegexPattern(regex)) {
+          ExceptionLogService().record(
+            node: 'bookshelf.import.txt_toc_rule.invalid_regex',
+            message: 'TXT 目录规则正则无效，已跳过',
+            context: <String, dynamic>{
+              'ruleId': rule.id,
+              'ruleName': rule.name,
+              'ruleRegex': regex,
+            },
+          );
+          continue;
+        }
+        candidates.add(regex);
+      }
+      return candidates;
+    } catch (error, stackTrace) {
+      // 目录规则加载失败不应阻断导入主链路，回退到解析器内置自动识别策略。
+      ExceptionLogService().record(
+        node: 'bookshelf.import.txt_toc_rule.load.failed',
+        message: '加载 TXT 目录规则失败，已回退默认自动识别',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return null;
+    }
+  }
+
+  bool _isValidRegexPattern(String regex) {
+    try {
+      RegExp(regex, multiLine: true);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../core/config/migration_exclusions.dart';
 import '../models/reading_settings.dart';
 
 /// 点击区域配置对话框
@@ -52,10 +53,23 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
       ? CupertinoColors.systemGrey.withValues(alpha: 0.16)
       : AppDesignTokens.pageBgLight;
 
+  List<int> get _availableActions {
+    return ClickAction.availableActions(
+      excludeTts: MigrationExclusions.excludeTts,
+    );
+  }
+
+  Map<String, int> _normalizeConfigForExclusions(Map<String, int> rawConfig) {
+    return ClickAction.normalizeConfigForExclusions(
+      rawConfig,
+      excludeTts: MigrationExclusions.excludeTts,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
-    _config = ClickAction.normalizeConfig(
+    _config = _normalizeConfigForExclusions(
       Map<String, int>.from(widget.initialConfig),
     );
   }
@@ -286,7 +300,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: ClickAction.allActions.map((action) {
+      children: _availableActions.map((action) {
         final actionColor = _getActionColor(action);
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -316,7 +330,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
       context: context,
       builder: (context) => CupertinoActionSheet(
         title: Text('选择 ${_getZoneName(zone)} 的动作'),
-        actions: ClickAction.allActions.map((action) {
+        actions: _availableActions.map((action) {
           final actionColor = _getActionColor(action);
           return CupertinoActionSheetAction(
             onPressed: () {
@@ -367,7 +381,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
     bool showRecoveryNotice = true,
   }) {
     final hadMenuZone = ClickAction.hasMenuZone(nextConfig);
-    final normalized = ClickAction.normalizeConfig(nextConfig);
+    final normalized = _normalizeConfigForExclusions(nextConfig);
     final recoveredMenuZone =
         !hadMenuZone && ClickAction.hasMenuZone(normalized);
     setState(() {

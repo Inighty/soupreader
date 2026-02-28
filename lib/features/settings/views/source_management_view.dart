@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../core/config/migration_exclusions.dart';
 import '../../reader/views/speak_engine_manage_view.dart';
 import '../../reader/views/txt_toc_rule_manage_view.dart';
 import '../../rss/views/rss_source_manage_view.dart';
@@ -14,6 +15,8 @@ class SourceManagementView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showRssManagement = !MigrationExclusions.excludeRss;
+    final showSpeakManagement = !MigrationExclusions.excludeTts;
     return AppCupertinoPageScaffold(
       title: '源管理',
       child: ListView(
@@ -34,30 +37,32 @@ class SourceManagementView extends StatelessWidget {
                   );
                 },
               ),
-              CupertinoListTile.notched(
-                title: const Text('订阅管理'),
-                additionalInfo: const Text('搜索/分组/启停'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () {
-                  Navigator.of(context).push(
-                    CupertinoPageRoute<void>(
-                      builder: (context) => const RssSourceManageView(),
-                    ),
-                  );
-                },
-              ),
-              CupertinoListTile.notched(
-                title: const Text('语音管理'),
-                additionalInfo: const Text('系统/HTTP 引擎'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: () {
-                  Navigator.of(context).push(
-                    CupertinoPageRoute<void>(
-                      builder: (context) => const SpeakEngineManageView(),
-                    ),
-                  );
-                },
-              ),
+              if (showRssManagement)
+                CupertinoListTile.notched(
+                  title: const Text('订阅管理'),
+                  additionalInfo: const Text('搜索/分组/启停'),
+                  trailing: const CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute<void>(
+                        builder: (context) => const RssSourceManageView(),
+                      ),
+                    );
+                  },
+                ),
+              if (showSpeakManagement)
+                CupertinoListTile.notched(
+                  title: const Text('语音管理'),
+                  additionalInfo: const Text('系统/HTTP 引擎'),
+                  trailing: const CupertinoListTileChevron(),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute<void>(
+                        builder: (context) => const SpeakEngineManageView(),
+                      ),
+                    );
+                  },
+                ),
             ],
           ),
           CupertinoListSection.insetGrouped(

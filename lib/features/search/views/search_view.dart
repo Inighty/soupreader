@@ -13,6 +13,7 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/app_settings.dart';
+import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../bookshelf/models/book.dart';
 import '../../bookshelf/services/book_add_service.dart';
@@ -403,11 +404,18 @@ class _SearchViewState extends State<SearchView> {
 
   void _onResultScroll() {
     if (!_resultScrollController.hasClients) return;
-    if (_resultScrollController.position.extentAfter > 120) return;
+    final position = _resultScrollController.position;
+    if (!_isAtBottomLikeLegado(position)) return;
     if (_isSearching || !_hasMore) return;
     if (_currentKeyword.trim().isEmpty) return;
     if (_displayResults.isEmpty) return;
     unawaited(_loadNextPage());
+  }
+
+  /// 对齐 legado `SearchActivity`：仅在“已到底部”时触发下一页。
+  bool _isAtBottomLikeLegado(ScrollPosition position) {
+    final remaining = position.maxScrollExtent - position.pixels;
+    return remaining <= 1.0;
   }
 
   Future<void> _continueLoadMoreLikeLegado() async {
@@ -604,6 +612,15 @@ class _SearchViewState extends State<SearchView> {
           if (!_isSearchSessionActive(searchSessionId)) return;
 
           final issue = _buildSearchIssue(source, debugResult);
+          if (issue != null) {
+            _recordSearchIssueLog(
+              source: source,
+              page: page,
+              reason: issue.reason,
+              statusCode: debugResult.fetch.statusCode,
+              listCount: debugResult.listCount,
+            );
+          }
           final filtered =
               _filterResultsByMode(debugResult.results, _currentKeyword.trim());
           if (filtered.isNotEmpty) {
@@ -621,22 +638,37 @@ class _SearchViewState extends State<SearchView> {
             }
             _completedSources++;
           });
-        } catch (e) {
+        } catch (e, st) {
           if (!_isSearchSessionActive(searchSessionId)) return;
           if (_isCanceledError(e)) {
             setState(() => _completedSources++);
             return;
           }
           if (e is TimeoutException) {
+            _recordSearchIssueLog(
+              source: source,
+              page: page,
+              reason: '请求超时（30s）',
+              error: e,
+              stackTrace: st,
+            );
             setState(() => _completedSources++);
             return;
           }
+          final reason = '搜索异常：${_compactReason(e.toString())}';
+          _recordSearchIssueLog(
+            source: source,
+            page: page,
+            reason: reason,
+            error: e,
+            stackTrace: st,
+          );
           setState(() {
             _completedSources++;
             _sourceIssues.add(
               _SourceRunIssue(
                 sourceName: source.bookSourceName,
-                reason: '搜索异常：${_compactReason(e.toString())}',
+                reason: reason,
               ),
             );
           });
@@ -720,13 +752,58 @@ class _SearchViewState extends State<SearchView> {
   }
 
   Future<void> _openBookInfo(SearchResult result) async {
-    await Navigator.of(context, rootNavigator: true).push(
-      CupertinoPageRoute(
-        builder: (_) => SearchBookInfoView(result: result),
-      ),
-    );
+    try {
+      await Navigator.of(context, rootNavigator: true).push(
+        CupertinoPageRoute(
+          builder: (_) => SearchBookInfoView(result: result),
+        ),
+      );
+    } catch (e, st) {
+      ExceptionLogService().record(
+        node: 'search.open_book_info',
+        message: '打开书籍详情失败',
+        error: e,
+        stackTrace: st,
+        context: <String, dynamic>{
+          'bookName': result.name,
+          'bookUrl': result.bookUrl,
+          'sourceUrl': result.sourceUrl,
+          'sourceName': result.sourceName,
+        },
+      );
+      if (mounted) {
+        _showMessage('打开详情失败，请稍后重试');
+      }
+      return;
+    }
     if (!mounted) return;
     setState(() => _rebuildDisplayResults(keyword: _currentKeyword));
+  }
+
+  void _recordSearchIssueLog({
+    required BookSource source,
+    required int page,
+    required String reason,
+    int? statusCode,
+    int? listCount,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
+    ExceptionLogService().record(
+      node: 'search.run_source',
+      message: '书源搜索失败',
+      error: error,
+      stackTrace: stackTrace,
+      context: <String, dynamic>{
+        'keyword': _currentKeyword,
+        'page': page,
+        'reason': reason,
+        'sourceUrl': source.bookSourceUrl,
+        'sourceName': source.bookSourceName,
+        if (statusCode != null) 'statusCode': statusCode,
+        if (listCount != null) 'listCount': listCount,
+      },
+    );
   }
 
   String _precisionSearchSummaryLabel() {

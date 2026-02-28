@@ -527,7 +527,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _readerCustomFontPath = _settingsService.getReaderCustomFontPath();
     unawaited(_restoreReaderCustomFontSelection());
     _webDavService = WebDavService();
-    final baseReadingSettings = _settingsService.readingSettings.sanitize();
+    final baseReadingSettings =
+        _readSettingsWithExclusions(_settingsService.readingSettings);
     _bookPageAnimOverride = _settingsService.getBookPageAnim(widget.bookId);
     _settings = _effectiveSettingsWithBookPageAnim(
       base: baseReadingSettings,
@@ -867,7 +868,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void _handleReadingSettingsChanged() {
     if (!mounted) return;
     final latest = _effectiveSettingsWithBookPageAnim(
-      base: _settingsService.readingSettings.sanitize(),
+      base: _readSettingsWithExclusions(_settingsService.readingSettings),
       bookPageAnimOverride: _bookPageAnimOverride,
     );
     if (_isSameReadingSettings(_settings, latest)) return;
@@ -2658,7 +2659,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   /// 更新设置
   void _updateSettings(ReadingSettings newSettings, {bool persist = true}) {
-    newSettings = newSettings.sanitize();
+    newSettings = _readSettingsWithExclusions(newSettings);
 
     // 产品约束：除“滚动”外一律水平翻页；滚动模式固定纵向滚动。
     if (newSettings.pageTurnMode == PageTurnMode.scroll) {
@@ -3035,7 +3036,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       );
 
   Map<String, int> get _clickActions {
-    return ClickAction.normalizeConfig(_settings.clickActions);
+    return ClickAction.normalizeConfigForExclusions(
+      _settings.clickActions,
+      excludeTts: MigrationExclusions.excludeTts,
+    );
   }
 
   /// 左右点击翻页处理
@@ -3177,26 +3181,15 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         }
         break;
       case ClickAction.readAloudPrevParagraph:
-        if (MigrationExclusions.excludeTts) {
-          unawaited(_showReadAloudExcludedHint(entry: 'click_action.prev'));
-          break;
-        }
+        if (MigrationExclusions.excludeTts) break;
         unawaited(_triggerReadAloudPreviousParagraph());
         break;
       case ClickAction.readAloudNextParagraph:
-        if (MigrationExclusions.excludeTts) {
-          unawaited(_showReadAloudExcludedHint(entry: 'click_action.next'));
-          break;
-        }
+        if (MigrationExclusions.excludeTts) break;
         unawaited(_triggerReadAloudNextParagraph());
         break;
       case ClickAction.readAloudPauseResume:
-        if (MigrationExclusions.excludeTts) {
-          unawaited(
-            _showReadAloudExcludedHint(entry: 'click_action.pause_resume'),
-          );
-          break;
-        }
+        if (MigrationExclusions.excludeTts) break;
         unawaited(_triggerReadAloudPauseResume());
         break;
       default:
@@ -4766,6 +4759,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         onReadAloudLongPress: _openReadAloudDialogFromMenu,
                         onShowInterfaceSettings: _openInterfaceSettingsFromMenu,
                         onShowBehaviorSettings: _openBehaviorSettingsFromMenu,
+                        showReadAloud: !MigrationExclusions.excludeTts,
                         readBarStyleFollowPage: _menuFollowPageTone,
                         readAloudRunning: _readAloudSnapshot.isRunning,
                         readAloudPaused: _readAloudSnapshot.isPaused,
@@ -5027,7 +5021,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     required String selectedText,
     required String rawSelectedText,
   }) async {
-    var expanded = false;
+    // 对齐 legado：可通过设置项控制“默认展开文本菜单”。
+    var expanded = _settings.expandTextMenu;
     while (mounted) {
       final selectedAction =
           await showCupertinoModalPopup<_ReaderTextActionMenuAction>(
@@ -5092,33 +5087,38 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     required BuildContext sheetContext,
     required bool expanded,
   }) {
-    if (!expanded) {
-      return <CupertinoActionSheetAction>[
-        _buildTextActionMenuAction(
-          sheetContext: sheetContext,
-          action: _ReaderTextActionMenuAction.replace,
-          label: '替换',
-        ),
-        _buildTextActionMenuAction(
-          sheetContext: sheetContext,
-          action: _ReaderTextActionMenuAction.copy,
-          label: '复制',
-        ),
-        _buildTextActionMenuAction(
-          sheetContext: sheetContext,
-          action: _ReaderTextActionMenuAction.bookmark,
-          label: '书签',
-        ),
+    final primaryActions = <CupertinoActionSheetAction>[
+      _buildTextActionMenuAction(
+        sheetContext: sheetContext,
+        action: _ReaderTextActionMenuAction.replace,
+        label: '替换',
+      ),
+      _buildTextActionMenuAction(
+        sheetContext: sheetContext,
+        action: _ReaderTextActionMenuAction.copy,
+        label: '复制',
+      ),
+      _buildTextActionMenuAction(
+        sheetContext: sheetContext,
+        action: _ReaderTextActionMenuAction.bookmark,
+        label: '书签',
+      ),
+      if (!MigrationExclusions.excludeTts)
         _buildTextActionMenuAction(
           sheetContext: sheetContext,
           action: _ReaderTextActionMenuAction.readAloud,
           label: '朗读',
         ),
-        _buildTextActionMenuAction(
-          sheetContext: sheetContext,
-          action: _ReaderTextActionMenuAction.dict,
-          label: '字典',
-        ),
+      _buildTextActionMenuAction(
+        sheetContext: sheetContext,
+        action: _ReaderTextActionMenuAction.dict,
+        label: '字典',
+      ),
+    ];
+    final alwaysExpanded = _settings.expandTextMenu;
+    if (!alwaysExpanded && !expanded) {
+      return <CupertinoActionSheetAction>[
+        ...primaryActions,
         _buildTextActionMenuAction(
           sheetContext: sheetContext,
           action: _ReaderTextActionMenuAction.more,
@@ -5149,13 +5149,21 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           action: _ReaderTextActionMenuAction.processText,
           label: '系统处理文本',
         ),
+    ];
+    if (alwaysExpanded) {
+      return <CupertinoActionSheetAction>[
+        ...primaryActions,
+        ...expandedActions,
+      ];
+    }
+    return <CupertinoActionSheetAction>[
+      ...expandedActions,
       _buildTextActionMenuAction(
         sheetContext: sheetContext,
         action: _ReaderTextActionMenuAction.collapse,
         label: '收起',
       ),
     ];
-    return expandedActions;
   }
 
   CupertinoActionSheetAction _buildTextActionMenuAction({
@@ -5180,7 +5188,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     required String selectedText,
     required String rawSelectedText,
   }) async {
-    debugPrint('[reader][text-action] selected=${_textActionMenuActionName(action)}');
+    debugPrint(
+        '[reader][text-action] selected=${_textActionMenuActionName(action)}');
     switch (action) {
       case _ReaderTextActionMenuAction.replace:
         await _openReplaceRuleEditorFromSelectedText(selectedText);
@@ -6392,6 +6401,21 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return base.copyWith(pageTurnMode: targetMode);
   }
 
+  ReadingSettings _readSettingsWithExclusions(ReadingSettings settings) {
+    if (!MigrationExclusions.excludeTts) {
+      return settings.sanitize();
+    }
+    return settings
+        .copyWith(
+          clickActions: ClickAction.normalizeConfigForExclusions(
+            settings.clickActions,
+            excludeTts: true,
+          ),
+          volumeKeyPageOnPlay: false,
+        )
+        .sanitize();
+  }
+
   PageTurnMode _resolveBookPageTurnMode({
     required PageTurnMode fallback,
     required int? bookPageAnimOverride,
@@ -6439,7 +6463,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (!mounted) return;
     _bookPageAnimOverride = nextOverride;
     final nextSettings = _effectiveSettingsWithBookPageAnim(
-      base: _settingsService.readingSettings.sanitize(),
+      base: _readSettingsWithExclusions(_settingsService.readingSettings),
       bookPageAnimOverride: _bookPageAnimOverride,
     );
     _updateSettings(nextSettings, persist: false);
@@ -6454,7 +6478,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
     if (!mounted) return;
     _bookPageAnimOverride = null;
-    final global = _settingsService.readingSettings.sanitize();
+    final global =
+        _readSettingsWithExclusions(_settingsService.readingSettings);
     _updateSettings(global.copyWith(pageTurnMode: mode));
     setPopupState(() {});
   }
@@ -7695,7 +7720,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         icon,
         size: 18,
         color: onTap == null ? _uiTextSubtle : _uiTextStrong,
-      ), minimumSize: Size(30, 30),
+      ),
+      minimumSize: Size(30, 30),
     );
   }
 
@@ -7724,7 +7750,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             ),
           ),
         ],
-      ), minimumSize: Size(0, 0),
+      ),
+      minimumSize: Size(0, 0),
     );
   }
 
@@ -12408,7 +12435,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                             CupertinoIcons.xmark_circle_fill,
                             color: _uiTextSubtle,
                             size: 24,
-                          ), minimumSize: Size(30, 30),
+                          ),
+                          minimumSize: Size(30, 30),
                         ),
                       ],
                     ),
@@ -12948,7 +12976,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 CupertinoIcons.minus,
                 size: 18,
                 color: safeProgress > 0 ? _uiTextStrong : _uiTextSubtle,
-              ), minimumSize: Size(24, 24),
+              ),
+              minimumSize: Size(24, 24),
             ),
           ),
           Expanded(
@@ -12972,7 +13001,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 CupertinoIcons.add,
                 size: 18,
                 color: safeProgress < safeMax ? _uiTextStrong : _uiTextSubtle,
-              ), minimumSize: Size(24, 24),
+              ),
+              minimumSize: Size(24, 24),
             ),
           ),
           SizedBox(
@@ -13635,16 +13665,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 _settings.copyWith(volumeKeyPage: value),
               );
             }),
-            _buildSwitchRow(
-              '朗读时音量键翻页',
-              _settings.volumeKeyPageOnPlay,
-              (value) {
-                _updateSettingsFromSheet(
-                  setPopupState,
-                  _settings.copyWith(volumeKeyPageOnPlay: value),
-                );
-              },
-            ),
+            if (!MigrationExclusions.excludeTts)
+              _buildSwitchRow(
+                '朗读时音量键翻页',
+                _settings.volumeKeyPageOnPlay,
+                (value) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(volumeKeyPageOnPlay: value),
+                  );
+                },
+              ),
             _buildSwitchRow('长按按键翻页', _settings.keyPageOnLongPress, (value) {
               _updateSettingsFromSheet(
                 setPopupState,
@@ -13682,6 +13713,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 );
               },
             ),
+            _buildSwitchRow('展开文本菜单', _settings.expandTextMenu, (value) {
+              _updateSettingsFromSheet(
+                setPopupState,
+                _settings.copyWith(expandTextMenu: value),
+              );
+            }),
             _buildSwitchRow('滚动翻页无动画', _settings.noAnimScrollPage, (value) {
               _updateSettingsFromSheet(
                 setPopupState,
@@ -14853,6 +14890,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     _settings.copyWith(disableReturnKey: value),
                   );
                 }),
+                _buildSwitchRow('展开文本菜单', _settings.expandTextMenu, (value) {
+                  _updateSettingsFromSheet(
+                    setPopupState,
+                    _settings.copyWith(expandTextMenu: value),
+                  );
+                }),
                 _buildSwitchRow('净化章节标题', _settings.cleanChapterTitle, (value) {
                   _updateSettingsFromSheet(
                     setPopupState,
@@ -15585,7 +15628,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
-                  ), minimumSize: Size(30, 30),
+                  ),
+                  minimumSize: Size(30, 30),
                 ),
                 CupertinoButton(
                   padding:
@@ -15600,7 +15644,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
-                  ), minimumSize: Size(30, 30),
+                  ),
+                  minimumSize: Size(30, 30),
                 ),
                 CupertinoButton(
                   padding: EdgeInsets.zero,
@@ -15609,7 +15654,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     CupertinoIcons.xmark_circle_fill,
                     color: _uiTextSubtle,
                     size: 24,
-                  ), minimumSize: Size(30, 30),
+                  ),
+                  minimumSize: Size(30, 30),
                 ),
               ],
             ),

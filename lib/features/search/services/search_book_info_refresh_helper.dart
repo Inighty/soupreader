@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../../bookshelf/models/book.dart';
+import '../../../core/services/exception_log_service.dart';
 import '../../import/epub_parser.dart';
 import '../../import/txt_parser.dart';
+import '../../reader/services/txt_toc_rule_store.dart';
 
 /// 详情页“刷新”本地书籍辅助（对齐 legado `menu_refresh` 本地刷新语义）。
 class SearchBookInfoRefreshHelper {
@@ -57,13 +59,18 @@ class SearchBookInfoRefreshHelper {
     bool splitLongChapter = true,
     String? txtTocRuleRegex,
   }) async {
+    final normalizedRegex = (txtTocRuleRegex ?? '').trim();
+    final tocRuleRegexCandidates = normalizedRegex.isNotEmpty
+        ? null
+        : await _loadEnabledTxtTocRuleRegexCandidates();
     final parsed = await TxtParser.reparseFromFile(
       filePath: localPath,
       bookId: book.id,
       bookName: book.title,
       forcedCharset: preferredTxtCharset,
       splitLongChapter: splitLongChapter,
-      tocRuleRegex: txtTocRuleRegex,
+      tocRuleRegex: normalizedRegex.isEmpty ? null : normalizedRegex,
+      tocRuleRegexCandidates: tocRuleRegexCandidates,
     );
 
     final chapters = parsed.chapters;
@@ -86,6 +93,50 @@ class SearchBookInfoRefreshHelper {
       chapters: chapters,
       charset: parsed.charset,
     );
+  }
+
+  static Future<List<String>?> _loadEnabledTxtTocRuleRegexCandidates() async {
+    try {
+      final store = TxtTocRuleStore();
+      final enabledRules = await store.loadEnabledRules();
+      final candidates = <String>[];
+      for (final rule in enabledRules) {
+        final regex = rule.rule.trim();
+        if (regex.isEmpty) continue;
+        if (!_isValidRegexPattern(regex)) {
+          ExceptionLogService().record(
+            node: 'search.book_info.local_refresh.txt_toc_rule.invalid_regex',
+            message: 'TXT 目录规则正则无效，已在刷新流程中跳过',
+            context: <String, dynamic>{
+              'ruleId': rule.id,
+              'ruleName': rule.name,
+              'ruleRegex': regex,
+            },
+          );
+          continue;
+        }
+        candidates.add(regex);
+      }
+      return candidates;
+    } catch (error, stackTrace) {
+      // 刷新目录时规则加载失败不阻断主链路，回退到解析器默认自动识别。
+      ExceptionLogService().record(
+        node: 'search.book_info.local_refresh.txt_toc_rule.load.failed',
+        message: '加载 TXT 目录规则失败，已回退默认自动识别',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return null;
+    }
+  }
+
+  static bool _isValidRegexPattern(String regex) {
+    try {
+      RegExp(regex, multiLine: true);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   static Future<SearchBookInfoLocalRefreshResult> _refreshEpubBook({

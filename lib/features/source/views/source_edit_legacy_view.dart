@@ -16,6 +16,7 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/cookie_store.dart';
+import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/keyboard_assist_store.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/services/settings_service.dart';
@@ -1194,7 +1195,17 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
           text: '分享书源',
         ),
       );
-    } catch (error) {
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'source.edit_legacy.share_qr',
+        message: '分享书源二维码失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'sourceUrl': source.bookSourceUrl,
+          'sourceName': source.bookSourceName,
+        },
+      );
       if (!mounted) return;
       _showMessage(_resolveShareErrorMessage(error));
     }
@@ -1271,6 +1282,14 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
 
     final result = await _importExportService.importFromText(text);
     if (!result.success || result.sources.isEmpty) {
+      ExceptionLogService().record(
+        node: 'source.edit_legacy.paste_json',
+        message: '粘贴导入书源失败',
+        error: result.errorMessage,
+        context: <String, dynamic>{
+          'inputLength': text.length,
+        },
+      );
       _showMessage(_resolvePasteSourceError(result.errorMessage));
       return;
     }
@@ -1303,6 +1322,14 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     final result = await _importExportService.importFromText(value);
     if (!result.success || result.sources.isEmpty) {
       final message = (result.errorMessage ?? '').trim();
+      ExceptionLogService().record(
+        node: 'source.edit_legacy.import_qr',
+        message: '扫码导入书源失败',
+        error: result.errorMessage,
+        context: <String, dynamic>{
+          'inputLength': value.length,
+        },
+      );
       _showMessage(message.isEmpty ? 'Error' : message);
       return;
     }
@@ -1512,7 +1539,17 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
         _showMessage('保存成功');
       }
       return saved;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      ExceptionLogService().record(
+        node: 'source.edit_legacy.save',
+        message: '书源保存失败',
+        error: e,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'sourceUrl': source.bookSourceUrl,
+          'sourceName': source.bookSourceName,
+        },
+      );
       if (mounted) {
         _showMessage(_legacyErrorMessage(e));
       }
