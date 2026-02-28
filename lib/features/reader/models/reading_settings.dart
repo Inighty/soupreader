@@ -96,6 +96,8 @@ class ReadingSettings {
   final bool keyPageOnLongPress; // 按键长按翻页（对标 legado）
   final bool disableReturnKey; // 禁用返回键（对标 legado）
   final int screenOrientation; // 屏幕方向（0~4，对标 legado）
+  final List<int> prevKeys; // 自定义上一页按键 keyId 列表（对标 legado prevKeys）
+  final List<int> nextKeys; // 自定义下一页按键 keyId 列表（对标 legado nextKeys）
 
   // === 页眉/页脚配置 ===
   final bool hideHeader; // 隐藏页眉
@@ -221,6 +223,8 @@ class ReadingSettings {
     this.keyPageOnLongPress = false,
     this.disableReturnKey = false,
     this.screenOrientation = screenOrientationUnspecified,
+    this.prevKeys = const <int>[],
+    this.nextKeys = const <int>[],
     // 页眉/页脚配置默认值
     this.hideHeader = false,
     this.hideFooter = false,
@@ -393,6 +397,44 @@ class ReadingSettings {
       parsed[entry.key.toString()] = _toInt(entry.value, ClickAction.showMenu);
     }
     return ClickAction.normalizeConfig(parsed);
+  }
+
+  static List<int> _parseKeyCodeList(dynamic raw) {
+    final values = <int>[];
+    if (raw is List) {
+      for (final item in raw) {
+        values.add(_toInt(item, -1));
+      }
+      return _normalizeKeyCodeList(values);
+    }
+    if (raw is String) {
+      for (final token in raw.split(',')) {
+        final normalized = token.trim();
+        if (normalized.isEmpty) continue;
+        values.add(_toInt(normalized, -1));
+      }
+      return _normalizeKeyCodeList(values);
+    }
+    if (raw is int) {
+      return _normalizeKeyCodeList(<int>[raw]);
+    }
+    if (raw is num && raw.isFinite) {
+      return _normalizeKeyCodeList(<int>[raw.toInt()]);
+    }
+    return const <int>[];
+  }
+
+  static List<int> _normalizeKeyCodeList(List<int> raw) {
+    if (raw.isEmpty) return const <int>[];
+    final normalizedSet = <int>{};
+    for (final code in raw) {
+      if (code > 0) {
+        normalizedSet.add(code);
+      }
+    }
+    if (normalizedSet.isEmpty) return const <int>[];
+    final sorted = normalizedSet.toList()..sort();
+    return List<int>.unmodifiable(sorted);
   }
 
   static List<ReadStyleConfig> _parseReadStyleConfigs(dynamic raw) {
@@ -675,6 +717,8 @@ class ReadingSettings {
         json['screenOrientation'],
         screenOrientationUnspecified,
       ),
+      prevKeys: _parseKeyCodeList(json['prevKeys']),
+      nextKeys: _parseKeyCodeList(json['nextKeys']),
       // 页眉/页脚配置
       hideHeader:
           _toBool(json['hideHeader'], parsedHeaderMode == headerModeHide),
@@ -818,6 +862,8 @@ class ReadingSettings {
       'keyPageOnLongPress': keyPageOnLongPress,
       'disableReturnKey': disableReturnKey,
       'screenOrientation': screenOrientation,
+      'prevKeys': prevKeys,
+      'nextKeys': nextKeys,
       // 页眉/页脚配置
       'hideHeader': hideHeader,
       'hideFooter': hideFooter,
@@ -1056,6 +1102,8 @@ class ReadingSettings {
         max: screenOrientationReversePortrait,
         fallback: screenOrientationUnspecified,
       ),
+      prevKeys: _normalizeKeyCodeList(prevKeys),
+      nextKeys: _normalizeKeyCodeList(nextKeys),
       hideHeader: safeHeaderMode == headerModeHide,
       hideFooter: safeFooterMode == footerModeHide,
       showHeaderLine: showHeaderLine,
@@ -1164,6 +1212,8 @@ class ReadingSettings {
     bool? keyPageOnLongPress,
     bool? disableReturnKey,
     int? screenOrientation,
+    List<int>? prevKeys,
+    List<int>? nextKeys,
     // 页眉/页脚配置
     int? headerMode,
     int? footerMode,
@@ -1279,6 +1329,8 @@ class ReadingSettings {
       keyPageOnLongPress: keyPageOnLongPress ?? this.keyPageOnLongPress,
       disableReturnKey: disableReturnKey ?? this.disableReturnKey,
       screenOrientation: screenOrientation ?? this.screenOrientation,
+      prevKeys: prevKeys ?? this.prevKeys,
+      nextKeys: nextKeys ?? this.nextKeys,
       // 页眉/页脚配置
       hideHeader: resolvedHeaderMode == headerModeHide,
       hideFooter: resolvedFooterMode == footerModeHide,

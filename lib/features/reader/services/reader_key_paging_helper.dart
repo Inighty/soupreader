@@ -19,7 +19,15 @@ class ReaderKeyPagingHelper {
   static ReaderKeyPagingAction resolveKeyDownAction({
     required LogicalKeyboardKey key,
     required bool volumeKeyPageEnabled,
+    List<int> customPrevKeys = const <int>[],
+    List<int> customNextKeys = const <int>[],
   }) {
+    if (_containsCustomKey(key, customNextKeys)) {
+      return ReaderKeyPagingAction.next;
+    }
+    if (_containsCustomKey(key, customPrevKeys)) {
+      return ReaderKeyPagingAction.prev;
+    }
     if (_isNextKey(key)) return ReaderKeyPagingAction.next;
     if (_isPrevKey(key)) return ReaderKeyPagingAction.prev;
     if (_isVolumeNextKey(key)) {
@@ -52,5 +60,11 @@ class ReaderKeyPagingHelper {
 
   static bool _isVolumePrevKey(LogicalKeyboardKey key) {
     return key == LogicalKeyboardKey.audioVolumeUp;
+  }
+
+  static bool _containsCustomKey(LogicalKeyboardKey key, List<int> keyIds) {
+    if (keyIds.isEmpty) return false;
+    final currentKeyId = key.keyId;
+    return keyIds.contains(currentKeyId);
   }
 }

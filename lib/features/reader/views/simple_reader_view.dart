@@ -445,6 +445,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   int _currentSearchHitIndex = -1;
   bool _isSearchingContent = false;
   bool _contentSearchUseReplace = false;
+  _ReaderSearchProgressSnapshot? _searchProgressSnapshot;
   int _contentSearchTaskToken = 0;
   final List<_ScrollSegment> _scrollSegments = <_ScrollSegment>[];
   final Map<int, GlobalKey> _scrollSegmentKeys = <int, GlobalKey>{};
@@ -3082,6 +3083,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final action = ReaderKeyPagingHelper.resolveKeyDownAction(
       key: key,
       volumeKeyPageEnabled: _settings.volumeKeyPage,
+      customPrevKeys: _settings.prevKeys,
+      customNextKeys: _settings.nextKeys,
     );
     switch (action) {
       case ReaderKeyPagingAction.next:
@@ -4596,11 +4599,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     // 阅读模式时阻止 iOS 边缘滑动返回（菜单显示时允许返回）
     return PopScope(
-      canPop: _showMenu || _showSearchMenu,
+      canPop: _showMenu,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         if (_showSearchMenu) {
-          _setSearchMenuVisible(false);
+          unawaited(_handleBackFromSearchMenu());
           return;
         }
         if (!_showMenu) {
@@ -7030,6 +7033,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (normalized.isEmpty) {
       return;
     }
+    _captureSearchProgressSnapshotIfNeeded();
 
     final taskToken = ++_contentSearchTaskToken;
     setState(() {
@@ -7442,7 +7446,60 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     unawaited(_jumpToSearchHit(_contentSearchHits[nextIndex]));
   }
 
-  void _exitSearchMenu() {
+  void _captureSearchProgressSnapshotIfNeeded() {
+    if (_searchProgressSnapshot != null) return;
+    final readableCount = _effectiveReadableChapterCount();
+    if (readableCount <= 0) return;
+    _searchProgressSnapshot = _ReaderSearchProgressSnapshot(
+      chapterIndex: _clampChapterIndexToReadableRange(_currentChapterIndex),
+      chapterProgress: _getChapterProgress().clamp(0.0, 1.0).toDouble(),
+    );
+  }
+
+  Future<void> _handleBackFromSearchMenu() async {
+    if (!_showSearchMenu) return;
+    final snapshot = _searchProgressSnapshot;
+    if (snapshot == null) {
+      _exitSearchMenu();
+      return;
+    }
+    final shouldRestore = await _confirmRestoreSearchProgress();
+    if (!shouldRestore) {
+      _exitSearchMenu();
+      return;
+    }
+    _exitSearchMenu(clearProgressSnapshot: false);
+    await _loadChapter(
+      snapshot.chapterIndex,
+      restoreOffset: true,
+      targetChapterProgress: snapshot.chapterProgress,
+    );
+    _searchProgressSnapshot = null;
+  }
+
+  Future<bool> _confirmRestoreSearchProgress() async {
+    return await showCupertinoDialog<bool>(
+          context: context,
+          builder: (dialogContext) => CupertinoAlertDialog(
+            title: const Text('恢复进度'),
+            content: const Text('\n是否恢复到搜索前的阅读位置？'),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                isDefaultAction: true,
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('恢复'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  void _exitSearchMenu({bool clearProgressSnapshot = true}) {
     debugPrint(
       '[reader][content-search] exit queryLength=${_contentSearchQuery.length} '
       'hits=${_contentSearchHits.length}',
@@ -7456,6 +7513,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _contentSearchQuery = '';
       _contentSearchUseReplace = false;
     });
+    if (clearProgressSnapshot) {
+      _searchProgressSnapshot = null;
+    }
     _syncSystemUiForOverlay();
   }
 
@@ -8057,15 +8117,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         builder: (_) => const ExceptionLogsView(),
       ),
     );
-  }
-
-  void _showReaderActionUnavailable(
-    String label, {
-    String? reason,
-  }) {
-    final suffix =
-        reason?.trim().isNotEmpty == true ? '：${reason!.trim()}' : '：当前版本暂未支持';
-    _showToast('$label$suffix');
   }
 
   String _progressSyncBookTitle() {
@@ -12108,31 +12159,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                             ),
                           ),
                           const SizedBox(width: 6),
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () => _showReaderActionUnavailable(
-                              '共享布局',
-                              reason: '样式切换联动排版参数尚未迁移完成',
-                            ),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _uiCardBg,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: _uiBorder),
-                              ),
-                              child: Text(
-                                '待迁移',
-                                style: TextStyle(
-                                  color: _uiTextSubtle,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
+                          CupertinoSwitch(
+                            value: _settings.shareLayout,
+                            onChanged: (value) {
+                              _updateSettingsFromSheet(
+                                setPopupState,
+                                _settings.copyWith(shareLayout: value),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -13743,11 +13777,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 _settings.copyWith(disableReturnKey: value),
               );
             }),
-            _buildOptionRow('翻页按键', '配置', () {
-              _showReaderActionUnavailable(
-                '翻页按键',
-                reason: '当前平台按键映射能力待补齐',
-              );
+            _buildOptionRow('翻页按键', _pageKeySummaryLabel(), () {
+              unawaited(_showPageKeyConfigDialog(setPopupState));
             }),
           ],
         ),
@@ -15055,6 +15086,109 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return value == 0 ? '系统默认' : value.toString();
   }
 
+  String _pageKeySummaryLabel() {
+    final prevCount = _settings.prevKeys.length;
+    final nextCount = _settings.nextKeys.length;
+    if (prevCount == 0 && nextCount == 0) {
+      return '未配置';
+    }
+    return '上一$prevCount / 下一$nextCount';
+  }
+
+  List<int>? _parsePageKeyCodesInput(String raw) {
+    final normalized = raw.trim();
+    if (normalized.isEmpty) {
+      return const <int>[];
+    }
+    final parsed = <int>{};
+    final tokens = normalized.split(RegExp(r'[,\s]+'));
+    for (final token in tokens) {
+      final text = token.trim();
+      if (text.isEmpty) continue;
+      final code = int.tryParse(text);
+      if (code == null || code <= 0) {
+        return null;
+      }
+      parsed.add(code);
+    }
+    final result = parsed.toList()..sort();
+    return List<int>.unmodifiable(result);
+  }
+
+  Future<void> _showPageKeyConfigDialog(StateSetter setPopupState) async {
+    final prevController = TextEditingController(
+      text: _settings.prevKeys.join(','),
+    );
+    final nextController = TextEditingController(
+      text: _settings.nextKeys.join(','),
+    );
+    final result = await showCupertinoDialog<Map<String, List<int>>?>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('翻页按键'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CupertinoTextField(
+                controller: prevController,
+                placeholder: '上一页键码（逗号分隔）',
+              ),
+              const SizedBox(height: 8),
+              CupertinoTextField(
+                controller: nextController,
+                placeholder: '下一页键码（逗号分隔）',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () {
+              prevController.clear();
+              nextController.clear();
+            },
+            child: const Text('重置'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () {
+              final prevKeys = _parsePageKeyCodesInput(prevController.text);
+              final nextKeys = _parsePageKeyCodesInput(nextController.text);
+              if (prevKeys == null || nextKeys == null) {
+                _showToast('按键码格式错误，请输入正整数并用逗号分隔');
+                return;
+              }
+              Navigator.pop(
+                dialogContext,
+                <String, List<int>>{
+                  'prev': prevKeys,
+                  'next': nextKeys,
+                },
+              );
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    prevController.dispose();
+    nextController.dispose();
+    if (result == null) return;
+    _updateSettingsFromSheet(
+      setPopupState,
+      _settings.copyWith(
+        prevKeys: result['prev'] ?? const <int>[],
+        nextKeys: result['next'] ?? const <int>[],
+      ),
+    );
+  }
+
   String _keepLightLabel(int keepLightSeconds) {
     switch (keepLightSeconds) {
       case ReadingSettings.keepLightOneMinute:
@@ -16283,7 +16417,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           await _exportBookmarksFromReader(markdown: true);
         },
         onEditTocRule: () {
-          _showReaderActionUnavailable('TXT 目录规则');
+          Navigator.pop(popupContext);
+          unawaited(_showTxtTocRuleDialogFromMenu());
         },
         initialDisplayTitlesByIndex: _buildCatalogInitialDisplayTitlesByIndex(),
         resolveDisplayTitle: _resolveCatalogDisplayTitle,
@@ -16960,6 +17095,16 @@ class _ReaderSearchHit {
     required this.previewMatch,
     required this.previewAfter,
     required this.pageIndex,
+  });
+}
+
+class _ReaderSearchProgressSnapshot {
+  final int chapterIndex;
+  final double chapterProgress;
+
+  const _ReaderSearchProgressSnapshot({
+    required this.chapterIndex,
+    required this.chapterProgress,
   });
 }
 
