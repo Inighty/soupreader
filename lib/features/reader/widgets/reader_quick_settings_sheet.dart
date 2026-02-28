@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
@@ -10,6 +12,9 @@ enum ReaderQuickSettingsTab {
   page,
   more,
 }
+
+bool get _supportsVolumeKeyPaging =>
+    defaultTargetPlatform != TargetPlatform.iOS;
 
 class ReaderQuickSettingsSheet extends StatefulWidget {
   final ReadingSettings settings;
@@ -59,15 +64,14 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final sheetBg = isDark
-        ? const Color(0xFF1C1C1E)
-        : AppDesignTokens.surfaceLight.withValues(alpha: 0.98);
+    final sheetBg = ReaderSettingsTokens.sheetBackground(isDark: isDark);
     final height = MediaQuery.of(context).size.height * 0.62;
     return Container(
       height: height,
       decoration: BoxDecoration(
         color: sheetBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppDesignTokens.radiusPopup)),
       ),
       child: SafeArea(
         top: false,
@@ -279,21 +283,15 @@ class _Section extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.1)
-        : AppDesignTokens.surfaceLight.withValues(alpha: 0.9);
-    final borderColor = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.12)
-        : AppDesignTokens.borderLight;
-    final titleColor = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.6)
-        : AppDesignTokens.textMuted;
+    final cardColor = ReaderSettingsTokens.sectionBackground(isDark: isDark);
+    final borderColor = ReaderSettingsTokens.sectionBorder(isDark: isDark);
+    final titleColor = ReaderSettingsTokens.titleColor(isDark: isDark);
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(ReaderSettingsTokens.sectionRadius),
         border: Border.all(color: borderColor),
       ),
       child: Column(
@@ -303,7 +301,7 @@ class _Section extends StatelessWidget {
             title,
             style: TextStyle(
               color: titleColor,
-              fontSize: 13,
+              fontSize: ReaderSettingsTokens.sectionTitleSize,
             ),
           ),
           const SizedBox(height: 10),
@@ -348,12 +346,9 @@ class _SliderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final labelColor =
-        isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
-    final valueColor =
-        isDark ? CupertinoColors.white : AppDesignTokens.textNormal;
-    final activeColor =
-        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+    final labelColor = ReaderSettingsTokens.rowTitleColor(isDark: isDark);
+    final valueColor = ReaderSettingsTokens.rowMetaColor(isDark: isDark);
+    final activeColor = ReaderSettingsTokens.accent(isDark: isDark);
     final safeMin = _safeMin();
     final safeMax = _safeMax();
     final safeValue = _safeValue();
@@ -364,7 +359,10 @@ class _SliderRow extends StatelessWidget {
           width: 44,
           child: Text(
             label,
-            style: TextStyle(color: labelColor, fontSize: 13),
+            style: TextStyle(
+              color: labelColor,
+              fontSize: ReaderSettingsTokens.rowMetaSize,
+            ),
           ),
         ),
         Expanded(
@@ -739,16 +737,17 @@ class _SwitchRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final labelColor =
-        isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
-    final activeTrackColor =
-        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+    final labelColor = ReaderSettingsTokens.rowTitleColor(isDark: isDark);
+    final activeTrackColor = ReaderSettingsTokens.accent(isDark: isDark);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
-          style: TextStyle(color: labelColor, fontSize: 14),
+          style: TextStyle(
+            color: labelColor,
+            fontSize: ReaderSettingsTokens.rowTitleSize,
+          ),
         ),
         CupertinoSwitch(
           value: value,
@@ -781,8 +780,8 @@ class _ChineseConverterTypeRow extends StatelessWidget {
         Text(
           '简繁转换',
           style: TextStyle(
-            color: isDark ? CupertinoColors.white : AppDesignTokens.textStrong,
-            fontSize: 14,
+            color: ReaderSettingsTokens.rowTitleColor(isDark: isDark),
+            fontSize: ReaderSettingsTokens.rowTitleSize,
           ),
         ),
         const SizedBox(height: 6),
@@ -791,9 +790,7 @@ class _ChineseConverterTypeRow extends StatelessWidget {
           backgroundColor: isDark
               ? CupertinoColors.white.withValues(alpha: 0.08)
               : AppDesignTokens.pageBgLight,
-          thumbColor: isDark
-              ? AppDesignTokens.brandSecondary
-              : AppDesignTokens.brandPrimary,
+          thumbColor: ReaderSettingsTokens.accent(isDark: isDark),
           children: {
             for (final mode in ChineseConverterType.values)
               mode: Padding(
@@ -804,7 +801,7 @@ class _ChineseConverterTypeRow extends StatelessWidget {
                   style: TextStyle(
                     color: isDark
                         ? CupertinoColors.white.withValues(alpha: 0.84)
-                        : AppDesignTokens.textStrong,
+                        : ReaderSettingsTokens.rowTitleColor(isDark: isDark),
                     fontSize: 12,
                   ),
                 ),
@@ -856,13 +853,15 @@ class _MoreTab extends StatelessWidget {
                   settings.copyWith(cleanChapterTitle: v),
                 ),
               ),
-              const SizedBox(height: 8),
-              _SwitchRow(
-                label: '音量键翻页',
-                value: settings.volumeKeyPage,
-                onChanged: (v) =>
-                    onSettingsChanged(settings.copyWith(volumeKeyPage: v)),
-              ),
+              if (_supportsVolumeKeyPaging) ...[
+                const SizedBox(height: 8),
+                _SwitchRow(
+                  label: '音量键翻页',
+                  value: settings.volumeKeyPage,
+                  onChanged: (v) =>
+                      onSettingsChanged(settings.copyWith(volumeKeyPage: v)),
+                ),
+              ],
               const SizedBox(height: 8),
               _ChineseConverterTypeRow(
                 currentType: settings.chineseConverterType,
@@ -948,15 +947,15 @@ class _ThemeCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final accent =
-        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
-    final borderColor = selected ? accent : AppDesignTokens.borderLight;
+    final accent = ReaderSettingsTokens.accent(isDark: isDark);
+    final borderColor =
+        selected ? accent : ReaderSettingsTokens.sectionBorder(isDark: isDark);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: theme.background,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
           border: Border.all(color: borderColor, width: selected ? 1.4 : 1),
         ),
         padding: const EdgeInsets.all(8),
@@ -991,10 +990,8 @@ class _PageTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final labelColor =
-        isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
-    final activeTrackColor =
-        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+    final labelColor = ReaderSettingsTokens.rowTitleColor(isDark: isDark);
+    final activeTrackColor = ReaderSettingsTokens.accent(isDark: isDark);
     final modes = PageTurnModeUi.values(current: settings.pageTurnMode);
     return ListView(
       physics: const BouncingScrollPhysics(),
@@ -1018,28 +1015,32 @@ class _PageTab extends StatelessWidget {
             ],
           ),
         ),
-        _Section(
-          title: '按键',
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '音量键翻页',
-                    style: TextStyle(color: labelColor, fontSize: 14),
-                  ),
-                  CupertinoSwitch(
-                    value: settings.volumeKeyPage,
-                    onChanged: (v) =>
-                        onSettingsChanged(settings.copyWith(volumeKeyPage: v)),
-                    activeTrackColor: activeTrackColor,
-                  ),
-                ],
-              ),
-            ],
+        if (_supportsVolumeKeyPaging)
+          _Section(
+            title: '按键',
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '音量键翻页',
+                      style: TextStyle(
+                        color: labelColor,
+                        fontSize: ReaderSettingsTokens.rowTitleSize,
+                      ),
+                    ),
+                    CupertinoSwitch(
+                      value: settings.volumeKeyPage,
+                      onChanged: (v) => onSettingsChanged(
+                          settings.copyWith(volumeKeyPage: v)),
+                      activeTrackColor: activeTrackColor,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
         const SizedBox(height: 14),
       ],
     );
@@ -1062,16 +1063,14 @@ class _ModeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final accent =
-        isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+    final accent = ReaderSettingsTokens.accent(isDark: isDark);
     final bgNormal = isDark
         ? CupertinoColors.white.withValues(alpha: 0.1)
         : AppDesignTokens.surfaceLight.withValues(alpha: 0.92);
     final borderNormal = isDark
         ? CupertinoColors.white.withValues(alpha: 0.12)
         : AppDesignTokens.borderLight;
-    final textNormal =
-        isDark ? CupertinoColors.white : AppDesignTokens.textNormal;
+    final textNormal = ReaderSettingsTokens.rowMetaColor(isDark: isDark);
     final baseColor =
         selected ? accent.withValues(alpha: isDark ? 0.18 : 0.12) : bgNormal;
     final borderColor = selected ? accent : borderNormal;

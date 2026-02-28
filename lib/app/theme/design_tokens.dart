@@ -1,4 +1,4 @@
-import 'dart:ui';
+import 'package:flutter/cupertino.dart';
 
 /// 全局设计令牌：用于统一品牌、语义色、节奏与交互时长。
 class AppDesignTokens {
@@ -198,4 +198,54 @@ class ReaderThemeTokens {
     amoled,
     legadoClassic,
   ];
+}
+
+/// 阅读设置页与阅读设置弹层统一视觉令牌。
+class ReaderSettingsTokens {
+  ReaderSettingsTokens._();
+
+  static const double sectionRadius = 14;
+  static const double sectionTitleSize = 13;
+  static const double rowTitleSize = 14;
+  static const double rowMetaSize = 12;
+
+  static Color sheetBackground({required bool isDark}) {
+    return isDark
+        ? const Color(0xFF1B1D21)
+        : AppDesignTokens.surfaceLight.withValues(alpha: 0.98);
+  }
+
+  static Color sectionBackground({required bool isDark}) {
+    return isDark
+        ? CupertinoColors.white.withValues(alpha: 0.1)
+        : AppDesignTokens.surfaceLight.withValues(alpha: 0.9);
+  }
+
+  static Color sectionBorder({required bool isDark}) {
+    return isDark
+        ? CupertinoColors.white.withValues(alpha: 0.14)
+        : AppDesignTokens.borderLight;
+  }
+
+  static Color titleColor({required bool isDark}) {
+    return isDark
+        ? CupertinoColors.white.withValues(alpha: 0.64)
+        : AppDesignTokens.textMuted;
+  }
+
+  static Color rowTitleColor({required bool isDark}) {
+    return isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+  }
+
+  static Color rowMetaColor({required bool isDark}) {
+    return isDark
+        ? CupertinoColors.white.withValues(alpha: 0.72)
+        : AppDesignTokens.textNormal;
+  }
+
+  static Color accent({required bool isDark}) {
+    return isDark
+        ? AppDesignTokens.brandSecondary
+        : AppDesignTokens.brandPrimary;
+  }
 }

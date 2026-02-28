@@ -1,7 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
@@ -18,6 +21,9 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
   final SettingsService _settingsService = SettingsService();
   late ReadingSettings _settings;
 
+  bool get _supportsVolumeKeyPaging =>
+      defaultTargetPlatform != TargetPlatform.iOS;
+
   @override
   void initState() {
     super.initState();
@@ -29,26 +35,62 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
     unawaited(_settingsService.saveReadingSettings(next));
   }
 
+  bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
+
+  Color get _accent => ReaderSettingsTokens.accent(isDark: _isDark);
+
+  Text _sectionHeader(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        color: ReaderSettingsTokens.titleColor(isDark: _isDark),
+        fontSize: ReaderSettingsTokens.sectionTitleSize,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  Text _tileTitle(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: ReaderSettingsTokens.rowTitleColor(isDark: _isDark),
+        fontSize: ReaderSettingsTokens.rowTitleSize,
+      ),
+    );
+  }
+
+  Text _tileMeta(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: ReaderSettingsTokens.rowMetaColor(isDark: _isDark),
+        fontSize: ReaderSettingsTokens.rowMetaSize,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '翻页与按键',
       child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+        padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
           CupertinoListSection.insetGrouped(
-            header: const Text('翻页触发'),
+            header: _sectionHeader('翻页触发'),
             children: [
               CupertinoListTile.notched(
-                title: const Text('翻页触发阈值'),
-                additionalInfo: Text(_touchSlopLabel),
+                title: _tileTitle('翻页触发阈值'),
+                additionalInfo: _tileMeta(_touchSlopLabel),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _pickTouchSlop,
               ),
               CupertinoListTile.notched(
-                title: const Text('滚动翻页无动画'),
+                title: _tileTitle('滚动翻页无动画'),
                 trailing: CupertinoSwitch(
                   value: _settings.noAnimScrollPage,
+                  activeTrackColor: _accent,
                   onChanged: (v) =>
                       _update(_settings.copyWith(noAnimScrollPage: v)),
                 ),
@@ -56,28 +98,32 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('按键'),
+            header: _sectionHeader('按键'),
             children: [
-              CupertinoListTile.notched(
-                title: const Text('音量键翻页'),
-                trailing: CupertinoSwitch(
-                  value: _settings.volumeKeyPage,
-                  onChanged: (v) =>
-                      _update(_settings.copyWith(volumeKeyPage: v)),
+              if (_supportsVolumeKeyPaging)
+                CupertinoListTile.notched(
+                  title: _tileTitle('音量键翻页'),
+                  trailing: CupertinoSwitch(
+                    value: _settings.volumeKeyPage,
+                    activeTrackColor: _accent,
+                    onChanged: (v) =>
+                        _update(_settings.copyWith(volumeKeyPage: v)),
+                  ),
                 ),
-              ),
               CupertinoListTile.notched(
-                title: const Text('鼠标滚轮翻页'),
+                title: _tileTitle('鼠标滚轮翻页'),
                 trailing: CupertinoSwitch(
                   value: _settings.mouseWheelPage,
+                  activeTrackColor: _accent,
                   onChanged: (v) =>
                       _update(_settings.copyWith(mouseWheelPage: v)),
                 ),
               ),
               CupertinoListTile.notched(
-                title: const Text('长按按键翻页'),
+                title: _tileTitle('长按按键翻页'),
                 trailing: CupertinoSwitch(
                   value: _settings.keyPageOnLongPress,
+                  activeTrackColor: _accent,
                   onChanged: (v) =>
                       _update(_settings.copyWith(keyPageOnLongPress: v)),
                 ),
@@ -103,6 +149,7 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
             controller: controller,
             keyboardType: TextInputType.number,
             placeholder: '0 - 9999（0=系统默认）',
+            clearButtonMode: OverlayVisibilityMode.editing,
           ),
         ),
         actions: [

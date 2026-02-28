@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
@@ -22,6 +23,19 @@ class _ReadingInterfaceSettingsHubViewState
   final SettingsService _settingsService = SettingsService();
 
   ReadingSettings get _settings => _settingsService.readingSettings;
+
+  bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
+
+  Text _sectionHeader(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        color: ReaderSettingsTokens.titleColor(isDark: _isDark),
+        fontSize: ReaderSettingsTokens.sectionTitleSize,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
 
   Future<void> _openPreferences() async {
     await Navigator.of(context).push(
@@ -60,10 +74,10 @@ class _ReadingInterfaceSettingsHubViewState
     return AppCupertinoPageScaffold(
       title: '阅读界面样式',
       child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+        padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
           CupertinoListSection.insetGrouped(
-            header: const Text('阅读样式与排版'),
+            header: _sectionHeader('阅读样式与排版'),
             children: [
               _buildItem(
                 title: '样式与排版',
@@ -78,7 +92,7 @@ class _ReadingInterfaceSettingsHubViewState
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('排版细项'),
+            header: _sectionHeader('排版细项'),
             children: [
               _buildItem(
                 title: '排版与边距（高级）',
@@ -103,14 +117,18 @@ class _ReadingInterfaceSettingsHubViewState
         title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: ReaderSettingsTokens.rowTitleColor(isDark: _isDark),
+          fontSize: ReaderSettingsTokens.rowTitleSize,
+        ),
       ),
       subtitle: Text(
         description.trim(),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          fontSize: 12,
-          color: CupertinoColors.secondaryLabel,
+        style: TextStyle(
+          fontSize: ReaderSettingsTokens.rowMetaSize,
+          color: ReaderSettingsTokens.rowMetaColor(isDark: _isDark),
         ),
       ),
       trailing: const CupertinoListTileChevron(),

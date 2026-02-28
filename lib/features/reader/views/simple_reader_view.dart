@@ -4,7 +4,8 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, listEquals;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb, listEquals;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -597,6 +598,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _screenOffTimerStart(force: true);
       unawaited(_applyPreferredOrientations(_settings, force: true));
       _syncSystemUiForOverlay(force: true);
+      _requestReaderKeyboardFocus();
     });
 
     // 初始化自动翻页器
@@ -740,6 +742,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   void _setReaderMenuVisible(bool visible) {
     if (_showMenu == visible) {
       _syncSystemUiForOverlay();
+      if (!visible) {
+        _requestReaderKeyboardFocus();
+      }
       return;
     }
     setState(() {
@@ -750,11 +755,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       }
     });
     _syncSystemUiForOverlay();
+    if (!visible) {
+      _requestReaderKeyboardFocus();
+    }
   }
 
   void _setSearchMenuVisible(bool visible) {
     if (_showSearchMenu == visible) {
       _syncSystemUiForOverlay();
+      if (!visible) {
+        _requestReaderKeyboardFocus();
+      }
       return;
     }
     setState(() {
@@ -765,6 +776,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       }
     });
     _syncSystemUiForOverlay();
+    if (!visible) {
+      _requestReaderKeyboardFocus();
+    }
+  }
+
+  void _requestReaderKeyboardFocus() {
+    if (!mounted || _keyboardFocusNode.hasFocus) return;
+    FocusScope.of(context).requestFocus(_keyboardFocusNode);
   }
 
   void _toggleReaderMenuVisible() {
@@ -945,19 +964,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   int _legacyPeriodDays(DateTime start, DateTime end) {
     final startDate = _normalizeDateOnly(start);
     final endDate = _normalizeDateOnly(end);
-    if (endDate.isBefore(startDate)) {
-      return -_legacyPeriodDays(endDate, startDate);
-    }
-    var monthDelta = endDate.month - startDate.month;
-    var dayDelta = endDate.day - startDate.day;
-    if (dayDelta < 0) {
-      monthDelta -= 1;
-      dayDelta += DateTime(endDate.year, endDate.month, 0).day;
-    }
-    if (monthDelta < 0) {
-      monthDelta += 12;
-    }
-    return dayDelta;
+    return endDate.difference(startDate).inDays;
   }
 
   int _effectiveReadableChapterCount() {
@@ -2861,10 +2868,34 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         .toList(growable: false);
   }
 
+  ReaderThemeMode get _currentReaderThemeMode {
+    return ReaderThemeModeHelper.resolveMode(
+      appearanceMode: _settingsService.appSettings.appearanceMode,
+      effectiveBrightness:
+          WidgetsBinding.instance.platformDispatcher.platformBrightness,
+    );
+  }
+
+  int _themeIndexForMode(ReaderThemeMode mode) {
+    return ReaderThemeModeHelper.resolveThemeIndex(
+      settings: _settings,
+      mode: mode,
+    );
+  }
+
+  ReadingSettings _settingsWithThemeIndexForCurrentMode(int index) {
+    return ReaderThemeModeHelper.updateThemeIndexForMode(
+      settings: _settings,
+      mode: _currentReaderThemeMode,
+      index: index,
+    );
+  }
+
   int get _activeReadStyleIndex {
     final styles = _activeReadStyleConfigs;
     if (styles.isEmpty) return 0;
-    return _settings.themeIndex.clamp(0, styles.length - 1).toInt();
+    final index = _themeIndexForMode(_currentReaderThemeMode);
+    return index.clamp(0, styles.length - 1).toInt();
   }
 
   String _readStyleDisplayName(ReadStyleConfig config) {
@@ -3041,6 +3072,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _settings.clickActions,
       excludeTts: MigrationExclusions.excludeTts,
     );
+  }
+
+  bool get _supportsVolumeKeyPaging {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform != TargetPlatform.iOS;
+  }
+
+  bool get _supportsCustomPageKeyMapping {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform != TargetPlatform.iOS;
   }
 
   /// 左右点击翻页处理
@@ -6405,13 +6446,26 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   ReadingSettings _readSettingsWithExclusions(ReadingSettings settings) {
-    if (!MigrationExclusions.excludeTts) {
-      return settings.sanitize();
+    var normalized = settings;
+    if (!_supportsVolumeKeyPaging) {
+      normalized = normalized.copyWith(
+        volumeKeyPage: false,
+        volumeKeyPageOnPlay: false,
+      );
     }
-    return settings
+    if (!_supportsCustomPageKeyMapping) {
+      normalized = normalized.copyWith(
+        prevKeys: const <int>[],
+        nextKeys: const <int>[],
+      );
+    }
+    if (!MigrationExclusions.excludeTts) {
+      return normalized.sanitize();
+    }
+    return normalized
         .copyWith(
           clickActions: ClickAction.normalizeConfigForExclusions(
-            settings.clickActions,
+            normalized.clickActions,
             excludeTts: true,
           ),
           volumeKeyPageOnPlay: false,
@@ -6751,14 +6805,22 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _toggleDayNightThemeFromQuickAction() {
+    final currentMode = _currentReaderThemeMode;
+    final currentIndex = _themeIndexForMode(currentMode);
     final targetIndex = ReaderLegacyQuickActionHelper.resolveToggleThemeIndex(
-      currentIndex: _settings.themeIndex,
+      currentIndex: currentIndex,
       themes: _activeReadStyles,
     );
-    if (targetIndex == _settings.themeIndex) {
+    if (targetIndex == currentIndex) {
       return;
     }
-    _updateSettings(_settings.copyWith(themeIndex: targetIndex));
+    _updateSettings(
+      ReaderThemeModeHelper.updateThemeIndexForMode(
+        settings: _settings,
+        mode: currentMode,
+        index: targetIndex,
+      ),
+    );
   }
 
   /// 迁移排除态提示：朗读（TTS）仅保留锚点，不进入业务实现。
@@ -10400,6 +10462,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       return;
     }
     await _sourceRepo.updateSource(source.copyWith(enabled: false));
+    if (!mounted) return;
+    _refreshCurrentSourceName();
+    setState(() {});
+    _showToast('已禁用书源：${source.bookSourceName}');
   }
 
   Future<void> _deleteSourceByLegacyRule(String sourceUrl) async {
@@ -12208,7 +12274,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                           return GestureDetector(
                             onTap: () => _updateSettingsFromSheet(
                               setPopupState,
-                              _settings.copyWith(themeIndex: index),
+                              _settingsWithThemeIndexForCurrentMode(index),
                             ),
                             onLongPress: () => _editReadStyleFromDialog(
                               setPopupState,
@@ -12266,10 +12332,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final createdIndex = styles.length - 1;
     _updateSettingsFromSheet(
       setPopupState,
-      _settings.copyWith(
-        readStyleConfigs: styles,
-        themeIndex: createdIndex,
-      ),
+      _settingsWithThemeIndexForCurrentMode(
+        createdIndex,
+      ).copyWith(readStyleConfigs: styles),
     );
     await _editReadStyleFromDialog(
       setPopupState,
@@ -12302,10 +12367,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             nextStyles[styleIndex] = next.sanitize();
             _updateSettingsFromSheet(
               setPopupState,
-              _settings.copyWith(
-                readStyleConfigs: nextStyles,
-                themeIndex: styleIndex,
-              ),
+              _settingsWithThemeIndexForCurrentMode(
+                styleIndex,
+              ).copyWith(readStyleConfigs: nextStyles),
             );
             setEditorState(() {});
           }
@@ -12344,17 +12408,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             if (nextStyles.isEmpty) {
               nextStyles.add(_createLegacyReadStyleTemplate());
             }
-            var nextIndex = _settings.themeIndex;
-            if (styleIndex <= nextIndex) {
-              nextIndex -= 1;
-            }
+            var nextIndex = ReaderThemeModeHelper.shiftIndexAfterRemoval(
+              index: _themeIndexForMode(_currentReaderThemeMode),
+              removedIndex: styleIndex,
+              newLength: nextStyles.length,
+            );
             nextIndex = nextIndex.clamp(0, nextStyles.length - 1).toInt();
             _updateSettingsFromSheet(
               setPopupState,
-              _settings.copyWith(
-                readStyleConfigs: nextStyles,
-                themeIndex: nextIndex,
-              ),
+              _settingsWithThemeIndexForCurrentMode(
+                nextIndex,
+              ).copyWith(readStyleConfigs: nextStyles),
             );
             if (dialogContext.mounted) {
               Navigator.pop(dialogContext);
@@ -13693,13 +13757,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 _settings.copyWith(mouseWheelPage: value),
               );
             }),
-            _buildSwitchRow('音量键翻页', _settings.volumeKeyPage, (value) {
-              _updateSettingsFromSheet(
-                setPopupState,
-                _settings.copyWith(volumeKeyPage: value),
-              );
-            }),
-            if (!MigrationExclusions.excludeTts)
+            if (_supportsVolumeKeyPaging)
+              _buildSwitchRow('音量键翻页', _settings.volumeKeyPage, (value) {
+                _updateSettingsFromSheet(
+                  setPopupState,
+                  _settings.copyWith(volumeKeyPage: value),
+                );
+              }),
+            if (_supportsVolumeKeyPaging && !MigrationExclusions.excludeTts)
               _buildSwitchRow(
                 '朗读时音量键翻页',
                 _settings.volumeKeyPageOnPlay,
@@ -13777,9 +13842,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 _settings.copyWith(disableReturnKey: value),
               );
             }),
-            _buildOptionRow('翻页按键', _pageKeySummaryLabel(), () {
-              unawaited(_showPageKeyConfigDialog(setPopupState));
-            }),
+            if (_supportsCustomPageKeyMapping)
+              _buildOptionRow('翻页按键', _pageKeySummaryLabel(), () {
+                unawaited(_showPageKeyConfigDialog(setPopupState));
+              }),
           ],
         ),
       ),
@@ -14302,7 +14368,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     onTap: () {
                       _updateSettingsFromSheet(
                         setPopupState,
-                        _settings.copyWith(themeIndex: index),
+                        _settingsWithThemeIndexForCurrentMode(index),
                       );
                     },
                     child: Container(
@@ -14743,12 +14809,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     _settings.copyWith(confirmSkipChapter: value),
                   );
                 }),
-                _buildSwitchRow('音量键翻页', _settings.volumeKeyPage, (value) {
-                  _updateSettingsFromSheet(
-                    setPopupState,
-                    _settings.copyWith(volumeKeyPage: value),
-                  );
-                }),
+                if (_supportsVolumeKeyPaging)
+                  _buildSwitchRow('音量键翻页', _settings.volumeKeyPage, (value) {
+                    _updateSettingsFromSheet(
+                      setPopupState,
+                      _settings.copyWith(volumeKeyPage: value),
+                    );
+                  }),
                 _buildSwitchRow('鼠标滚轮翻页', _settings.mouseWheelPage, (value) {
                   _updateSettingsFromSheet(
                     setPopupState,

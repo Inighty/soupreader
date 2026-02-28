@@ -22,6 +22,41 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
   final SettingsService _settingsService = SettingsService();
   late ReadingSettings _settings;
 
+  bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
+
+  Color get _accent => ReaderSettingsTokens.accent(isDark: _isDark);
+
+  Text _sectionHeader(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        color: ReaderSettingsTokens.titleColor(isDark: _isDark),
+        fontSize: ReaderSettingsTokens.sectionTitleSize,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  Text _tileTitle(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: ReaderSettingsTokens.rowTitleColor(isDark: _isDark),
+        fontSize: ReaderSettingsTokens.rowTitleSize,
+      ),
+    );
+  }
+
+  Text _tileMeta(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: ReaderSettingsTokens.rowMetaColor(isDark: _isDark),
+        fontSize: ReaderSettingsTokens.rowMetaSize,
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -63,7 +98,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
       context: context,
       title: '选择阅读主题',
       currentValue: _settings.themeIndex,
-      accentColor: AppDesignTokens.brandPrimary,
+      accentColor: _accent,
       items: AppColors.readingThemes.asMap().entries.map((entry) {
         final index = entry.key;
         final theme = entry.value;
@@ -82,7 +117,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
       context: context,
       title: '选择翻页模式',
       currentValue: _settings.pageTurnMode,
-      accentColor: AppDesignTokens.brandPrimary,
+      accentColor: _accent,
       items: PageTurnModeUi.values(current: _settings.pageTurnMode).map((mode) {
         return OptionPickerItem<PageTurnMode>(
           value: mode,
@@ -104,7 +139,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
       context: context,
       title: '选择字体',
       currentValue: _settings.fontFamilyIndex,
-      accentColor: AppDesignTokens.brandPrimary,
+      accentColor: _accent,
       items: ReadingFontFamily.presets.asMap().entries.map((entry) {
         final index = entry.key;
         final preset = entry.value;
@@ -129,7 +164,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
       context: context,
       title: '选择字重',
       currentValue: _settings.textBold,
-      accentColor: AppDesignTokens.brandPrimary,
+      accentColor: _accent,
       items: options
           .map(
             (option) => OptionPickerItem<int>(
@@ -174,39 +209,39 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
     return AppCupertinoPageScaffold(
       title: '样式与排版',
       child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+        padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
           CupertinoListSection.insetGrouped(
-            header: const Text('样式'),
+            header: _sectionHeader('样式'),
             children: [
               CupertinoListTile.notched(
-                title: const Text('主题'),
-                additionalInfo: Text(_themeLabel),
+                title: _tileTitle('主题'),
+                additionalInfo: _tileMeta(_themeLabel),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _pickTheme,
               ),
               CupertinoListTile.notched(
-                title: const Text('字体'),
-                additionalInfo: Text(_fontLabel),
+                title: _tileTitle('字体'),
+                additionalInfo: _tileMeta(_fontLabel),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _pickFontFamily,
               ),
               CupertinoListTile.notched(
-                title: const Text('字重'),
-                additionalInfo: Text(_fontWeightLabel),
+                title: _tileTitle('字重'),
+                additionalInfo: _tileMeta(_fontWeightLabel),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _pickFontWeight,
               ),
               CupertinoListTile.notched(
-                title: const Text('翻页模式'),
-                additionalInfo: Text(_settings.pageTurnMode.name),
+                title: _tileTitle('翻页模式'),
+                additionalInfo: _tileMeta(_settings.pageTurnMode.name),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _pickPageTurnMode,
               ),
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('排版'),
+            header: _sectionHeader('排版'),
             children: [
               _SliderTile(
                 title: '字号',
@@ -214,6 +249,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                 min: 10,
                 max: 40,
                 display: _settings.fontSize.toInt().toString(),
+                activeColor: _accent,
                 onChanged: (v) => _update(_settings.copyWith(fontSize: v)),
               ),
               _SliderTile(
@@ -222,6 +258,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                 min: -2,
                 max: 5,
                 display: _settings.letterSpacing.toStringAsFixed(1),
+                activeColor: _accent,
                 onChanged: (v) => _update(_settings.copyWith(letterSpacing: v)),
               ),
               _SliderTile(
@@ -230,6 +267,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                 min: 1.0,
                 max: 3.0,
                 display: _settings.lineHeight.toStringAsFixed(1),
+                activeColor: _accent,
                 onChanged: (v) => _update(_settings.copyWith(lineHeight: v)),
               ),
               _SliderTile(
@@ -238,21 +276,24 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                 min: 0,
                 max: 50,
                 display: _settings.paragraphSpacing.toInt().toString(),
+                activeColor: _accent,
                 onChanged: (v) =>
                     _update(_settings.copyWith(paragraphSpacing: v)),
               ),
               CupertinoListTile.notched(
-                title: const Text('两端对齐'),
+                title: _tileTitle('两端对齐'),
                 trailing: CupertinoSwitch(
                   value: _settings.textFullJustify,
+                  activeTrackColor: _accent,
                   onChanged: (value) =>
                       _update(_settings.copyWith(textFullJustify: value)),
                 ),
               ),
               CupertinoListTile.notched(
-                title: const Text('段首缩进'),
+                title: _tileTitle('段首缩进'),
                 trailing: CupertinoSwitch(
                   value: _settings.paragraphIndent.isNotEmpty,
+                  activeTrackColor: _accent,
                   onChanged: (value) => _update(
                     _settings.copyWith(paragraphIndent: value ? '　　' : ''),
                   ),
@@ -261,11 +302,11 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('高级'),
+            header: _sectionHeader('高级'),
             children: [
               CupertinoListTile.notched(
-                title: const Text('排版与边距（高级）'),
-                additionalInfo: const Text('更多选项'),
+                title: _tileTitle('排版与边距（高级）'),
+                additionalInfo: _tileMeta('更多选项'),
                 trailing: const CupertinoListTileChevron(),
                 onTap: _openAdvancedTypography,
               ),
@@ -284,6 +325,7 @@ class _SliderTile extends StatelessWidget {
   final double min;
   final double max;
   final String display;
+  final Color activeColor;
   final ValueChanged<double> onChanged;
 
   const _SliderTile({
@@ -292,6 +334,7 @@ class _SliderTile extends StatelessWidget {
     required this.min,
     required this.max,
     required this.display,
+    required this.activeColor,
     required this.onChanged,
   });
 
@@ -311,23 +354,37 @@ class _SliderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final safeMin = _safeMin();
     final safeMax = _safeMax();
     final safeValue = _safeSliderValue();
     final canSlide = min.isFinite && max.isFinite && max > min;
 
     return CupertinoListTile(
-      title: Text(title),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: ReaderSettingsTokens.rowTitleColor(isDark: isDark),
+          fontSize: ReaderSettingsTokens.rowTitleSize,
+        ),
+      ),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 10),
         child: CupertinoSlider(
           value: safeValue,
           min: safeMin,
           max: safeMax,
+          activeColor: activeColor,
           onChanged: canSlide ? onChanged : null,
         ),
       ),
-      additionalInfo: Text(display),
+      additionalInfo: Text(
+        display,
+        style: TextStyle(
+          color: ReaderSettingsTokens.rowMetaColor(isDark: isDark),
+          fontSize: ReaderSettingsTokens.rowMetaSize,
+        ),
+      ),
     );
   }
 }

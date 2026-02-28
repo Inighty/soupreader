@@ -22,17 +22,20 @@ class ReaderThemeModeHelper {
   ///
   /// 约束：
   /// - `appearanceMode == eInk` 时强制走 EInk；
-  /// - 其余情况使用 `effectiveBrightness` 判定日/夜。
+  /// - `appearanceMode == light/dark` 时使用显式模式；
+  /// - `appearanceMode == followSystem` 时使用 `effectiveBrightness` 判定日/夜。
   static ReaderThemeMode resolveMode({
     required AppAppearanceMode appearanceMode,
     required Brightness effectiveBrightness,
   }) {
-    if (appearanceMode == AppAppearanceMode.eInk) {
-      return ReaderThemeMode.eInk;
-    }
-    return effectiveBrightness == Brightness.dark
-        ? ReaderThemeMode.night
-        : ReaderThemeMode.day;
+    return switch (appearanceMode) {
+      AppAppearanceMode.eInk => ReaderThemeMode.eInk,
+      AppAppearanceMode.dark => ReaderThemeMode.night,
+      AppAppearanceMode.light => ReaderThemeMode.day,
+      AppAppearanceMode.followSystem => effectiveBrightness == Brightness.dark
+          ? ReaderThemeMode.night
+          : ReaderThemeMode.day,
+    };
   }
 
   /// 从阅读设置中取出“当前模式”的主题索引。
@@ -78,4 +81,3 @@ class ReaderThemeModeHelper {
     return next.clamp(0, newLength - 1).toInt();
   }
 }
-
