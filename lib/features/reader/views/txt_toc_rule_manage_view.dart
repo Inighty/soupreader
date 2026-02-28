@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
 import '../../settings/views/app_help_dialog.dart';
@@ -160,8 +161,9 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
 
   Future<void> _showMoreMenu() async {
     if (_menuBusy) return;
-    final selected = await showCupertinoModalPopup<_TxtTocRuleMenuAction>(
+    final selected = await showCupertinoBottomDialog<_TxtTocRuleMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('TXT 目录规则'),
         actions: [
@@ -224,8 +226,9 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
   Future<void> _showSelectionMoreMenu() async {
     if (_menuBusy || _selectedRuleIds.isEmpty) return;
     final selected =
-        await showCupertinoModalPopup<_TxtTocRuleSelectionMenuAction>(
+        await showCupertinoBottomDialog<_TxtTocRuleSelectionMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('批量操作'),
         actions: [
@@ -273,8 +276,10 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
 
   Future<void> _showRuleItemMenu(TxtTocRule rule) async {
     if (_menuBusy || _selectionMode) return;
-    final selected = await showCupertinoModalPopup<_TxtTocRuleItemMenuAction>(
+    final selected =
+        await showCupertinoBottomDialog<_TxtTocRuleItemMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: Text(rule.name.trim().isEmpty ? '未命名规则' : rule.name.trim()),
         actions: [

@@ -252,8 +252,9 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
   }
 
   Future<void> _pickUpdateToVariant() async {
-    final selected = await showCupertinoModalPopup<String>(
+    final selected = await showCupertinoBottomDialog<String>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: [
           CupertinoActionSheetAction(

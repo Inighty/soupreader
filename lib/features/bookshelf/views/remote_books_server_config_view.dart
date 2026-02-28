@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/remote_server.dart';
 import '../services/remote_server_store.dart';
 
@@ -134,7 +135,7 @@ class _RemoteBooksServerConfigViewState
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

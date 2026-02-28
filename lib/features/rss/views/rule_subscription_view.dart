@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../models/rule_subscription.dart';
 import '../services/rule_subscription_store.dart';
@@ -173,8 +174,9 @@ class _RuleSubscriptionViewState extends State<RuleSubscriptionView> {
 
   Future<void> _showSubscriptionActions(RuleSubscription subscription) async {
     if (!mounted) return;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: Text(
           subscription.name.trim().isEmpty

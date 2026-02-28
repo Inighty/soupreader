@@ -57,8 +57,9 @@ class _WelcomeStyleSettingsViewState extends State<WelcomeStyleSettingsView> {
       return;
     }
 
-    final selected = await showCupertinoModalPopup<_WelcomeImageAction>(
+    final selected = await showCupertinoBottomDialog<_WelcomeImageAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: [
           CupertinoActionSheetAction(

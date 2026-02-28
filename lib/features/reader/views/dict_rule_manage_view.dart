@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
 import '../../settings/views/app_help_dialog.dart';
@@ -171,8 +172,9 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
 
   Future<void> _showMoreMenu() async {
     if (_menuBusy) return;
-    final selected = await showCupertinoModalPopup<_DictRuleMenuAction>(
+    final selected = await showCupertinoBottomDialog<_DictRuleMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('配置字典规则'),
         actions: [
@@ -239,8 +241,9 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
   Future<void> _showSelectionMoreMenu() async {
     if (_menuBusy || _selectedRuleNames.isEmpty) return;
     final selected =
-        await showCupertinoModalPopup<_DictRuleSelectionMenuAction>(
+        await showCupertinoBottomDialog<_DictRuleSelectionMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('批量操作'),
         actions: [

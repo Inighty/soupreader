@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/replace_rule.dart';
 import '../services/replace_rule_engine.dart';
 
@@ -170,8 +171,10 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
 
   Future<void> _showMoreMenu() async {
     if (_saving) return;
-    final selected = await showCupertinoModalPopup<_ReplaceRuleEditMenuAction>(
+    final selected =
+        await showCupertinoBottomDialog<_ReplaceRuleEditMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('编辑规则'),
         actions: [

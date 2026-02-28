@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -664,8 +665,9 @@ class _BookshelfManagePlaceholderViewState
       });
     var openGroupManage = false;
     int? selectedGroupId;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (popupContext) {
         return CupertinoActionSheet(
           title: const Text('分组'),
@@ -729,8 +731,9 @@ class _BookshelfManagePlaceholderViewState
   }
 
   void _showMoreMenu() {
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (popupContext) {
         return CupertinoActionSheet(
           actions: [
@@ -1894,8 +1897,9 @@ class _BookshelfManageSourcePickerViewState
   }
 
   void _showMoreMenu() {
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) {
         return CupertinoActionSheet(
           actions: [

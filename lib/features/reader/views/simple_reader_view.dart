@@ -20,6 +20,7 @@ import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
+import '../../../core/models/app_settings.dart';
 import '../../../core/services/js_runtime.dart';
 import '../../../core/services/keep_screen_on_service.dart';
 import '../../../core/services/screen_brightness_service.dart';
@@ -31,6 +32,7 @@ import '../../../core/utils/chinese_script_converter.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
 import '../../bookshelf/models/book.dart';
 import '../../bookshelf/services/bookshelf_catalog_update_service.dart';
@@ -537,6 +539,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       base: baseReadingSettings,
       bookPageAnimOverride: _bookPageAnimOverride,
     );
+    _maybeNormalizeFollowSystemReaderThemes();
     _useReplaceRule = _settingsService.getBookUseReplaceRule(
       widget.bookId,
       fallback: _defaultUseReplaceRule(),
@@ -610,6 +613,68 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     });
 
     _syncSystemUiForOverlay(force: true);
+  }
+
+  void _maybeNormalizeFollowSystemReaderThemes() {
+    final appSettings = _settingsService.appSettings;
+    if (appSettings.appearanceMode != AppAppearanceMode.followSystem) {
+      return;
+    }
+
+    final styles = _activeReadStyleConfigs;
+    if (styles.isEmpty) return;
+
+    int clampIndex(int index) {
+      return index.clamp(0, styles.length - 1).toInt();
+    }
+
+    bool isDarkIndex(int index) {
+      final safeIndex = clampIndex(index);
+      return Color(styles[safeIndex].backgroundColor).computeLuminance() < 0.5;
+    }
+
+    int? firstLightIndex;
+    int? firstDarkIndex;
+    for (var i = 0; i < styles.length; i++) {
+      final isDark = Color(styles[i].backgroundColor).computeLuminance() < 0.5;
+      if (!isDark && firstLightIndex == null) {
+        firstLightIndex = i;
+      }
+      if (isDark && firstDarkIndex == null) {
+        firstDarkIndex = i;
+      }
+      if (firstLightIndex != null && firstDarkIndex != null) break;
+    }
+
+    var nextThemeIndex = clampIndex(_settings.themeIndex);
+    var nextNightThemeIndex = clampIndex(_settings.nightThemeIndex);
+
+    final dayIsDark = isDarkIndex(nextThemeIndex);
+    final nightIsDark = isDarkIndex(nextNightThemeIndex);
+    if (dayIsDark && !nightIsDark) {
+      final tmp = nextThemeIndex;
+      nextThemeIndex = nextNightThemeIndex;
+      nextNightThemeIndex = tmp;
+    }
+
+    if (firstLightIndex != null && isDarkIndex(nextThemeIndex)) {
+      nextThemeIndex = firstLightIndex;
+    }
+    if (firstDarkIndex != null && !isDarkIndex(nextNightThemeIndex)) {
+      nextNightThemeIndex = firstDarkIndex;
+    }
+
+    if (_settings.themeIndex == nextThemeIndex &&
+        _settings.nightThemeIndex == nextNightThemeIndex) {
+      return;
+    }
+
+    final next = _settings.copyWith(
+      themeIndex: nextThemeIndex,
+      nightThemeIndex: nextNightThemeIndex,
+    );
+    _settings = next;
+    unawaited(_settingsService.saveReadingSettings(next));
   }
 
   Future<void> _initReader() async {
@@ -906,8 +971,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final appSettings = _settingsService.appSettings;
     final resolvedMode = ReaderThemeModeHelper.resolveMode(
       appearanceMode: appSettings.appearanceMode,
-      effectiveBrightness:
-          WidgetsBinding.instance.platformDispatcher.platformBrightness,
+      effectiveBrightness: _effectiveBrightnessForReaderThemeMode(),
     );
     debugPrint(
       '[reader] appSettings changed: '
@@ -2872,9 +2936,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   ReaderThemeMode get _currentReaderThemeMode {
     return ReaderThemeModeHelper.resolveMode(
       appearanceMode: _settingsService.appSettings.appearanceMode,
-      effectiveBrightness:
-          WidgetsBinding.instance.platformDispatcher.platformBrightness,
+      effectiveBrightness: _effectiveBrightnessForReaderThemeMode(),
     );
+  }
+
+  Brightness _effectiveBrightnessForReaderThemeMode() {
+    final themeBrightness = CupertinoTheme.of(context).brightness;
+    if (themeBrightness != null) return themeBrightness;
+    final mediaQuery = MediaQuery.maybeOf(context);
+    if (mediaQuery != null) return mediaQuery.platformBrightness;
+    return WidgetsBinding.instance.platformDispatcher.platformBrightness;
   }
 
   int _themeIndexForMode(ReaderThemeMode mode) {
@@ -5078,8 +5149,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     var expanded = _settings.expandTextMenu;
     while (mounted) {
       final selectedAction =
-          await showCupertinoModalPopup<_ReaderTextActionMenuAction>(
+          await showCupertinoBottomDialog<_ReaderTextActionMenuAction>(
         context: context,
+        barrierDismissible: true,
         builder: (sheetContext) => CupertinoActionSheet(
           title: const Text('文本操作'),
           message: Text(_selectedTextActionPreview(selectedText)),
@@ -6263,8 +6335,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final source = _resolveCurrentSource();
     final hasLogin =
         source != null && ReaderSourceActionHelper.hasLoginUrl(source.loginUrl);
-    final selected = await showCupertinoModalPopup<_ReaderAudioPlayMenuAction>(
+    final selected = await showCupertinoBottomDialog<_ReaderAudioPlayMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('播放'),
         actions: [
@@ -6680,8 +6753,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Future<_EffectiveReplaceMenuEntry?> _showEffectiveReplacesDialog(
     List<_EffectiveReplaceMenuEntry> entries,
   ) async {
-    return showCupertinoModalPopup<_EffectiveReplaceMenuEntry>(
+    return showCupertinoBottomDialog<_EffectiveReplaceMenuEntry>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) {
         return CupertinoActionSheet(
           title: const Text('起效的替换'),
@@ -6703,8 +6777,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   Future<bool> _showChineseConverterPickerFromEffectiveReplaces() async {
-    final selected = await showCupertinoModalPopup<int>(
+    final selected = await showCupertinoBottomDialog<int>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) {
         return CupertinoActionSheet(
           title: const Text('简繁转换'),
@@ -6816,20 +6891,20 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _toggleDayNightThemeFromQuickAction() {
-    final currentMode = _currentReaderThemeMode;
-    final currentIndex = _themeIndexForMode(currentMode);
-    final targetIndex = ReaderLegacyQuickActionHelper.resolveToggleThemeIndex(
-      currentIndex: currentIndex,
-      themes: _activeReadStyles,
+    final settings = _settingsService.appSettings;
+    final mode = ReaderThemeModeHelper.resolveMode(
+      appearanceMode: settings.appearanceMode,
+      effectiveBrightness: _effectiveBrightnessForReaderThemeMode(),
     );
-    if (targetIndex == currentIndex) {
+    final targetMode = mode == ReaderThemeMode.night
+        ? AppAppearanceMode.light
+        : AppAppearanceMode.dark;
+    if (settings.appearanceMode == targetMode) {
       return;
     }
-    _updateSettings(
-      ReaderThemeModeHelper.updateThemeIndexForMode(
-        settings: _settings,
-        mode: currentMode,
-        index: targetIndex,
+    unawaited(
+      _settingsService.saveAppSettings(
+        settings.copyWith(appearanceMode: targetMode),
       ),
     );
   }
@@ -7023,8 +7098,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               action != ReaderLegacyReadMenuAction.setCharset,
         )
         .toList(growable: false);
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('阅读操作'),
         actions: actions
@@ -7593,8 +7669,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _showContentSearchOptionsSheet() {
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: [
           CupertinoActionSheetAction(
@@ -7982,10 +8059,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           onTap: () => unawaited(_openReplaceRuleListFromMenu()),
         );
       case ReaderLegacyQuickAction.toggleDayNightTheme:
-        final isDark = _currentTheme.isDark;
+        final isNightMode = _currentReaderThemeMode == ReaderThemeMode.night;
         return _buildFloatingActionButton(
-          icon: isDark ? CupertinoIcons.sun_max : CupertinoIcons.moon_fill,
-          semanticLabel: isDark ? '切换日间模式' : '切换夜间模式',
+          icon: isNightMode ? CupertinoIcons.sun_max : CupertinoIcons.moon_fill,
+          semanticLabel: isNightMode ? '切换日间模式' : '切换夜间模式',
           onTap: _toggleDayNightThemeFromQuickAction,
         );
     }
@@ -9365,8 +9442,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   Future<void> _showChangeSourceEntryActions() async {
     final selected =
-        await showCupertinoModalPopup<ReaderLegacyChangeSourceMenuAction>(
+        await showCupertinoBottomDialog<ReaderLegacyChangeSourceMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('换源'),
         actions: ReaderLegacyMenuHelper.buildChangeSourceMenuActions()
@@ -9673,8 +9751,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   Future<void> _showRefreshEntryActions() async {
     final selected =
-        await showCupertinoModalPopup<ReaderLegacyRefreshMenuAction>(
+        await showCupertinoBottomDialog<ReaderLegacyRefreshMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('刷新'),
         actions: ReaderLegacyMenuHelper.buildRefreshMenuActions()
@@ -10135,8 +10214,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       currentChapterIsPay: _resolveCurrentChapterIsPay(),
     );
 
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: Text(source.bookSourceName),
         message: Text(source.bookSourceUrl),
@@ -15571,8 +15651,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Future<void> _onSelectDefaultSystemTypeface(
     StateSetter parentSetState,
   ) async {
-    final selected = await showCupertinoModalPopup<_ReaderSystemTypefaceOption>(
+    final selected =
+        await showCupertinoBottomDialog<_ReaderSystemTypefaceOption>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) {
         return CupertinoActionSheet(
           title: const Text('系统内置字体样式'),

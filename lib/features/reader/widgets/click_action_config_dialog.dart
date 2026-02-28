@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/config/migration_exclusions.dart';
 import '../models/reading_settings.dart';
 
@@ -326,8 +327,9 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
       _selectedZone = zone;
     });
 
-    showCupertinoModalPopup(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (context) => CupertinoActionSheet(
         title: Text('选择 ${_getZoneName(zone)} 的动作'),
         actions: _availableActions.map((action) {

@@ -8,6 +8,7 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/theme/cupertino_theme_adapter.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../app/widgets/source_aware_cover_image.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
@@ -832,8 +833,9 @@ class _SearchViewState extends State<SearchView> {
   }
 
   Future<void> _showSearchSettingsSheet() async {
-    final action = await showCupertinoModalPopup<_SearchSettingAction>(
+    final action = await showCupertinoBottomDialog<_SearchSettingAction>(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => CupertinoActionSheet(
         title: const Text('搜索设置'),
         message: const Text('以下设置会自动保存'),

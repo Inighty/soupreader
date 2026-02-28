@@ -298,8 +298,9 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
 
   Future<void> _pickExploreQuick() async {
     if (_exploreKinds.isEmpty) return;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (popupContext) => CupertinoActionSheet(
         title: const Text('选择发现'),
         actions: [
@@ -394,8 +395,9 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
   }
 
   Future<void> _showMoreMenu() async {
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (popupContext) => CupertinoActionSheet(
         title: const Text('更多'),
         actions: [

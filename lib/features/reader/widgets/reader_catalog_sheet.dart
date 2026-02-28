@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cover_image.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../bookshelf/models/book.dart';
@@ -666,8 +667,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       bookmarkTab: _selectedTab == 1,
       isLocalTxt: widget.isLocalTxtBook,
     );
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('目录操作'),
         actions: actions

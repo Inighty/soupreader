@@ -218,8 +218,9 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
     final currentPath =
         night ? _settings.backgroundImageNight : _settings.backgroundImage;
     final hasImage = currentPath.trim().isNotEmpty;
-    final selected = await showCupertinoModalPopup<_BackgroundImageAction>(
+    final selected = await showCupertinoBottomDialog<_BackgroundImageAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: [
           CupertinoActionSheetAction(

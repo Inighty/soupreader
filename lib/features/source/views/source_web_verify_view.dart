@@ -329,8 +329,9 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
   }
 
   void _showMoreMenu() {
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (_) => CupertinoActionSheet(
         title: const Text('操作'),
         message: Text(

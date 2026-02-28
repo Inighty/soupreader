@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/source_login_store.dart';
 import '../../../core/utils/legado_json.dart';
@@ -183,8 +184,10 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
 
   Future<void> _showMoreMenu() async {
     if (_menuBusy) return;
-    final selected = await showCupertinoModalPopup<_HttpTtsRuleEditMenuAction>(
+    final selected =
+        await showCupertinoBottomDialog<_HttpTtsRuleEditMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('朗读引擎'),
         actions: [

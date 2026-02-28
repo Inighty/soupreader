@@ -35,6 +35,7 @@ Future<T?> showOptionPickerSheet<T>({
   return showCupertinoModalPopup<T>(
     context: context,
     barrierColor: barrier,
+    barrierDismissible: true,
     builder: (sheetContext) => _OptionPickerSheet<T>(
       title: title,
       message: message,
@@ -66,253 +67,243 @@ class _OptionPickerSheet<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final panelBg =
-        isDark ? ReaderOverlayTokens.panelDark : ReaderOverlayTokens.panelLight;
-    final cardBg =
-        isDark ? ReaderOverlayTokens.cardDark : ReaderOverlayTokens.cardLight;
-    final border = isDark
-        ? ReaderOverlayTokens.borderDark
-        : ReaderOverlayTokens.borderLight;
-    final textStrong = isDark
-        ? ReaderOverlayTokens.textStrongDark
-        : ReaderOverlayTokens.textStrongLight;
-    final textNormal = isDark
-        ? ReaderOverlayTokens.textNormalDark
-        : ReaderOverlayTokens.textNormalLight;
-    final textSubtle = isDark
-        ? ReaderOverlayTokens.textSubtleDark
-        : ReaderOverlayTokens.textSubtleLight;
     final accent = accentColor ??
         (isDark
             ? AppDesignTokens.brandSecondary
             : AppDesignTokens.brandPrimary);
+    final sheetBg =
+        CupertinoColors.systemGroupedBackground.resolveFrom(context);
+    final titleColor = CupertinoColors.label.resolveFrom(context);
+    final subtitleColor = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final handleColor =
+        CupertinoColors.systemGrey3.resolveFrom(context).withValues(alpha: 0.72);
     final mediaQuery = MediaQuery.of(context);
     final bottomInset = math.max(mediaQuery.padding.bottom, 8.0);
+    final maxHeight = mediaQuery.size.height * 0.58;
 
     return SafeArea(
       top: false,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(10, 0, 10, bottomInset),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: panelBg,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: border),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: sheetBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+        ),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(0, 10, 0, bottomInset),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _OptionPickerHeader(
+                title: title,
+                message: message,
+                handleColor: handleColor,
+                titleColor: titleColor,
+                subtitleColor: subtitleColor,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: textSubtle.withValues(alpha: 0.36),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                    child: Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: textStrong,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  if (message != null && message!.trim().isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                      child: Text(
-                        message!.trim(),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: textSubtle,
-                          fontSize: 12,
-                        ),
-                      ),
-                    )
-                  else
-                    const SizedBox(height: 8),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: mediaQuery.size.height * 0.56,
-                    ),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final item = items[index];
-                        final selected = item.value == currentValue;
-                        return _OptionTile<T>(
-                          item: item,
-                          selected: selected,
-                          accent: accent,
-                          cardBg: cardBg,
-                          border: border,
-                          textStrong: textStrong,
-                          textNormal: textNormal,
-                          onTap: item.enabled
-                              ? () {
-                                  Navigator.of(context).pop(item.value);
-                                }
-                              : null,
-                        );
-                      },
-                    ),
-                  ),
-                ],
+              _OptionPickerContent<T>(
+                items: items,
+                currentValue: currentValue,
+                accent: accent,
+                cancelText: cancelText,
+                cancelColor: titleColor,
+                maxHeight: maxHeight,
               ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: panelBg,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: border),
-              ),
-              child: CupertinoButton(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(
-                  cancelText,
-                  style: TextStyle(
-                    color: textStrong,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _OptionTile<T> extends StatelessWidget {
+class _OptionPickerHeader extends StatelessWidget {
+  final String title;
+  final String? message;
+  final Color handleColor;
+  final Color titleColor;
+  final Color subtitleColor;
+
+  const _OptionPickerHeader({
+    required this.title,
+    required this.message,
+    required this.handleColor,
+    required this.titleColor,
+    required this.subtitleColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmedMessage = (message ?? '').trim();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 36,
+          height: 4,
+          decoration: BoxDecoration(
+            color: handleColor,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: titleColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        if (trimmedMessage.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Text(
+              trimmedMessage,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: subtitleColor,
+                fontSize: 12,
+              ),
+            ),
+          )
+        else
+          const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+class _OptionPickerContent<T> extends StatelessWidget {
+  final List<OptionPickerItem<T>> items;
+  final T? currentValue;
+  final Color accent;
+  final String cancelText;
+  final Color cancelColor;
+  final double maxHeight;
+
+  const _OptionPickerContent({
+    required this.items,
+    required this.currentValue,
+    required this.accent,
+    required this.cancelText,
+    required this.cancelColor,
+    required this.maxHeight,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: ListView(
+        shrinkWrap: true,
+        physics: const BouncingScrollPhysics(),
+        children: [
+          CupertinoListSection.insetGrouped(
+            children: [
+              for (final item in items)
+                _OptionPickerRow<T>(
+                  item: item,
+                  selected: item.value == currentValue,
+                  accent: accent,
+                  onTap: item.enabled
+                      ? () => Navigator.of(context).pop(item.value)
+                      : null,
+                ),
+            ],
+          ),
+          CupertinoListSection.insetGrouped(
+            children: [
+              CupertinoListTile.notched(
+                title: Text(
+                  cancelText,
+                  style: TextStyle(
+                    color: cancelColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OptionPickerRow<T> extends StatelessWidget {
   final OptionPickerItem<T> item;
   final bool selected;
   final Color accent;
-  final Color cardBg;
-  final Color border;
-  final Color textStrong;
-  final Color textNormal;
   final VoidCallback? onTap;
 
-  const _OptionTile({
+  const _OptionPickerRow({
     required this.item,
     required this.selected,
     required this.accent,
-    required this.cardBg,
-    required this.border,
-    required this.textStrong,
-    required this.textNormal,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final tileBorder = selected ? accent : border;
-    final tileBg = selected ? accent.withValues(alpha: 0.16) : cardBg;
-    return Opacity(
-      opacity: item.enabled ? 1 : 0.45,
-      child: Container(
-        decoration: BoxDecoration(
-          color: tileBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: tileBorder, width: selected ? 1.2 : 1),
-        ),
-        child: CupertinoButton(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-          onPressed: onTap,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.label,
-                            style: TextStyle(
-                              color: selected ? accent : textStrong,
-                              fontSize: 15,
-                              fontWeight:
-                                  selected ? FontWeight.w700 : FontWeight.w600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (item.isRecommended)
-                          Container(
-                            margin: const EdgeInsets.only(left: 8),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              '推荐',
-                              style: TextStyle(
-                                color: accent,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    if (item.subtitle != null &&
-                        item.subtitle!.trim().isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 3),
-                        child: Text(
-                          item.subtitle!.trim(),
-                          style: TextStyle(
-                            color: textNormal,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                  ],
+    final labelColor = item.enabled
+        ? CupertinoColors.label.resolveFrom(context)
+        : CupertinoColors.secondaryLabel.resolveFrom(context);
+    final subtitleColor = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final titleStyle = TextStyle(
+      color: selected ? accent : labelColor,
+      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+    );
+    final subtitle = (item.subtitle ?? '').trim();
+
+    return CupertinoListTile.notched(
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              item.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: titleStyle,
+            ),
+          ),
+          if (item.isRecommended)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '推荐',
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
-              if (selected)
-                Icon(
-                  CupertinoIcons.check_mark_circled_solid,
-                  color: accent,
-                  size: 18,
-                )
-              else
-                Icon(
-                  CupertinoIcons.circle,
-                  color: border,
-                  size: 17,
-                ),
-            ],
-          ), minimumSize: Size(0, 0),
-        ),
+            ),
+        ],
       ),
+      subtitle: subtitle.isEmpty
+          ? null
+          : Text(
+              subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: subtitleColor, fontSize: 12),
+            ),
+      trailing: selected
+          ? Icon(CupertinoIcons.check_mark, size: 18, color: accent)
+          : null,
+      onTap: onTap,
     );
   }
 }

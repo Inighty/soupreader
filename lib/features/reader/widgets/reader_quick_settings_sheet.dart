@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart'
 
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/reading_settings.dart';
 
 enum ReaderQuickSettingsTab {
@@ -220,8 +221,9 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   }
 
   void _showMoreActions() {
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (context) => CupertinoActionSheet(
         title: const Text('更多'),
         actions: [

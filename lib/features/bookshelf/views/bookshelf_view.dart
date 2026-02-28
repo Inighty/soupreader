@@ -7,6 +7,8 @@ import 'package:path/path.dart' as p;
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_cover_image.dart';
+import '../../../app/widgets/app_popover_menu.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -37,6 +39,22 @@ enum _ImportFolderAction {
   create,
 }
 
+enum _BookshelfMoreMenuAction {
+  updateCatalog,
+  importLocal,
+  selectFolder,
+  scanFolder,
+  importFileNameRule,
+  addUrl,
+  manage,
+  cacheExport,
+  groupManage,
+  layout,
+  exportBooklist,
+  importBooklist,
+  log,
+}
+
 /// 书架页面 - 纯 iOS 原生风格
 class BookshelfView extends StatefulWidget {
   final ValueListenable<int>? reselectSignal;
@@ -60,6 +78,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   // 与 legado 一致：图墙/列表都可展示“更新中”状态。
   final Set<String> _updatingBookIds = <String>{};
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey _moreMenuKey = GlobalKey();
   late final DatabaseService _database;
   late final BookRepository _bookRepo;
   late final SourceRepository _sourceRepo;
@@ -609,8 +628,9 @@ class _BookshelfViewState extends State<BookshelfView> {
       return;
     }
 
-    final action = await showCupertinoModalPopup<_ImportFolderAction>(
+    final action = await showCupertinoBottomDialog<_ImportFolderAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('选择文件夹'),
         actions: [
@@ -1026,8 +1046,9 @@ class _BookshelfViewState extends State<BookshelfView> {
   Future<bool> _showScanCandidateLongPressMenu({
     required BuildContext context,
   }) async {
-    final result = await showCupertinoModalPopup<bool>(
+    final result = await showCupertinoBottomDialog<bool>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: [
           CupertinoActionSheetAction(
@@ -1492,7 +1513,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
 
     if (!mounted) return;
-    showCupertinoDialog(
+    showCupertinoBottomDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) => CupertinoAlertDialog(
@@ -1811,112 +1832,120 @@ class _BookshelfViewState extends State<BookshelfView> {
     return '更新目录';
   }
 
-  void _showMoreMenu() {
-    showCupertinoModalPopup(
+  Future<void> _showMoreMenu() async {
+    final action = await showAppPopoverMenu<_BookshelfMoreMenuAction>(
       context: context,
-      builder: (context) => CupertinoActionSheet(
-        title: Text(_currentBookshelfTitle()),
-        actions: [
-          CupertinoActionSheetAction(
-            child: Text(_updateCatalogMenuText()),
-            onPressed: () {
-              Navigator.pop(context);
-              _updateBookshelfCatalog();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('添加本地'),
-            onPressed: () {
-              Navigator.pop(context);
-              _importLocalBook();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: Text(
-              _isSelectingImportFolder ? '选择文件夹（进行中）' : '选择文件夹',
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              _selectImportFolder();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('智能扫描'),
-            onPressed: () {
-              Navigator.pop(context);
-              _scanImportFolder();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('导入文件名'),
-            onPressed: () {
-              Navigator.pop(context);
-              _showImportFileNameRuleDialog();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('添加网址'),
-            onPressed: () {
-              Navigator.pop(context);
-              _showAddBookByUrlDialog();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('书架管理'),
-            onPressed: () {
-              Navigator.pop(context);
-              _openBookshelfManage();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('缓存/导出'),
-            onPressed: () {
-              Navigator.pop(context);
-              _openCacheExport();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('分组管理'),
-            onPressed: () {
-              Navigator.pop(context);
-              _openBookshelfGroupManageDialog();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('书架布局'),
-            onPressed: () {
-              Navigator.pop(context);
-              _showLayoutConfigDialog();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('导出书单'),
-            onPressed: () {
-              Navigator.pop(context);
-              _exportBookshelf();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('导入书单'),
-            onPressed: () {
-              Navigator.pop(context);
-              _showImportBookshelfDialog();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('日志'),
-            onPressed: () {
-              Navigator.pop(context);
-              _openAppLogDialog();
-            },
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          child: const Text('取消'),
-          onPressed: () => Navigator.pop(context),
+      anchorKey: _moreMenuKey,
+      items: [
+        AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.updateCatalog,
+          icon: CupertinoIcons.refresh,
+          label: _updateCatalogMenuText(),
         ),
-      ),
+        const AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.importLocal,
+          icon: CupertinoIcons.folder,
+          label: '添加本地',
+        ),
+        AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.selectFolder,
+          icon: CupertinoIcons.folder_open,
+          label: _isSelectingImportFolder ? '选择文件夹（进行中）' : '选择文件夹',
+        ),
+        const AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.scanFolder,
+          icon: CupertinoIcons.wand_rays,
+          label: '智能扫描',
+        ),
+        const AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.importFileNameRule,
+          icon: CupertinoIcons.doc_text,
+          label: '导入文件名',
+        ),
+        const AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.addUrl,
+          icon: CupertinoIcons.globe,
+          label: '添加网址',
+        ),
+        const AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.manage,
+          icon: CupertinoIcons.square_list,
+          label: '书架管理',
+        ),
+        const AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.cacheExport,
+          icon: CupertinoIcons.arrow_down_doc,
+          label: '缓存/导出',
+        ),
+        const AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.groupManage,
+          icon: CupertinoIcons.folder_badge_plus,
+          label: '分组管理',
+        ),
+        const AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.layout,
+          icon: CupertinoIcons.rectangle_grid_2x2,
+          label: '书架布局',
+        ),
+        const AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.exportBooklist,
+          icon: CupertinoIcons.square_arrow_up,
+          label: '导出书单',
+        ),
+        const AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.importBooklist,
+          icon: CupertinoIcons.square_arrow_down,
+          label: '导入书单',
+        ),
+        const AppPopoverMenuItem(
+          value: _BookshelfMoreMenuAction.log,
+          icon: CupertinoIcons.doc_plaintext,
+          label: '日志',
+        ),
+      ],
     );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _BookshelfMoreMenuAction.updateCatalog:
+        _updateBookshelfCatalog();
+        break;
+      case _BookshelfMoreMenuAction.importLocal:
+        _importLocalBook();
+        break;
+      case _BookshelfMoreMenuAction.selectFolder:
+        _selectImportFolder();
+        break;
+      case _BookshelfMoreMenuAction.scanFolder:
+        _scanImportFolder();
+        break;
+      case _BookshelfMoreMenuAction.importFileNameRule:
+        _showImportFileNameRuleDialog();
+        break;
+      case _BookshelfMoreMenuAction.addUrl:
+        _showAddBookByUrlDialog();
+        break;
+      case _BookshelfMoreMenuAction.manage:
+        _openBookshelfManage();
+        break;
+      case _BookshelfMoreMenuAction.cacheExport:
+        _openCacheExport();
+        break;
+      case _BookshelfMoreMenuAction.groupManage:
+        _openBookshelfGroupManageDialog();
+        break;
+      case _BookshelfMoreMenuAction.layout:
+        _showLayoutConfigDialog();
+        break;
+      case _BookshelfMoreMenuAction.exportBooklist:
+        _exportBookshelf();
+        break;
+      case _BookshelfMoreMenuAction.importBooklist:
+        _showImportBookshelfDialog();
+        break;
+      case _BookshelfMoreMenuAction.log:
+        _openAppLogDialog();
+        break;
+    }
   }
 
   String _buildCatalogUpdateSummaryMessage(
@@ -1995,7 +2024,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         content: Text(message),
@@ -2111,6 +2140,7 @@ class _BookshelfViewState extends State<BookshelfView> {
             child: const Icon(CupertinoIcons.search),
           ),
           CupertinoButton(
+            key: _moreMenuKey,
             padding: EdgeInsets.zero,
             minimumSize: const Size(30, 30),
             onPressed: _showMoreMenu,
@@ -2862,8 +2892,9 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   void _onBookLongPress(Book book) {
-    showCupertinoModalPopup(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (context) => CupertinoActionSheet(
         title: Text(book.title),
         actions: [

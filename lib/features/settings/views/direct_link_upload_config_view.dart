@@ -103,8 +103,9 @@ class _DirectLinkUploadConfigViewState
 
   Future<void> _showMoreMenu() async {
     final selected =
-        await showCupertinoModalPopup<_DirectLinkUploadConfigMenuAction>(
+        await showCupertinoBottomDialog<_DirectLinkUploadConfigMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('直链上传配置'),
         actions: [
@@ -161,8 +162,9 @@ class _DirectLinkUploadConfigViewState
   Future<void> _importDefaultRule() async {
     final defaultRules = await _service.loadDefaultRules();
     if (!mounted || defaultRules.isEmpty) return;
-    final selected = await showCupertinoModalPopup<DirectLinkUploadRule>(
+    final selected = await showCupertinoBottomDialog<DirectLinkUploadRule>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('导入默认规则'),
         actions: defaultRules

@@ -156,8 +156,9 @@ class _CoverConfigViewState extends State<CoverConfigView> {
       return;
     }
 
-    final selected = await showCupertinoModalPopup<_CoverImageAction>(
+    final selected = await showCupertinoBottomDialog<_CoverImageAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: [
           CupertinoActionSheetAction(

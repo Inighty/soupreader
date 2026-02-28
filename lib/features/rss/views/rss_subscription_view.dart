@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
@@ -352,8 +353,9 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
     final currentGroup = query.startsWith(RssSubscriptionHelper.groupPrefix)
         ? query.substring(RssSubscriptionHelper.groupPrefix.length).trim()
         : '';
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => CupertinoActionSheet(
         actions: [
           for (final group in groups)
@@ -452,8 +454,9 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
 
   Future<void> _showSourceActions(RssSource source) async {
     if (!mounted) return;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => CupertinoActionSheet(
         title: Text(source.sourceName),
         actions: [

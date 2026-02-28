@@ -75,8 +75,9 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
 
   Future<void> _showMoreMenu() async {
     if (_loading || !mounted) return;
-    final selected = await showCupertinoModalPopup<_SourceLoginMenuAction>(
+    final selected = await showCupertinoBottomDialog<_SourceLoginMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: [
           CupertinoActionSheetAction(

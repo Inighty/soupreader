@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../services/reader_source_switch_helper.dart';
 
 Future<ReaderSourceSwitchCandidate?> showSourceSwitchCandidateSheet({
@@ -604,8 +605,10 @@ class _SourceSwitchCandidateSheetState
         _updatingSourceDelay) {
       return;
     }
-    final action = await showCupertinoModalPopup<_SourceSwitchCandidateAction>(
+    final action =
+        await showCupertinoBottomDialog<_SourceSwitchCandidateAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: [
           if (widget.onTopSourceCandidate != null)
@@ -884,8 +887,9 @@ class _SourceSwitchCandidateSheetState
     }
     final groups = _normalizedSourceGroups;
     final selectedGroup = _normalizeGroupText(_changeSourceGroup);
-    final selected = await showCupertinoModalPopup<String>(
+    final selected = await showCupertinoBottomDialog<String>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('分组'),
         actions: [
@@ -923,8 +927,9 @@ class _SourceSwitchCandidateSheetState
         _updatingSourceDelay) {
       return;
     }
-    final action = await showCupertinoModalPopup<_SourceSwitchMenuAction>(
+    final action = await showCupertinoBottomDialog<_SourceSwitchMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: [
           if (widget.onCheckAuthorChanged != null)

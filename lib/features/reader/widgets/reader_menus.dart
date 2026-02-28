@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/reading_settings.dart';
 import 'reader_menu_surface_style.dart';
 
@@ -609,8 +610,9 @@ class ReaderBottomMenu extends StatelessWidget {
     ValueChanged<ReadingSettings> onSettingsChanged,
   ) {
     final rootContext = context;
-    showCupertinoModalPopup(
+    showCupertinoBottomDialog<void>(
       context: rootContext,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('选择翻页模式'),
         actions:
@@ -674,7 +676,7 @@ class ReaderBottomMenu extends StatelessWidget {
   }
 
   void _showMessage(BuildContext context, String message) {
-    showCupertinoDialog(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),

@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
 import 'http_tts_rule_edit_view.dart';
 import '../models/http_tts_rule.dart';
@@ -128,8 +129,9 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
 
   Future<void> _showMoreMenu() async {
     if (_menuBusy) return;
-    final selected = await showCupertinoModalPopup<_SpeakEngineMenuAction>(
+    final selected = await showCupertinoBottomDialog<_SpeakEngineMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('朗读引擎'),
         actions: [

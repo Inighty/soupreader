@@ -103,6 +103,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
       return CupertinoPageScaffold(
         navigationBar: CupertinoNavigationBar(
           middle: middle ?? Text(title),
+          previousPageTitle: '',
           leading: _buildNavBarItem(
             context,
             leading,
@@ -145,6 +146,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
               largeTitle: resolvedLargeTitle,
               middle: resolvedMiddle,
               alwaysShowMiddle: !showLargeTitle,
+              previousPageTitle: '',
               leading: _buildNavBarItem(
                 context,
                 leading,

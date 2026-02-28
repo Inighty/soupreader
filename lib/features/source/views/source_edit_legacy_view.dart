@@ -694,8 +694,9 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   }
 
   Future<void> _pickBookSourceType() async {
-    final selected = await showCupertinoModalPopup<int>(
+    final selected = await showCupertinoBottomDialog<int>(
       context: context,
+      barrierDismissible: true,
       builder: (popupContext) => CupertinoActionSheet(
         title: const Text('书源类型'),
         actions: [
@@ -724,8 +725,9 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   Future<void> _showMore() async {
     if (!mounted) return;
 
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (popupContext) => CupertinoActionSheet(
         title: const Text('更多'),
         actions: [
@@ -830,8 +832,9 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     if (!mounted) return;
     final fieldKey = _activeFieldKey;
     final onGroupField = fieldKey == 'bookSourceGroup';
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (popupContext) => CupertinoActionSheet(
         title: const Text('编辑工具'),
         actions: [
@@ -1083,8 +1086,9 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
       return;
     }
 
-    final selected = await showCupertinoModalPopup<String>(
+    final selected = await showCupertinoBottomDialog<String>(
       context: context,
+      barrierDismissible: true,
       builder: (popupContext) => CupertinoActionSheet(
         title: const Text('选择分组'),
         actions: [

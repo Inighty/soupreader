@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
-const Duration _kBottomDialogDuration = Duration(milliseconds: 260);
+import 'cupertino_action_sheet_bottom_sheet.dart';
+import 'cupertino_bottom_sheet_helpers.dart';
 
 Future<T?> showCupertinoBottomDialog<T>({
   required BuildContext context,
@@ -11,81 +12,159 @@ Future<T?> showCupertinoBottomDialog<T>({
   bool useRootNavigator = true,
   RouteSettings? routeSettings,
 }) {
-  final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
   final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
   final resolvedBarrierColor = barrierColor ??
       (isDark ? const Color(0x99000000) : const Color(0x4D000000));
-  return navigator.push<T>(
-    _CupertinoBottomDialogRoute<T>(
-      builder: builder,
-      barrierDismissible: barrierDismissible,
-      barrierLabel: barrierLabel ?? '关闭弹窗',
-      barrierColor: resolvedBarrierColor,
-      settings: routeSettings,
-    ),
+  return showCupertinoModalPopup<T>(
+    context: context,
+    useRootNavigator: useRootNavigator,
+    barrierColor: resolvedBarrierColor,
+    barrierDismissible: barrierDismissible,
+    semanticsDismissible: barrierDismissible,
+    routeSettings: routeSettings,
+    builder: (popupContext) {
+      final child = builder(popupContext);
+      return CupertinoTheme(
+        data: CupertinoTheme.of(context),
+        child: _adaptDialogToBottomSheet(child),
+      );
+    },
   );
 }
 
-class _CupertinoBottomDialogRoute<T> extends PopupRoute<T> {
-  _CupertinoBottomDialogRoute({
-    required this.builder,
-    required this.barrierDismissible,
-    required this.barrierLabel,
-    required this.barrierColor,
-    super.settings,
+Widget _adaptDialogToBottomSheet(Widget child) {
+  if (child is CupertinoAlertDialog) {
+    return _CupertinoAlertBottomSheet(dialog: child);
+  }
+  if (child is CupertinoActionSheet) {
+    return CupertinoActionSheetBottomSheet(sheet: child);
+  }
+  return child;
+}
+
+bool _isCancelAction(Widget child) {
+  if (child is! Text) return false;
+  final text = child.data?.trim() ?? '';
+  return text == '取消' || text == '关闭';
+}
+
+class _CupertinoAlertBottomSheet extends StatelessWidget {
+  final CupertinoAlertDialog dialog;
+
+  const _CupertinoAlertBottomSheet({
+    required this.dialog,
   });
 
-  final WidgetBuilder builder;
-
   @override
-  final bool barrierDismissible;
+  Widget build(BuildContext context) {
+    final labelColor = CupertinoColors.label.resolveFrom(context);
+    final subtle = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final destructive = CupertinoColors.systemRed.resolveFrom(context);
+    final bg = CupertinoColors.systemGroupedBackground.resolveFrom(context);
+    final mediaQuery = MediaQuery.of(context);
+    final bottomInset =
+        mediaQuery.padding.bottom > 0 ? mediaQuery.padding.bottom : 8.0;
 
-  @override
-  final String barrierLabel;
+    final actions = _splitActions(
+      actions: dialog.actions,
+      labelColor: labelColor,
+      destructiveColor: destructive,
+    );
+    final headerWidgets = buildCupertinoBottomSheetHeader(
+      title: dialog.title,
+      message: dialog.content,
+      titleColor: labelColor,
+      messageColor: subtle,
+    );
 
-  @override
-  final Color barrierColor;
-
-  @override
-  Duration get transitionDuration => _kBottomDialogDuration;
-
-  @override
-  Widget buildPage(
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-  ) {
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: SafeArea(
-        top: false,
-        child: builder(context),
+    return SafeArea(
+      top: false,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+        ),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(0, 10, 0, bottomInset),
+          child: ListView(
+            shrinkWrap: true,
+            physics: const BouncingScrollPhysics(),
+            children: [
+              buildCupertinoBottomSheetDragHandle(context),
+              ...headerWidgets,
+              if (actions.normal.isNotEmpty)
+                CupertinoListSection.insetGrouped(
+                  children: actions.normal,
+                ),
+              if (actions.cancel != null)
+                CupertinoListSection.insetGrouped(
+                  children: [actions.cancel!],
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  @override
-  Widget buildTransitions(
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-    Widget child,
-  ) {
-    final curved = CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    );
-    final offsetTween = Tween<Offset>(
-      begin: const Offset(0, 1),
-      end: Offset.zero,
-    ).animate(curved);
-    return FadeTransition(
-      opacity: curved,
-      child: SlideTransition(
-        position: offsetTween,
-        child: child,
+  _DialogSheetActions _splitActions({
+    required List<Widget> actions,
+    required Color labelColor,
+    required Color destructiveColor,
+  }) {
+    final normal = <Widget>[];
+    Widget? cancel;
+    for (final action in actions) {
+      final tile = _convertActionToTile(
+        labelColor: labelColor,
+        destructiveColor: destructiveColor,
+        action: action,
+      );
+      if (tile == null) continue;
+      if (cancel == null && _isCancelLikeAction(action)) {
+        cancel = tile;
+        continue;
+      }
+      normal.add(tile);
+    }
+    return _DialogSheetActions(normal: normal, cancel: cancel);
+  }
+
+  bool _isCancelLikeAction(Widget rawAction) {
+    if (rawAction is! CupertinoDialogAction) return false;
+    return _isCancelAction(rawAction.child);
+  }
+
+  Widget? _convertActionToTile({
+    required Color labelColor,
+    required Color destructiveColor,
+    required Widget action,
+  }) {
+    if (action is! CupertinoDialogAction) return action;
+    final enabled = action.onPressed != null;
+    final color = action.isDestructiveAction ? destructiveColor : labelColor;
+    final title = DefaultTextStyle(
+      style: TextStyle(
+        color: color,
+        fontSize: 16,
+        fontWeight: action.isDefaultAction ? FontWeight.w700 : FontWeight.w600,
       ),
+      child: action.child,
+    );
+    return CupertinoListTile.notched(
+      title: title,
+      onTap: enabled ? action.onPressed : null,
     );
   }
+}
+
+class _DialogSheetActions {
+  final List<Widget> normal;
+  final Widget? cancel;
+
+  const _DialogSheetActions({
+    required this.normal,
+    required this.cancel,
+  });
 }

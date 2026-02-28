@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/services/exception_log_service.dart';
@@ -266,8 +267,9 @@ class _CacheExportViewState extends State<CacheExportView> {
 
   Future<void> _handleDownloadActionLongPress() async {
     if (!mounted) return;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) {
         return CupertinoActionSheet(
           actions: [
@@ -359,8 +361,9 @@ class _CacheExportViewState extends State<CacheExportView> {
       _exportTypeIndex = _exportService.getExportTypeIndex();
       _exportCharset = _exportService.getExportCharset();
     });
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) {
         return CupertinoActionSheet(
           title: const Text('更多'),
@@ -522,8 +525,9 @@ class _CacheExportViewState extends State<CacheExportView> {
     if (!mounted) return;
     final options = _legacyBookGroups.toList(growable: false)
       ..sort((a, b) => a.order.compareTo(b.order));
-    final selectedGroupId = await showCupertinoModalPopup<int>(
+    final selectedGroupId = await showCupertinoBottomDialog<int>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) {
         return CupertinoActionSheet(
           title: const Text('分组'),
@@ -753,8 +757,9 @@ class _CacheExportViewState extends State<CacheExportView> {
   Future<void> _handleExportTypeTap() async {
     if (!mounted) return;
     final options = _exportService.getExportTypeOptions();
-    final selected = await showCupertinoModalPopup<int>(
+    final selected = await showCupertinoBottomDialog<int>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) {
         return CupertinoActionSheet(
           title: const Text('导出格式'),

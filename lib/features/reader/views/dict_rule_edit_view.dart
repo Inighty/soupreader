@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/dict_rule.dart';
 
 enum _DictRuleEditMenuAction {
@@ -47,8 +48,9 @@ class _DictRuleEditViewState extends State<DictRuleEditView> {
   }
 
   Future<void> _showMoreMenu() async {
-    final selected = await showCupertinoModalPopup<_DictRuleEditMenuAction>(
+    final selected = await showCupertinoBottomDialog<_DictRuleEditMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('字典规则'),
         actions: [

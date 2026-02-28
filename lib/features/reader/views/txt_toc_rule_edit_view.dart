@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/txt_toc_rule.dart';
 
 enum _TxtTocRuleEditMenuAction {
@@ -47,8 +48,10 @@ class _TxtTocRuleEditViewState extends State<TxtTocRuleEditView> {
   }
 
   Future<void> _showMoreMenu() async {
-    final selected = await showCupertinoModalPopup<_TxtTocRuleEditMenuAction>(
+    final selected =
+        await showCupertinoBottomDialog<_TxtTocRuleEditMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('TXT 目录规则'),
         actions: [

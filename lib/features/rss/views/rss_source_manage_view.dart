@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
@@ -378,8 +379,9 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
 
   Future<void> _showSelectionMoreActions(List<RssSource> visibleSources) async {
     if (!mounted) return;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => CupertinoActionSheet(
         title: const Text('批量操作'),
         actions: [
@@ -879,8 +881,9 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
   Future<void> _openGroupMenuSheet() async {
     final groups = _repo.allGroups();
     if (!mounted) return;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => CupertinoActionSheet(
         title: const Text('分组'),
         actions: [
@@ -955,8 +958,9 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
 
   Future<void> _openMainOptions() async {
     if (!mounted) return;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => CupertinoActionSheet(
         title: const Text('更多'),
         actions: [
@@ -1700,8 +1704,9 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
 
   Future<void> _showSourceActions(RssSource source) async {
     if (!mounted) return;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => CupertinoActionSheet(
         title: Text(source.sourceName),
         actions: [

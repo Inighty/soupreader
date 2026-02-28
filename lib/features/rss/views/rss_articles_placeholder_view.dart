@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_article_repository.dart';
 import '../../../core/database/repositories/rss_star_repository.dart';
@@ -320,8 +321,9 @@ class _RssArticlesPlaceholderViewState
     required List<_RssArticlesMenuAction> actions,
   }) async {
     if (!mounted) return;
-    final selected = await showCupertinoModalPopup<_RssArticlesMenuAction>(
+    final selected = await showCupertinoBottomDialog<_RssArticlesMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: actions
             .map(
@@ -1329,8 +1331,9 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
   Future<void> _showMoreMenu(RssSource? source) async {
     if (!mounted) return;
     final actions = _buildReadMenuActions(source);
-    final selected = await showCupertinoModalPopup<_RssReadMenuAction>(
+    final selected = await showCupertinoBottomDialog<_RssReadMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: actions
             .map(
@@ -1536,8 +1539,9 @@ class _RssFavoritesPlaceholderViewState
     required String currentGroup,
   }) async {
     if (!mounted || groups.isEmpty) return;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) {
         return CupertinoActionSheet(
           title: const Text('分组'),
@@ -1565,8 +1569,9 @@ class _RssFavoritesPlaceholderViewState
     required String currentGroup,
   }) async {
     if (!mounted) return;
-    final selected = await showCupertinoModalPopup<_RssFavoritesMenuAction>(
+    final selected = await showCupertinoBottomDialog<_RssFavoritesMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) {
         return CupertinoActionSheet(
           actions: [

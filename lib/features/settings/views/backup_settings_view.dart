@@ -590,8 +590,9 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
   }
 
   Future<void> _showMoreActions() async {
-    final selected = await showCupertinoModalPopup<_BackupMoreAction>(
+    final selected = await showCupertinoBottomDialog<_BackupMoreAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: [
           CupertinoActionSheetAction(

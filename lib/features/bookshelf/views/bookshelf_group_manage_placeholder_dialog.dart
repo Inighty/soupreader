@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../models/bookshelf_book_group.dart';
 import '../services/bookshelf_book_group_store.dart';
@@ -284,8 +285,9 @@ class _AddGroupDialogState extends State<_AddGroupDialog> {
   }
 
   Future<void> _pickSort() async {
-    final selected = await showCupertinoModalPopup<int>(
+    final selected = await showCupertinoBottomDialog<int>(
       context: context,
+      barrierDismissible: true,
       builder: (popupContext) => CupertinoActionSheet(
         title: const Text('排序'),
         actions: [

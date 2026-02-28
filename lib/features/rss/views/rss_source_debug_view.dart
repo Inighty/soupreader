@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../source/views/source_debug_text_view.dart';
 import '../models/rss_source.dart';
 import '../services/rss_source_debug_service.dart';
@@ -76,8 +77,9 @@ class _RssSourceDebugViewState extends State<RssSourceDebugView> {
 
   Future<void> _showMoreMenu() async {
     if (!mounted) return;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (popupContext) => CupertinoActionSheet(
         title: const Text('更多'),
         actions: [

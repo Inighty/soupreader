@@ -167,8 +167,9 @@ class _FileManageViewState extends State<FileManageView> {
   }
 
   Future<void> _showEntityMenu(FileSystemEntity entity) async {
-    final selected = await showCupertinoModalPopup<_FileEntityAction>(
+    final selected = await showCupertinoBottomDialog<_FileEntityAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: Text(_displayName(entity)),
         actions: [

@@ -68,6 +68,7 @@ dependencies:
   pinyin: ^3.3.0
   qr_flutter: ^4.1.0
   flutter_tts: ^4.2.5
+  flutter_slidable: ^4.0.3
 
 dev_dependencies:
   flutter_test:

@@ -1378,8 +1378,9 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Future<void> _showDebugLegacyMenuSheet() async {
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) {
         void closeThen(VoidCallback action) {
           Navigator.pop(sheetContext);
@@ -1453,8 +1454,9 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Future<void> _showDebugMoreToolsSheet() async {
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) {
         void closeThen(VoidCallback action) {
           Navigator.pop(sheetContext);
@@ -1775,8 +1777,9 @@ class _SourceEditViewState extends State<SourceEditView> {
   Future<void> _showExploreQuickPicker(
     List<MapEntry<String, String>> entries,
   ) async {
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => CupertinoActionSheet(
         title: const Text('选择发现入口'),
         actions: entries
@@ -2683,8 +2686,9 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Future<void> _showExportDebugBundleSheet() async {
-    showCupertinoModalPopup(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (context) => CupertinoActionSheet(
         title: const Text('导出调试包'),
         message: const Text('调试包可能很大，建议优先保存到文件。'),
@@ -3124,8 +3128,9 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   void _showMore() {
-    showCupertinoModalPopup(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (context) => CupertinoActionSheet(
         title: const Text('更多'),
         actions: [

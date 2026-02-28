@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
 import '../../../core/services/exception_log_service.dart';
@@ -451,8 +452,9 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   void _showGroupFilterOptions(List<ReplaceRule> allRules) {
     final groups = _buildGroups(allRules);
     final activeGroupQuery = _resolveActiveGroupQuery(groups);
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (popupContext) => CupertinoActionSheet(
         title: const Text('分组'),
         actions: <Widget>[
@@ -887,8 +889,9 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   void _showMoreMenu() {
-    showCupertinoModalPopup(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (context) => CupertinoActionSheet(
         title: const Text('替换净化规则'),
         actions: [
@@ -937,8 +940,9 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   Future<void> _showRuleItemMenu(ReplaceRule rule) async {
-    final action = await showCupertinoModalPopup<_ReplaceRuleItemMenuAction>(
+    final action = await showCupertinoBottomDialog<_ReplaceRuleItemMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: Text(rule.name.isEmpty ? '未命名规则' : rule.name),
         actions: [
@@ -1130,8 +1134,9 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   Future<void> _showSelectionMoreMenu(List<ReplaceRule> visibleRules) async {
     if (_menuBusy || _selectedCountIn(visibleRules) == 0) return;
     final selected =
-        await showCupertinoModalPopup<_ReplaceRuleSelectionMenuAction>(
+        await showCupertinoBottomDialog<_ReplaceRuleSelectionMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('批量操作'),
         actions: [
@@ -1792,7 +1797,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       if (isHttpPath) '',
       if (isHttpPath) '检测到网络链接，可直接复制后分享。',
     ];
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('导出成功'),
@@ -1812,7 +1817,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),

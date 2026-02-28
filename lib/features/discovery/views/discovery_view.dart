@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../app/theme/cupertino_theme_adapter.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/app_settings.dart';
@@ -152,8 +153,9 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   Future<void> _showGroupFilterMenu() async {
     final groups = _buildGroups(_eligibleSources(_allSources));
     if (groups.isEmpty) return;
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => CupertinoActionSheet(
         title: const Text('分组'),
         actions: [
@@ -274,8 +276,9 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   Future<void> _showSourceActions(BookSource source) async {
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => CupertinoActionSheet(
         title: Text(source.bookSourceName),
         message: Text(source.bookSourceUrl),

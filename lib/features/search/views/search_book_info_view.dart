@@ -13,6 +13,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
 import '../../../core/database/repositories/book_repository.dart';
@@ -597,8 +598,9 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   }) async {
     final options = await _loadTxtTocRuleOptions();
     if (!mounted) return null;
-    return showCupertinoModalPopup<String?>(
+    return showCupertinoBottomDialog<String?>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) {
         final normalizedCurrent = currentRegex.trim();
         return CupertinoActionSheet(
@@ -2041,8 +2043,9 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       isLocalTxtBook: _isLocalTxtBook(),
     );
 
-    await showCupertinoModalPopup<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: Text(_displayName),
         actions: [
@@ -3234,8 +3237,9 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
         _runningExportBookmarkMarkdownAction) {
       return;
     }
-    final selected = await showCupertinoModalPopup<_SearchBookTocMenuAction>(
+    final selected = await showCupertinoBottomDialog<_SearchBookTocMenuAction>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('目录操作'),
         actions: [

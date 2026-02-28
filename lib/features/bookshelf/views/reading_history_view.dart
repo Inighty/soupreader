@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/services/settings_service.dart';
@@ -285,8 +286,9 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
   }
 
   void _showTopActions() {
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         actions: [
           CupertinoActionSheetAction(
@@ -316,8 +318,9 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
   }
 
   void _showSortActions() {
-    showCupertinoModalPopup<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (sheetContext) => CupertinoActionSheet(
         title: const Text('排序'),
         actions: [
@@ -431,8 +434,9 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
   }
 
   void _showActions(Book book) {
-    showCupertinoModalPopup(
+    showCupertinoBottomDialog<void>(
       context: context,
+      barrierDismissible: true,
       builder: (context) => CupertinoActionSheet(
         title: Text(book.title),
         actions: [
