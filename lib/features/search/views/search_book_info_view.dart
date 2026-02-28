@@ -2574,6 +2574,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
+              clipBehavior: Clip.none,
               children: [
                 SizedBox(
                   height: 286,
