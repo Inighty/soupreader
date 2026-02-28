@@ -2,6 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 
+const double _screenEdgePadding = 10.0;
+const double _popoverVerticalGap = 8.0;
+
 class AppPopoverMenuItem<T> {
   final T value;
   final IconData icon;
@@ -40,6 +43,16 @@ class _PopoverPosition {
   });
 }
 
+class _PopoverLayout {
+  final _PopoverPosition position;
+  final double maxHeight;
+
+  const _PopoverLayout({
+    required this.position,
+    required this.maxHeight,
+  });
+}
+
 Future<T?> showAppPopoverMenu<T>({
   required BuildContext context,
   required GlobalKey anchorKey,
@@ -56,16 +69,19 @@ Future<T?> showAppPopoverMenu<T>({
     itemHeight: itemHeight,
     verticalPadding: verticalPadding,
   );
-  final position = _resolvePosition(
+  final layout = _resolveLayout(
     anchor: anchor,
     width: width,
     estimatedHeight: estimatedHeight,
   );
-  return showCupertinoModalPopup<T>(
+  final barrierLabel = CupertinoLocalizations.of(context).modalBarrierDismissLabel;
+  return showGeneralDialog<T>(
     context: context,
-    barrierColor: CupertinoColors.black.withValues(alpha: 0.06),
+    useRootNavigator: true,
     barrierDismissible: true,
-    builder: (popupContext) {
+    barrierLabel: barrierLabel,
+    barrierColor: CupertinoColors.black.withValues(alpha: 0.06),
+    pageBuilder: (popupContext, __, ___) {
       final labelColor = CupertinoColors.label.resolveFrom(popupContext);
       final iconColor = CupertinoColors.secondaryLabel.resolveFrom(popupContext);
       final destructiveColor = CupertinoColors.systemRed.resolveFrom(popupContext);
@@ -77,35 +93,40 @@ Future<T?> showAppPopoverMenu<T>({
         child: Stack(
           children: [
             Positioned(
-              left: position.left,
-              top: position.top,
+              left: layout.position.left,
+              top: layout.position.top,
               width: width,
               child: _PopoverSurface(
                 backgroundColor: bg,
                 radius: radius,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: verticalPadding),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (var i = 0; i < items.length; i++) ...[
-                        _PopoverMenuRow(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: layout.maxHeight),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: verticalPadding),
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return _PopoverMenuRow(
                           height: itemHeight,
-                          icon: items[i].icon,
-                          label: items[i].label,
-                          enabled: items[i].enabled,
-                          iconColor: items[i].isDestructiveAction
+                          icon: item.icon,
+                          label: item.label,
+                          enabled: item.enabled,
+                          iconColor: item.isDestructiveAction
                               ? destructiveColor
                               : iconColor,
-                          textColor: items[i].isDestructiveAction
+                          textColor: item.isDestructiveAction
                               ? destructiveColor
                               : labelColor,
-                          onTap: items[i].enabled
-                              ? () => Navigator.of(popupContext).pop(items[i].value)
+                          onTap: item.enabled
+                              ? () => Navigator.of(popupContext).pop(item.value)
                               : null,
-                        ),
-                      ],
-                    ],
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),
@@ -129,7 +150,8 @@ _PopoverAnchor _resolveAnchor({
   if (renderBox is! RenderBox || !renderBox.hasSize) {
     throw FlutterError('showAppPopoverMenu: anchorKey renderBox not ready');
   }
-  final overlayBox = Overlay.of(context).context.findRenderObject() as RenderBox;
+  final overlayBox =
+      Overlay.of(context, rootOverlay: true).context.findRenderObject() as RenderBox;
   final anchorOffset = renderBox.localToGlobal(Offset.zero);
   return _PopoverAnchor(
     rect: anchorOffset & renderBox.size,
@@ -146,27 +168,38 @@ double _estimateHeight({
   return verticalPadding * 2 + itemHeight * math.max(1, itemCount);
 }
 
-_PopoverPosition _resolvePosition({
+_PopoverLayout _resolveLayout({
   required _PopoverAnchor anchor,
   required double width,
   required double estimatedHeight,
 }) {
-  const screenEdgePadding = 10.0;
   final overlaySize = anchor.overlaySize;
-  final maxLeft = overlaySize.width - width - screenEdgePadding;
+  final maxLeft = overlaySize.width - width - _screenEdgePadding;
   final desiredLeft = anchor.rect.right - width;
-  final clampedLeft = desiredLeft.clamp(screenEdgePadding, maxLeft).toDouble();
+  final left = desiredLeft.clamp(_screenEdgePadding, maxLeft).toDouble();
 
-  final belowTop = anchor.rect.bottom + 8;
-  final aboveTop = anchor.rect.top - estimatedHeight - 8;
-  final canShowBelow = belowTop + estimatedHeight <=
-      overlaySize.height -
-          math.max(anchor.safePadding.bottom, screenEdgePadding);
-  final top = canShowBelow
+  final safeTop = math.max(anchor.safePadding.top, _screenEdgePadding);
+  final safeBottom = math.max(anchor.safePadding.bottom, _screenEdgePadding);
+  final belowTop = anchor.rect.bottom + _popoverVerticalGap;
+  final availableBelow = overlaySize.height - safeBottom - belowTop;
+  final availableAbove = anchor.rect.top - safeTop - _popoverVerticalGap;
+  final canFitBelow = estimatedHeight <= availableBelow;
+  final canFitAbove = estimatedHeight <= availableAbove;
+  final showBelow = canFitBelow || (!canFitAbove && availableBelow >= availableAbove);
+
+  final maxHeight =
+      math.max(0, showBelow ? availableBelow : availableAbove).toDouble();
+  final resolvedHeight = math.min(estimatedHeight, maxHeight);
+  final rawTop = showBelow
       ? belowTop
-      : math.max(screenEdgePadding + anchor.safePadding.top, aboveTop);
+      : anchor.rect.top - resolvedHeight - _popoverVerticalGap;
+  final maxTop = overlaySize.height - safeBottom - resolvedHeight;
+  final top = rawTop.clamp(safeTop, math.max(safeTop, maxTop)).toDouble();
 
-  return _PopoverPosition(left: clampedLeft, top: top.toDouble());
+  return _PopoverLayout(
+    position: _PopoverPosition(left: left, top: top),
+    maxHeight: maxHeight,
+  );
 }
 
 class _PopoverSurface extends StatelessWidget {

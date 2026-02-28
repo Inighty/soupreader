@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
@@ -32,6 +33,16 @@ class _RssImportSelectionDecision {
   final RssSourceImportSelectionPolicy policy;
 }
 
+enum _RssSourceMainMenuAction {
+  create,
+  importFile,
+  importUrl,
+  importQr,
+  importDefault,
+}
+
+typedef _RssGroupMenuDecision = ({bool openManage, String? query});
+
 class RssSourceManageView extends StatefulWidget {
   const RssSourceManageView({
     super.key,
@@ -50,6 +61,8 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
   late final RssSourceImportExportService _importExportService;
   late final RssSourceImportCommitService _importCommitService;
   final TextEditingController _queryController = TextEditingController();
+  final GlobalKey _groupMenuKey = GlobalKey();
+  final GlobalKey _mainMenuKey = GlobalKey();
   final Set<String> _selectedSourceUrls = <String>{};
 
   @override
@@ -86,12 +99,14 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
             child: const Icon(CupertinoIcons.dot_radiowaves_left_right),
           ),
           CupertinoButton(
+            key: _groupMenuKey,
             padding: EdgeInsets.zero,
             minimumSize: const Size(28, 28),
             onPressed: _openGroupMenuSheet,
             child: const Icon(CupertinoIcons.folder),
           ),
           CupertinoButton(
+            key: _mainMenuKey,
             padding: EdgeInsets.zero,
             minimumSize: const Size(28, 28),
             onPressed: _openMainOptions,
@@ -881,62 +896,54 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
   Future<void> _openGroupMenuSheet() async {
     final groups = _repo.allGroups();
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    final selected = await showAppPopoverMenu<_RssGroupMenuDecision>(
       context: context,
-      barrierDismissible: true,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('分组'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _openGroupManageSheet();
-            },
-            child: const Text('分组管理'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _setQuery('已启用');
-            },
-            child: const Text('已启用'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _setQuery('已禁用');
-            },
-            child: const Text('已禁用'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _setQuery('需要登录');
-            },
-            child: const Text('需要登录'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _setQuery('未分组');
-            },
-            child: const Text('未分组'),
-          ),
-          for (final group in groups)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _setQuery('${RssSourceManageHelper.groupPrefix}$group');
-              },
-              child: Text(group),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('取消'),
+      anchorKey: _groupMenuKey,
+      items: [
+        const AppPopoverMenuItem(
+          value: (openManage: true, query: null),
+          icon: CupertinoIcons.gear,
+          label: '分组管理',
         ),
-      ),
+        const AppPopoverMenuItem(
+          value: (openManage: false, query: '已启用'),
+          icon: CupertinoIcons.check_mark,
+          label: '已启用',
+        ),
+        const AppPopoverMenuItem(
+          value: (openManage: false, query: '已禁用'),
+          icon: CupertinoIcons.xmark,
+          label: '已禁用',
+        ),
+        const AppPopoverMenuItem(
+          value: (openManage: false, query: '需要登录'),
+          icon: CupertinoIcons.lock,
+          label: '需要登录',
+        ),
+        const AppPopoverMenuItem(
+          value: (openManage: false, query: '未分组'),
+          icon: CupertinoIcons.tray,
+          label: '未分组',
+        ),
+        for (final group in groups)
+          AppPopoverMenuItem(
+            value: (
+              openManage: false,
+              query: '${RssSourceManageHelper.groupPrefix}$group',
+            ),
+            icon: CupertinoIcons.folder,
+            label: group,
+          ),
+      ],
     );
+    if (!mounted || selected == null) return;
+    if (selected.openManage) {
+      _openGroupManageSheet();
+      return;
+    }
+    final query = selected.query?.trim() ?? '';
+    if (query.isEmpty) return;
+    _setQuery(query);
   }
 
   Future<void> _openGroupManageSheet() async {
@@ -958,54 +965,55 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
 
   Future<void> _openMainOptions() async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    final selected = await showAppPopoverMenu<_RssSourceMainMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('更多'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _openAddSource();
-            },
-            child: const Text('新建订阅源'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _importFromLocalFile();
-            },
-            child: const Text('本地导入'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _importFromOnlineInput();
-            },
-            child: const Text('网络导入'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _importFromQrCode();
-            },
-            child: const Text('二维码导入'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _importDefaultSources();
-            },
-            child: const Text('导入默认规则'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('取消'),
+      anchorKey: _mainMenuKey,
+      items: const [
+        AppPopoverMenuItem(
+          value: _RssSourceMainMenuAction.create,
+          icon: CupertinoIcons.add_circled,
+          label: '新建订阅源',
         ),
-      ),
+        AppPopoverMenuItem(
+          value: _RssSourceMainMenuAction.importFile,
+          icon: CupertinoIcons.doc,
+          label: '本地导入',
+        ),
+        AppPopoverMenuItem(
+          value: _RssSourceMainMenuAction.importUrl,
+          icon: CupertinoIcons.globe,
+          label: '网络导入',
+        ),
+        AppPopoverMenuItem(
+          value: _RssSourceMainMenuAction.importQr,
+          icon: CupertinoIcons.qrcode,
+          label: '二维码导入',
+        ),
+        AppPopoverMenuItem(
+          value: _RssSourceMainMenuAction.importDefault,
+          icon: CupertinoIcons.wand_rays,
+          label: '导入默认规则',
+        ),
+      ],
     );
+    if (!mounted || selected == null) return;
+    switch (selected) {
+      case _RssSourceMainMenuAction.create:
+        _openAddSource();
+        break;
+      case _RssSourceMainMenuAction.importFile:
+        _importFromLocalFile();
+        break;
+      case _RssSourceMainMenuAction.importUrl:
+        _importFromOnlineInput();
+        break;
+      case _RssSourceMainMenuAction.importQr:
+        _importFromQrCode();
+        break;
+      case _RssSourceMainMenuAction.importDefault:
+        _importDefaultSources();
+        break;
+    }
   }
 
   Future<void> _importFromLocalFile() async {

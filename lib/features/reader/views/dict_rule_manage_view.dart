@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
+import '../../../app/widgets/app_popover_menu.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
 import '../../settings/views/app_help_dialog.dart';
@@ -27,6 +27,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
   static const String _onlineImportHistoryKey = 'dictRuleUrls';
 
   final DictRuleStore _ruleStore = DictRuleStore();
+  final GlobalKey _moreMenuKey = GlobalKey();
 
   bool _loading = true;
   bool _importingDefault = false;
@@ -172,51 +173,36 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
 
   Future<void> _showMoreMenu() async {
     if (_menuBusy) return;
-    final selected = await showCupertinoBottomDialog<_DictRuleMenuAction>(
+    final selected = await showAppPopoverMenu<_DictRuleMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('配置字典规则'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _DictRuleMenuAction.importLocal,
-            ),
-            child: const Text('本地导入'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _DictRuleMenuAction.importOnline,
-            ),
-            child: const Text('网络导入'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _DictRuleMenuAction.importQr,
-            ),
-            child: const Text('二维码导入'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _DictRuleMenuAction.importDefault,
-            ),
-            child: const Text('导入默认规则'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.pop(sheetContext, _DictRuleMenuAction.help),
-            child: const Text('帮助'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+      anchorKey: _moreMenuKey,
+      items: const [
+        AppPopoverMenuItem(
+          value: _DictRuleMenuAction.importLocal,
+          icon: CupertinoIcons.doc,
+          label: '本地导入',
         ),
-      ),
+        AppPopoverMenuItem(
+          value: _DictRuleMenuAction.importOnline,
+          icon: CupertinoIcons.globe,
+          label: '网络导入',
+        ),
+        AppPopoverMenuItem(
+          value: _DictRuleMenuAction.importQr,
+          icon: CupertinoIcons.qrcode,
+          label: '二维码导入',
+        ),
+        AppPopoverMenuItem(
+          value: _DictRuleMenuAction.importDefault,
+          icon: CupertinoIcons.wand_rays,
+          label: '导入默认规则',
+        ),
+        AppPopoverMenuItem(
+          value: _DictRuleMenuAction.help,
+          icon: CupertinoIcons.question_circle,
+          label: '帮助',
+        ),
+      ],
     );
     if (selected == null) return;
     switch (selected) {
@@ -240,40 +226,26 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
 
   Future<void> _showSelectionMoreMenu() async {
     if (_menuBusy || _selectedRuleNames.isEmpty) return;
-    final selected =
-        await showCupertinoBottomDialog<_DictRuleSelectionMenuAction>(
+    final selected = await showAppPopoverMenu<_DictRuleSelectionMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('批量操作'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _DictRuleSelectionMenuAction.enableSelection,
-            ),
-            child: const Text('启用所选'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _DictRuleSelectionMenuAction.disableSelection,
-            ),
-            child: const Text('禁用所选'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _DictRuleSelectionMenuAction.exportSelection,
-            ),
-            child: const Text('导出所选'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+      anchorKey: _moreMenuKey,
+      items: const [
+        AppPopoverMenuItem(
+          value: _DictRuleSelectionMenuAction.enableSelection,
+          icon: CupertinoIcons.check_mark,
+          label: '启用所选',
         ),
-      ),
+        AppPopoverMenuItem(
+          value: _DictRuleSelectionMenuAction.disableSelection,
+          icon: CupertinoIcons.xmark,
+          label: '禁用所选',
+        ),
+        AppPopoverMenuItem(
+          value: _DictRuleSelectionMenuAction.exportSelection,
+          icon: CupertinoIcons.square_arrow_up,
+          label: '导出所选',
+        ),
+      ],
     );
     if (selected == null) return;
     switch (selected) {
@@ -989,6 +961,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
             minimumSize: Size(30, 30),
           ),
           CupertinoButton(
+            key: _moreMenuKey,
             padding: EdgeInsets.zero,
             onPressed: _selectionMode
                 ? (hasSelection && !_menuBusy ? _showSelectionMoreMenu : null)

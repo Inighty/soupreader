@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
@@ -29,6 +30,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
       'https://gitee.com/fisher52/YueDuJson/raw/master/myTxtChapterRule.json';
 
   final TxtTocRuleStore _ruleStore = TxtTocRuleStore();
+  final GlobalKey _moreMenuKey = GlobalKey();
 
   bool _loading = true;
   bool _importingDefault = false;
@@ -161,47 +163,36 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
 
   Future<void> _showMoreMenu() async {
     if (_menuBusy) return;
-    final selected = await showCupertinoBottomDialog<_TxtTocRuleMenuAction>(
+    final selected = await showAppPopoverMenu<_TxtTocRuleMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('TXT 目录规则'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.pop(sheetContext, _TxtTocRuleMenuAction.importLocal),
-            child: const Text('本地导入'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _TxtTocRuleMenuAction.importOnline,
-            ),
-            child: const Text('网络导入'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.pop(sheetContext, _TxtTocRuleMenuAction.importQr),
-            child: const Text('二维码导入'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _TxtTocRuleMenuAction.importDefault,
-            ),
-            child: const Text('导入默认规则'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.pop(sheetContext, _TxtTocRuleMenuAction.help),
-            child: const Text('帮助'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+      anchorKey: _moreMenuKey,
+      items: const [
+        AppPopoverMenuItem(
+          value: _TxtTocRuleMenuAction.importLocal,
+          icon: CupertinoIcons.doc,
+          label: '本地导入',
         ),
-      ),
+        AppPopoverMenuItem(
+          value: _TxtTocRuleMenuAction.importOnline,
+          icon: CupertinoIcons.globe,
+          label: '网络导入',
+        ),
+        AppPopoverMenuItem(
+          value: _TxtTocRuleMenuAction.importQr,
+          icon: CupertinoIcons.qrcode,
+          label: '二维码导入',
+        ),
+        AppPopoverMenuItem(
+          value: _TxtTocRuleMenuAction.importDefault,
+          icon: CupertinoIcons.wand_rays,
+          label: '导入默认规则',
+        ),
+        AppPopoverMenuItem(
+          value: _TxtTocRuleMenuAction.help,
+          icon: CupertinoIcons.question_circle,
+          label: '帮助',
+        ),
+      ],
     );
     if (selected == null) return;
     switch (selected) {
@@ -225,40 +216,26 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
 
   Future<void> _showSelectionMoreMenu() async {
     if (_menuBusy || _selectedRuleIds.isEmpty) return;
-    final selected =
-        await showCupertinoBottomDialog<_TxtTocRuleSelectionMenuAction>(
+    final selected = await showAppPopoverMenu<_TxtTocRuleSelectionMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('批量操作'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _TxtTocRuleSelectionMenuAction.enableSelection,
-            ),
-            child: const Text('启用所选'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _TxtTocRuleSelectionMenuAction.disableSelection,
-            ),
-            child: const Text('禁用所选'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _TxtTocRuleSelectionMenuAction.exportSelection,
-            ),
-            child: const Text('导出所选'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+      anchorKey: _moreMenuKey,
+      items: const [
+        AppPopoverMenuItem(
+          value: _TxtTocRuleSelectionMenuAction.enableSelection,
+          icon: CupertinoIcons.check_mark,
+          label: '启用所选',
         ),
-      ),
+        AppPopoverMenuItem(
+          value: _TxtTocRuleSelectionMenuAction.disableSelection,
+          icon: CupertinoIcons.xmark,
+          label: '禁用所选',
+        ),
+        AppPopoverMenuItem(
+          value: _TxtTocRuleSelectionMenuAction.exportSelection,
+          icon: CupertinoIcons.square_arrow_up,
+          label: '导出所选',
+        ),
+      ],
     );
     if (selected == null) return;
     switch (selected) {
@@ -1167,6 +1144,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
             ),
           ),
           CupertinoButton(
+            key: _moreMenuKey,
             padding: EdgeInsets.zero,
             minimumSize: const Size(30, 30),
             onPressed: _selectionMode

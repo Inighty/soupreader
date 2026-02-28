@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
@@ -25,6 +26,7 @@ class BackupSettingsView extends StatefulWidget {
 class _BackupSettingsViewState extends State<BackupSettingsView> {
   static const int _autoCheckPromptGapMs = 60 * 1000;
 
+  final GlobalKey _moreMenuKey = GlobalKey();
   final BackupService _backupService = BackupService();
   final BackupRestoreIgnoreService _backupRestoreIgnoreService =
       BackupRestoreIgnoreService();
@@ -550,6 +552,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
         CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: _showMoreActions,
+          key: _moreMenuKey,
           child: const Icon(CupertinoIcons.ellipsis_circle, size: 22),
           minimumSize: Size(30, 30),
         ),
@@ -590,22 +593,16 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
   }
 
   Future<void> _showMoreActions() async {
-    final selected = await showCupertinoBottomDialog<_BackupMoreAction>(
+    final selected = await showAppPopoverMenu<_BackupMoreAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () =>
-                Navigator.of(sheetContext).pop(_BackupMoreAction.logs),
-            child: const Text('日志'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(sheetContext).pop(),
-          child: const Text('取消'),
+      anchorKey: _moreMenuKey,
+      items: const [
+        AppPopoverMenuItem(
+          value: _BackupMoreAction.logs,
+          icon: CupertinoIcons.doc_text,
+          label: '日志',
         ),
-      ),
+      ],
     );
     if (selected == _BackupMoreAction.logs && mounted) {
       await showAppLogDialog(context);

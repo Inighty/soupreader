@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
+import '../../../app/widgets/app_popover_menu.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/services/settings_service.dart';
@@ -8,6 +9,11 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../reader/views/simple_reader_view.dart';
 import '../../search/models/search_scope_group_helper.dart';
 import '../models/book.dart';
+
+enum _ReadRecordTopMenuAction {
+  sort,
+  toggleRecord,
+}
 
 /// 阅读记录
 ///
@@ -27,6 +33,7 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
   static const int _readRecordSortByReadLong = 1;
   static const int _readRecordSortByReadTime = 2;
 
+  final GlobalKey _moreMenuKey = GlobalKey();
   late final BookRepository _bookRepo;
   late final SettingsService _settingsService;
   final TextEditingController _searchController = TextEditingController();
@@ -57,9 +64,11 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
     return AppCupertinoPageScaffold(
       title: '阅读记录',
       trailing: CupertinoButton(
+        key: _moreMenuKey,
         padding: EdgeInsets.zero,
         onPressed: _showTopActions,
-        child: const Icon(CupertinoIcons.ellipsis_circle, size: 22), minimumSize: Size(28, 28),
+        minimumSize: const Size(28, 28),
+        child: const Icon(CupertinoIcons.ellipsis_circle, size: 22),
       ),
       child: StreamBuilder<List<Book>>(
         stream: _bookRepo.watchAllBooks(),
@@ -181,7 +190,8 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
                 : () => _clearAllReadRecord(history),
             child: _clearingAll
                 ? const CupertinoActivityIndicator(radius: 9)
-                : const Text('清空'), minimumSize: Size(28, 28),
+                : const Text('清空'),
+            minimumSize: const Size(28, 28),
           ),
         ],
       ),
@@ -285,89 +295,68 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
     return SearchScopeGroupHelper.cnCompareLikeLegado(left.title, right.title);
   }
 
-  void _showTopActions() {
-    showCupertinoBottomDialog<void>(
+  Future<void> _showTopActions() async {
+    if (!mounted) return;
+    final selected = await showAppPopoverMenu<_ReadRecordTopMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            child: const Text('排序'),
-            onPressed: () {
-              Navigator.of(sheetContext).pop();
-              _showSortActions();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: Text('${_enableReadRecord ? '✓ ' : ''}开启记录'),
-            onPressed: () async {
-              Navigator.of(sheetContext).pop();
-              final nextValue = !_enableReadRecord;
-              await _settingsService.saveEnableReadRecord(nextValue);
-              if (!mounted) return;
-              setState(() => _enableReadRecord = nextValue);
-            },
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          child: const Text('取消'),
-          onPressed: () => Navigator.of(sheetContext).pop(),
+      anchorKey: _moreMenuKey,
+      items: [
+        const AppPopoverMenuItem(
+          value: _ReadRecordTopMenuAction.sort,
+          icon: CupertinoIcons.arrow_up_arrow_down,
+          label: '排序',
         ),
-      ),
+        AppPopoverMenuItem(
+          value: _ReadRecordTopMenuAction.toggleRecord,
+          icon: CupertinoIcons.check_mark,
+          label: '${_enableReadRecord ? '✓ ' : ''}开启记录',
+        ),
+      ],
     );
+    if (!mounted || selected == null) return;
+    switch (selected) {
+      case _ReadRecordTopMenuAction.sort:
+        await _showSortActions();
+        break;
+      case _ReadRecordTopMenuAction.toggleRecord:
+        final nextValue = !_enableReadRecord;
+        await _settingsService.saveEnableReadRecord(nextValue);
+        if (!mounted) return;
+        setState(() => _enableReadRecord = nextValue);
+        break;
+    }
   }
 
-  void _showSortActions() {
-    showCupertinoBottomDialog<void>(
+  Future<void> _showSortActions() async {
+    if (!mounted) return;
+    final selected = await showAppPopoverMenu<int>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('排序'),
-        actions: [
-          CupertinoActionSheetAction(
-            child: Text(
-              '${_readRecordSort == _readRecordSortByName ? '✓ ' : ''}名称排序',
-            ),
-            onPressed: () async {
-              Navigator.of(sheetContext).pop();
-              await _settingsService.saveReadRecordSort(_readRecordSortByName);
-              if (!mounted) return;
-              setState(() => _readRecordSort = _readRecordSortByName);
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: Text(
-              '${_readRecordSort == _readRecordSortByReadLong ? '✓ ' : ''}阅读时长排序',
-            ),
-            onPressed: () async {
-              Navigator.of(sheetContext).pop();
-              await _settingsService.saveReadRecordSort(
-                _readRecordSortByReadLong,
-              );
-              if (!mounted) return;
-              setState(() => _readRecordSort = _readRecordSortByReadLong);
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: Text(
-              '${_readRecordSort == _readRecordSortByReadTime ? '✓ ' : ''}阅读时间排序',
-            ),
-            onPressed: () async {
-              Navigator.of(sheetContext).pop();
-              await _settingsService.saveReadRecordSort(
-                _readRecordSortByReadTime,
-              );
-              if (!mounted) return;
-              setState(() => _readRecordSort = _readRecordSortByReadTime);
-            },
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          child: const Text('取消'),
-          onPressed: () => Navigator.of(sheetContext).pop(),
+      anchorKey: _moreMenuKey,
+      items: [
+        AppPopoverMenuItem(
+          value: _readRecordSortByName,
+          icon: CupertinoIcons.textformat,
+          label: '${_readRecordSort == _readRecordSortByName ? '✓ ' : ''}名称排序',
         ),
-      ),
+        AppPopoverMenuItem(
+          value: _readRecordSortByReadLong,
+          icon: CupertinoIcons.time,
+          label:
+              '${_readRecordSort == _readRecordSortByReadLong ? '✓ ' : ''}阅读时长排序',
+        ),
+        AppPopoverMenuItem(
+          value: _readRecordSortByReadTime,
+          icon: CupertinoIcons.clock,
+          label:
+              '${_readRecordSort == _readRecordSortByReadTime ? '✓ ' : ''}阅读时间排序',
+        ),
+      ],
     );
+    if (!mounted || selected == null) return;
+
+    await _settingsService.saveReadRecordSort(selected);
+    if (!mounted) return;
+    setState(() => _readRecordSort = selected);
   }
 
   void _openReader(Book book) {

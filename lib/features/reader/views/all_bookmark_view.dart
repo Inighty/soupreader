@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
+import '../../../app/widgets/app_popover_menu.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
@@ -22,7 +22,13 @@ class AllBookmarkView extends StatefulWidget {
   State<AllBookmarkView> createState() => _AllBookmarkViewState();
 }
 
+enum _AllBookmarkTopAction {
+  exportJson,
+  exportMarkdown,
+}
+
 class _AllBookmarkViewState extends State<AllBookmarkView> {
+  final GlobalKey _moreMenuKey = GlobalKey();
   final BookmarkRepository _bookmarkRepo = BookmarkRepository();
   final ReaderBookmarkExportService _bookmarkExportService =
       ReaderBookmarkExportService();
@@ -128,33 +134,33 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
     }
   }
 
-  void _showTopActions() {
-    showCupertinoBottomDialog<void>(
+  Future<void> _showTopActions() async {
+    if (!mounted) return;
+    final action = await showAppPopoverMenu<_AllBookmarkTopAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(sheetContext).pop();
-              unawaited(_runExport(markdown: false));
-            },
-            child: Text(_exporting ? '导出中...' : '导出'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(sheetContext).pop();
-              unawaited(_runExport(markdown: true));
-            },
-            child: Text(_exporting ? '导出中...' : '导出(MD)'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(sheetContext).pop(),
-          child: const Text('取消'),
+      anchorKey: _moreMenuKey,
+      items: [
+        AppPopoverMenuItem(
+          value: _AllBookmarkTopAction.exportJson,
+          icon: CupertinoIcons.square_arrow_up,
+          label: _exporting ? '导出中...' : '导出',
         ),
-      ),
+        AppPopoverMenuItem(
+          value: _AllBookmarkTopAction.exportMarkdown,
+          icon: CupertinoIcons.doc_text,
+          label: _exporting ? '导出中...' : '导出(MD)',
+        ),
+      ],
     );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _AllBookmarkTopAction.exportJson:
+        unawaited(_runExport(markdown: false));
+        break;
+      case _AllBookmarkTopAction.exportMarkdown:
+        unawaited(_runExport(markdown: true));
+        break;
+    }
   }
 
   Future<Book?> _resolveBookForBookmark(BookmarkEntity bookmark) async {
@@ -323,11 +329,13 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
     return AppCupertinoPageScaffold(
       title: '所有书签',
       trailing: CupertinoButton(
+        key: _moreMenuKey,
         padding: EdgeInsets.zero,
         onPressed: _showTopActions,
+        minimumSize: const Size(28, 28),
         child: _exporting
             ? const CupertinoActivityIndicator(radius: 10)
-            : const Icon(CupertinoIcons.ellipsis_circle, size: 22), minimumSize: Size(28, 28),
+            : const Icon(CupertinoIcons.ellipsis_circle, size: 22),
       ),
       child: _buildBody(),
     );

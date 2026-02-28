@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
@@ -28,6 +29,14 @@ class ReplaceRuleListView extends StatefulWidget {
   State<ReplaceRuleListView> createState() => _ReplaceRuleListViewState();
 }
 
+enum _ReplaceRuleTopMenuAction {
+  create,
+  importFile,
+  importUrl,
+  importQr,
+  help,
+}
+
 class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   static const int _maxImportDepth = 5;
   static const String _requestWithoutUaSuffix = '#requestWithoutUA';
@@ -38,6 +47,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   static final RegExp _groupSplitPattern = RegExp(r'[,;，；]');
 
   late final ReplaceRuleRepository _repo;
+  final GlobalKey _moreMenuKey = GlobalKey();
   final ReplaceRuleImportExportService _io = ReplaceRuleImportExportService();
   final TextEditingController _searchController = TextEditingController();
 
@@ -135,6 +145,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                 ),
               ),
               CupertinoButton(
+                key: _moreMenuKey,
                 padding: EdgeInsets.zero,
                 minimumSize: const Size(30, 30),
                 onPressed: _selectionMode
@@ -888,55 +899,58 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     );
   }
 
-  void _showMoreMenu() {
-    showCupertinoBottomDialog<void>(
+  Future<void> _showMoreMenu() async {
+    if (_menuBusy) return;
+    if (!mounted) return;
+    final action = await showAppPopoverMenu<_ReplaceRuleTopMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (context) => CupertinoActionSheet(
-        title: const Text('替换净化规则'),
-        actions: [
-          CupertinoActionSheetAction(
-            child: const Text('新建替换'),
-            onPressed: () {
-              Navigator.pop(context);
-              _createRule();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('本地导入'),
-            onPressed: () {
-              Navigator.pop(context);
-              _importFromFile();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('网络导入'),
-            onPressed: () {
-              Navigator.pop(context);
-              _importFromUrl();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('二维码导入'),
-            onPressed: () {
-              Navigator.pop(context);
-              _importFromQr();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('帮助'),
-            onPressed: () {
-              Navigator.pop(context);
-              _showReplaceRuleHelp();
-            },
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          child: const Text('取消'),
-          onPressed: () => Navigator.pop(context),
+      anchorKey: _moreMenuKey,
+      items: const [
+        AppPopoverMenuItem(
+          value: _ReplaceRuleTopMenuAction.create,
+          icon: CupertinoIcons.add_circled,
+          label: '新建替换',
         ),
-      ),
+        AppPopoverMenuItem(
+          value: _ReplaceRuleTopMenuAction.importFile,
+          icon: CupertinoIcons.doc,
+          label: '本地导入',
+        ),
+        AppPopoverMenuItem(
+          value: _ReplaceRuleTopMenuAction.importUrl,
+          icon: CupertinoIcons.globe,
+          label: '网络导入',
+        ),
+        AppPopoverMenuItem(
+          value: _ReplaceRuleTopMenuAction.importQr,
+          icon: CupertinoIcons.qrcode,
+          label: '二维码导入',
+        ),
+        AppPopoverMenuItem(
+          value: _ReplaceRuleTopMenuAction.help,
+          icon: CupertinoIcons.question_circle,
+          label: '帮助',
+        ),
+      ],
     );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _ReplaceRuleTopMenuAction.create:
+        _createRule();
+        break;
+      case _ReplaceRuleTopMenuAction.importFile:
+        _importFromFile();
+        break;
+      case _ReplaceRuleTopMenuAction.importUrl:
+        _importFromUrl();
+        break;
+      case _ReplaceRuleTopMenuAction.importQr:
+        _importFromQr();
+        break;
+      case _ReplaceRuleTopMenuAction.help:
+        _showReplaceRuleHelp();
+        break;
+    }
   }
 
   Future<void> _showRuleItemMenu(ReplaceRule rule) async {
@@ -1133,54 +1147,36 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
 
   Future<void> _showSelectionMoreMenu(List<ReplaceRule> visibleRules) async {
     if (_menuBusy || _selectedCountIn(visibleRules) == 0) return;
-    final selected =
-        await showCupertinoBottomDialog<_ReplaceRuleSelectionMenuAction>(
+    final selected = await showAppPopoverMenu<_ReplaceRuleSelectionMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('批量操作'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _ReplaceRuleSelectionMenuAction.enableSelection,
-            ),
-            child: const Text('启用所选'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _ReplaceRuleSelectionMenuAction.disableSelection,
-            ),
-            child: const Text('禁用所选'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _ReplaceRuleSelectionMenuAction.topSelection,
-            ),
-            child: const Text('置顶所选'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _ReplaceRuleSelectionMenuAction.bottomSelection,
-            ),
-            child: const Text('置底所选'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _ReplaceRuleSelectionMenuAction.exportSelection,
-            ),
-            child: const Text('导出所选'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+      anchorKey: _moreMenuKey,
+      items: const [
+        AppPopoverMenuItem(
+          value: _ReplaceRuleSelectionMenuAction.enableSelection,
+          icon: CupertinoIcons.check_mark,
+          label: '启用所选',
         ),
-      ),
+        AppPopoverMenuItem(
+          value: _ReplaceRuleSelectionMenuAction.disableSelection,
+          icon: CupertinoIcons.xmark,
+          label: '禁用所选',
+        ),
+        AppPopoverMenuItem(
+          value: _ReplaceRuleSelectionMenuAction.topSelection,
+          icon: CupertinoIcons.arrow_up_to_line,
+          label: '置顶所选',
+        ),
+        AppPopoverMenuItem(
+          value: _ReplaceRuleSelectionMenuAction.bottomSelection,
+          icon: CupertinoIcons.arrow_down_to_line,
+          label: '置底所选',
+        ),
+        AppPopoverMenuItem(
+          value: _ReplaceRuleSelectionMenuAction.exportSelection,
+          icon: CupertinoIcons.square_arrow_up,
+          label: '导出所选',
+        ),
+      ],
     );
     if (selected == null) return;
     switch (selected) {

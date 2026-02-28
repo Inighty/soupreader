@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_article_repository.dart';
@@ -185,6 +186,7 @@ class _RssArticlesPlaceholderViewState
   int _fallbackArticleStyle = RssArticleStyleHelper.minStyle;
   String _sortFutureKey = '';
   Future<List<RssSortTab>>? _sortTabsFuture;
+  final GlobalKey _moreMenuKey = GlobalKey();
 
   @override
   void initState() {
@@ -272,6 +274,7 @@ class _RssArticlesPlaceholderViewState
     final actions = _buildMenuActions(source);
     if (actions.isEmpty) return null;
     return CupertinoButton(
+      key: _moreMenuKey,
       padding: EdgeInsets.zero,
       minimumSize: const Size(28, 28),
       onPressed: () => _showMoreMenu(
@@ -316,30 +319,43 @@ class _RssArticlesPlaceholderViewState
     }
   }
 
+  IconData _menuActionIcon(_RssArticlesMenuAction action) {
+    switch (action) {
+      case _RssArticlesMenuAction.login:
+        return CupertinoIcons.person;
+      case _RssArticlesMenuAction.refreshSort:
+        return CupertinoIcons.refresh;
+      case _RssArticlesMenuAction.setSourceVariable:
+        return CupertinoIcons.slider_horizontal_3;
+      case _RssArticlesMenuAction.editSource:
+        return CupertinoIcons.pencil;
+      case _RssArticlesMenuAction.switchLayout:
+        return CupertinoIcons.square_grid_2x2;
+      case _RssArticlesMenuAction.readRecord:
+        return CupertinoIcons.clock;
+      case _RssArticlesMenuAction.clear:
+        return CupertinoIcons.delete;
+    }
+  }
+
   Future<void> _showMoreMenu({
     required RssSource source,
     required List<_RssArticlesMenuAction> actions,
   }) async {
     if (!mounted) return;
-    final selected = await showCupertinoBottomDialog<_RssArticlesMenuAction>(
+    final selected = await showAppPopoverMenu<_RssArticlesMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        actions: actions
-            .map(
-              (action) => CupertinoActionSheetAction(
-                onPressed: () {
-                  Navigator.pop(sheetContext, action);
-                },
-                child: Text(_menuActionText(action)),
-              ),
-            )
-            .toList(growable: false),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
-        ),
-      ),
+      anchorKey: _moreMenuKey,
+      items: actions
+          .map(
+            (action) => AppPopoverMenuItem(
+              value: action,
+              icon: _menuActionIcon(action),
+              label: _menuActionText(action),
+              isDestructiveAction: action == _RssArticlesMenuAction.clear,
+            ),
+          )
+          .toList(growable: false),
     );
     if (selected == null) return;
     switch (selected) {

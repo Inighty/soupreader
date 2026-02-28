@@ -13,6 +13,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
@@ -49,6 +50,28 @@ import '../services/search_book_info_share_helper.dart';
 import '../services/search_book_info_top_helper.dart';
 import '../services/search_book_toc_filter_helper.dart';
 import 'search_book_info_edit_view.dart';
+
+enum _SearchBookInfoMoreMenuAction {
+  uploadWebDav,
+  refresh,
+  login,
+  pinTop,
+  setSourceVariable,
+  setBookVariable,
+  copyBookUrl,
+  copyTocUrl,
+  toggleAllowUpdate,
+  toggleSplitLongChapter,
+  toggleDeleteAlert,
+  clearCache,
+  logs,
+}
+
+typedef _SearchBookInfoMoreActionConfig = ({
+  String actionKey,
+  String actionLabel,
+  Future<void> Function() action,
+});
 
 /// 搜索/发现结果详情页（对标 legado：点击结果先进入详情，再决定阅读/加书架/目录）。
 /// 也可从书架进入：若历史数据缺少 bookUrl，则降级展示缓存信息。
@@ -115,6 +138,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   late final ReaderBookmarkExportService _bookmarkExportService;
   late final ChapterTitleDisplayHelper _chapterTitleDisplayHelper;
   final TxtTocRuleStore _txtTocRuleStore = TxtTocRuleStore();
+  final GlobalKey _moreMenuKey = GlobalKey();
 
   late SearchResult _activeResult;
   BookSource? _source;
@@ -512,6 +536,23 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
             _activeResult.sourceUrl)
         .trim();
     return sourceUrl.isNotEmpty ? sourceUrl : '未知来源';
+  }
+
+  String _resolveTocMetaValue() {
+    if (_loadingToc) return '加载中';
+    if (_tocError != null && _toc.isEmpty) return '加载失败';
+    if (_toc.isEmpty) return '暂无';
+
+    var index = 0;
+    final shelfBook = widget.bookshelfBook;
+    if (shelfBook != null) {
+      index = shelfBook.currentChapter;
+    }
+
+    final safeIndex = index.clamp(0, _toc.length - 1).toInt();
+    final title = _toc[safeIndex].name.trim();
+    if (title.isNotEmpty) return title;
+    return '第${safeIndex + 1}章';
   }
 
   int _resolveChineseConverterType() {
@@ -1371,23 +1412,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     }
   }
 
-  Widget _buildCheckableActionLabel({
-    required String title,
-    required bool checked,
-  }) {
-    if (!checked) {
-      return Text(title);
-    }
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(CupertinoIcons.check_mark, size: 18),
-        const SizedBox(width: 6),
-        Text(title),
-      ],
-    );
-  }
-
   Future<void> _toggleSplitLongChapter() async {
     final next = !_splitLongChapter;
     if (!mounted) return;
@@ -2006,20 +2030,251 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     }
   }
 
-  Future<void> _runMoreActionAndCloseSheet({
-    required BuildContext sheetContext,
-    required String actionKey,
-    required String actionLabel,
-    required Future<void> Function() action,
-  }) async {
-    final navigator = Navigator.of(sheetContext);
-    if (navigator.canPop()) {
-      navigator.pop();
+  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>> _buildSyncMenuItems({
+    required bool showUpload,
+    required bool hasLogin,
+  }) {
+    return [
+      if (showUpload)
+        const AppPopoverMenuItem(
+          value: _SearchBookInfoMoreMenuAction.uploadWebDav,
+          icon: CupertinoIcons.cloud_upload,
+          label: '上传 WebDav',
+        ),
+      const AppPopoverMenuItem(
+        value: _SearchBookInfoMoreMenuAction.refresh,
+        icon: CupertinoIcons.refresh,
+        label: '刷新',
+      ),
+      if (hasLogin)
+        const AppPopoverMenuItem(
+          value: _SearchBookInfoMoreMenuAction.login,
+          icon: CupertinoIcons.person,
+          label: '登录',
+        ),
+    ];
+  }
+
+  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>> _buildVariableMenuItems({
+    required bool showSetVariable,
+  }) {
+    if (!showSetVariable) return const <AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>>[];
+    return const [
+      AppPopoverMenuItem(
+        value: _SearchBookInfoMoreMenuAction.setSourceVariable,
+        icon: CupertinoIcons.slider_horizontal_3,
+        label: '设置源变量',
+      ),
+      AppPopoverMenuItem(
+        value: _SearchBookInfoMoreMenuAction.setBookVariable,
+        icon: CupertinoIcons.book,
+        label: '设置书籍变量',
+      ),
+    ];
+  }
+
+  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>> _buildCopyMenuItems() {
+    return const [
+      AppPopoverMenuItem(
+        value: _SearchBookInfoMoreMenuAction.copyBookUrl,
+        icon: CupertinoIcons.link,
+        label: '拷贝书籍 URL',
+      ),
+      AppPopoverMenuItem(
+        value: _SearchBookInfoMoreMenuAction.copyTocUrl,
+        icon: CupertinoIcons.link,
+        label: '拷贝目录 URL',
+      ),
+    ];
+  }
+
+  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>> _buildOptionMenuItems({
+    required bool showAllowUpdate,
+    required bool showSplitLongChapter,
+  }) {
+    return [
+      if (showAllowUpdate)
+        AppPopoverMenuItem(
+          value: _SearchBookInfoMoreMenuAction.toggleAllowUpdate,
+          icon: CupertinoIcons.check_mark,
+          label: '${_allowUpdate ? '✓ ' : ''}允许更新',
+        ),
+      if (showSplitLongChapter)
+        AppPopoverMenuItem(
+          value: _SearchBookInfoMoreMenuAction.toggleSplitLongChapter,
+          icon: CupertinoIcons.textformat,
+          label: _splitLongChapter ? '分割长章节：开' : '分割长章节：关',
+        ),
+      AppPopoverMenuItem(
+        value: _SearchBookInfoMoreMenuAction.toggleDeleteAlert,
+        icon: CupertinoIcons.bell,
+        label: '${_deleteAlertEnabled ? '✓ ' : ''}删除提醒',
+      ),
+    ];
+  }
+
+  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>> _buildUtilityMenuItems() {
+    return const [
+      AppPopoverMenuItem(
+        value: _SearchBookInfoMoreMenuAction.clearCache,
+        icon: CupertinoIcons.delete,
+        label: '清理缓存',
+      ),
+      AppPopoverMenuItem(
+        value: _SearchBookInfoMoreMenuAction.logs,
+        icon: CupertinoIcons.doc_text,
+        label: '日志',
+      ),
+    ];
+  }
+
+  List<AppPopoverMenuItem<_SearchBookInfoMoreMenuAction>> _buildMoreMenuItems({
+    required bool hasLogin,
+    required bool showSetVariable,
+    required bool showAllowUpdate,
+    required bool showUpload,
+    required bool showSplitLongChapter,
+  }) {
+    return [
+      ..._buildSyncMenuItems(showUpload: showUpload, hasLogin: hasLogin),
+      const AppPopoverMenuItem(
+        value: _SearchBookInfoMoreMenuAction.pinTop,
+        icon: CupertinoIcons.arrow_up_to_line,
+        label: '置顶',
+      ),
+      ..._buildVariableMenuItems(showSetVariable: showSetVariable),
+      ..._buildCopyMenuItems(),
+      ..._buildOptionMenuItems(
+        showAllowUpdate: showAllowUpdate,
+        showSplitLongChapter: showSplitLongChapter,
+      ),
+      ..._buildUtilityMenuItems(),
+    ];
+  }
+
+  _SearchBookInfoMoreActionConfig? _resolveSyncMoreMenuActionConfig(
+    _SearchBookInfoMoreMenuAction action,
+  ) {
+    switch (action) {
+      case _SearchBookInfoMoreMenuAction.uploadWebDav:
+        return (
+          actionKey: 'upload',
+          actionLabel: '上传 WebDav',
+          action: _uploadToRemote,
+        );
+      case _SearchBookInfoMoreMenuAction.refresh:
+        return (
+          actionKey: 'refresh',
+          actionLabel: '刷新',
+          action: _triggerRefresh,
+        );
+      case _SearchBookInfoMoreMenuAction.login:
+        return (
+          actionKey: 'login',
+          actionLabel: '登录',
+          action: _openSourceLogin,
+        );
+      case _SearchBookInfoMoreMenuAction.pinTop:
+        return (
+          actionKey: 'top',
+          actionLabel: '置顶',
+          action: _pinBookToTop,
+        );
+      default:
+        return null;
     }
-    await _executeMoreActionSafely(
-      actionKey: actionKey,
-      actionLabel: actionLabel,
-      action: action,
+  }
+
+  _SearchBookInfoMoreActionConfig? _resolveVariableMoreMenuActionConfig(
+    _SearchBookInfoMoreMenuAction action,
+  ) {
+    switch (action) {
+      case _SearchBookInfoMoreMenuAction.setSourceVariable:
+        return (
+          actionKey: 'set_source_variable',
+          actionLabel: '设置源变量',
+          action: _setSourceVariable,
+        );
+      case _SearchBookInfoMoreMenuAction.setBookVariable:
+        return (
+          actionKey: 'set_book_variable',
+          actionLabel: '设置书籍变量',
+          action: _setBookVariable,
+        );
+      case _SearchBookInfoMoreMenuAction.copyBookUrl:
+        return (
+          actionKey: 'copy_book_url',
+          actionLabel: '拷贝书籍 URL',
+          action: _copyBookUrl,
+        );
+      case _SearchBookInfoMoreMenuAction.copyTocUrl:
+        return (
+          actionKey: 'copy_toc_url',
+          actionLabel: '拷贝目录 URL',
+          action: _copyTocUrl,
+        );
+      default:
+        return null;
+    }
+  }
+
+  _SearchBookInfoMoreActionConfig? _resolveToggleMoreMenuActionConfig(
+    _SearchBookInfoMoreMenuAction action,
+  ) {
+    switch (action) {
+      case _SearchBookInfoMoreMenuAction.toggleAllowUpdate:
+        return (
+          actionKey: 'allow_update',
+          actionLabel: '允许更新',
+          action: _toggleAllowUpdate,
+        );
+      case _SearchBookInfoMoreMenuAction.toggleSplitLongChapter:
+        return (
+          actionKey: 'split_long_chapter',
+          actionLabel: '分割长章节',
+          action: _toggleSplitLongChapter,
+        );
+      case _SearchBookInfoMoreMenuAction.toggleDeleteAlert:
+        return (
+          actionKey: 'delete_alert',
+          actionLabel: '删除提醒',
+          action: _toggleDeleteAlertEnabled,
+        );
+      case _SearchBookInfoMoreMenuAction.clearCache:
+        return (
+          actionKey: 'clear_cache',
+          actionLabel: '清理缓存',
+          action: _clearBookCache,
+        );
+      case _SearchBookInfoMoreMenuAction.logs:
+        return (
+          actionKey: 'log',
+          actionLabel: '日志',
+          action: _openAppLogDialog,
+        );
+      default:
+        return null;
+    }
+  }
+
+  _SearchBookInfoMoreActionConfig _resolveMoreMenuActionConfig(
+    _SearchBookInfoMoreMenuAction action,
+  ) {
+    final resolved = _resolveSyncMoreMenuActionConfig(action) ??
+        _resolveVariableMoreMenuActionConfig(action) ??
+        _resolveToggleMoreMenuActionConfig(action);
+    if (resolved == null) {
+      throw StateError('SearchBookInfo: unhandled more menu action: $action');
+    }
+    return resolved;
+  }
+
+  Future<void> _handleMoreMenuAction(_SearchBookInfoMoreMenuAction action) {
+    final config = _resolveMoreMenuActionConfig(action);
+    return _executeMoreActionSafely(
+      actionKey: config.actionKey,
+      actionLabel: config.actionLabel,
+      action: config.action,
     );
   }
 
@@ -2034,7 +2289,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     final showAllowUpdate = SearchBookInfoMenuHelper.shouldShowAllowUpdate(
       hasSource: source != null,
     );
-    const canClearCache = true;
     final showUpload = SearchBookInfoMenuHelper.shouldShowUpload(
       isLocalBook: _isLocalBook(),
     );
@@ -2042,176 +2296,21 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
         SearchBookInfoMenuHelper.shouldShowSplitLongChapter(
       isLocalTxtBook: _isLocalTxtBook(),
     );
-
-    await showCupertinoBottomDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: Text(_displayName),
-        actions: [
-          if (showUpload)
-            CupertinoActionSheetAction(
-              onPressed: () async {
-                await _runMoreActionAndCloseSheet(
-                  sheetContext: sheetContext,
-                  actionKey: 'upload',
-                  actionLabel: '上传 WebDav',
-                  action: _uploadToRemote,
-                );
-              },
-              child: const Text('上传 WebDav'),
-            ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              await _runMoreActionAndCloseSheet(
-                sheetContext: sheetContext,
-                actionKey: 'refresh',
-                actionLabel: '刷新',
-                action: _triggerRefresh,
-              );
-            },
-            child: const Text('刷新'),
-          ),
-          if (hasLogin)
-            CupertinoActionSheetAction(
-              onPressed: () async {
-                await _runMoreActionAndCloseSheet(
-                  sheetContext: sheetContext,
-                  actionKey: 'login',
-                  actionLabel: '登录',
-                  action: _openSourceLogin,
-                );
-              },
-              child: const Text('登录'),
-            ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              await _runMoreActionAndCloseSheet(
-                sheetContext: sheetContext,
-                actionKey: 'top',
-                actionLabel: '置顶',
-                action: _pinBookToTop,
-              );
-            },
-            child: const Text('置顶'),
-          ),
-          if (showSetVariable)
-            CupertinoActionSheetAction(
-              onPressed: () async {
-                await _runMoreActionAndCloseSheet(
-                  sheetContext: sheetContext,
-                  actionKey: 'set_source_variable',
-                  actionLabel: '设置源变量',
-                  action: _setSourceVariable,
-                );
-              },
-              child: const Text('设置源变量'),
-            ),
-          if (showSetVariable)
-            CupertinoActionSheetAction(
-              onPressed: () async {
-                await _runMoreActionAndCloseSheet(
-                  sheetContext: sheetContext,
-                  actionKey: 'set_book_variable',
-                  actionLabel: '设置书籍变量',
-                  action: _setBookVariable,
-                );
-              },
-              child: const Text('设置书籍变量'),
-            ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              await _runMoreActionAndCloseSheet(
-                sheetContext: sheetContext,
-                actionKey: 'copy_book_url',
-                actionLabel: '拷贝书籍 URL',
-                action: _copyBookUrl,
-              );
-            },
-            child: const Text('拷贝书籍 URL'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              await _runMoreActionAndCloseSheet(
-                sheetContext: sheetContext,
-                actionKey: 'copy_toc_url',
-                actionLabel: '拷贝目录 URL',
-                action: _copyTocUrl,
-              );
-            },
-            child: const Text('拷贝目录 URL'),
-          ),
-          if (showAllowUpdate)
-            CupertinoActionSheetAction(
-              onPressed: () async {
-                await _runMoreActionAndCloseSheet(
-                  sheetContext: sheetContext,
-                  actionKey: 'allow_update',
-                  actionLabel: '允许更新',
-                  action: _toggleAllowUpdate,
-                );
-              },
-              child: _buildCheckableActionLabel(
-                title: '允许更新',
-                checked: _allowUpdate,
-              ),
-            ),
-          if (showSplitLongChapter)
-            CupertinoActionSheetAction(
-              onPressed: () async {
-                await _runMoreActionAndCloseSheet(
-                  sheetContext: sheetContext,
-                  actionKey: 'split_long_chapter',
-                  actionLabel: '分割长章节',
-                  action: _toggleSplitLongChapter,
-                );
-              },
-              child: Text(_splitLongChapter ? '分割长章节：开' : '分割长章节：关'),
-            ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              await _runMoreActionAndCloseSheet(
-                sheetContext: sheetContext,
-                actionKey: 'delete_alert',
-                actionLabel: '删除提醒',
-                action: _toggleDeleteAlertEnabled,
-              );
-            },
-            child: _buildCheckableActionLabel(
-              title: '删除提醒',
-              checked: _deleteAlertEnabled,
-            ),
-          ),
-          if (canClearCache)
-            CupertinoActionSheetAction(
-              onPressed: () async {
-                await _runMoreActionAndCloseSheet(
-                  sheetContext: sheetContext,
-                  actionKey: 'clear_cache',
-                  actionLabel: '清理缓存',
-                  action: _clearBookCache,
-                );
-              },
-              child: const Text('清理缓存'),
-            ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              await _runMoreActionAndCloseSheet(
-                sheetContext: sheetContext,
-                actionKey: 'log',
-                actionLabel: '日志',
-                action: _openAppLogDialog,
-              );
-            },
-            child: const Text('日志'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
-        ),
-      ),
+    final items = _buildMoreMenuItems(
+      hasLogin: hasLogin,
+      showSetVariable: showSetVariable,
+      showAllowUpdate: showAllowUpdate,
+      showUpload: showUpload,
+      showSplitLongChapter: showSplitLongChapter,
     );
+    if (items.isEmpty || !mounted) return;
+    final selected = await showAppPopoverMenu<_SearchBookInfoMoreMenuAction>(
+      context: context,
+      anchorKey: _moreMenuKey,
+      items: items,
+    );
+    if (!mounted || selected == null) return;
+    await _handleMoreMenuAction(selected);
   }
 
   SearchResult _copyResultWithSource(SearchResult value, BookSource source) {
@@ -2435,6 +2534,10 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       _detail?.lastChapter ?? '',
       _activeResult.lastChapter,
     ]);
+    final showUpdateTime = updateTime != null;
+    final showWordCount = wordCount != null;
+    final tocIsLast = !showUpdateTime && !showWordCount;
+    final updateTimeIsLast = showUpdateTime && !showWordCount;
 
     return AppCupertinoPageScaffold(
       title: '书籍详情',
@@ -2455,6 +2558,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
             child: const Icon(CupertinoIcons.share),
           ),
           CupertinoButton(
+            key: _moreMenuKey,
             padding: EdgeInsets.zero,
             onPressed: _showMoreActions,
             child: _switchingSource
@@ -2612,16 +2716,11 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                               icon: CupertinoIcons.globe,
                               text: '来源：$_displaySourceName',
                               trailing: _canFetchOnlineDetail
-                                  ? CupertinoButton(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      minimumSize: const Size(28, 28),
-                                      onPressed: _switchingSource
-                                          ? null
-                                          : _switchSource,
-                                      child: const Text('换源'),
+                                  ? _MetaActionChip(
+                                      label: '换源',
+                                      onPressed:
+                                          _switchingSource ? null : _switchSource,
+                                      color: primaryActionColor,
                                     )
                                   : null,
                             ),
@@ -2630,22 +2729,20 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                               text: '最新：${lastChapter ?? '暂无'}',
                             ),
                             _MetaLine(
-                              icon: CupertinoIcons.collections,
-                              text: '目录：${_toc.length} 章',
-                              trailing: CupertinoButton(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                minimumSize: const Size(28, 28),
-                                onPressed: _loadingToc ? null : _openToc,
-                                child: Text(_loadingToc ? '加载中' : '查看'),
+                              icon: CupertinoIcons.folder_open,
+                              text: '目录：${_resolveTocMetaValue()}',
+                              trailing: _MetaActionChip(
+                                label: '查看',
+                                onPressed: _openToc,
+                                color: primaryActionColor,
                               ),
+                              isLast: tocIsLast,
                             ),
                             if (updateTime != null)
                               _MetaLine(
                                 icon: CupertinoIcons.clock,
                                 text: '更新：$updateTime',
+                                isLast: updateTimeIsLast,
                               ),
                             if (wordCount != null)
                               _MetaLine(
@@ -2679,7 +2776,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                                   : TextOverflow.ellipsis,
                               style: textStyle.copyWith(
                                 fontSize: 13,
-                                color: primaryTextColor,
+                                color: CupertinoColors.secondaryLabel
+                                    .resolveFrom(context),
                               ),
                             ),
                             if (_displayIntro.trim().length > 90) ...[
@@ -2917,15 +3015,26 @@ class _HeroBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCoverImage(
-      urlOrPath: coverUrl,
-      title: title,
-      author: author,
-      width: double.infinity,
-      height: double.infinity,
-      borderRadius: 0,
-      fit: BoxFit.cover,
-      showTextOnPlaceholder: false,
+    const blurSigma = 18.0;
+    const blurScale = 1.08;
+
+    return ClipRect(
+      child: ImageFiltered(
+        imageFilter: ui.ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+        child: Transform.scale(
+          scale: blurScale,
+          child: AppCoverImage(
+            urlOrPath: coverUrl,
+            title: title,
+            author: author,
+            width: double.infinity,
+            height: double.infinity,
+            borderRadius: 0,
+            fit: BoxFit.cover,
+            showTextOnPlaceholder: false,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -2946,7 +3055,6 @@ class _MetaLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
-    final primaryTextColor = CupertinoColors.label.resolveFrom(context);
     final secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
       context,
     );
@@ -2974,8 +3082,8 @@ class _MetaLine extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: textStyle.copyWith(
-                fontSize: 12,
-                color: primaryTextColor,
+                fontSize: 13,
+                color: secondaryTextColor,
               ),
             ),
           ),
@@ -2984,6 +3092,51 @@ class _MetaLine extends StatelessWidget {
             trailing!,
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _MetaActionChip extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final Color color;
+
+  const _MetaActionChip({
+    required this.label,
+    required this.onPressed,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
+    final disabledColor = CupertinoColors.inactiveGray.resolveFrom(context);
+    final resolvedColor = onPressed == null ? disabledColor : color;
+    final resolvedBackground = resolvedColor.withValues(
+      alpha: onPressed == null ? 0.10 : 0.14,
+    );
+
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: const Size(0, 0),
+      onPressed: onPressed,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: resolvedBackground,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          child: Text(
+            label,
+            style: textStyle.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: resolvedColor,
+            ),
+          ),
+        ),
       ),
     );
   }
