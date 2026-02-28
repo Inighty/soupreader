@@ -2517,6 +2517,8 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     final destructiveColor = CupertinoColors.systemRed.resolveFrom(context);
     final warningColor = CupertinoColors.systemOrange.resolveFrom(context);
     final coverUrl = _displayCoverUrl;
+    final heroTopExtend =
+        MediaQuery.of(context).padding.top + kMinInteractiveDimensionCupertino;
 
     final kind = _pickFirstNonEmpty([
       _detail?.kind ?? '',
@@ -2576,26 +2578,41 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                 SizedBox(
                   height: 286,
                   child: Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      Positioned.fill(
-                        child: _HeroBackground(
-                          coverUrl: coverUrl,
-                          title: _displayName,
-                          author: _displayAuthor,
-                        ),
-                      ),
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                CupertinoColors.black.withValues(alpha: 0.32),
-                                CupertinoColors.black.withValues(alpha: 0.12),
-                              ],
+                      Positioned(
+                        top: -heroTopExtend,
+                        left: 0,
+                        right: 0,
+                        height: 286 + heroTopExtend,
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: _HeroBackground(
+                                coverUrl: coverUrl,
+                                title: _displayName,
+                                author: _displayAuthor,
+                              ),
                             ),
-                          ),
+                            Positioned.fill(
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      CupertinoColors.black.withValues(
+                                        alpha: 0.32,
+                                      ),
+                                      CupertinoColors.black.withValues(
+                                        alpha: 0.12,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       Positioned(
