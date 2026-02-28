@@ -24,19 +24,33 @@ List<Widget> buildCupertinoBottomSheetHeader({
   required Widget? message,
   required Color titleColor,
   required Color messageColor,
+  TextAlign titleAlign = TextAlign.center,
+  TextAlign messageAlign = TextAlign.center,
+  EdgeInsets titlePadding = const EdgeInsets.fromLTRB(16, 4, 16, 4),
+  EdgeInsets messagePadding = const EdgeInsets.fromLTRB(18, 0, 18, 8),
 }) {
   final widgets = <Widget>[];
   if (title != null) {
     widgets.add(
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        padding: titlePadding,
         child: DefaultTextStyle(
           style: TextStyle(
             color: titleColor,
             fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
-          child: Center(child: title),
+          child: SizedBox(
+            width: double.infinity,
+            child: Align(
+              alignment: switch (titleAlign) {
+                TextAlign.left => Alignment.centerLeft,
+                TextAlign.right => Alignment.centerRight,
+                _ => Alignment.center,
+              },
+              child: title,
+            ),
+          ),
         ),
       ),
     );
@@ -44,14 +58,23 @@ List<Widget> buildCupertinoBottomSheetHeader({
   if (message != null) {
     widgets.add(
       Padding(
-        padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+        padding: messagePadding,
         child: DefaultTextStyle(
           style: TextStyle(color: messageColor, fontSize: 13, height: 1.3),
-          child: Center(child: message),
+          child: SizedBox(
+            width: double.infinity,
+            child: Align(
+              alignment: switch (messageAlign) {
+                TextAlign.left => Alignment.centerLeft,
+                TextAlign.right => Alignment.centerRight,
+                _ => Alignment.center,
+              },
+              child: message,
+            ),
+          ),
         ),
       ),
     );
   }
   return widgets;
 }
-

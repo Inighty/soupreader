@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../app/theme/cupertino_theme_adapter.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -568,7 +569,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     final tokens = AppCupertinoThemeAdapter.resolve(context);
 
     final header = Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Column(
         children: [
           CupertinoSearchTextField(
@@ -650,9 +651,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     required int eligibleCount,
     required String query,
   }) {
-    final theme = CupertinoTheme.of(context);
-    final tokens = AppCupertinoThemeAdapter.resolve(context);
-
     String subtitle;
     if (eligibleCount == 0) {
       subtitle = '请在书源管理导入书源';
@@ -661,36 +659,10 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     } else {
       subtitle = '请在书源管理导入书源';
     }
-
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            CupertinoIcons.globe,
-            size: 52,
-            color: tokens.mutedForeground,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '没有发现任何内容',
-            style: theme.textTheme.textStyle.copyWith(
-              color: tokens.foreground,
-              fontSize: 30,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.textStyle.copyWith(
-              color: tokens.mutedForeground,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
+    return AppEmptyState(
+      illustration: const AppEmptyPlanetIllustration(),
+      title: '没有发现任何内容',
+      message: subtitle,
     );
   }
 

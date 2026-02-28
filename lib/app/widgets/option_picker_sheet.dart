@@ -28,6 +28,7 @@ Future<T?> showOptionPickerSheet<T>({
   required List<OptionPickerItem<T>> items,
   required T? currentValue,
   String cancelText = '取消',
+  bool showCancel = false,
   Color? accentColor,
 }) {
   final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
@@ -42,6 +43,7 @@ Future<T?> showOptionPickerSheet<T>({
       items: items,
       currentValue: currentValue,
       cancelText: cancelText,
+      showCancel: showCancel,
       accentColor: accentColor,
     ),
   );
@@ -53,6 +55,7 @@ class _OptionPickerSheet<T> extends StatelessWidget {
   final List<OptionPickerItem<T>> items;
   final T? currentValue;
   final String cancelText;
+  final bool showCancel;
   final Color? accentColor;
 
   const _OptionPickerSheet({
@@ -61,6 +64,7 @@ class _OptionPickerSheet<T> extends StatelessWidget {
     required this.items,
     required this.currentValue,
     required this.cancelText,
+    required this.showCancel,
     required this.accentColor,
   });
 
@@ -107,6 +111,7 @@ class _OptionPickerSheet<T> extends StatelessWidget {
                 accent: accent,
                 cancelText: cancelText,
                 cancelColor: titleColor,
+                showCancel: showCancel,
                 maxHeight: maxHeight,
               ),
             ],
@@ -183,6 +188,7 @@ class _OptionPickerContent<T> extends StatelessWidget {
   final Color accent;
   final String cancelText;
   final Color cancelColor;
+  final bool showCancel;
   final double maxHeight;
 
   const _OptionPickerContent({
@@ -191,6 +197,7 @@ class _OptionPickerContent<T> extends StatelessWidget {
     required this.accent,
     required this.cancelText,
     required this.cancelColor,
+    required this.showCancel,
     required this.maxHeight,
   });
 
@@ -215,20 +222,21 @@ class _OptionPickerContent<T> extends StatelessWidget {
                 ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
-            children: [
-              CupertinoListTile.notched(
-                title: Text(
-                  cancelText,
-                  style: TextStyle(
-                    color: cancelColor,
-                    fontWeight: FontWeight.w600,
+          if (showCancel)
+            CupertinoListSection.insetGrouped(
+              children: [
+                CupertinoListTile.notched(
+                  title: Text(
+                    cancelText,
+                    style: TextStyle(
+                      color: cancelColor,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
+                  onTap: () => Navigator.of(context).pop(),
                 ),
-                onTap: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );
@@ -255,8 +263,8 @@ class _OptionPickerRow<T> extends StatelessWidget {
         : CupertinoColors.secondaryLabel.resolveFrom(context);
     final subtitleColor = CupertinoColors.secondaryLabel.resolveFrom(context);
     final titleStyle = TextStyle(
-      color: selected ? accent : labelColor,
-      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+      color: labelColor,
+      fontWeight: FontWeight.w600,
     );
     final subtitle = (item.subtitle ?? '').trim();
 

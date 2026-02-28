@@ -70,7 +70,6 @@ Future<T?> showAppPopoverMenu<T>({
       final iconColor = CupertinoColors.secondaryLabel.resolveFrom(popupContext);
       final destructiveColor = CupertinoColors.systemRed.resolveFrom(popupContext);
       final bg = CupertinoColors.systemBackground.resolveFrom(popupContext);
-      final divider = CupertinoColors.systemGrey5.resolveFrom(popupContext);
 
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -105,8 +104,6 @@ Future<T?> showAppPopoverMenu<T>({
                               ? () => Navigator.of(popupContext).pop(items[i].value)
                               : null,
                         ),
-                        if (i != items.length - 1)
-                          Container(height: 0.5, color: divider),
                       ],
                     ],
                   ),

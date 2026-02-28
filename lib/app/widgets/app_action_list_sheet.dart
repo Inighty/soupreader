@@ -27,6 +27,7 @@ Future<T?> showAppActionListSheet<T>({
   required List<AppActionListItem<T>> items,
   String cancelText = '取消',
   TextAlign titleAlign = TextAlign.left,
+  bool showCancel = false,
   bool barrierDismissible = true,
   Color? accentColor,
 }) {
@@ -42,6 +43,7 @@ Future<T?> showAppActionListSheet<T>({
       items: items,
       cancelText: cancelText,
       titleAlign: titleAlign,
+      showCancel: showCancel,
       accentColor: accentColor,
     ),
   );
@@ -49,14 +51,16 @@ Future<T?> showAppActionListSheet<T>({
 
 class _AppActionListSheet<T> extends StatelessWidget {
   static const double _radius = 18;
-  static const double _handleWidth = 36;
-  static const double _handleHeight = 4;
+  static const double _maxHeightFactor = 0.74;
+  static const double _rowHeight = 48;
+  static const double _dividerHeight = 0.5;
 
   final String title;
   final String? message;
   final List<AppActionListItem<T>> items;
   final String cancelText;
   final TextAlign titleAlign;
+  final bool showCancel;
   final Color? accentColor;
 
   const _AppActionListSheet({
@@ -65,6 +69,7 @@ class _AppActionListSheet<T> extends StatelessWidget {
     required this.items,
     required this.cancelText,
     required this.titleAlign,
+    required this.showCancel,
     required this.accentColor,
   });
 
@@ -76,6 +81,7 @@ class _AppActionListSheet<T> extends StatelessWidget {
     );
     final bottomInset = math.max(MediaQuery.of(context).padding.bottom, 8.0);
     final trimmedMessage = (message ?? '').trim();
+    final maxHeight = MediaQuery.sizeOf(context).height * _maxHeightFactor;
     final children = _buildChildren(
       context,
       tokens: tokens,
@@ -93,10 +99,13 @@ class _AppActionListSheet<T> extends StatelessWidget {
         ),
         child: Padding(
           padding: EdgeInsets.fromLTRB(0, 10, 0, bottomInset),
-          child: ListView(
-            shrinkWrap: true,
-            physics: const BouncingScrollPhysics(),
-            children: children,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: ListView(
+              shrinkWrap: true,
+              physics: const BouncingScrollPhysics(),
+              children: children,
+            ),
           ),
         ),
       ),
@@ -108,6 +117,8 @@ class _AppActionListSheet<T> extends StatelessWidget {
     required _ActionListTokens tokens,
     required String trimmedMessage,
   }) {
+    final dividerColor = CupertinoColors.systemGrey5.resolveFrom(context);
+
     final children = <Widget>[
       _SheetHeader(
         title: title,
@@ -115,40 +126,43 @@ class _AppActionListSheet<T> extends StatelessWidget {
         titleAlign: titleAlign,
         titleColor: tokens.labelColor,
         messageColor: tokens.subtleColor,
-        handleColor: tokens.handleColor,
       ),
     ];
+
     if (items.isNotEmpty) {
       children.add(
-        CupertinoListSection.insetGrouped(
+        Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            for (final item in items)
+            for (var i = 0; i < items.length; i++) ...[
               _ActionRow<T>(
-                item: item,
+                height: _rowHeight,
+                item: items[i],
                 accent: tokens.accent,
                 labelColor: tokens.labelColor,
                 destructiveColor: tokens.destructiveColor,
               ),
+              if (i != items.length - 1)
+                Container(height: _dividerHeight, color: dividerColor),
+            ],
           ],
         ),
       );
     }
-    children.add(
-      CupertinoListSection.insetGrouped(
-        children: [
-          CupertinoListTile.notched(
-            title: Text(
-              cancelText,
-              style: TextStyle(
-                color: tokens.labelColor,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+
+    if (showCancel) {
+      children.addAll(
+        [
+          const SizedBox(height: 10),
+          _CancelRow(
+            height: _rowHeight,
+            label: cancelText,
+            labelColor: tokens.labelColor,
             onTap: () => Navigator.of(context).pop(),
           ),
         ],
-      ),
-    );
+      );
+    }
     return children;
   }
 }
@@ -158,7 +172,6 @@ class _ActionListTokens {
   final Color labelColor;
   final Color subtleColor;
   final Color destructiveColor;
-  final Color handleColor;
   final Color sheetBg;
 
   const _ActionListTokens({
@@ -166,7 +179,6 @@ class _ActionListTokens {
     required this.labelColor,
     required this.subtleColor,
     required this.destructiveColor,
-    required this.handleColor,
     required this.sheetBg,
   });
 
@@ -184,9 +196,7 @@ class _ActionListTokens {
       labelColor: CupertinoColors.label.resolveFrom(context),
       subtleColor: CupertinoColors.secondaryLabel.resolveFrom(context),
       destructiveColor: CupertinoColors.systemRed.resolveFrom(context),
-      handleColor:
-          CupertinoColors.systemGrey3.resolveFrom(context).withValues(alpha: 0.72),
-      sheetBg: CupertinoColors.systemGroupedBackground.resolveFrom(context),
+      sheetBg: CupertinoColors.systemBackground.resolveFrom(context),
     );
   }
 }
@@ -197,7 +207,6 @@ class _SheetHeader extends StatelessWidget {
   final TextAlign titleAlign;
   final Color titleColor;
   final Color messageColor;
-  final Color handleColor;
 
   const _SheetHeader({
     required this.title,
@@ -205,22 +214,20 @@ class _SheetHeader extends StatelessWidget {
     required this.titleAlign,
     required this.titleColor,
     required this.messageColor,
-    required this.handleColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final resolvedAlign = switch (titleAlign) {
+      TextAlign.left => CrossAxisAlignment.start,
+      TextAlign.right => CrossAxisAlignment.end,
+      _ => CrossAxisAlignment.center,
+    };
+
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: resolvedAlign,
       children: [
-        Container(
-          width: _AppActionListSheet._handleWidth,
-          height: _AppActionListSheet._handleHeight,
-          decoration: BoxDecoration(
-            color: handleColor,
-            borderRadius: BorderRadius.circular(999),
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
           child: Text(
@@ -238,7 +245,7 @@ class _SheetHeader extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
             child: Text(
               message,
-              textAlign: TextAlign.center,
+              textAlign: titleAlign,
               style: TextStyle(color: messageColor, fontSize: 13, height: 1.3),
             ),
           )
@@ -250,12 +257,14 @@ class _SheetHeader extends StatelessWidget {
 }
 
 class _ActionRow<T> extends StatelessWidget {
+  final double height;
   final AppActionListItem<T> item;
   final Color accent;
   final Color labelColor;
   final Color destructiveColor;
 
   const _ActionRow({
+    required this.height,
     required this.item,
     required this.accent,
     required this.labelColor,
@@ -265,22 +274,83 @@ class _ActionRow<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = item.enabled;
-    final color = item.isDestructiveAction ? destructiveColor : accent;
     final textColor = item.isDestructiveAction ? destructiveColor : labelColor;
+    final iconColor = item.isDestructiveAction ? destructiveColor : accent;
 
     return Opacity(
       opacity: enabled ? 1 : 0.45,
-      child: CupertinoListTile.notched(
-        leading: Icon(item.icon, size: 18, color: color),
-        title: Text(
-          item.label,
-          style: TextStyle(
-            color: textColor,
-            fontWeight: FontWeight.w600,
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        onPressed: enabled ? () => Navigator.of(context).pop(item.value) : null,
+        child: SizedBox(
+          height: height,
+          width: double.infinity,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Icon(item.icon, size: 18, color: iconColor),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: textColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        onTap: enabled ? () => Navigator.of(context).pop(item.value) : null,
       ),
+    );
+  }
+}
+
+class _CancelRow extends StatelessWidget {
+  final double height;
+  final String label;
+  final Color labelColor;
+  final VoidCallback onTap;
+
+  const _CancelRow({
+    required this.height,
+    required this.label,
+    required this.labelColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dividerColor = CupertinoColors.systemGrey5.resolveFrom(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(height: _AppActionListSheet._dividerHeight, color: dividerColor),
+        CupertinoButton(
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          onPressed: onTap,
+          child: SizedBox(
+            height: height,
+            width: double.infinity,
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: labelColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
