@@ -9,6 +9,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_webview_toolbar.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
@@ -33,6 +34,13 @@ class SourceWebVerifyView extends StatefulWidget {
 }
 
 class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
+  static const double _progressBarHeight = 2;
+  static const double _progressMinFactor = 0.08;
+  static const double _fullScreenOverlayBgAlpha = 0.72;
+  static const double _fullScreenOverlayRadius = 12;
+  static const double _fullScreenOverlayButtonSize = 34;
+  static const double _fullScreenOverlayIconSize = 18;
+
   late final SourceRepository _sourceRepo;
   late final ExceptionLogService _exceptionLogService;
 
@@ -40,6 +48,10 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
   int _progress = 0;
   String _currentUrl = '';
   bool _isFullScreen = false;
+  bool _isLoading = true;
+  bool _canGoBack = false;
+  bool _canGoForward = false;
+  bool _navStateRefreshErrorLogged = false;
 
   String? _lastImportHint;
   String? _lastImportCookieHeaderValue;
@@ -62,13 +74,23 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
           },
           onPageStarted: (url) {
             if (!mounted) return;
-            setState(() => _currentUrl = url);
+            setState(() {
+              _isLoading = true;
+              _currentUrl = url;
+            });
+            unawaited(_refreshNavState());
+          },
+          onPageFinished: (_) {
+            if (!mounted) return;
+            setState(() => _isLoading = false);
+            unawaited(_refreshNavState());
           },
           onUrlChange: (change) {
             final url = change.url;
             if (url == null) return;
             if (!mounted) return;
             setState(() => _currentUrl = url);
+            unawaited(_refreshNavState());
           },
         ),
       )
@@ -109,6 +131,71 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
         SystemUiOverlay.bottom,
       ],
     );
+  }
+
+  Future<void> _refreshNavState() async {
+    try {
+      final back = await _controller.canGoBack();
+      final forward = await _controller.canGoForward();
+      if (!mounted) return;
+      setState(() {
+        _canGoBack = back;
+        _canGoForward = forward;
+      });
+    } catch (error, stackTrace) {
+      // WebView 生命周期中可能暂不可用：允许忽略导航态刷新，但不能静默吞错。
+      if (_navStateRefreshErrorLogged) return;
+      _navStateRefreshErrorLogged = true;
+      _exceptionLogService.record(
+        node: 'source.web_view.refresh_nav_state',
+        message: '刷新 WebView 导航状态失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'initialUrl': widget.initialUrl,
+          'currentUrl': _currentUrl,
+          'isFullScreen': _isFullScreen,
+          'isLoading': _isLoading,
+        },
+      );
+    }
+  }
+
+  Future<void> _goBack() async {
+    if (!await _controller.canGoBack()) return;
+    await _controller.goBack();
+    unawaited(_refreshNavState());
+  }
+
+  Future<void> _goForward() async {
+    if (!await _controller.canGoForward()) return;
+    await _controller.goForward();
+    unawaited(_refreshNavState());
+  }
+
+  Future<void> _reloadOrStop() async {
+    if (_isLoading) {
+      // webview_flutter 没有 stopLoading API，尽量用 window.stop() 对齐浏览器行为。
+      try {
+        await _controller.runJavaScript('window.stop();');
+      } catch (error, stackTrace) {
+        _exceptionLogService.record(
+          node: 'source.web_view.stop_loading',
+          message: '停止加载失败（window.stop）',
+          error: error,
+          stackTrace: stackTrace,
+          context: <String, dynamic>{
+            'initialUrl': widget.initialUrl,
+            'currentUrl': _currentUrl,
+          },
+        );
+      }
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      return;
+    }
+    setState(() => _isLoading = true);
+    await _controller.reload();
   }
 
   Future<void> _showMessage(String message) async {
@@ -240,7 +327,14 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
   }
 
   Future<void> _copyBaseUrl() async {
-    await Clipboard.setData(ClipboardData(text: widget.initialUrl));
+    final current = _currentUrl.trim();
+    final initial = widget.initialUrl.trim();
+    final target = current.isNotEmpty ? current : initial;
+    if (target.isEmpty) {
+      await _showMessage('URL 为空');
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: target));
     await _showMessage('复制完成');
   }
 
@@ -425,30 +519,36 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
         : AppDesignTokens.brandPrimary;
   }
 
-  Widget _buildPageBody(BuildContext context, {required bool showProgress}) {
-    final progress = _progress;
-    return Column(
-      children: [
-        if (showProgress)
-          SizedBox(
-            height: 2,
+  Widget _buildProgressBar(BuildContext context, {required bool showProgress}) {
+    if (!showProgress) return const SizedBox.shrink();
+    final factor = _progress <= 0 && _isLoading
+        ? _progressMinFactor
+        : (_progress / 100.0);
+    return SizedBox(
+      height: _progressBarHeight,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: CupertinoColors.systemGrey5.resolveFrom(context),
+        ),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: FractionallySizedBox(
+            widthFactor: factor.clamp(0.0, 1.0),
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: CupertinoColors.systemGrey5.resolveFrom(context),
-              ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: FractionallySizedBox(
-                  widthFactor: progress / 100.0,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: _accentColor(context),
-                    ),
-                  ),
-                ),
+                color: _accentColor(context),
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPageBody(BuildContext context, {required bool showProgress}) {
+    return Column(
+      children: [
+        _buildProgressBar(context, showProgress: showProgress),
         if (_lastImportHint != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
@@ -463,31 +563,129 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
         Expanded(
           child: WebViewWidget(controller: _controller),
         ),
+        if (!_isFullScreen)
+          AppWebViewToolbar(
+            canGoBack: _canGoBack,
+            canGoForward: _canGoForward,
+            isLoading: _isLoading,
+            onBack: () => unawaited(_goBack()),
+            onForward: () => unawaited(_goForward()),
+            onReload: () => unawaited(_reloadOrStop()),
+            onToggleFullScreen: () => unawaited(_toggleFullScreen()),
+            onMore: _showMoreMenu,
+          ),
       ],
+    );
+  }
+
+  Widget _buildFullScreenOverlayControls(BuildContext context) {
+    final bg = CupertinoColors.systemBackground
+        .resolveFrom(context)
+        .withValues(alpha: _fullScreenOverlayBgAlpha);
+    final iconColor = CupertinoColors.label.resolveFrom(context);
+
+    Widget buildIconButton({
+      required IconData icon,
+      required VoidCallback onTap,
+    }) {
+      return CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(_fullScreenOverlayButtonSize, _fullScreenOverlayButtonSize),
+        onPressed: onTap,
+        child: Container(
+          width: _fullScreenOverlayButtonSize,
+          height: _fullScreenOverlayButtonSize,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(_fullScreenOverlayRadius),
+          ),
+          child: Icon(icon, size: _fullScreenOverlayIconSize, color: iconColor),
+        ),
+      );
+    }
+
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        child: Row(
+          children: [
+            buildIconButton(
+              icon: CupertinoIcons.chevron_down,
+              onTap: () => unawaited(_toggleFullScreen()),
+            ),
+            const Spacer(),
+            buildIconButton(
+              icon: CupertinoIcons.ellipsis,
+              onTap: _showMoreMenu,
+            ),
+            const SizedBox(width: 8),
+            buildIconButton(
+              icon: CupertinoIcons.xmark,
+              onTap: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final progress = _progress;
-    final showProgress = progress > 0 && progress < 100;
+    final showProgress = _isLoading || (_progress > 0 && _progress < 100);
     return PopScope(
-      canPop: !_isFullScreen,
+      // - 全屏时：返回用于退出全屏（避免“全屏无法返回”）
+      // - WebView 可后退时：返回用于页面后退（对齐浏览器语义）
+      // - WebView 不可后退时：允许路由正常 pop，保留 iOS 侧滑返回
+      canPop: !_isFullScreen && !_canGoBack,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         if (_isFullScreen) {
           await _toggleFullScreen();
           return;
         }
+        try {
+          final canGoBack = await _controller.canGoBack();
+          if (canGoBack) {
+            await _controller.goBack();
+            unawaited(_refreshNavState());
+            return;
+          }
+        } catch (error, stackTrace) {
+          _exceptionLogService.record(
+            node: 'source.web_view.pop_go_back',
+            message: '返回触发 WebView 后退失败',
+            error: error,
+            stackTrace: stackTrace,
+            context: <String, dynamic>{
+              'initialUrl': widget.initialUrl,
+              'currentUrl': _currentUrl,
+              'isFullScreen': _isFullScreen,
+              'isLoading': _isLoading,
+            },
+          );
+        }
         if (!context.mounted) return;
         Navigator.of(context).pop();
       },
       child: _isFullScreen
           ? CupertinoPageScaffold(
-              child: SafeArea(
-                top: false,
-                bottom: false,
-                child: _buildPageBody(context, showProgress: showProgress),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: SafeArea(
+                      top: false,
+                      bottom: false,
+                      child: _buildPageBody(context, showProgress: showProgress),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    child: _buildFullScreenOverlayControls(context),
+                  ),
+                ],
               ),
             )
           : AppCupertinoPageScaffold(

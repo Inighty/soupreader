@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -10,6 +11,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_webview_toolbar.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/webview_cookie_bridge.dart';
 import '../models/book_source.dart';
@@ -40,20 +42,30 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
       'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) '
       'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 '
       'Safari/604.1';
+  static const double _progressBarHeight = 2;
+  static const double _progressMinFactor = 0.08;
 
   late final WebViewController _controller;
   late final Map<String, String> _headerMap;
   late final String _initialUrl;
+  late final ExceptionLogService _exceptionLogService;
 
   bool _checking = false;
   bool _closing = false;
   int _progress = 0;
+  bool _isLoading = true;
+  bool _canGoBack = false;
+  bool _canGoForward = false;
+  String _currentUrl = '';
+  bool _navStateRefreshErrorLogged = false;
+  bool _cookieFromJsErrorLogged = false;
 
   @override
   void initState() {
     super.initState();
     _initialUrl = widget.initialUrl.trim();
     _headerMap = _buildHeaderMap(widget.source.header);
+    _exceptionLogService = ExceptionLogService();
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -64,12 +76,30 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
             setState(() => _progress = progress);
           },
           onPageStarted: (url) {
+            if (!mounted) return;
+            setState(() {
+              _isLoading = true;
+              _currentUrl = url;
+            });
             unawaited(_syncCookies(url));
+            unawaited(_refreshNavState());
           },
           onPageFinished: (url) {
+            if (!mounted) return;
+            setState(() {
+              _isLoading = false;
+              _currentUrl = url;
+            });
             unawaited(_handlePageFinished(url));
+            unawaited(_refreshNavState());
           },
-          onUrlChange: (_) {},
+          onUrlChange: (change) {
+            final url = change.url;
+            if (url == null) return;
+            if (!mounted) return;
+            setState(() => _currentUrl = url);
+            unawaited(_refreshNavState());
+          },
           onNavigationRequest: (request) async {
             final uri = Uri.tryParse(request.url);
             final scheme = uri?.scheme.toLowerCase();
@@ -87,14 +117,215 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
       );
 
     if (_initialUrl.isNotEmpty) {
+      _currentUrl = _initialUrl;
       unawaited(_loadUrl(_initialUrl));
     }
+  }
+
+  Future<void> _refreshNavState() async {
+    try {
+      final back = await _controller.canGoBack();
+      final forward = await _controller.canGoForward();
+      if (!mounted) return;
+      setState(() {
+        _canGoBack = back;
+        _canGoForward = forward;
+      });
+    } catch (error, stackTrace) {
+      if (_navStateRefreshErrorLogged) return;
+      _navStateRefreshErrorLogged = true;
+      _exceptionLogService.record(
+        node: 'source.webview_login.refresh_nav_state',
+        message: '刷新 WebView 导航状态失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'sourceKey': widget.source.bookSourceUrl,
+          'initialUrl': _initialUrl,
+          'currentUrl': _currentUrl,
+          'isLoading': _isLoading,
+        },
+      );
+    }
+  }
+
+  Future<void> _goBack() async {
+    if (!await _controller.canGoBack()) return;
+    await _controller.goBack();
+  }
+
+  Future<void> _goForward() async {
+    if (!await _controller.canGoForward()) return;
+    await _controller.goForward();
+  }
+
+  Future<void> _reloadOrStop() async {
+    if (_isLoading) {
+      try {
+        await _controller.runJavaScript('window.stop();');
+      } catch (error, stackTrace) {
+        _exceptionLogService.record(
+          node: 'source.webview_login.stop_loading',
+          message: '停止加载失败（window.stop）',
+          error: error,
+          stackTrace: stackTrace,
+          context: <String, dynamic>{
+            'sourceKey': widget.source.bookSourceUrl,
+            'initialUrl': _initialUrl,
+            'currentUrl': _currentUrl,
+          },
+        );
+      }
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      return;
+    }
+    setState(() => _isLoading = true);
+    await _controller.reload();
+  }
+
+  Future<void> _showMessage(String message) async {
+    if (!mounted) return;
+    await showCupertinoBottomDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('提示'),
+        content: Text('\n$message'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('好'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openInBrowser() async {
+    final raw = _currentUrl.trim().isNotEmpty ? _currentUrl.trim() : _initialUrl;
+    final uri = Uri.tryParse(raw);
+    final scheme = uri?.scheme.toLowerCase();
+    if (uri == null || (scheme != 'http' && scheme != 'https')) {
+      _exceptionLogService.record(
+        node: 'source.webview_login.menu_open_in_browser',
+        message: '浏览器打开失败（URL 解析失败）',
+        context: <String, dynamic>{
+          'sourceKey': widget.source.bookSourceUrl,
+          'target': raw,
+          'initialUrl': _initialUrl,
+          'currentUrl': _currentUrl,
+        },
+      );
+      await _showMessage('打开失败');
+      return;
+    }
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (launched) return;
+      _exceptionLogService.record(
+        node: 'source.webview_login.menu_open_in_browser',
+        message: '浏览器打开失败（launchUrl=false）',
+        context: <String, dynamic>{
+          'sourceKey': widget.source.bookSourceUrl,
+          'target': raw,
+          'initialUrl': _initialUrl,
+          'currentUrl': _currentUrl,
+        },
+      );
+      await _showMessage('打开失败');
+    } catch (error, stackTrace) {
+      _exceptionLogService.record(
+        node: 'source.webview_login.menu_open_in_browser',
+        message: '浏览器打开失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'sourceKey': widget.source.bookSourceUrl,
+          'target': raw,
+          'initialUrl': _initialUrl,
+          'currentUrl': _currentUrl,
+        },
+      );
+      await _showMessage('打开失败');
+    }
+  }
+
+  Future<void> _copyUrl() async {
+    final url = _currentUrl.trim().isNotEmpty ? _currentUrl.trim() : _initialUrl;
+    if (url.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: url));
+    await _showMessage('已复制 URL');
+  }
+
+  Future<void> _showMoreMenu() async {
+    if (!mounted) return;
+    await showCupertinoBottomDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('操作'),
+        message: Text(
+          (_currentUrl.isEmpty ? _initialUrl : _currentUrl),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(sheetContext);
+              await _openInBrowser();
+            },
+            child: const Text('浏览器打开'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(sheetContext);
+              await _copyUrl();
+            },
+            child: const Text('拷贝 URL'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(sheetContext);
+              unawaited(_reloadOrStop());
+            },
+            child: const Text('刷新'),
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () async {
+              Navigator.pop(sheetContext);
+              final ok = await WebViewCookieBridge.clearAllCookies();
+              await _showMessage(ok ? '已清空 Cookie' : '清空失败或不支持');
+            },
+            child: const Text('清空 WebView Cookie'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
   }
 
   Future<void> _loadUrl(String url) async {
     final uri = Uri.tryParse(url);
     final scheme = uri?.scheme.toLowerCase();
     if (uri == null || (scheme != 'http' && scheme != 'https')) {
+      _exceptionLogService.record(
+        node: 'source.webview_login.load_url',
+        message: '加载 URL 失败（URL 无效）',
+        context: <String, dynamic>{
+          'sourceKey': widget.source.bookSourceUrl,
+          'target': url,
+          'initialUrl': _initialUrl,
+          'currentUrl': _currentUrl,
+        },
+      );
       return;
     }
     await _controller.loadRequest(uri, headers: _headerMap);
@@ -238,7 +469,21 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
       final cookieHeader = _normalizeJsResult(raw).trim();
       if (cookieHeader.isEmpty) return const <Cookie>[];
       return _parseCookieHeader(cookieHeader, uri.host);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      if (!_cookieFromJsErrorLogged) {
+        _cookieFromJsErrorLogged = true;
+        _exceptionLogService.record(
+          node: 'source.webview_login.cookie_read_js',
+          message: '读取 document.cookie 失败',
+          error: error,
+          stackTrace: stackTrace,
+          context: <String, dynamic>{
+            'sourceKey': widget.source.bookSourceUrl,
+            'host': uri.host,
+            'currentUrl': _currentUrl,
+          },
+        );
+      }
       return const <Cookie>[];
     }
   }
@@ -298,23 +543,34 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
   @override
   Widget build(BuildContext context) {
     final progress = _progress;
-    final showProgress = progress > 0 && progress < 100;
+    final showProgress = _isLoading || (progress > 0 && progress < 100);
     final sourceName = widget.source.bookSourceName.trim();
     final title = sourceName.isEmpty ? '登录' : '登录 $sourceName';
 
     return AppCupertinoPageScaffold(
       title: title,
-      trailing: CupertinoButton(
-        padding: EdgeInsets.zero,
-        onPressed: _confirmAndCheck,
-        child: const Text('确认'),
-        minimumSize: const Size(30, 30),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(30, 30),
+            onPressed: _showMoreMenu,
+            child: const Icon(CupertinoIcons.ellipsis),
+          ),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: _confirmAndCheck,
+            child: const Text('确认'),
+            minimumSize: const Size(30, 30),
+          ),
+        ],
       ),
       child: Column(
         children: [
           if (showProgress)
             SizedBox(
-              height: 2,
+              height: _progressBarHeight,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: CupertinoColors.systemGrey5.resolveFrom(context),
@@ -322,7 +578,9 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: FractionallySizedBox(
-                    widthFactor: progress / 100.0,
+                    widthFactor: (_progress <= 0 && _isLoading)
+                        ? _progressMinFactor
+                        : (progress / 100.0),
                     child: DecoratedBox(
                       decoration: BoxDecoration(color: _accentColor(context)),
                     ),
@@ -343,6 +601,15 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
             ),
           Expanded(
             child: WebViewWidget(controller: _controller),
+          ),
+          AppWebViewToolbar(
+            canGoBack: _canGoBack,
+            canGoForward: _canGoForward,
+            isLoading: _isLoading,
+            onBack: () => unawaited(_goBack()),
+            onForward: () => unawaited(_goForward()),
+            onReload: () => unawaited(_reloadOrStop()),
+            onMore: _showMoreMenu,
           ),
         ],
       ),
