@@ -4,7 +4,7 @@ import '../theme/design_tokens.dart';
 
 typedef AppSliverBodyBuilder = Widget Function(BuildContext context);
 
-/// 统一页面容器：导航栏 + 渐变背景 + SafeArea。
+/// 统一页面容器：导航栏 + 页面背景 + SafeArea。
 class AppCupertinoPageScaffold extends StatelessWidget {
   final String title;
   final Widget child;
@@ -14,6 +14,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
   final bool includeTopSafeArea;
   final bool includeBottomSafeArea;
   final bool useSliverNavigationBar;
+  final bool showLargeTitle;
   final Widget? largeTitle;
   final AppSliverBodyBuilder? sliverBodyBuilder;
   final ScrollController? sliverScrollController;
@@ -29,6 +30,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     this.includeTopSafeArea = true,
     this.includeBottomSafeArea = true,
     this.useSliverNavigationBar = false,
+    this.showLargeTitle = false,
     this.largeTitle,
     this.sliverBodyBuilder,
     this.sliverScrollController,
@@ -54,21 +56,11 @@ class AppCupertinoPageScaffold extends StatelessWidget {
   }
 
   Widget _buildBackground({
-    required Color topLayer,
-    required Color baseBackground,
+    required Color backgroundColor,
     required Widget child,
   }) {
     return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            topLayer,
-            baseBackground,
-          ],
-        ),
-      ),
+      decoration: BoxDecoration(color: backgroundColor),
       child: child,
     );
   }
@@ -98,13 +90,11 @@ class AppCupertinoPageScaffold extends StatelessWidget {
         ? AppDesignTokens.borderDark.withValues(alpha: 0.85)
         : AppDesignTokens.borderLight;
     final baseBackground = theme.scaffoldBackgroundColor;
-    final surface = isDark
+    final navSurface = isDark
         ? AppDesignTokens.surfaceDark.withValues(alpha: 0.78)
         : AppDesignTokens.surfaceLight.withValues(alpha: 0.96);
-    final topLayer = Color.alphaBlend(surface, baseBackground);
     final navBarBackground = Color.alphaBlend(
-      (isDark ? AppDesignTokens.surfaceDark : AppDesignTokens.surfaceLight)
-          .withValues(alpha: isDark ? 0.36 : 0.22),
+      navSurface,
       theme.barBackgroundColor,
     );
     final border = Border(bottom: BorderSide(color: borderColor, width: 0.5));
@@ -127,8 +117,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
           border: border,
         ),
         child: _buildBackground(
-          topLayer: topLayer,
-          baseBackground: baseBackground,
+          backgroundColor: baseBackground,
           child: SafeArea(
             top: includeTopSafeArea,
             bottom: includeBottomSafeArea,
@@ -140,20 +129,22 @@ class AppCupertinoPageScaffold extends StatelessWidget {
 
     final bodySliver =
         sliverBodyBuilder?.call(context) ?? _buildDefaultSliverBody();
+    final resolvedMiddle = middle ?? Text(title);
+    final resolvedLargeTitle =
+        showLargeTitle ? (largeTitle ?? Text(title)) : null;
 
     return CupertinoPageScaffold(
       child: _buildBackground(
-        topLayer: topLayer,
-        baseBackground: baseBackground,
+        backgroundColor: baseBackground,
         child: CustomScrollView(
           primary: sliverScrollController == null,
           controller: sliverScrollController,
           physics: sliverScrollPhysics,
           slivers: [
             CupertinoSliverNavigationBar(
-              largeTitle: largeTitle ?? Text(title),
-              middle: middle ?? Text(title),
-              alwaysShowMiddle: false,
+              largeTitle: resolvedLargeTitle,
+              middle: resolvedMiddle,
+              alwaysShowMiddle: !showLargeTitle,
               leading: _buildNavBarItem(
                 context,
                 leading,

@@ -1,4 +1,6 @@
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/theme/design_tokens.dart';
@@ -92,7 +94,7 @@ class _SourceAvailabilityCheckViewState
     );
     if (!mounted) return;
     if (result.type == SourceCheckStartType.runningOtherTask) {
-      await showCupertinoDialog<void>(
+      await showCupertinoBottomDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('提示'),
@@ -108,7 +110,7 @@ class _SourceAvailabilityCheckViewState
       return;
     }
     if (result.type == SourceCheckStartType.emptySource) {
-      await showCupertinoDialog<void>(
+      await showCupertinoBottomDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('提示'),
@@ -297,7 +299,7 @@ class _SourceAvailabilityCheckViewState
     final text = _buildReportText(onlyVisible: true);
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -322,7 +324,7 @@ class _SourceAvailabilityCheckViewState
       dialogTitle: '导出检测报告',
     );
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -339,7 +341,7 @@ class _SourceAvailabilityCheckViewState
 
   Future<void> _disableUnavailableSources() async {
     if (_running) {
-      await showCupertinoDialog<void>(
+      await showCupertinoBottomDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('提示'),
@@ -362,7 +364,7 @@ class _SourceAvailabilityCheckViewState
                 item.status == SourceCheckStatus.empty))
         .toList(growable: false);
     if (targets.isEmpty) {
-      await showCupertinoDialog<void>(
+      await showCupertinoBottomDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('提示'),
@@ -378,7 +380,7 @@ class _SourceAvailabilityCheckViewState
       return;
     }
 
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
           context: context,
           builder: (dialogContext) => CupertinoAlertDialog(
             title: const Text('一键禁用失效源'),
@@ -409,7 +411,7 @@ class _SourceAvailabilityCheckViewState
 
     if (!mounted) return;
     setState(() {});
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('完成'),
@@ -450,7 +452,7 @@ class _SourceAvailabilityCheckViewState
   Future<void> _openEditorAtDebug(SourceCheckItem item) async {
     final source = _repo.getSourceByUrl(item.source.bookSourceUrl);
     if (source == null) {
-      await showCupertinoDialog<void>(
+      await showCupertinoBottomDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('提示'),

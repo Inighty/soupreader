@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -56,7 +58,7 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -113,7 +115,7 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
     final loginHeaderText =
         key.isEmpty ? null : await SourceLoginStore.getLoginHeaderText(key);
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('登录头'),
@@ -309,12 +311,14 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: _loading ? null : _submit,
-            child: const Text('完成'), minimumSize: Size(30, 30),
+            child: const Text('完成'),
+            minimumSize: Size(30, 30),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
             onPressed: _loading ? null : _showMoreMenu,
-            child: const Icon(CupertinoIcons.ellipsis), minimumSize: Size(30, 30),
+            child: const Icon(CupertinoIcons.ellipsis),
+            minimumSize: Size(30, 30),
           ),
         ],
       ),

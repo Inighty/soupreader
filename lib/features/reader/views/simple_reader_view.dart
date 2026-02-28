@@ -236,6 +236,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   // 翻页模式相关（对标 Legado PageFactory）
   final PageFactory _pageFactory = PageFactory();
+  final PagedReaderController _pagedReaderController = PagedReaderController();
 
   final _replaceStageCache = <String, _ReplaceStageCache>{};
   final _catalogDisplayTitleCacheByChapterId = <String, String>{};
@@ -3161,10 +3162,17 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _scrollPage(up: !next);
       return;
     }
-    final moved = next ? _pageFactory.moveToNext() : _pageFactory.moveToPrev();
-    if (moved && mounted) {
-      setState(() {});
+    if (_pagedReaderController.isAttached) {
+      if (next) {
+        _pagedReaderController.turnNextPage();
+      } else {
+        _pagedReaderController.turnPrevPage();
+      }
+      return;
     }
+    final moved = next ? _pageFactory.moveToNext() : _pageFactory.moveToPrev();
+    if (!moved || !mounted) return;
+    setState(() {});
   }
 
   int _resolveClickAction(Offset position) {
@@ -4990,6 +4998,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   /// 翻页模式内容（对标 Legado ReadView）
   Widget _buildPagedContent() {
     return PagedReaderWidget(
+      controller: _pagedReaderController,
       pageFactory: _pageFactory,
       pageTurnMode: _settings.pageTurnMode,
       textStyle: TextStyle(
@@ -6578,7 +6587,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       return;
     }
 
-    final moved = _pageFactory.moveToNext();
+    final moved = _pagedReaderController.isAttached
+        ? _pagedReaderController.turnNextPage()
+        : _pageFactory.moveToNext();
     if (!moved) {
       _stopAutoPagerAtBoundary();
     }

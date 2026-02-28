@@ -23,6 +23,36 @@ class PagedReaderLongPressSelection {
   final Offset globalPosition;
 }
 
+/// 分页阅读器控制器
+/// 用于外部触发与手势同路径的翻页动画。
+class PagedReaderController {
+  _PagedReaderWidgetState? _state;
+
+  bool get isAttached => _state != null;
+
+  bool turnNextPage() {
+    final state = _state;
+    if (state == null) return false;
+    return state._nextPageByAnim();
+  }
+
+  bool turnPrevPage() {
+    final state = _state;
+    if (state == null) return false;
+    return state._prevPageByAnim();
+  }
+
+  void _attach(_PagedReaderWidgetState state) {
+    _state = state;
+  }
+
+  void _detach(_PagedReaderWidgetState state) {
+    if (identical(_state, state)) {
+      _state = null;
+    }
+  }
+}
+
 /// 翻页阅读器组件（对标 Legado ReadView + flutter_novel）
 /// 核心优化：使用 PictureRecorder 预渲染页面，避免截图开销
 class PagedReaderWidget extends StatefulWidget {
@@ -46,6 +76,7 @@ class PagedReaderWidget extends StatefulWidget {
   final void Function(String src, Size resolvedSize)? onImageSizeResolved;
   final bool showTipBars;
   final ValueChanged<PagedReaderLongPressSelection>? onTextLongPress;
+  final PagedReaderController? controller;
 
   // === 翻页动画增强 ===
   final int animDuration; // 动画时长 (100-600ms)
@@ -111,6 +142,7 @@ class PagedReaderWidget extends StatefulWidget {
     this.onImageSizeResolved,
     this.showTipBars = true,
     this.onTextLongPress,
+    this.controller,
     // 翻页动画增强默认值
     this.animDuration = 300,
     this.pageDirection = PageDirection.horizontal,
@@ -262,6 +294,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         _onAnimComplete();
       }
     });
+    widget.controller?._attach(this);
 
     widget.pageFactory
         .addContentChangedListener(_onPageFactoryContentChangedForRender);
@@ -302,6 +335,10 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
         _onPageFactoryContentChangedForRender,
       );
     }
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach(this);
+      widget.controller?._attach(this);
+    }
     if (oldWidget.pageFactory != widget.pageFactory ||
         oldWidget.textStyle != widget.textStyle ||
         oldWidget.backgroundColor != widget.backgroundColor ||
@@ -326,6 +363,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   void dispose() {
     _cancelPendingSimulationPreparation();
     _batteryStateSubscription?.cancel();
+    widget.controller?._detach(this);
     widget.pageFactory.removeContentChangedListener(
       _onPageFactoryContentChangedForRender,
     );
@@ -1638,9 +1676,9 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
   }
 
   // === 对标 Legado: nextPageByAnim ===
-  void _nextPageByAnim({double? startY}) {
+  bool _nextPageByAnim({double? startY}) {
     _abortAnim();
-    if (!_factory.hasNext()) return;
+    if (!_factory.hasNext()) return false;
 
     final size = MediaQuery.of(context).size;
     final touchStartY = startY ?? size.height * 0.9;
@@ -1649,17 +1687,19 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     _setStartPoint(size.width * 0.9, y);
     _setDirection(_PageDirection.next);
     _startTurnAnimation();
+    return true;
   }
 
   // === 对标 Legado: prevPageByAnim ===
-  void _prevPageByAnim({double? startY}) {
+  bool _prevPageByAnim({double? startY}) {
     _abortAnim();
-    if (!_factory.hasPrev()) return;
+    if (!_factory.hasPrev()) return false;
 
     final size = MediaQuery.of(context).size;
     _setStartPoint(0, size.height);
     _setDirection(_PageDirection.prev);
     _startTurnAnimation();
+    return true;
   }
 
   // === 对标 Legado: setDirection ===

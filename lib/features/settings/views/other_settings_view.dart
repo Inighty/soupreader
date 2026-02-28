@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../app/theme/design_tokens.dart';
@@ -114,7 +116,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     final controller = TextEditingController(
       text: _otherSourceSettingsService.getUserAgent(),
     );
-    final value = await showCupertinoDialog<String>(
+    final value = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('用户代理'),
@@ -161,7 +163,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     final controller = TextEditingController(
       text: _otherSourceSettingsService.getSourceEditMaxLine().toString(),
     );
-    final value = await showCupertinoDialog<String>(
+    final value = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('源编辑框最大行数'),
@@ -358,7 +360,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     required Future<void> Function(int value) save,
   }) async {
     final controller = TextEditingController(text: currentValue.toString());
-    final value = await showCupertinoDialog<String>(
+    final value = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),
@@ -714,7 +716,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         content: Text(message),

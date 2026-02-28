@@ -38,7 +38,8 @@ class _SourceDebugTextViewState extends State<SourceDebugTextView> {
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
         onPressed: () => Navigator.of(context).pop(),
-        child: const Text('关闭'), minimumSize: Size(30, 30),
+        child: const Text('关闭'),
+        minimumSize: Size(30, 30),
       ),
       child: CupertinoScrollbar(
         child: SingleChildScrollView(

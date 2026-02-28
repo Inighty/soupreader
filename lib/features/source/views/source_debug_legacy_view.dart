@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -456,7 +458,7 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
       await showAppHelpDialog(context, markdownText: markdownText);
     } catch (error) {
       if (!mounted) return;
-      await showCupertinoDialog<void>(
+      await showCupertinoBottomDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('帮助'),

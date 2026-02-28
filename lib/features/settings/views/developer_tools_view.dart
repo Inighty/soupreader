@@ -51,4 +51,3 @@ class DeveloperToolsView extends StatelessWidget {
     );
   }
 }
-

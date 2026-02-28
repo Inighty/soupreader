@@ -1063,71 +1063,57 @@ class _SearchViewState extends State<SearchView> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
               child: Column(
                 children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: tokens.card,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: tokens.border.withValues(alpha: 0.72),
-                        width: 0.8,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CupertinoSearchTextField(
+                          controller: _searchController,
+                          focusNode: _searchFocusNode,
+                          placeholder: '输入书名/作者，进行编辑搜索书籍...',
+                          backgroundColor: tokens.card,
+                          itemColor: tokens.mutedForeground,
+                          style: theme.textTheme.textStyle.copyWith(
+                            color: tokens.foreground,
+                          ),
+                          onChanged: (_) {
+                            if (_isSearching) {
+                              _cancelOngoingSearch();
+                              return;
+                            }
+                            if (_hasMore) {
+                              setState(() {
+                                // 对齐 legado onQueryTextChange：输入变更即隐藏“继续加载”入口。
+                                _hasMore = false;
+                              });
+                              return;
+                            }
+                            setState(() {});
+                          },
+                          onSubmitted: (_) => _search(),
+                          onSuffixTap: () {
+                            _searchController.clear();
+                            if (_isSearching) {
+                              _cancelOngoingSearch();
+                              return;
+                            }
+                            setState(() {
+                              _hasMore = false;
+                            });
+                          },
+                        ),
                       ),
-                    ),
-                    padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.search,
-                          size: 16,
-                          color: tokens.mutedForeground,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: CupertinoTextField.borderless(
-                            controller: _searchController,
-                            focusNode: _searchFocusNode,
-                            placeholder: '搜索书名、作者',
-                            textInputAction: TextInputAction.search,
-                            style: theme.textTheme.textStyle.copyWith(
-                              color: tokens.foreground,
-                            ),
-                            placeholderStyle:
-                                theme.textTheme.textStyle.copyWith(
-                              color: tokens.mutedForeground,
-                            ),
-                            onChanged: (_) {
-                              if (_isSearching) {
-                                _cancelOngoingSearch();
-                                return;
-                              }
-                              if (_hasMore) {
-                                setState(() {
-                                  // 对齐 legado onQueryTextChange：输入变更即隐藏“继续加载”入口。
-                                  _hasMore = false;
-                                });
-                                return;
-                              }
-                              setState(() {});
-                            },
-                            onSubmitted: (_) => _search(),
-                          ),
-                        ),
-                        CupertinoButton(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          minimumSize: const Size(28, 28),
-                          onPressed:
-                              _isSearching ? null : () => unawaited(_search()),
-                          child: _isSearching
-                              ? const CupertinoActivityIndicator(radius: 7)
-                              : const Icon(
-                                  CupertinoIcons.search,
-                                  size: 16,
-                                ),
-                        ),
-                      ],
-                    ),
+                      CupertinoButton(
+                        padding: const EdgeInsets.only(left: 10, right: 2),
+                        minimumSize: const Size(42, 32),
+                        onPressed: () {
+                          _searchFocusNode.unfocus();
+                          if (_isSearching) {
+                            _cancelOngoingSearch();
+                          }
+                        },
+                        child: Text(_isSearching ? '停止' : '取消'),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   GestureDetector(

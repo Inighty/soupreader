@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -335,7 +337,7 @@ class _FileManageViewState extends State<FileManageView> {
     final current = _currentDir;
     if (current == null || _creatingFolder) return;
     final controller = TextEditingController();
-    final folderName = await showCupertinoDialog<String>(
+    final folderName = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('新建文件夹'),
@@ -437,7 +439,7 @@ class _FileManageViewState extends State<FileManageView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

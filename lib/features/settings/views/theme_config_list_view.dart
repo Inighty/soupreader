@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -95,7 +97,7 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
   }
 
   Future<void> _deleteConfig(int index) async {
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('删除'),
@@ -145,7 +147,7 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
   }
 
   Future<void> _showMessage(String message) async {
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(message),
@@ -166,7 +168,8 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
         onPressed: _importFromClipboard,
-        child: const Text('剪贴板导入'), minimumSize: Size(30, 30),
+        child: const Text('剪贴板导入'),
+        minimumSize: Size(30, 30),
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())
@@ -199,7 +202,8 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
                                   child: const Icon(
                                     CupertinoIcons.share,
                                     size: 18,
-                                  ), minimumSize: Size(28, 28),
+                                  ),
+                                  minimumSize: Size(28, 28),
                                 ),
                                 CupertinoButton(
                                   padding: const EdgeInsets.symmetric(
@@ -210,7 +214,8 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
                                   child: const Icon(
                                     CupertinoIcons.delete,
                                     size: 18,
-                                  ), minimumSize: Size(28, 28),
+                                  ),
+                                  minimumSize: Size(28, 28),
                                 ),
                               ],
                             ),

@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -210,7 +212,7 @@ class _DirectLinkUploadConfigViewState
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         content: Text(message),
@@ -252,7 +254,8 @@ class _DirectLinkUploadConfigViewState
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
         onPressed: _showMoreMenu,
-        child: const Icon(CupertinoIcons.ellipsis), minimumSize: Size(30, 30),
+        child: const Icon(CupertinoIcons.ellipsis),
+        minimumSize: Size(30, 30),
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())

@@ -5,31 +5,31 @@ class AppDesignTokens {
   AppDesignTokens._();
 
   // ===== 品牌色（全局仅一套主语义） =====
-  static const Color brandPrimary = Color(0xFF0369A1);
-  static const Color brandSecondary = Color(0xFF38BDF8);
-  static const Color cta = Color(0xFF22C55E);
+  static const Color brandPrimary = Color(0xFF0A84FF);
+  static const Color brandSecondary = Color(0xFF64D2FF);
+  static const Color cta = Color(0xFF30D158);
 
   // ===== 功能语义色 =====
-  static const Color success = Color(0xFF16A34A);
-  static const Color warning = Color(0xFFF59E0B);
-  static const Color error = Color(0xFFEF4444);
-  static const Color info = Color(0xFF0EA5E9);
+  static const Color success = Color(0xFF34C759);
+  static const Color warning = Color(0xFFFF9F0A);
+  static const Color error = Color(0xFFFF3B30);
+  static const Color info = Color(0xFF0A84FF);
 
   // ===== 中性色（UI 管理页） =====
-  static const Color textStrong = Color(0xFF0F172A);
-  static const Color textNormal = Color(0xFF334155);
-  static const Color textMuted = Color(0xFF64748B);
-  static const Color textInverse = Color(0xFFE2E8F0);
+  static const Color textStrong = Color(0xFF1C1C1E);
+  static const Color textNormal = Color(0xFF3A3A3C);
+  static const Color textMuted = Color(0xFF8E8E93);
+  static const Color textInverse = Color(0xFFF2F2F7);
 
-  static const Color pageBgLight = Color(0xFFF8FAFC);
-  static const Color pageBgDark = Color(0xFF121212);
+  static const Color pageBgLight = Color(0xFFF2F2F7);
+  static const Color pageBgDark = Color(0xFF000000);
   static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color surfaceDark = Color(0xFF1E1E1E);
+  static const Color surfaceDark = Color(0xFF1C1C1E);
 
-  static const Color borderLight = Color(0xFFE2E8F0);
-  static const Color borderDark = Color(0xFF333333);
-  static const Color dividerLight = Color(0xFFEEEEEE);
-  static const Color dividerDark = Color(0xFF2A2A2A);
+  static const Color borderLight = Color(0xFFD1D1D6);
+  static const Color borderDark = Color(0xFF3A3A3C);
+  static const Color dividerLight = Color(0xFFC6C6C8);
+  static const Color dividerDark = Color(0xFF2C2C2E);
 
   // ===== 统一圆角 =====
   static const double radiusControl = 8;

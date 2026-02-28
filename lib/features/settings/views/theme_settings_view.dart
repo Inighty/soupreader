@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
+
 import '../../../app/theme/cupertino_theme.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/models/app_settings.dart';
@@ -44,7 +46,7 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
   }
 
   Future<void> _showThemeModeManagedHint() async {
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('主题模式'),
@@ -100,7 +102,7 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
       {required bool isNightTheme}) async {
     final controller = TextEditingController();
     final modeLabel = isNightTheme ? '夜间' : '白天';
-    final result = await showCupertinoDialog<String>(
+    final result = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text('保存$modeLabel主题'),
@@ -131,7 +133,7 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
   }
 
   Future<void> _showSuccessHint(String message) async {
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('保存成功'),
@@ -148,7 +150,7 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
   }
 
   Future<void> _showFallbackHint(String message) async {
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -312,7 +314,8 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
         onPressed: _showThemeModeManagedHint,
-        child: const Text('主题模式'), minimumSize: Size(30, 30),
+        child: const Text('主题模式'),
+        minimumSize: Size(30, 30),
       ),
       child: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 20),

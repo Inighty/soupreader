@@ -543,7 +543,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         padding: EdgeInsets.zero,
         minimumSize: const Size(28, 28),
         onPressed: _showGroupFilterMenu,
-        child: const Icon(CupertinoIcons.square_grid_2x2),
+        child: const Icon(CupertinoIcons.slider_horizontal_3),
       ),
       child: const SizedBox.shrink(),
       sliverBodyBuilder: (_) => _buildBodySliver(
@@ -570,7 +570,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         children: [
           CupertinoSearchTextField(
             controller: _searchController,
-            placeholder: '搜索书源 / 输入 group:分组',
+            placeholder: '请输入关键字搜索书源...',
           ),
           const SizedBox(height: 8),
           Row(
@@ -652,11 +652,11 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
     String subtitle;
     if (eligibleCount == 0) {
-      subtitle = '没有可用的发现书源\n请先导入带 exploreUrl 的 Legado 书源';
+      subtitle = '请在书源管理导入书源';
     } else if (query.isNotEmpty) {
       subtitle = '当前筛选条件下无书源';
     } else {
-      subtitle = '暂无发现书源';
+      subtitle = '请在书源管理导入书源';
     }
 
     return Center(
@@ -664,16 +664,16 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            CupertinoIcons.compass,
+            CupertinoIcons.globe,
             size: 52,
             color: tokens.mutedForeground,
           ),
           const SizedBox(height: 16),
           Text(
-            '暂无发现内容',
+            '没有发现任何内容',
             style: theme.textTheme.textStyle.copyWith(
               color: tokens.foreground,
-              fontSize: 22,
+              fontSize: 30,
               fontWeight: FontWeight.w600,
             ),
           ),

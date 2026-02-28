@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -24,7 +26,7 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
   final ExceptionLogService _service = ExceptionLogService();
 
   Future<void> _clearLogs() async {
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('清空日志'),
@@ -55,7 +57,7 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
   }
 
   Future<void> _showMessage(String message) async {
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -85,7 +87,8 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
       trailing: CupertinoButton(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         onPressed: _clearLogs,
-        child: const Text('清除'), minimumSize: Size(30, 30),
+        child: const Text('清除'),
+        minimumSize: Size(30, 30),
       ),
       child: ValueListenableBuilder<List<ExceptionLogEntry>>(
         valueListenable: _service.listenable,
@@ -222,7 +225,7 @@ class ExceptionLogDetailView extends StatelessWidget {
   Future<void> _copy(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: _fullText()));
     if (!context.mounted) return;
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('已复制'),

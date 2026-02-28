@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -3673,7 +3675,7 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),

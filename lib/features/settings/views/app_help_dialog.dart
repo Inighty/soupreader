@@ -2,12 +2,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
+
 Future<void> showAppHelpDialog(
   BuildContext context, {
   required String markdownText,
   String title = '帮助',
 }) {
-  return showCupertinoDialog<void>(
+  return showCupertinoBottomDialog<void>(
     context: context,
     builder: (_) => _AppHelpDialog(
       title: title,
@@ -82,7 +84,8 @@ class _AppHelpDialogState extends State<_AppHelpDialog> {
                         CupertinoButton(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('关闭'), minimumSize: Size(30, 30),
+                          child: const Text('关闭'),
+                          minimumSize: Size(30, 30),
                         ),
                       ],
                     ),

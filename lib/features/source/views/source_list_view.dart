@@ -3,6 +3,8 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -181,29 +183,11 @@ class _SourceListViewState extends State<SourceListView> {
       },
       child: AppCupertinoPageScaffold(
         title: '书源管理',
-        middle: _buildNavigationSearchField(),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(30, 30),
-              onPressed: _showSortOptions,
-              child: const Icon(CupertinoIcons.arrow_up_arrow_down),
-            ),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(30, 30),
-              onPressed: _showGroupFilterOptions,
-              child: const Icon(CupertinoIcons.square_grid_2x2),
-            ),
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(30, 30),
-              onPressed: _showMainOptions,
-              child: const Icon(CupertinoIcons.ellipsis_circle),
-            ),
-          ],
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(30, 30),
+          onPressed: _showMainOptions,
+          child: const Icon(CupertinoIcons.line_horizontal_3),
         ),
         child: StreamBuilder<List<BookSource>>(
           stream: _sourceRepo.watchAllSources(),
@@ -215,6 +199,11 @@ class _SourceListViewState extends State<SourceListView> {
 
             return Column(
               children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                  child: _buildNavigationSearchField(),
+                ),
+                _buildSelectionQuickActionStrip(visibleSources: filtered),
                 _buildCheckTaskBanner(),
                 Expanded(
                   child: filtered.isEmpty
@@ -401,12 +390,115 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Widget _buildNavigationSearchField() {
-    return SizedBox(
-      height: 34,
-      child: CupertinoSearchTextField(
-        controller: _searchController,
-        placeholder: '搜索书源',
-        onChanged: (_) => setState(() {}),
+    return CupertinoSearchTextField(
+      controller: _searchController,
+      placeholder: '请输入搜索关键字搜索书源...',
+      onChanged: (_) => setState(() {}),
+    );
+  }
+
+  Widget _buildSelectionQuickActionStrip({
+    required List<BookSource> visibleSources,
+  }) {
+    final selected = _selectedSources(visibleSources);
+    if (selected.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    const enabledTextColor = CupertinoColors.white;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: SizedBox(
+        height: 42,
+        child: Row(
+          children: _buildSelectionQuickActions(
+            visibleSources: visibleSources,
+            selectedSources: selected,
+            iconColor: enabledTextColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildSelectionQuickActions({
+    required List<BookSource> visibleSources,
+    required List<BookSource> selectedSources,
+    required Color iconColor,
+  }) {
+    return [
+      _buildQuickActionExpanded(
+        color: const Color(0xFF2F80ED),
+        icon: CupertinoIcons.ellipsis,
+        iconColor: iconColor,
+        onTap: () => _showBatchMoreActions(visibleSources),
+      ),
+      const SizedBox(width: 1),
+      _buildQuickActionExpanded(
+        color: const Color(0xFF22B07D),
+        icon: CupertinoIcons.share,
+        iconColor: iconColor,
+        onTap: () => unawaited(_batchShareSelected(visibleSources)),
+      ),
+      const SizedBox(width: 1),
+      _buildQuickActionExpanded(
+        color: const Color(0xFFFF9500),
+        icon: CupertinoIcons.pencil,
+        iconColor: iconColor,
+        onTap: () => _handleQuickEditSelection(selectedSources),
+      ),
+      const SizedBox(width: 1),
+      _buildQuickActionExpanded(
+        color: const Color(0xFFFF3B30),
+        icon: CupertinoIcons.delete,
+        iconColor: iconColor,
+        onTap: () => unawaited(_batchDeleteSelected(visibleSources)),
+      ),
+    ];
+  }
+
+  Widget _buildQuickActionExpanded({
+    required Color color,
+    required IconData icon,
+    required Color iconColor,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: _buildQuickActionCell(
+        color: color,
+        icon: icon,
+        iconColor: iconColor,
+        onTap: onTap,
+      ),
+    );
+  }
+
+  void _handleQuickEditSelection(List<BookSource> selectedSources) {
+    if (selectedSources.length != 1) {
+      _showMessage('请选择 1 个书源进行编辑');
+      return;
+    }
+    unawaited(_openEditor(selectedSources.first.bookSourceUrl));
+  }
+
+  Widget _buildQuickActionCell({
+    required Color color,
+    required IconData icon,
+    required Color iconColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        color: color,
+        child: Center(
+          child: Icon(
+            icon,
+            size: 20,
+            color: iconColor,
+          ),
+        ),
       ),
     );
   }
@@ -908,9 +1000,7 @@ class _SourceListViewState extends State<SourceListView> {
                 alignment: Alignment.centerLeft,
                 onPressed: totalCount == 0 ? null : selectAllOrClearVisible,
                 child: Text(
-                  allSelected
-                      ? '取消全选（$selectedCount/$totalCount）'
-                      : '全选（$selectedCount/$totalCount）',
+                  '全选（$selectedCount/$totalCount）',
                   style: TextStyle(
                     fontSize: 13,
                     color: totalCount == 0 ? disabledColor : enabledColor,
@@ -931,31 +1021,17 @@ class _SourceListViewState extends State<SourceListView> {
               ),
             ),
             CupertinoButton(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              minimumSize: const Size(30, 30),
-              onPressed: hasSelection
-                  ? () => _batchDeleteSelected(visibleSources)
-                  : null,
-              child: Text(
-                '删除',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: hasSelection
-                      ? CupertinoColors.systemRed.resolveFrom(context)
-                      : disabledColor,
-                ),
-              ),
-            ),
-            CupertinoButton(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               minimumSize: const Size(30, 30),
               onPressed: hasSelection
                   ? () => _showBatchMoreActions(visibleSources)
                   : null,
-              child: Icon(
-                CupertinoIcons.ellipsis_circle,
-                size: 19,
-                color: hasSelection ? enabledColor : disabledColor,
+              child: Text(
+                '更多',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: hasSelection ? enabledColor : disabledColor,
+                ),
               ),
             ),
           ],
@@ -1105,6 +1181,20 @@ class _SourceListViewState extends State<SourceListView> {
       builder: (context) => CupertinoActionSheet(
         title: const Text('更多'),
         actions: [
+          CupertinoActionSheetAction(
+            child: const Text('排序'),
+            onPressed: () {
+              Navigator.pop(context);
+              _showSortOptions();
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: const Text('分组筛选'),
+            onPressed: () {
+              Navigator.pop(context);
+              _showGroupFilterOptions();
+            },
+          ),
           CupertinoActionSheetAction(
             child: const Text('新建书源'),
             onPressed: () {
@@ -1467,7 +1557,7 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Future<void> _confirmDeleteSource(BookSource source) async {
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('提醒'),
@@ -1813,7 +1903,7 @@ class _SourceListViewState extends State<SourceListView> {
       return;
     }
 
-    final ok = await showCupertinoDialog<bool>(
+    final ok = await showCupertinoBottomDialog<bool>(
           context: context,
           builder: (ctx) => CupertinoAlertDialog(
             title: const Text('批量删除'),
@@ -2040,7 +2130,7 @@ class _SourceListViewState extends State<SourceListView> {
     final controller = TextEditingController(text: initialValue ?? '');
     final allGroups =
         _buildGroups(_normalizeSources(_sourceRepo.getAllSources()));
-    final value = await showCupertinoDialog<String>(
+    final value = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (dialogContext, setDialogState) {
@@ -2157,7 +2247,7 @@ class _SourceListViewState extends State<SourceListView> {
     );
 
     try {
-      final saved = await showCupertinoDialog<bool>(
+      final saved = await showCupertinoBottomDialog<bool>(
         context: context,
         builder: (ctx) {
           return StatefulBuilder(
@@ -2328,7 +2418,7 @@ class _SourceListViewState extends State<SourceListView> {
   ) async {
     final controller = TextEditingController(text: initialKeyword);
     try {
-      return await showCupertinoDialog<String>(
+      return await showCupertinoBottomDialog<String>(
         context: context,
         builder: (ctx) => CupertinoAlertDialog(
           title: const Text('搜索关键词'),
@@ -2386,7 +2476,7 @@ class _SourceListViewState extends State<SourceListView> {
       await showAppHelpDialog(context, markdownText: markdownText);
     } catch (error) {
       if (!mounted) return;
-      await showCupertinoDialog<void>(
+      await showCupertinoBottomDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('帮助'),
@@ -3228,7 +3318,7 @@ class _SourceListViewState extends State<SourceListView> {
         _buildGroups(_normalizeSources(_sourceRepo.getAllSources()));
     var appendGroup = initialAppendGroup;
     try {
-      return showCupertinoDialog<_ImportCustomGroupInput>(
+      return showCupertinoBottomDialog<_ImportCustomGroupInput>(
         context: context,
         builder: (dialogContext) {
           return StatefulBuilder(
@@ -3647,7 +3737,7 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -3674,7 +3764,7 @@ class _SourceListViewState extends State<SourceListView> {
       if (isHttpPath) '',
       if (isHttpPath) '检测到网络链接，可直接复制后分享。',
     ];
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('导出成功'),

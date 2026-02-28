@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
+
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
@@ -189,7 +191,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),

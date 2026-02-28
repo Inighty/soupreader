@@ -21,6 +21,10 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
   final SettingsService _settingsService = SettingsService();
   late ReadingSettings _settings;
 
+  bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
+
+  Color get _accent => ReaderSettingsTokens.accent(isDark: _isDark);
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +46,37 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
     );
   }
 
+  Text _sectionHeader(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        color: ReaderSettingsTokens.titleColor(isDark: _isDark),
+        fontSize: ReaderSettingsTokens.sectionTitleSize,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  Text _tileTitle(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: ReaderSettingsTokens.rowTitleColor(isDark: _isDark),
+        fontSize: ReaderSettingsTokens.rowTitleSize,
+      ),
+    );
+  }
+
+  Text _tileMeta(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: ReaderSettingsTokens.rowMetaColor(isDark: _isDark),
+        fontSize: ReaderSettingsTokens.rowMetaSize,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
@@ -50,7 +85,7 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
         padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
-            header: const Text('标题'),
+            header: _sectionHeader('标题'),
             children: [
               _optionTile(
                 title: '章节标题位置',
@@ -63,6 +98,7 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
                 min: 0,
                 max: 10,
                 display: _settings.titleSize.toString(),
+                activeColor: _accent,
                 onChanged: (value) => _update(
                   _settings.copyWith(titleSize: value.round()),
                 ),
@@ -73,6 +109,7 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
                 min: 0,
                 max: 100,
                 display: _settings.titleTopSpacing.toStringAsFixed(0),
+                activeColor: _accent,
                 onChanged: (value) =>
                     _update(_settings.copyWith(titleTopSpacing: value)),
               ),
@@ -82,13 +119,14 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
                 min: 0,
                 max: 100,
                 display: _settings.titleBottomSpacing.toStringAsFixed(0),
+                activeColor: _accent,
                 onChanged: (value) =>
                     _update(_settings.copyWith(titleBottomSpacing: value)),
               ),
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('页眉'),
+            header: _sectionHeader('页眉'),
             children: [
               _optionTile(
                 title: '显示模式',
@@ -96,9 +134,10 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
                 onTap: _pickHeaderMode,
               ),
               CupertinoListTile.notched(
-                title: const Text('页眉分割线'),
+                title: _tileTitle('页眉分割线'),
                 trailing: CupertinoSwitch(
                   value: _settings.showHeaderLine,
+                  activeTrackColor: _accent,
                   onChanged: (v) =>
                       _update(_settings.copyWith(showHeaderLine: v)),
                 ),
@@ -139,7 +178,7 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('页脚'),
+            header: _sectionHeader('页脚'),
             children: [
               _optionTile(
                 title: '显示模式',
@@ -147,9 +186,10 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
                 onTap: _pickFooterMode,
               ),
               CupertinoListTile.notched(
-                title: const Text('页脚分割线'),
+                title: _tileTitle('页脚分割线'),
                 trailing: CupertinoSwitch(
                   value: _settings.showFooterLine,
+                  activeTrackColor: _accent,
                   onChanged: (v) =>
                       _update(_settings.copyWith(showFooterLine: v)),
                 ),
@@ -190,7 +230,7 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('页眉页脚样式'),
+            header: _sectionHeader('页眉页脚样式'),
             children: [
               _optionTile(
                 title: '文字颜色',
@@ -216,8 +256,8 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
     required VoidCallback onTap,
   }) {
     return CupertinoListTile.notched(
-      title: Text(title),
-      additionalInfo: Text(value),
+      title: _tileTitle(title),
+      additionalInfo: _tileMeta(value),
       trailing: const CupertinoListTileChevron(),
       onTap: onTap,
     );
@@ -449,6 +489,7 @@ class _SliderTile extends StatelessWidget {
   final double min;
   final double max;
   final String display;
+  final Color activeColor;
   final ValueChanged<double> onChanged;
 
   const _SliderTile({
@@ -457,6 +498,7 @@ class _SliderTile extends StatelessWidget {
     required this.min,
     required this.max,
     required this.display,
+    required this.activeColor,
     required this.onChanged,
   });
 
@@ -476,23 +518,37 @@ class _SliderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final safeMin = _safeMin();
     final safeMax = _safeMax();
     final safeValue = _safeSliderValue();
     final canSlide = min.isFinite && max.isFinite && max > min;
 
     return CupertinoListTile(
-      title: Text(title),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: ReaderSettingsTokens.rowTitleColor(isDark: isDark),
+          fontSize: ReaderSettingsTokens.rowTitleSize,
+        ),
+      ),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 10),
         child: CupertinoSlider(
           value: safeValue,
           min: safeMin,
           max: safeMax,
+          activeColor: activeColor,
           onChanged: canSlide ? onChanged : null,
         ),
       ),
-      additionalInfo: Text(display),
+      additionalInfo: Text(
+        display,
+        style: TextStyle(
+          color: ReaderSettingsTokens.rowMetaColor(isDark: isDark),
+          fontSize: ReaderSettingsTokens.rowMetaSize,
+        ),
+      ),
     );
   }
 }

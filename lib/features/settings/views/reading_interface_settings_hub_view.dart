@@ -80,13 +80,15 @@ class _ReadingInterfaceSettingsHubViewState
             header: _sectionHeader('阅读样式与排版'),
             children: [
               _buildItem(
+                leading: CupertinoIcons.textformat,
                 title: '样式与排版',
-                description: '字体 / 排版',
+                description: '字体/排版',
                 onTap: _openPreferences,
               ),
               _buildItem(
+                leading: CupertinoIcons.doc_text,
                 title: '页眉页脚与标题',
-                description: '标题间距 / 内容位 / 分割线',
+                description: '标题间距/内容位/分割线',
                 onTap: _openTipSettings,
               ),
             ],
@@ -95,8 +97,9 @@ class _ReadingInterfaceSettingsHubViewState
             header: _sectionHeader('排版细项'),
             children: [
               _buildItem(
+                leading: CupertinoIcons.slider_horizontal_3,
                 title: '排版与边距（高级）',
-                description: '标题/正文/边距滑杆',
+                description: '标题/正文/边距',
                 onTap: _openTypographyDialog,
               ),
             ],
@@ -108,11 +111,17 @@ class _ReadingInterfaceSettingsHubViewState
   }
 
   Widget _buildItem({
+    required IconData leading,
     required String title,
     required String description,
     required VoidCallback onTap,
   }) {
     return CupertinoListTile.notched(
+      leading: Icon(
+        leading,
+        size: 20,
+        color: ReaderSettingsTokens.rowMetaColor(isDark: _isDark),
+      ),
       title: Text(
         title,
         maxLines: 1,
@@ -122,9 +131,9 @@ class _ReadingInterfaceSettingsHubViewState
           fontSize: ReaderSettingsTokens.rowTitleSize,
         ),
       ),
-      subtitle: Text(
+      additionalInfo: Text(
         description.trim(),
-        maxLines: 2,
+        maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: ReaderSettingsTokens.rowMetaSize,

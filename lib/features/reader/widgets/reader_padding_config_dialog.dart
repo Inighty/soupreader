@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/reading_settings.dart';
 
 /// 阅读器边距设置弹窗（对标 legado PaddingConfigDialog）。
@@ -347,7 +348,7 @@ Future<void> showReaderPaddingConfigDialog(
   required ValueChanged<ReadingSettings> onSettingsChanged,
   required bool isDarkMode,
 }) {
-  return showCupertinoDialog<void>(
+  return showCupertinoBottomDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: '边距设置',

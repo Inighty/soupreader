@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
+
 Future<int?> showReaderColorPickerDialog({
   required BuildContext context,
   required String title,
@@ -10,7 +12,7 @@ Future<int?> showReaderColorPickerDialog({
   String invalidHexMessage = '请输入 6 位十六进制颜色（如 FF6600）',
 }) {
   final safeInitialColor = 0xFF000000 | (initialColor & 0x00FFFFFF);
-  return showCupertinoDialog<int>(
+  return showCupertinoBottomDialog<int>(
     context: context,
     builder: (dialogContext) => _ReaderColorPickerDialog(
       title: title,

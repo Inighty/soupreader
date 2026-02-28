@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform;
 
@@ -139,7 +141,7 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
   Future<void> _pickTouchSlop() async {
     final controller =
         TextEditingController(text: _settings.pageTouchSlop.toString());
-    final result = await showCupertinoDialog<int>(
+    final result = await showCupertinoBottomDialog<int>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('翻页触发阈值'),

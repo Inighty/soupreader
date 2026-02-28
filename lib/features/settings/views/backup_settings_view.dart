@@ -1,5 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -233,7 +235,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
   }
 
   Future<void> _confirmRestoreDetectedBackup(WebDavRemoteEntry entry) async {
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
           context: context,
           builder: (dialogContext) => CupertinoAlertDialog(
             title: const Text('恢复'),
@@ -568,7 +570,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
       );
     } catch (error) {
       if (!mounted) return;
-      await showCupertinoDialog<void>(
+      await showCupertinoBottomDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('帮助'),
@@ -610,7 +612,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
   }
 
   Future<void> _export({required bool includeOnlineCache}) async {
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(child: CupertinoActivityIndicator()),
@@ -646,7 +648,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     }
 
     if (overwrite) {
-      final confirmed = await showCupertinoDialog<bool>(
+      final confirmed = await showCupertinoBottomDialog<bool>(
         context: context,
         builder: (context) => CupertinoAlertDialog(
           title: const Text('确认覆盖导入？'),
@@ -668,7 +670,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     }
 
     if (!mounted) return;
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(child: CupertinoActivityIndicator()),
@@ -704,7 +706,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
 
   Future<void> _backupToWebDav() async {
     final settings = _settingsService.appSettings;
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CupertinoActivityIndicator()),
@@ -742,7 +744,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
 
   Future<void> _restoreFromWebDav() async {
     final settings = _settingsService.appSettings;
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CupertinoActivityIndicator()),
@@ -799,7 +801,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
       return;
     }
 
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CupertinoActivityIndicator()),
@@ -832,7 +834,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
   Future<WebDavRemoteEntry?> _pickWebDavBackupFile(
     List<WebDavRemoteEntry> backups,
   ) async {
-    return showCupertinoDialog<WebDavRemoteEntry>(
+    return showCupertinoBottomDialog<WebDavRemoteEntry>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('选择恢复文件'),
@@ -887,7 +889,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
   }
 
   Future<bool> _restoreSelectedWebDavBackup(WebDavRemoteEntry entry) async {
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CupertinoActivityIndicator()),
@@ -946,7 +948,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
 
   Future<void> _showWebDavRestoreFallback(String errorMessage) async {
     if (!mounted) return;
-    final shouldFallback = await showCupertinoDialog<bool>(
+    final shouldFallback = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('恢复'),
@@ -1013,7 +1015,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
       if (!current.isIgnored(option.key)) continue;
       selected.add(option.key);
     }
-    final result = await showCupertinoDialog<Set<String>>(
+    final result = await showCupertinoBottomDialog<Set<String>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => CupertinoAlertDialog(
@@ -1100,7 +1102,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     bool obscureText = false,
   }) async {
     final controller = TextEditingController(text: initialValue);
-    final result = await showCupertinoDialog<String>(
+    final result = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),
@@ -1133,7 +1135,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
   }
 
   Future<void> _testWebDavConnection() async {
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CupertinoActivityIndicator()),
@@ -1204,7 +1206,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),

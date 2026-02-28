@@ -2114,7 +2114,7 @@ class _BookshelfViewState extends State<BookshelfView> {
             padding: EdgeInsets.zero,
             minimumSize: const Size(30, 30),
             onPressed: _showMoreMenu,
-            child: const Icon(CupertinoIcons.ellipsis),
+            child: const Icon(CupertinoIcons.line_horizontal_3),
           ),
         ],
       ),

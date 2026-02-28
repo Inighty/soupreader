@@ -445,8 +445,8 @@ class _MainScreenState extends State<MainScreen> {
         const _MainTabSpec(
           id: _MainTabId.discovery,
           item: BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.compass),
-            activeIcon: Icon(CupertinoIcons.compass_fill),
+            icon: Icon(CupertinoIcons.scope),
+            activeIcon: Icon(CupertinoIcons.scope),
             label: '发现',
           ),
         ),
@@ -454,8 +454,8 @@ class _MainScreenState extends State<MainScreen> {
         const _MainTabSpec(
           id: _MainTabId.rss,
           item: BottomNavigationBarItem(
-            icon: Icon(CupertinoIcons.dot_radiowaves_left_right),
-            activeIcon: Icon(CupertinoIcons.dot_radiowaves_right),
+            icon: Icon(CupertinoIcons.paperplane),
+            activeIcon: Icon(CupertinoIcons.paperplane_fill),
             label: '订阅',
           ),
         ),

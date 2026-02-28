@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
+
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../models/check_source_settings.dart';
 import '../services/check_source_settings_service.dart';
@@ -36,7 +38,7 @@ class _CheckSourceSettingsViewState extends State<CheckSourceSettingsView> {
     final controller = TextEditingController(
       text: (_draft.timeoutMs ~/ 1000).toString(),
     );
-    final result = await showCupertinoDialog<String>(
+    final result = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('单个书源校验超时（秒）'),
@@ -124,7 +126,7 @@ class _CheckSourceSettingsViewState extends State<CheckSourceSettingsView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         content: Text(message),
@@ -160,12 +162,14 @@ class _CheckSourceSettingsViewState extends State<CheckSourceSettingsView> {
       leading: CupertinoButton(
         padding: EdgeInsets.zero,
         onPressed: () => Navigator.of(context).pop(false),
-        child: const Text('取消'), minimumSize: Size(30, 30),
+        child: const Text('取消'),
+        minimumSize: Size(30, 30),
       ),
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
         onPressed: _saveAndClose,
-        child: const Text('确定'), minimumSize: Size(30, 30),
+        child: const Text('确定'),
+        minimumSize: Size(30, 30),
       ),
       child: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 20),

@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -51,7 +53,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
   }
 
   Future<void> _showThemeModeManagedHint() async {
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('外观开关'),
@@ -380,7 +382,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
     required String initialValue,
   }) async {
     final controller = TextEditingController(text: initialValue);
-    return showCupertinoDialog<String>(
+    return showCupertinoBottomDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),
@@ -415,7 +417,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
   }
 
   Future<void> _showValidationMessage(String message) async {
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('输入无效'),
@@ -431,7 +433,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
   }
 
   Future<void> _showMessage(String message) async {
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

@@ -13,13 +13,13 @@ class AppCupertinoTheme {
     final bg =
         isDark ? AppDesignTokens.pageBgDark : AppDesignTokens.pageBgLight;
     final barBg = isDark
-        ? AppDesignTokens.surfaceDark.withValues(alpha: 0.92)
-        : AppDesignTokens.surfaceLight.withValues(alpha: 0.92);
+        ? AppDesignTokens.surfaceDark.withValues(alpha: 0.88)
+        : AppDesignTokens.surfaceLight.withValues(alpha: 0.88);
     final textColor =
         isDark ? AppDesignTokens.textInverse : AppDesignTokens.textStrong;
     final secondaryText = isDark
-        ? AppDesignTokens.textMuted.withValues(alpha: 0.9)
-        : AppDesignTokens.textNormal.withValues(alpha: 0.9);
+        ? AppDesignTokens.textInverse.withValues(alpha: 0.72)
+        : AppDesignTokens.textMuted;
 
     return CupertinoThemeData(
       brightness: brightness,
@@ -32,8 +32,8 @@ class AppCupertinoTheme {
         textStyle: TextStyle(
           fontFamily: AppTypography.fontFamilySans,
           color: textColor,
-          fontSize: 15,
-          height: 1.45,
+          fontSize: 16,
+          height: 1.35,
         ),
         navTitleTextStyle: TextStyle(
           fontFamily: AppTypography.fontFamilySans,
@@ -42,11 +42,11 @@ class AppCupertinoTheme {
           fontWeight: FontWeight.w600,
         ),
         navLargeTitleTextStyle: TextStyle(
-          fontFamily: AppTypography.fontFamilySerif,
+          fontFamily: AppTypography.fontFamilySans,
           color: textColor,
-          fontSize: 31,
+          fontSize: 33,
           fontWeight: FontWeight.w700,
-          height: 1.15,
+          height: 1.18,
         ),
         actionTextStyle: TextStyle(
           fontFamily: AppTypography.fontFamilySans,
@@ -54,7 +54,7 @@ class AppCupertinoTheme {
               ? AppDesignTokens.brandSecondary
               : AppDesignTokens.brandPrimary,
           fontSize: 16,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w500,
         ),
         tabLabelTextStyle: TextStyle(
           fontFamily: AppTypography.fontFamilySans,
@@ -68,9 +68,9 @@ class AppCupertinoTheme {
 
   static Color tabBarBackground(Brightness brightness) {
     if (brightness == Brightness.dark) {
-      return AppDesignTokens.surfaceDark.withValues(alpha: 0.94);
+      return AppDesignTokens.surfaceDark.withValues(alpha: 0.96);
     }
-    return AppDesignTokens.surfaceLight.withValues(alpha: 0.94);
+    return AppDesignTokens.surfaceLight.withValues(alpha: 0.96);
   }
 
   static Color tabBarActive(Brightness brightness) {
@@ -81,14 +81,14 @@ class AppCupertinoTheme {
 
   static Color tabBarInactive(Brightness brightness) {
     return brightness == Brightness.dark
-        ? AppDesignTokens.textMuted.withValues(alpha: 0.92)
-        : AppDesignTokens.textNormal.withValues(alpha: 0.74);
+        ? AppDesignTokens.textInverse.withValues(alpha: 0.62)
+        : AppDesignTokens.textMuted;
   }
 
   static Border tabBarBorder(Brightness brightness) {
     final color = brightness == Brightness.dark
         ? AppDesignTokens.borderDark.withValues(alpha: 0.85)
-        : AppDesignTokens.borderLight;
+        : AppDesignTokens.borderLight.withValues(alpha: 0.9);
     return Border(top: BorderSide(color: color, width: 0.5));
   }
 }

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -119,7 +121,7 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
     if (!mounted) return false;
     // 对齐 legado WebViewLoginFragment：
     // 非 http(s) 仅二次确认是否跳转其它应用，不提供额外管理动作。
-    final result = await showCupertinoDialog<bool>(
+    final result = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('跳转其它应用'),

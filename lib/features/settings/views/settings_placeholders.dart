@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
+
 import 'settings_ui_tokens.dart';
 
 class SettingsPlaceholders {
@@ -7,7 +9,7 @@ class SettingsPlaceholders {
     final raw = title ?? '该功能暂未实现';
     final normalized = SettingsUiTokens.normalizePlannedText(raw);
 
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('扩展阶段'),

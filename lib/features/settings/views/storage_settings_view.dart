@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
+
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
@@ -128,7 +130,7 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
     final chapterText =
         _cacheInfo.chapters == 0 ? '无' : '${_cacheInfo.chapters} 章';
 
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('清理缓存'),
@@ -156,7 +158,7 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
   }
 
   Future<void> _confirmClearWebViewData() async {
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('清除 WebView 数据'),
@@ -183,7 +185,7 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
   }
 
   Future<void> _confirmShrinkDatabase() async {
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('压缩数据库'),
@@ -214,7 +216,7 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
     required Future<MaintenanceActionResult> Function() action,
     required bool refreshCacheInfo,
   }) async {
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => CupertinoAlertDialog(
@@ -254,7 +256,7 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
 
   void _showMessage(String message, {String? detail}) {
     final normalizedDetail = (detail ?? '').trim();
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),

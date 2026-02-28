@@ -2,10 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
+
 import '../../../core/services/exception_log_service.dart';
 
 Future<void> showAppLogDialog(BuildContext context) {
-  return showCupertinoDialog<void>(
+  return showCupertinoBottomDialog<void>(
     context: context,
     barrierDismissible: true,
     builder: (_) => const _AppLogDialog(),
@@ -53,7 +55,8 @@ class _AppLogDialog extends StatelessWidget {
                         CupertinoButton(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           onPressed: service.clear,
-                          child: const Text('清除'), minimumSize: Size(30, 30),
+                          child: const Text('清除'),
+                          minimumSize: Size(30, 30),
                         ),
                       ],
                     ),
@@ -99,7 +102,7 @@ class _AppLogTile extends StatelessWidget {
   Future<void> _showStackTrace(BuildContext context) async {
     final stack = entry.stackTrace?.trim() ?? '';
     if (stack.isEmpty) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('Log'),

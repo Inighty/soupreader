@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -57,7 +59,7 @@ class _CoverConfigViewState extends State<CoverConfigView> {
     final searchUrlController = TextEditingController(text: initial.searchUrl);
     final coverRuleController = TextEditingController(text: initial.coverRule);
 
-    final action = await showCupertinoDialog<_CoverRuleDialogAction>(
+    final action = await showCupertinoBottomDialog<_CoverRuleDialogAction>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => CupertinoAlertDialog(
@@ -298,7 +300,7 @@ class _CoverConfigViewState extends State<CoverConfigView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

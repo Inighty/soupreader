@@ -4,6 +4,8 @@ import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
@@ -461,7 +463,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
     required String confirmText,
   }) async {
     if (!mounted) return false;
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),
@@ -515,7 +517,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
 
   Future<void> _checkUpdate() async {
     if (!mounted) return;
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CupertinoActivityIndicator()),
@@ -566,7 +568,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -693,7 +695,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
   }
 
   void _showUpdateInfo(_AppUpdateInfo updateInfo) {
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (_) => _AppUpdateDialog(
@@ -829,7 +831,8 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
                         CupertinoButton(
                           padding: const EdgeInsets.all(4),
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const Icon(CupertinoIcons.xmark), minimumSize: Size(30, 30),
+                          child: const Icon(CupertinoIcons.xmark),
+                          minimumSize: Size(30, 30),
                         ),
                         Expanded(
                           child: Text(
@@ -844,7 +847,8 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
                         CupertinoButton(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           onPressed: widget.onDownload,
-                          child: const Text('下载'), minimumSize: Size(30, 30),
+                          child: const Text('下载'),
+                          minimumSize: Size(30, 30),
                         ),
                       ],
                     ),

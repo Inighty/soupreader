@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -111,7 +113,7 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -274,7 +276,7 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
     if (sourceUrl.isEmpty || !mounted) return;
     final sourceName = widget.sourceName.trim();
 
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提醒'),

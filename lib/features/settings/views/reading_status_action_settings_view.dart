@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
@@ -20,6 +21,10 @@ class _ReadingStatusActionSettingsViewState
   final SettingsService _settingsService = SettingsService();
   late ReadingSettings _settings;
 
+  bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
+
+  Color get _accent => ReaderSettingsTokens.accent(isDark: _isDark);
+
   @override
   void initState() {
     super.initState();
@@ -31,6 +36,65 @@ class _ReadingStatusActionSettingsViewState
     unawaited(_settingsService.saveReadingSettings(next));
   }
 
+  Text _sectionHeader(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        color: ReaderSettingsTokens.titleColor(isDark: _isDark),
+        fontSize: ReaderSettingsTokens.sectionTitleSize,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  Text _tileTitle(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: ReaderSettingsTokens.rowTitleColor(isDark: _isDark),
+        fontSize: ReaderSettingsTokens.rowTitleSize,
+      ),
+    );
+  }
+
+  Text _tileMeta(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: ReaderSettingsTokens.rowMetaColor(isDark: _isDark),
+        fontSize: ReaderSettingsTokens.rowMetaSize,
+      ),
+    );
+  }
+
+  Widget _buildSwitchItem({
+    required String title,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return CupertinoListTile.notched(
+      title: _tileTitle(title),
+      trailing: CupertinoSwitch(
+        value: value,
+        activeTrackColor: _accent,
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  Widget _buildOptionItem({
+    required String title,
+    required String info,
+    required VoidCallback onTap,
+  }) {
+    return CupertinoListTile.notched(
+      title: _tileTitle(title),
+      additionalInfo: _tileMeta(info),
+      trailing: const CupertinoListTileChevron(),
+      onTap: onTap,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
@@ -39,71 +103,54 @@ class _ReadingStatusActionSettingsViewState
         padding: const EdgeInsets.only(top: 8, bottom: 20),
         children: [
           CupertinoListSection.insetGrouped(
-            header: const Text('状态栏'),
+            header: _sectionHeader('状态栏'),
             children: [
-              CupertinoListTile.notched(
-                title: const Text('显示状态栏'),
-                trailing: CupertinoSwitch(
-                  value: _settings.showStatusBar,
-                  onChanged: (v) =>
-                      _update(_settings.copyWith(showStatusBar: v)),
-                ),
+              _buildSwitchItem(
+                title: '显示状态栏',
+                value: _settings.showStatusBar,
+                onChanged: (v) => _update(_settings.copyWith(showStatusBar: v)),
               ),
-              CupertinoListTile.notched(
-                title: const Text('隐藏导航栏'),
-                trailing: CupertinoSwitch(
-                  value: _settings.hideNavigationBar,
-                  onChanged: (v) =>
-                      _update(_settings.copyWith(hideNavigationBar: v)),
-                ),
+              _buildSwitchItem(
+                title: '隐藏导航栏',
+                value: _settings.hideNavigationBar,
+                onChanged: (v) =>
+                    _update(_settings.copyWith(hideNavigationBar: v)),
               ),
-              CupertinoListTile.notched(
-                title: const Text('显示章节进度'),
-                trailing: CupertinoSwitch(
-                  value: _settings.showChapterProgress,
-                  onChanged: (v) =>
-                      _update(_settings.copyWith(showChapterProgress: v)),
-                ),
+              _buildSwitchItem(
+                title: '显示章节进度',
+                value: _settings.showChapterProgress,
+                onChanged: (v) =>
+                    _update(_settings.copyWith(showChapterProgress: v)),
               ),
-              CupertinoListTile.notched(
-                title: const Text('显示时间'),
-                trailing: CupertinoSwitch(
-                  value: _settings.showTime,
-                  onChanged: (v) => _update(_settings.copyWith(showTime: v)),
-                ),
+              _buildSwitchItem(
+                title: '显示时间',
+                value: _settings.showTime,
+                onChanged: (v) => _update(_settings.copyWith(showTime: v)),
               ),
-              CupertinoListTile.notched(
-                title: const Text('显示进度'),
-                trailing: CupertinoSwitch(
-                  value: _settings.showProgress,
-                  onChanged: (v) =>
-                      _update(_settings.copyWith(showProgress: v)),
-                ),
+              _buildSwitchItem(
+                title: '显示进度',
+                value: _settings.showProgress,
+                onChanged: (v) => _update(_settings.copyWith(showProgress: v)),
               ),
-              CupertinoListTile.notched(
-                title: const Text('显示电量'),
-                trailing: CupertinoSwitch(
-                  value: _settings.showBattery,
-                  onChanged: (v) => _update(_settings.copyWith(showBattery: v)),
-                ),
+              _buildSwitchItem(
+                title: '显示电量',
+                value: _settings.showBattery,
+                onChanged: (v) => _update(_settings.copyWith(showBattery: v)),
               ),
-              CupertinoListTile.notched(
-                title: const Text('显示亮度条'),
-                trailing: CupertinoSwitch(
-                  value: _settings.showBrightnessView,
-                  onChanged: (v) =>
-                      _update(_settings.copyWith(showBrightnessView: v)),
-                ),
+              _buildSwitchItem(
+                title: '显示亮度条',
+                value: _settings.showBrightnessView,
+                onChanged: (v) =>
+                    _update(_settings.copyWith(showBrightnessView: v)),
               ),
             ],
           ),
           CupertinoListSection.insetGrouped(
-            header: const Text('操作'),
+            header: _sectionHeader('操作'),
             children: [
-              CupertinoListTile.notched(
-                title: const Text('点击区域（9 宫格）'),
-                additionalInfo: const Text('配置'),
-                trailing: const CupertinoListTileChevron(),
+              _buildOptionItem(
+                title: '点击区域（9 宫格）',
+                info: '配置',
                 onTap: () {
                   showClickActionConfigDialog(
                     context,

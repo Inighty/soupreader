@@ -5,6 +5,8 @@ import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
+
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -1576,7 +1578,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
     final dirty = _snapshotFor(_buildSourceFromFields()) != _savedSnapshot;
     if (!dirty) return true;
 
-    final result = await showCupertinoDialog<bool>(
+    final result = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('退出'),
@@ -1970,7 +1972,7 @@ class _SourceEditLegacyViewState extends State<SourceEditLegacyView> {
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog(
+    showCupertinoBottomDialog(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
