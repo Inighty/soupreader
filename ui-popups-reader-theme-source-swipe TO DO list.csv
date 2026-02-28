@@ -1,6 +1,0 @@
-id,task,status,completed_at,notes
-1,对照 legado 截图与代码定位差异,DONE,2026-02-28 20:20,"已核对 .happy-attachments 截图（排序/更多操作/书架右上角菜单/书源管理）并阅读 legado BookSourceActivity 行为与操作项"
-2,统一弹窗与分组样式实现,DONE,2026-02-28 21:54,"新增/替换通用弹层组件：Popover 菜单、图标动作列表、分组选择面板；showCupertinoBottomDialog 统一适配 AlertDialog/ActionSheet 到 insetGrouped 底部弹层；并将全仓 ActionSheet/Dialog 调用迁移至统一入口"
-3,修复阅读器跟随系统主题,DONE,2026-02-28 22:32,"对齐 legado：阅读器“切换夜间模式”改为切换全局 appearanceMode（浅色/深色）；判定日/夜使用当前 CupertinoTheme/MediaQuery 亮度，避免跟随系统时主题错判。"
-4,书源管理改为左滑右侧操作,DONE,2026-02-28 22:32,"书源列表项接入 flutter_slidable：左滑显示右侧操作按钮（更多/分享/编辑/删除），样式对齐截图的四色操作区。"
-5,运行 flutter analyze 并整理变更,DONE,2026-02-28 22:32,"flutter analyze 通过；修复 cupertino_action_sheet_bottom_sheet.dart：actions 可空迭代与无用空比较。"

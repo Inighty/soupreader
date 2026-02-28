@@ -64,3 +64,9 @@ tool/
 # Root-level image artifacts
 /*.IMG
 /*.PNG
+
+# Root-level Happy attachments (local chat uploads)
+/.happy-attachments/
+
+# Root-level CSV artifacts (local task lists, exports)
+/*.csv
