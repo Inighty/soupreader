@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'app/theme/cupertino_theme.dart';
+import 'core/config/migration_exclusions.dart';
 import 'core/database/database_service.dart';
 import 'core/database/repositories/book_repository.dart';
 import 'core/database/repositories/rss_article_repository.dart';
@@ -333,10 +334,8 @@ class _MainScreenState extends State<MainScreen> {
   late final CupertinoTabController _tabController;
   final ValueNotifier<int> _bookshelfReselectSignal = ValueNotifier<int>(0);
   final ValueNotifier<int> _discoveryCompressSignal = ValueNotifier<int>(0);
-  final ValueNotifier<int> _rssReselectSignal = ValueNotifier<int>(0);
-  final ValueNotifier<int> _myReselectSignal = ValueNotifier<int>(0);
-  _MainTabId? _lastReselectedTab;
-  int _lastReselectedAt = 0;
+  int _bookshelfReselectedAt = 0;
+  int _discoveryReselectedAt = 0;
   late List<_MainTabSpec> _tabs;
 
   @override
@@ -356,8 +355,6 @@ class _MainScreenState extends State<MainScreen> {
     _tabController.dispose();
     _bookshelfReselectSignal.dispose();
     _discoveryCompressSignal.dispose();
-    _rssReselectSignal.dispose();
-    _myReselectSignal.dispose();
     super.dispose();
   }
 
@@ -381,36 +378,38 @@ class _MainScreenState extends State<MainScreen> {
 
   void _onTabTap(int index) {
     if (index < 0 || index >= _tabs.length) return;
-    if (index != _tabController.index) {
-      // 切换 tab 不属于重按；重置窗口避免跨 tab 误触发。
-      _lastReselectedTab = null;
-      _lastReselectedAt = 0;
-      return;
-    }
-    final tabId = _tabs[index].id;
+    if (index != _tabController.index) return;
     final now = DateTime.now().millisecondsSinceEpoch;
-    final isDoubleTap = _lastReselectedTab == tabId &&
-        now - _lastReselectedAt <= _legacyReselectWindow.inMilliseconds;
-    _lastReselectedTab = tabId;
-    _lastReselectedAt = now;
-    if (!isDoubleTap) return;
-    switch (tabId) {
+    switch (_tabs[index].id) {
       case _MainTabId.bookshelf:
-        _bookshelfReselectSignal.value++;
+        if (_shouldTriggerLegacyReselect(_bookshelfReselectedAt, now)) {
+          _bookshelfReselectSignal.value++;
+        } else {
+          _bookshelfReselectedAt = now;
+        }
         return;
       case _MainTabId.discovery:
-        _discoveryCompressSignal.value++;
+        if (_shouldTriggerLegacyReselect(_discoveryReselectedAt, now)) {
+          _discoveryCompressSignal.value++;
+        } else {
+          _discoveryReselectedAt = now;
+        }
         return;
       case _MainTabId.rss:
-        _rssReselectSignal.value++;
-        return;
       case _MainTabId.my:
-        _myReselectSignal.value++;
+        // 对齐 legado：仅书架/发现支持重按动作，RSS/我的重按不触发额外行为。
         return;
     }
   }
 
+  bool _shouldTriggerLegacyReselect(int lastReselectedAt, int now) {
+    // 与 legado MainActivity 同义：按 tab 独立计时，间隔 <= 300ms 即触发动作。
+    return now - lastReselectedAt <= _legacyReselectWindow.inMilliseconds;
+  }
+
   List<_MainTabSpec> _buildTabs(AppSettings settings) {
+    // 迁移排除策略：RSS 在默认构建下必须隐藏入口，而不是展示不可用锚点。
+    final showRssTab = !MigrationExclusions.excludeRss && settings.showRss;
     return [
       const _MainTabSpec(
         id: _MainTabId.bookshelf,
@@ -429,7 +428,7 @@ class _MainScreenState extends State<MainScreen> {
             label: '发现',
           ),
         ),
-      if (settings.showRss)
+      if (showRssTab)
         const _MainTabSpec(
           id: _MainTabId.rss,
           item: BottomNavigationBarItem(
@@ -505,13 +504,9 @@ class _MainScreenState extends State<MainScreen> {
                   compressSignal: _discoveryCompressSignal,
                 );
               case _MainTabId.rss:
-                return RssSubscriptionView(
-                  reselectSignal: _rssReselectSignal,
-                );
+                return const RssSubscriptionView();
               case _MainTabId.my:
-                return SettingsView(
-                  reselectSignal: _myReselectSignal,
-                );
+                return const SettingsView();
             }
           },
         );

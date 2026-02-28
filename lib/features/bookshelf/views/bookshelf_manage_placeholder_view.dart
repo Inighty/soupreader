@@ -1536,21 +1536,21 @@ class _SelectionSummaryBar extends StatelessWidget {
               CupertinoButton(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                minSize: 28,
                 onPressed: onToggleSelectAll,
                 child: Text(allVisibleSelected ? '取消全选' : '全选'),
+                minimumSize: Size(28, 28),
               ),
               CupertinoButton(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                minSize: 28,
                 onPressed: onClearSelection,
                 child: const Text('清空'),
+                minimumSize: Size(28, 28),
               ),
               CupertinoButton.filled(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                minSize: 28,
+                minimumSize: const Size(28, 28),
                 onPressed: onBatchChangeSource,
                 child: changingSource
                     ? const CupertinoActivityIndicator()
@@ -1559,16 +1559,15 @@ class _SelectionSummaryBar extends StatelessWidget {
               CupertinoButton(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                minSize: 28,
                 onPressed: onClearCache,
                 child: clearingCache
                     ? const CupertinoActivityIndicator()
                     : const Text('清理缓存'),
+                minimumSize: Size(28, 28),
               ),
               CupertinoButton(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                minSize: 28,
                 onPressed: onDeleteSelection,
                 child: deletingSelection
                     ? const CupertinoActivityIndicator()
@@ -1578,40 +1577,41 @@ class _SelectionSummaryBar extends StatelessWidget {
                           color: CupertinoColors.destructiveRed,
                         ),
                       ),
+                minimumSize: Size(28, 28),
               ),
               CupertinoButton(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                minSize: 28,
                 onPressed: onEnableUpdate,
                 child: updatingCanUpdate
                     ? const CupertinoActivityIndicator()
                     : const Text('允许更新'),
+                minimumSize: Size(28, 28),
               ),
               CupertinoButton(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                minSize: 28,
                 onPressed: onDisableUpdate,
                 child: updatingCanUpdate
                     ? const CupertinoActivityIndicator()
                     : const Text('禁止更新'),
+                minimumSize: Size(28, 28),
               ),
               CupertinoButton(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                minSize: 28,
                 onPressed: onAddToGroup,
                 child: addingToGroup
                     ? const CupertinoActivityIndicator()
                     : const Text('加入分组'),
+                minimumSize: Size(28, 28),
               ),
               CupertinoButton(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                minSize: 28,
                 onPressed: onCheckSelectedInterval,
                 child: const Text('选中所选区间'),
+                minimumSize: Size(28, 28),
               ),
             ],
           ),

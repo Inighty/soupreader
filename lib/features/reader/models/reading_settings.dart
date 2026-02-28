@@ -27,7 +27,9 @@ class ReadingSettings {
   final double paragraphSpacing;
   final double marginHorizontal; // 左右页边距
   final double marginVertical; // 上下页边距
-  final int themeIndex; // 阅读主题索引
+  final int themeIndex; // 阅读主题索引（白天/普通模式）
+  final int nightThemeIndex; // 夜间主题索引（跟随系统深色模式时使用）
+  final int eInkThemeIndex; // EInk 主题索引（对标 legado EInk 模式）
   final int fontFamilyIndex; // 字体选择索引
   final PageTurnMode pageTurnMode;
   final bool keepScreenOn;
@@ -154,6 +156,10 @@ class ReadingSettings {
     this.marginVertical = legadoV2PaddingVertical,
     // Legado 默认首套排版的纸色主题（本项目在 AppColors.readingThemes 末尾追加）
     this.themeIndex = 9,
+    // 迁移策略：夜间默认使用 nightTheme（通常为索引 1），EInk 默认使用 inkTheme（通常为索引 3）
+    // 注意：索引的最终有效性在 sanitize()/渲染侧会根据可用样式数量进行保护性裁剪。
+    this.nightThemeIndex = 1,
+    this.eInkThemeIndex = 3,
     this.fontFamilyIndex = 0,
     // Legado 默认翻页：覆盖
     this.pageTurnMode = PageTurnMode.cover,
@@ -579,6 +585,23 @@ class ReadingSettings {
       layoutPresetVersion = layoutPresetVersionLegadoV2;
     }
 
+    final parsedThemeIndex = _toInt(json['themeIndex'], 9);
+    final parsedReadStyleConfigs = _parseReadStyleConfigs(
+      json['readStyleConfigs'],
+    );
+    final parsedNightThemeIndex = json.containsKey('nightThemeIndex')
+        ? _toInt(json['nightThemeIndex'], 1)
+        : _inferNightThemeIndex(
+            dayThemeIndex: parsedThemeIndex,
+            styles: parsedReadStyleConfigs,
+          );
+    final parsedEInkThemeIndex = json.containsKey('eInkThemeIndex')
+        ? _toInt(json['eInkThemeIndex'], 3)
+        : _inferEInkThemeIndex(
+            dayThemeIndex: parsedThemeIndex,
+            styles: parsedReadStyleConfigs,
+          );
+
     return ReadingSettings(
       fontSize: fontSize,
       lineHeight: lineHeight,
@@ -586,7 +609,9 @@ class ReadingSettings {
       paragraphSpacing: paragraphSpacing,
       marginHorizontal: marginHorizontal,
       marginVertical: marginVertical,
-      themeIndex: _toInt(json['themeIndex'], 9),
+      themeIndex: parsedThemeIndex,
+      nightThemeIndex: parsedNightThemeIndex,
+      eInkThemeIndex: parsedEInkThemeIndex,
       fontFamilyIndex: _toInt(json['fontFamilyIndex'], 0),
       pageTurnMode: safePageTurnMode,
       keepScreenOn: parsedKeepLightSeconds == keepLightAlways,
@@ -618,7 +643,7 @@ class ReadingSettings {
       textFullJustify: _toBool(json['textFullJustify'], true),
       underline: _toBool(json['underline'], false),
       shareLayout: _toBool(json['shareLayout'], true),
-      readStyleConfigs: _parseReadStyleConfigs(json['readStyleConfigs']),
+      readStyleConfigs: parsedReadStyleConfigs,
       paddingTop: paddingTop,
       paddingBottom: paddingBottom,
       paddingLeft: paddingLeft,
@@ -671,6 +696,55 @@ class ReadingSettings {
     ).sanitize();
   }
 
+  /// legacy 兼容：旧版本仅保存 `themeIndex`，新增字段缺失时需要推断夜间/EInk 的默认索引。
+  ///
+  /// 规则：
+  /// - 若存在样式列表：优先选择“第一个暗色背景”的样式作为夜间主题；
+  /// - 若不存在：回退到默认索引（night=1）。
+  static int _inferNightThemeIndex({
+    required int dayThemeIndex,
+    required List<ReadStyleConfig> styles,
+  }) {
+    if (styles.isEmpty) {
+      return 1;
+    }
+    final index = styles.indexWhere(
+      (style) => _isDarkColor(style.backgroundColor),
+    );
+    if (index >= 0) {
+      return index;
+    }
+    return dayThemeIndex < 0 ? 0 : dayThemeIndex;
+  }
+
+  /// legacy 兼容：EInk 模式下优先选择“背景最亮”的样式。
+  ///
+  /// 说明：
+  /// - legado 的 EInk 配置是独立分支（bgStrEInk/textColorEInk），这里用“最亮背景”近似；
+  /// - 若不存在样式列表：回退到默认索引（eInk=3）。
+  static int _inferEInkThemeIndex({
+    required int dayThemeIndex,
+    required List<ReadStyleConfig> styles,
+  }) {
+    if (styles.isEmpty) {
+      return 3;
+    }
+    var bestIndex = 0;
+    var bestLuminance = -1.0;
+    for (var i = 0; i < styles.length; i++) {
+      final lum = Color(styles[i].backgroundColor).computeLuminance();
+      if (lum > bestLuminance) {
+        bestLuminance = lum;
+        bestIndex = i;
+      }
+    }
+    return bestIndex < 0 ? (dayThemeIndex < 0 ? 0 : dayThemeIndex) : bestIndex;
+  }
+
+  static bool _isDarkColor(int argb) {
+    return Color(argb).computeLuminance() < 0.5;
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'fontSize': fontSize,
@@ -680,6 +754,8 @@ class ReadingSettings {
       'marginHorizontal': marginHorizontal,
       'marginVertical': marginVertical,
       'themeIndex': themeIndex,
+      'nightThemeIndex': nightThemeIndex,
+      'eInkThemeIndex': eInkThemeIndex,
       'fontFamilyIndex': fontFamilyIndex,
       'pageTurnMode': pageTurnMode.index,
       'keepScreenOn': keepScreenOn,
@@ -768,6 +844,14 @@ class ReadingSettings {
     final safeThemeIndex = safeReadStyleConfigs.isEmpty
         ? (themeIndex < 0 ? 0 : themeIndex)
         : themeIndex.clamp(0, safeReadStyleConfigs.length - 1).toInt();
+    final safeNightThemeIndex = safeReadStyleConfigs.isEmpty
+        ? (nightThemeIndex < 0 ? 0 : nightThemeIndex)
+        : nightThemeIndex
+            .clamp(0, safeReadStyleConfigs.length - 1)
+            .toInt();
+    final safeEInkThemeIndex = safeReadStyleConfigs.isEmpty
+        ? (eInkThemeIndex < 0 ? 0 : eInkThemeIndex)
+        : eInkThemeIndex.clamp(0, safeReadStyleConfigs.length - 1).toInt();
     final safeHeaderMode = _safeInt(
       headerMode,
       min: headerModeHideWhenStatusBarShown,
@@ -831,6 +915,8 @@ class ReadingSettings {
         fallback: legadoV2PaddingVertical,
       ),
       themeIndex: safeThemeIndex,
+      nightThemeIndex: safeNightThemeIndex,
+      eInkThemeIndex: safeEInkThemeIndex,
       fontFamilyIndex: fontFamilyIndex < 0 ? 0 : fontFamilyIndex,
       pageTurnMode: pageTurnMode,
       keepScreenOn: safeKeepLightSeconds == keepLightAlways,
@@ -1016,6 +1102,8 @@ class ReadingSettings {
     double? marginHorizontal,
     double? marginVertical,
     int? themeIndex,
+    int? nightThemeIndex,
+    int? eInkThemeIndex,
     int? fontFamilyIndex,
     PageTurnMode? pageTurnMode,
     bool? keepScreenOn,
@@ -1124,6 +1212,8 @@ class ReadingSettings {
       marginHorizontal: marginHorizontal ?? this.marginHorizontal,
       marginVertical: marginVertical ?? this.marginVertical,
       themeIndex: themeIndex ?? this.themeIndex,
+      nightThemeIndex: nightThemeIndex ?? this.nightThemeIndex,
+      eInkThemeIndex: eInkThemeIndex ?? this.eInkThemeIndex,
       fontFamilyIndex: fontFamilyIndex ?? this.fontFamilyIndex,
       pageTurnMode: pageTurnMode ?? this.pageTurnMode,
       keepScreenOn: resolvedKeepScreenOn,

@@ -84,9 +84,9 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
   void initState() {
     super.initState();
     final initial = Color(widget.initialColor);
-    _originalColor = initial.value;
+    _originalColor = initial.toARGB32();
     _hsvColor = HSVColor.fromColor(initial);
-    _hexController = TextEditingController(text: _hexRgb(initial.value));
+    _hexController = TextEditingController(text: _hexRgb(initial.toARGB32()));
     _hexController.addListener(_onHexChanged);
   }
 
@@ -102,7 +102,7 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
 
   void _setColor(Color color) {
     final next = HSVColor.fromColor(color);
-    final hex = _hexRgb(color.value);
+    final hex = _hexRgb(color.toARGB32());
     setState(() {
       _hsvColor = HSVColor.fromAHSV(
         1,
@@ -162,7 +162,7 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
       _hsvColor = next;
       _errorText = null;
     });
-    _setHexText(_hexRgb(color.value));
+    _setHexText(_hexRgb(color.toARGB32()));
   }
 
   void _updateSaturationAndValue(Offset localPosition, Size panelSize) {
@@ -297,7 +297,7 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
             keyName: 'reader_color_selected_preview',
           ),
           const Spacer(),
-          Text('#${_hexRgb(currentColor.value)}'),
+          Text('#${_hexRgb(currentColor.toARGB32())}'),
         ],
       ),
     );
@@ -552,9 +552,9 @@ class _ReaderColorPickerDialogState extends State<_ReaderColorPickerDialog> {
           runSpacing: 7,
           children: colors.map((value) {
             final color = Color(0xFF000000 | (value & 0x00FFFFFF));
-            final selected =
-                (currentColor.value & 0x00FFFFFF) == (color.value & 0x00FFFFFF);
-            final keyHex = _hexRgb(color.value);
+            final selected = (currentColor.toARGB32() & 0x00FFFFFF) ==
+                (color.toARGB32() & 0x00FFFFFF);
+            final keyHex = _hexRgb(color.toARGB32());
             return GestureDetector(
               key: Key('$keyPrefix\_$keyHex'),
               onTap: () => _setColor(color),

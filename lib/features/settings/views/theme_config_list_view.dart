@@ -165,9 +165,8 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
       title: '主题列表',
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
-        minSize: 30,
         onPressed: _importFromClipboard,
-        child: const Text('剪贴板导入'),
+        child: const Text('剪贴板导入'), minimumSize: Size(30, 30),
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())
@@ -196,24 +195,22 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
                                     horizontal: 6,
                                     vertical: 0,
                                   ),
-                                  minSize: 28,
                                   onPressed: () => _shareConfig(index),
                                   child: const Icon(
                                     CupertinoIcons.share,
                                     size: 18,
-                                  ),
+                                  ), minimumSize: Size(28, 28),
                                 ),
                                 CupertinoButton(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 6,
                                     vertical: 0,
                                   ),
-                                  minSize: 28,
                                   onPressed: () => _deleteConfig(index),
                                   child: const Icon(
                                     CupertinoIcons.delete,
                                     size: 18,
-                                  ),
+                                  ), minimumSize: Size(28, 28),
                                 ),
                               ],
                             ),

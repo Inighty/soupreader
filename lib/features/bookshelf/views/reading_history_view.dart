@@ -57,9 +57,8 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
       title: '阅读记录',
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
-        minSize: 28,
         onPressed: _showTopActions,
-        child: const Icon(CupertinoIcons.ellipsis_circle, size: 22),
+        child: const Icon(CupertinoIcons.ellipsis_circle, size: 22), minimumSize: Size(28, 28),
       ),
       child: StreamBuilder<List<Book>>(
         stream: _bookRepo.watchAllBooks(),
@@ -176,13 +175,12 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
           ),
           CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            minSize: 28,
             onPressed: (!hasHistory || _clearingAll)
                 ? null
                 : () => _clearAllReadRecord(history),
             child: _clearingAll
                 ? const CupertinoActivityIndicator(radius: 9)
-                : const Text('清空'),
+                : const Text('清空'), minimumSize: Size(28, 28),
           ),
         ],
       ),

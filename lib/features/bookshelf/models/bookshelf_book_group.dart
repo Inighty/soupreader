@@ -12,6 +12,8 @@ class BookshelfBookGroup {
     required this.enableRefresh,
   });
 
+  /// 与 legado `BookGroup.IdRoot` 对齐：style2 根态（展示“分组卡 + 书籍列表”）。
+  static const int idRoot = -100;
   static const int longMinValue = -9223372036854775808;
   static const int idAll = -1;
   static const int idLocal = -2;

@@ -311,9 +311,8 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
       title: '主题设置',
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
-        minSize: 30,
         onPressed: _showThemeModeManagedHint,
-        child: const Text('主题模式'),
+        child: const Text('主题模式'), minimumSize: Size(30, 30),
       ),
       child: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 20),

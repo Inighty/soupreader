@@ -69,7 +69,6 @@ class _ReaderTxtTocRuleDialogState extends State<ReaderTxtTocRuleDialog> {
                       horizontal: 0,
                       vertical: 10,
                     ),
-                    minSize: 0,
                     onPressed: () {
                       setState(() {
                         _selectedRule = choices[index].rule;
@@ -98,7 +97,7 @@ class _ReaderTxtTocRuleDialogState extends State<ReaderTxtTocRuleDialog> {
                             color: accent,
                           ),
                       ],
-                    ),
+                    ), minimumSize: Size(0, 0),
                   ),
                   if (index != choices.length - 1)
                     Container(

@@ -173,6 +173,28 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     return '${normalized.substring(0, maxLength)}…';
   }
 
+  String _resolveShareErrorMessage(Object error) {
+    final raw = error.toString().trim();
+    if (raw.isEmpty) return 'ERROR';
+
+    const exceptionPrefix = 'Exception:';
+    if (raw.startsWith(exceptionPrefix)) {
+      final message = raw.substring(exceptionPrefix.length).trim();
+      return message.isEmpty ? 'ERROR' : _compactReason(message);
+    }
+
+    const platformPrefix = 'PlatformException(';
+    if (raw.startsWith(platformPrefix) && raw.endsWith(')')) {
+      final body = raw.substring(platformPrefix.length, raw.length - 1);
+      final segments = body.split(',');
+      if (segments.length >= 2) {
+        final message = segments[1].trim();
+        if (message.isNotEmpty) return _compactReason(message);
+      }
+    }
+    return _compactReason(raw);
+  }
+
   String _normalize(String text) {
     return text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
   }
@@ -916,9 +938,11 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   Future<File?> _buildShareQrPngFile(String payload) async {
     if (kIsWeb) return null;
     try {
+      // 对齐 legado `shareWithQr`：二维码承载 `bookUrl#bookJson`，使用高纠错等级降低扫码失败率。
       final painter = QrPainter(
         data: payload,
         version: QrVersions.auto,
+        errorCorrectionLevel: QrErrorCorrectLevel.H,
         eyeStyle: const QrEyeStyle(
           eyeShape: QrEyeShape.square,
           color: CupertinoColors.black,
@@ -945,7 +969,16 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       );
       await file.writeAsBytes(bytes, flush: true);
       return file;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'search_book_info.menu_share_it.qr_build',
+        message: '生成书籍详情分享二维码失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'payloadLength': payload.length,
+        },
+      );
       return null;
     }
   }
@@ -960,12 +993,26 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
   }
 
   Future<void> _shareBook() async {
+    if (kIsWeb) {
+      _showMessage('当前平台暂不支持二维码分享');
+      return;
+    }
     final snapshot = _buildShareBookSnapshot();
     final payload = SearchBookInfoShareHelper.buildPayload(snapshot);
     final subject =
         snapshot.title.trim().isEmpty ? '分享' : snapshot.title.trim();
     final qrFile = await _buildShareQrPngFile(payload);
     if (qrFile == null) {
+      ExceptionLogService().record(
+        node: 'search_book_info.menu_share_it.qr_file',
+        message: '生成书籍详情分享二维码失败',
+        error: 'qr_file_null',
+        context: <String, dynamic>{
+          'bookId': snapshot.id,
+          'bookUrl': (snapshot.bookUrl ?? '').trim(),
+          'payloadLength': payload.length,
+        },
+      );
       _showMessage('文字太多，生成二维码失败');
       return;
     }
@@ -976,12 +1023,22 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
             XFile(qrFile.path, mimeType: 'image/png'),
           ],
           subject: subject,
-          text: subject,
         ),
       );
-    } catch (e) {
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'search_book_info.menu_share_it.share',
+        message: '书籍详情分享失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'bookId': snapshot.id,
+          'bookUrl': (snapshot.bookUrl ?? '').trim(),
+          'payloadLength': payload.length,
+        },
+      );
       if (!mounted) return;
-      _showMessage('分享失败：${_compactReason(e.toString())}');
+      _showMessage('分享失败：${_resolveShareErrorMessage(error)}');
     }
   }
 
@@ -2505,7 +2562,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                                 alignment: Alignment.centerLeft,
                                 child: CupertinoButton(
                                   padding: EdgeInsets.zero,
-                                  minSize: 0,
                                   onPressed: () {
                                     setState(() {
                                       _introExpanded = !_introExpanded;
@@ -2518,7 +2574,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                                       fontWeight: FontWeight.w600,
                                       color: primaryActionColor,
                                     ),
-                                  ),
+                                  ), minimumSize: Size(0, 0),
                                 ),
                               ),
                             ],
@@ -2602,7 +2658,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                 Expanded(
                   child: CupertinoButton(
                     padding: EdgeInsets.zero,
-                    minSize: 0,
                     onPressed: _shelfBusy ? null : _toggleShelf,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -2637,14 +2692,13 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                           ],
                         ),
                       ),
-                    ),
+                    ), minimumSize: Size(0, 0),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: CupertinoButton(
                     padding: EdgeInsets.zero,
-                    minSize: 0,
                     onPressed: (_loading || _loadingToc)
                         ? null
                         : () => _openReader(initialChapter: 0),
@@ -2669,7 +2723,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                           ),
                         ),
                       ),
-                    ),
+                    ), minimumSize: Size(0, 0),
                   ),
                 ),
               ],

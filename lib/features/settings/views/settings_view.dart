@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
+import '../../../core/config/migration_exclusions.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 import '../../bookshelf/views/reading_history_view.dart';
@@ -185,9 +186,8 @@ class _SettingsViewState extends State<SettingsView> {
     }
     return CupertinoButton(
       padding: EdgeInsets.zero,
-      minSize: 30,
       onPressed: _openMyHelp,
-      child: const Icon(CupertinoIcons.question_circle, size: 22),
+      child: const Icon(CupertinoIcons.question_circle, size: 22), minimumSize: Size(30, 30),
     );
   }
 
@@ -269,16 +269,17 @@ class _SettingsViewState extends State<SettingsView> {
                     trailing: const CupertinoListTileChevron(),
                     onTap: _pickThemeMode,
                   ),
-                  CupertinoListTile.notched(
-                    key: const Key('my_menu_webService'),
-                    title: const Text('Web服务'),
-                    additionalInfo: const Text('Web编辑书源与阅读'),
-                    trailing: CupertinoSwitch(
-                      value: false,
-                      onChanged: (_) => _showWebServiceNotImplemented(),
+                  if (!MigrationExclusions.excludeWebService)
+                    CupertinoListTile.notched(
+                      key: const Key('my_menu_webService'),
+                      title: const Text('Web服务'),
+                      additionalInfo: const Text('Web编辑书源与阅读'),
+                      trailing: CupertinoSwitch(
+                        value: false,
+                        onChanged: (_) => _showWebServiceNotImplemented(),
+                      ),
+                      onTap: _showWebServiceNotImplemented,
                     ),
-                    onTap: _showWebServiceNotImplemented,
-                  ),
                 ],
               ),
               CupertinoListSection.insetGrouped(

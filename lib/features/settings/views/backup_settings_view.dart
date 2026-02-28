@@ -3,9 +3,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../core/models/app_settings.dart';
 import '../../../core/models/backup_restore_ignore_config.dart';
 import '../../../core/services/backup_service.dart';
 import '../../../core/services/backup_restore_ignore_service.dart';
+import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/services/webdav_service.dart';
 import 'app_help_dialog.dart';
@@ -19,12 +21,21 @@ class BackupSettingsView extends StatefulWidget {
 }
 
 class _BackupSettingsViewState extends State<BackupSettingsView> {
+  static const int _autoCheckPromptGapMs = 60 * 1000;
+
   final BackupService _backupService = BackupService();
   final BackupRestoreIgnoreService _backupRestoreIgnoreService =
       BackupRestoreIgnoreService();
+  final ExceptionLogService _exceptionLogService = ExceptionLogService();
   final SettingsService _settingsService = SettingsService();
   final WebDavService _webDavService = WebDavService();
   bool _loadingHelp = false;
+  bool _checkingAutoCheckNewBackup = false;
+  bool _autoCheckNewBackupTriggered = false;
+  bool _restoringDetectedBackup = false;
+  bool _lastAutoCheckNewBackupEnabled = false;
+  String? _autoCheckNewBackupError;
+  WebDavRemoteEntry? _detectedNewBackup;
   BackupRestoreIgnoreConfig _restoreIgnoreConfig =
       const BackupRestoreIgnoreConfig();
 
@@ -32,7 +43,12 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
   void initState() {
     super.initState();
     _restoreIgnoreConfig = _backupRestoreIgnoreService.load();
+    _lastAutoCheckNewBackupEnabled =
+        _settingsService.appSettings.autoCheckNewBackup;
     _settingsService.appSettingsListenable.addListener(_onSettingsChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _triggerAutoCheckNewBackupOnPageEnter();
+    });
   }
 
   @override
@@ -43,7 +59,245 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
 
   void _onSettingsChanged() {
     if (!mounted) return;
+    final enabled = _settingsService.appSettings.autoCheckNewBackup;
+    if (!enabled) {
+      _autoCheckNewBackupTriggered = false;
+      setState(() {
+        _detectedNewBackup = null;
+        _autoCheckNewBackupError = null;
+        _checkingAutoCheckNewBackup = false;
+      });
+      _lastAutoCheckNewBackupEnabled = enabled;
+      return;
+    }
+    if (enabled && !_lastAutoCheckNewBackupEnabled) {
+      _triggerAutoCheckNewBackupOnPageEnter(force: true);
+    } else if (!_autoCheckNewBackupTriggered && !_checkingAutoCheckNewBackup) {
+      _triggerAutoCheckNewBackupOnPageEnter();
+    }
+    _lastAutoCheckNewBackupEnabled = enabled;
     setState(() {});
+  }
+
+  Future<void> _onAutoCheckNewBackupChanged(bool enabled) async {
+    await _settingsService.saveAutoCheckNewBackup(enabled);
+    if (!mounted) return;
+    if (!enabled) {
+      setState(() {
+        _detectedNewBackup = null;
+        _autoCheckNewBackupError = null;
+        _checkingAutoCheckNewBackup = false;
+      });
+      return;
+    }
+    await _triggerAutoCheckNewBackupOnPageEnter(force: true);
+  }
+
+  /// 进入备份页时自动检查“是否存在比本地记录更新的 WebDav 备份”。
+  ///
+  /// 对齐 legado `MainActivity.backupSync` 的核心语义：
+  /// 1) 开关关闭时不检查；
+  /// 2) 仅比较最新备份时间与本地记录时间；
+  /// 3) 差值超过 1 分钟判定为“新备份”；
+  /// 4) 命中新备份时先写入“已提示时间”，再展示恢复提示，避免重复弹出。
+  Future<void> _triggerAutoCheckNewBackupOnPageEnter({
+    bool force = false,
+  }) async {
+    final settings = _settingsService.appSettings;
+    if (!settings.autoCheckNewBackup) return;
+    if (_checkingAutoCheckNewBackup) return;
+    if (_autoCheckNewBackupTriggered && !force) return;
+    if (!_hasWebDavCredential(settings)) {
+      if (mounted) {
+        setState(() {
+          _detectedNewBackup = null;
+          _autoCheckNewBackupError = null;
+          _checkingAutoCheckNewBackup = false;
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _checkingAutoCheckNewBackup = true;
+        _autoCheckNewBackupError = null;
+      });
+    }
+
+    try {
+      final backups = await _webDavService.listBackupFiles(settings: settings);
+      if (!mounted) return;
+      _autoCheckNewBackupTriggered = true;
+
+      if (backups.isEmpty) {
+        setState(() {
+          _detectedNewBackup = null;
+        });
+        return;
+      }
+
+      final latestBackup = backups.first;
+      final remoteLastModify = latestBackup.lastModify;
+      if (remoteLastModify <= 0) {
+        setState(() {
+          _detectedNewBackup = null;
+        });
+        return;
+      }
+
+      final lastSeenMillis = _settingsService.getLastSeenWebDavBackupMillis();
+      final hasNewerBackup =
+          remoteLastModify - lastSeenMillis > _autoCheckPromptGapMs;
+      if (!hasNewerBackup) {
+        setState(() {
+          _detectedNewBackup = null;
+        });
+        return;
+      }
+
+      // 与 legado 一致：提示前先更新本地“已提示时间”，避免同一远端备份重复提示。
+      await _settingsService.saveLastSeenWebDavBackupMillis(remoteLastModify);
+      if (!mounted) return;
+      setState(() {
+        _detectedNewBackup = latestBackup;
+      });
+    } catch (error, stackTrace) {
+      _autoCheckNewBackupTriggered = true;
+      _exceptionLogService.record(
+        node: 'backup_settings.auto_check_new_backup',
+        message: '进入备份页自动检查远端新备份失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'webDavUrl': settings.webDavUrl,
+          'hasAccount': settings.webDavAccount.trim().isNotEmpty,
+          'hasPassword': settings.webDavPassword.trim().isNotEmpty,
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _detectedNewBackup = null;
+        _autoCheckNewBackupError = _normalizeErrorMessage(error);
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _checkingAutoCheckNewBackup = false;
+      });
+    }
+  }
+
+  List<Widget> _buildAutoCheckNewBackupPromptTiles() {
+    final enabled = _settingsService.appSettings.autoCheckNewBackup;
+    if (!enabled) return const <Widget>[];
+
+    if (_checkingAutoCheckNewBackup) {
+      return <Widget>[
+        const CupertinoListTile.notched(
+          title: Text('自动检查新备份'),
+          additionalInfo: Text('正在检查 WebDav 远端备份'),
+          trailing: CupertinoActivityIndicator(),
+        ),
+      ];
+    }
+
+    final detected = _detectedNewBackup;
+    if (detected != null) {
+      return <Widget>[
+        CupertinoListTile.notched(
+          title: const Text('检测到较新的 WebDav 备份'),
+          additionalInfo: Text(_backupEntrySummary(detected)),
+          trailing: _restoringDetectedBackup
+              ? const CupertinoActivityIndicator()
+              : const CupertinoListTileChevron(),
+          onTap: _restoringDetectedBackup
+              ? null
+              : () => _confirmRestoreDetectedBackup(detected),
+        ),
+      ];
+    }
+
+    if (_autoCheckNewBackupError != null &&
+        _autoCheckNewBackupError!.trim().isNotEmpty) {
+      return <Widget>[
+        CupertinoListTile.notched(
+          title: const Text('自动检查失败'),
+          additionalInfo: Text(_brief(_autoCheckNewBackupError!)),
+          trailing: const CupertinoListTileChevron(),
+          onTap: () => _triggerAutoCheckNewBackupOnPageEnter(force: true),
+        ),
+      ];
+    }
+    return const <Widget>[];
+  }
+
+  Future<void> _confirmRestoreDetectedBackup(WebDavRemoteEntry entry) async {
+    final confirmed = await showCupertinoDialog<bool>(
+          context: context,
+          builder: (dialogContext) => CupertinoAlertDialog(
+            title: const Text('恢复'),
+            content: Text(
+              '检测到 WebDav 备份比本地更新，是否恢复？\n'
+              '${entry.displayName}\n'
+              '${_backupEntrySummary(entry)}',
+            ),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                isDestructiveAction: true,
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('恢复'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+
+    setState(() {
+      _restoringDetectedBackup = true;
+      _autoCheckNewBackupError = null;
+      _detectedNewBackup = null;
+    });
+
+    final restored = await _restoreSelectedWebDavBackup(entry);
+    if (!mounted) return;
+    setState(() {
+      _restoringDetectedBackup = false;
+      if (!restored) {
+        // 恢复失败时保留提示入口，允许用户重试。
+        _detectedNewBackup = entry;
+      }
+    });
+  }
+
+  bool _hasWebDavCredential(AppSettings settings) {
+    return settings.webDavAccount.trim().isNotEmpty &&
+        settings.webDavPassword.trim().isNotEmpty;
+  }
+
+  String _normalizeErrorMessage(Object error) {
+    final raw = error.toString().trim();
+    if (raw.isEmpty) {
+      return '未知错误';
+    }
+    const prefixes = <String>[
+      'Exception:',
+      'WebDavOperationException:',
+    ];
+    for (final prefix in prefixes) {
+      if (raw.startsWith(prefix)) {
+        final message = raw.substring(prefix.length).trim();
+        if (message.isNotEmpty) {
+          return message;
+        }
+      }
+    }
+    return raw;
   }
 
   @override
@@ -229,6 +483,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                   onTap: _restoreFromWebDav,
                 ),
               ),
+              ..._buildAutoCheckNewBackupPromptTiles(),
               CupertinoListTile.notched(
                 title: const Text('恢复时忽略'),
                 additionalInfo: Text(_brief(_restoreIgnoreConfig.summary())),
@@ -255,7 +510,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                 additionalInfo: const Text('打开软件时检查是否有新备份，有新备份时提示是否更新'),
                 trailing: CupertinoSwitch(
                   value: settings.autoCheckNewBackup,
-                  onChanged: _settingsService.saveAutoCheckNewBackup,
+                  onChanged: _onAutoCheckNewBackupChanged,
                 ),
               ),
             ],
@@ -286,15 +541,13 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
         else
           CupertinoButton(
             padding: EdgeInsets.zero,
-            minSize: 30,
             onPressed: _openWebDavHelp,
-            child: const Icon(CupertinoIcons.question_circle, size: 22),
+            child: const Icon(CupertinoIcons.question_circle, size: 22), minimumSize: Size(30, 30),
           ),
         CupertinoButton(
           padding: EdgeInsets.zero,
-          minSize: 30,
           onPressed: _showMoreActions,
-          child: const Icon(CupertinoIcons.ellipsis_circle, size: 22),
+          child: const Icon(CupertinoIcons.ellipsis_circle, size: 22), minimumSize: Size(30, 30),
         ),
       ],
     );
@@ -536,7 +789,6 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                 for (final entry in backups)
                   CupertinoButton(
                     padding: EdgeInsets.zero,
-                    minSize: 44,
                     onPressed: () => Navigator.pop(dialogContext, entry),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -560,7 +812,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                               ),
                         ),
                       ],
-                    ),
+                    ), minimumSize: Size(44, 44),
                   ),
               ],
             ),
@@ -576,7 +828,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     );
   }
 
-  Future<void> _restoreSelectedWebDavBackup(WebDavRemoteEntry entry) async {
+  Future<bool> _restoreSelectedWebDavBackup(WebDavRemoteEntry entry) async {
     showCupertinoDialog(
       context: context,
       barrierDismissible: false,
@@ -590,21 +842,26 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
       );
       final result =
           await _backupService.importFromBytesWithStoredIgnore(bytes);
-      if (!mounted) return;
+      if (!mounted) return false;
       Navigator.pop(context);
       if (!result.success) {
         await _showWebDavRestoreFallback(result.errorMessage ?? 'WebDav 恢复失败');
-        return;
+        return false;
+      }
+      if (entry.lastModify > 0) {
+        await _settingsService.saveLastSeenWebDavBackupMillis(entry.lastModify);
       }
       _showImportResult(
         result,
         prefix:
             'WebDav 恢复完成：书源 ${result.sourcesImported} 条，书籍 ${result.booksImported} 本，章节 ${result.chaptersImported} 章',
       );
+      return true;
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) return false;
       Navigator.pop(context);
       await _showWebDavRestoreFallback(error.toString());
+      return false;
     }
   }
 
@@ -692,7 +949,6 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                   for (final option in BackupRestoreIgnoreConfig.options)
                     CupertinoButton(
                       padding: EdgeInsets.zero,
-                      minSize: 34,
                       onPressed: () {
                         setDialogState(() {
                           if (!selected.add(option.key)) {
@@ -717,7 +973,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                               size: 18,
                             ),
                         ],
-                      ),
+                      ), minimumSize: Size(34, 34),
                     ),
                 ],
               ),

@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -789,17 +788,17 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
         children: [
           CupertinoButton(
             padding: EdgeInsets.zero,
-            minSize: 30,
             onPressed: _menuBusy ? null : _addRule,
             child: const Icon(CupertinoIcons.add),
+            minimumSize: Size(30, 30),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
-            minSize: 30,
             onPressed: _menuBusy ? null : _showMoreMenu,
             child: _menuBusy
                 ? const CupertinoActivityIndicator(radius: 9)
                 : const Icon(CupertinoIcons.ellipsis),
+            minimumSize: Size(30, 30),
           ),
         ],
       ),
@@ -941,7 +940,7 @@ class _ImportCandidateTile extends StatelessWidget {
               const SizedBox(width: 10),
               DecoratedBox(
                 decoration: BoxDecoration(
-                  color: stateColor.withOpacity(0.14),
+                  color: stateColor.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Padding(

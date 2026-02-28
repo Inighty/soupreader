@@ -235,7 +235,6 @@ class _OptionTile<T> extends StatelessWidget {
         ),
         child: CupertinoButton(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-          minSize: 0,
           onPressed: onTap,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -311,7 +310,7 @@ class _OptionTile<T> extends StatelessWidget {
                   size: 17,
                 ),
             ],
-          ),
+          ), minimumSize: Size(0, 0),
         ),
       ),
     );

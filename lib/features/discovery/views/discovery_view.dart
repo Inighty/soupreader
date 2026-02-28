@@ -8,6 +8,7 @@ import '../../../app/theme/cupertino_theme_adapter.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
+import '../../../core/models/app_settings.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/services/source_variable_store.dart';
@@ -179,6 +180,11 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       return;
     }
     if (!_scrollController.hasClients) return;
+    // 与 legado 保持一致：E-Ink 模式避免平滑动画，直接回到顶部。
+    if (_settingsService.appSettings.appearanceMode == AppAppearanceMode.eInk) {
+      _scrollController.jumpTo(0);
+      return;
+    }
     _scrollController.animateTo(
       0,
       duration: const Duration(milliseconds: 260),

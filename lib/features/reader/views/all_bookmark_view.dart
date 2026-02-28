@@ -322,11 +322,10 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
       title: '所有书签',
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
-        minSize: 28,
         onPressed: _showTopActions,
         child: _exporting
             ? const CupertinoActivityIndicator(radius: 10)
-            : const Icon(CupertinoIcons.ellipsis_circle, size: 22),
+            : const Icon(CupertinoIcons.ellipsis_circle, size: 22), minimumSize: Size(28, 28),
       ),
       child: _buildBody(),
     );

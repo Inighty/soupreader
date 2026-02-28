@@ -171,15 +171,13 @@ class _TxtTocRuleEditViewState extends State<TxtTocRuleEditView> {
         children: [
           CupertinoButton(
             padding: EdgeInsets.zero,
-            minSize: 30,
             onPressed: _saveRule,
-            child: const Text('保存'),
+            child: const Text('保存'), minimumSize: Size(30, 30),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
-            minSize: 30,
             onPressed: _showMoreMenu,
-            child: const Icon(CupertinoIcons.ellipsis),
+            child: const Icon(CupertinoIcons.ellipsis), minimumSize: Size(30, 30),
           ),
         ],
       ),

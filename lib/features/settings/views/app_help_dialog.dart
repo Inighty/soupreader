@@ -81,9 +81,8 @@ class _AppHelpDialogState extends State<_AppHelpDialog> {
                         ),
                         CupertinoButton(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
-                          minSize: 30,
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('关闭'),
+                          child: const Text('关闭'), minimumSize: Size(30, 30),
                         ),
                       ],
                     ),

@@ -413,9 +413,8 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
       title: title,
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
-        minSize: 30,
         onPressed: _confirmAndCheck,
-        child: const Text('确认'),
+        child: const Text('确认'), minimumSize: Size(30, 30),
       ),
       child: Column(
         children: [

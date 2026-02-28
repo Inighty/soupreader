@@ -84,9 +84,8 @@ class _ExceptionLogsViewState extends State<ExceptionLogsView> {
       title: widget.title,
       trailing: CupertinoButton(
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        minSize: 30,
         onPressed: _clearLogs,
-        child: const Text('清除'),
+        child: const Text('清除'), minimumSize: Size(30, 30),
       ),
       child: ValueListenableBuilder<List<ExceptionLogEntry>>(
         valueListenable: _service.listenable,

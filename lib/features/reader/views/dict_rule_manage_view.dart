@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -971,13 +970,12 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
           if (!_selectionMode)
             CupertinoButton(
               padding: const EdgeInsets.symmetric(horizontal: 4),
-              minSize: 30,
               onPressed: _menuBusy ? null : _createRule,
               child: const Icon(CupertinoIcons.add),
+              minimumSize: Size(30, 30),
             ),
           CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            minSize: 30,
             onPressed: _menuBusy || (!_selectionMode && _rules.isEmpty)
                 ? null
                 : _toggleSelectionMode,
@@ -985,10 +983,10 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
               _selectionMode ? '完成' : '多选',
               style: const TextStyle(fontSize: 13),
             ),
+            minimumSize: Size(30, 30),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
-            minSize: 30,
             onPressed: _selectionMode
                 ? (hasSelection && !_menuBusy ? _showSelectionMoreMenu : null)
                 : (_menuBusy ? null : _showMoreMenu),
@@ -1002,6 +1000,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                 : (_menuBusy
                     ? const CupertinoActivityIndicator(radius: 9)
                     : const Icon(CupertinoIcons.ellipsis)),
+            minimumSize: Size(30, 30),
           ),
         ],
       ),
@@ -1275,7 +1274,7 @@ class _DictRuleImportCandidateTile extends StatelessWidget {
               const SizedBox(width: 10),
               DecoratedBox(
                 decoration: BoxDecoration(
-                  color: stateColor.withOpacity(0.14),
+                  color: stateColor.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Padding(

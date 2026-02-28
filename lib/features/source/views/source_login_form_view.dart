@@ -308,15 +308,13 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
         children: [
           CupertinoButton(
             padding: EdgeInsets.zero,
-            minSize: 30,
             onPressed: _loading ? null : _submit,
-            child: const Text('完成'),
+            child: const Text('完成'), minimumSize: Size(30, 30),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
-            minSize: 30,
             onPressed: _loading ? null : _showMoreMenu,
-            child: const Icon(CupertinoIcons.ellipsis),
+            child: const Icon(CupertinoIcons.ellipsis), minimumSize: Size(30, 30),
           ),
         ],
       ),

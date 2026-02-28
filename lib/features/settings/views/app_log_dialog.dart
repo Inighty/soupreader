@@ -52,9 +52,8 @@ class _AppLogDialog extends StatelessWidget {
                         ),
                         CupertinoButton(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
-                          minSize: 30,
                           onPressed: service.clear,
-                          child: const Text('清除'),
+                          child: const Text('清除'), minimumSize: Size(30, 30),
                         ),
                       ],
                     ),

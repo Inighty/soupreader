@@ -218,7 +218,6 @@ class _DiscoveryExploreResultsViewState
                 const SizedBox(height: 12),
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  minSize: 0,
                   onPressed: () => _loadMore(forceRefresh: true),
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -237,7 +236,7 @@ class _DiscoveryExploreResultsViewState
                         ),
                       ),
                     ),
-                  ),
+                  ), minimumSize: Size(0, 0),
                 ),
               ],
             ),
@@ -403,7 +402,6 @@ class _DiscoveryExploreResultsViewState
             const SizedBox(height: 8),
             CupertinoButton(
               padding: EdgeInsets.zero,
-              minSize: 0,
               onPressed: _loadMore,
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -427,7 +425,7 @@ class _DiscoveryExploreResultsViewState
                     ),
                   ),
                 ),
-              ),
+              ), minimumSize: Size(0, 0),
             ),
           ],
         ),

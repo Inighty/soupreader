@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
+import '../../../core/config/migration_exclusions.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 import '../services/check_source_settings_service.dart';
@@ -42,6 +43,11 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
 
   static const String _fallbackCheckSourceSummary =
       '校验超时：180秒\n校验项目： 搜索 发现 详情 目录 正文';
+
+  bool get _excludeRss => MigrationExclusions.excludeRss;
+  bool get _excludeTts => MigrationExclusions.excludeTts;
+  bool get _excludeManga => MigrationExclusions.excludeManga;
+  bool get _excludeWebService => MigrationExclusions.excludeWebService;
 
   @override
   void initState() {
@@ -201,32 +207,46 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
   }
 
   Future<void> _pickDefaultHomePage() async {
-    final selected = await showOptionPickerSheet<MainDefaultHomePage>(
-      context: context,
-      title: '默认主页',
-      currentValue: _appSettings.defaultHomePage,
-      accentColor: AppDesignTokens.brandPrimary,
-      items: const [
-        OptionPickerItem<MainDefaultHomePage>(
-          value: MainDefaultHomePage.bookshelf,
-          label: '书架',
-        ),
-        OptionPickerItem<MainDefaultHomePage>(
-          value: MainDefaultHomePage.explore,
-          label: '发现',
-        ),
-        OptionPickerItem<MainDefaultHomePage>(
+    final pickerItems = <OptionPickerItem<MainDefaultHomePage>>[
+      const OptionPickerItem<MainDefaultHomePage>(
+        value: MainDefaultHomePage.bookshelf,
+        label: '书架',
+      ),
+      const OptionPickerItem<MainDefaultHomePage>(
+        value: MainDefaultHomePage.explore,
+        label: '发现',
+      ),
+      if (!_excludeRss)
+        const OptionPickerItem<MainDefaultHomePage>(
           value: MainDefaultHomePage.rss,
           label: '订阅',
         ),
-        OptionPickerItem<MainDefaultHomePage>(
-          value: MainDefaultHomePage.my,
-          label: '我的',
-        ),
-      ],
+      const OptionPickerItem<MainDefaultHomePage>(
+        value: MainDefaultHomePage.my,
+        label: '我的',
+      ),
+    ];
+    final selected = await showOptionPickerSheet<MainDefaultHomePage>(
+      context: context,
+      title: '默认主页',
+      currentValue: _effectiveDefaultHomePageForUi(
+        _appSettings.defaultHomePage,
+      ),
+      accentColor: AppDesignTokens.brandPrimary,
+      items: pickerItems,
     );
     if (selected == null) return;
     await _settingsService.saveDefaultHomePage(selected);
+  }
+
+  MainDefaultHomePage _effectiveDefaultHomePageForUi(
+    MainDefaultHomePage page,
+  ) {
+    // 迁移排除策略：RSS 入口隐藏时，默认主页不应继续显示为“订阅”。
+    if (_excludeRss && page == MainDefaultHomePage.rss) {
+      return MainDefaultHomePage.bookshelf;
+    }
+    return page;
   }
 
   Future<void> _pickUpdateToVariant() async {
@@ -432,16 +452,17 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                   !_appSettings.showDiscovery,
                 ),
               ),
-              CupertinoListTile.notched(
-                title: const Text('显示订阅'),
-                trailing: CupertinoSwitch(
-                  value: _appSettings.showRss,
-                  onChanged: _settingsService.saveShowRss,
+              if (!_excludeRss)
+                CupertinoListTile.notched(
+                  title: const Text('显示订阅'),
+                  trailing: CupertinoSwitch(
+                    value: _appSettings.showRss,
+                    onChanged: _settingsService.saveShowRss,
+                  ),
+                  onTap: () => _settingsService.saveShowRss(
+                    !_appSettings.showRss,
+                  ),
                 ),
-                onTap: () => _settingsService.saveShowRss(
-                  !_appSettings.showRss,
-                ),
-              ),
               CupertinoListTile.notched(
                 title: const Text('默认主页'),
                 additionalInfo: Text(
@@ -514,12 +535,14 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                 trailing: const CupertinoListTileChevron(),
                 onTap: _editBitmapCacheSize,
               ),
-              CupertinoListTile.notched(
-                title: const Text('漫画保留数量'),
-                additionalInfo: Text('保留已读章节数量 ${_appSettings.imageRetainNum}'),
-                trailing: const CupertinoListTileChevron(),
-                onTap: _editImageRetainNum,
-              ),
+              if (!_excludeManga)
+                CupertinoListTile.notched(
+                  title: const Text('漫画保留数量'),
+                  additionalInfo:
+                      Text('保留已读章节数量 ${_appSettings.imageRetainNum}'),
+                  trailing: const CupertinoListTileChevron(),
+                  onTap: _editImageRetainNum,
+                ),
               CupertinoListTile.notched(
                 title: const Text('默认启用替换净化'),
                 additionalInfo: const Text('新加入书架的书是否启用替换净化'),
@@ -596,24 +619,27 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                   value: _appSettings.antiAlias,
                   save: _settingsService.saveAntiAlias,
                 ),
-                _buildBooleanTile(
-                  title: '全程响应耳机按键',
-                  additionalInfo: '即使退出软件也响应耳机按键',
-                  value: _appSettings.mediaButtonOnExit,
-                  save: _settingsService.saveMediaButtonOnExit,
-                ),
-                _buildBooleanTile(
-                  title: '耳机按键启动朗读',
-                  additionalInfo: '通过耳机按键来启动朗读',
-                  value: _appSettings.readAloudByMediaButton,
-                  save: _settingsService.saveReadAloudByMediaButton,
-                ),
-                _buildBooleanTile(
-                  title: '忽略音频焦点',
-                  additionalInfo: '允许与其他应用同时播放音频',
-                  value: _appSettings.ignoreAudioFocus,
-                  save: _settingsService.saveIgnoreAudioFocus,
-                ),
+                if (!_excludeTts)
+                  _buildBooleanTile(
+                    title: '全程响应耳机按键',
+                    additionalInfo: '即使退出软件也响应耳机按键',
+                    value: _appSettings.mediaButtonOnExit,
+                    save: _settingsService.saveMediaButtonOnExit,
+                  ),
+                if (!_excludeTts)
+                  _buildBooleanTile(
+                    title: '耳机按键启动朗读',
+                    additionalInfo: '通过耳机按键来启动朗读',
+                    value: _appSettings.readAloudByMediaButton,
+                    save: _settingsService.saveReadAloudByMediaButton,
+                  ),
+                if (!_excludeTts)
+                  _buildBooleanTile(
+                    title: '忽略音频焦点',
+                    additionalInfo: '允许与其他应用同时播放音频',
+                    value: _appSettings.ignoreAudioFocus,
+                    save: _settingsService.saveIgnoreAudioFocus,
+                  ),
                 _buildBooleanTile(
                   title: '自动清除过期搜索数据',
                   additionalInfo: '超过一天的搜索数据',
@@ -636,29 +662,30 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                   trailing: const CupertinoListTileChevron(),
                   onTap: _pickUpdateToVariant,
                 ),
-                _buildBooleanTile(
-                  title: '漫画浏览',
-                  value: _appSettings.showMangaUi,
-                  save: _settingsService.saveShowMangaUi,
+                if (!_excludeManga)
+                  _buildBooleanTile(
+                    title: '漫画浏览',
+                    value: _appSettings.showMangaUi,
+                    save: _settingsService.saveShowMangaUi,
+                  ),
+              ],
+            ),
+          if (!_excludeWebService)
+            CupertinoListSection.insetGrouped(
+              header: const Text('Web 服务（未启用）'),
+              children: [
+                CupertinoListTile.notched(
+                  title: const Text('Web 端口'),
+                  additionalInfo: Text('未启用（当前: ${_appSettings.webPort}）'),
+                ),
+                CupertinoListTile.notched(
+                  title: const Text('WebService 唤醒锁'),
+                  additionalInfo: Text(
+                    '未启用（当前: ${_appSettings.webServiceWakeLock ? '开' : '关'}）',
+                  ),
                 ),
               ],
             ),
-          CupertinoListSection.insetGrouped(
-            header: const Text('Web 服务（未启用）'),
-            footer: const Text('当前构建排除了 Web 服务，以下配置仅保留说明，不可操作。'),
-            children: [
-              CupertinoListTile.notched(
-                title: const Text('Web 端口'),
-                additionalInfo: Text('未启用（当前: ${_appSettings.webPort}）'),
-              ),
-              CupertinoListTile.notched(
-                title: const Text('WebService 唤醒锁'),
-                additionalInfo: Text(
-                  '未启用（当前: ${_appSettings.webServiceWakeLock ? '开' : '关'}）',
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 24),
         ],
       ),
@@ -666,7 +693,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
   }
 
   String _defaultHomePageLabel(MainDefaultHomePage page) {
-    switch (page) {
+    switch (_effectiveDefaultHomePageForUi(page)) {
       case MainDefaultHomePage.bookshelf:
         return '书架';
       case MainDefaultHomePage.explore:

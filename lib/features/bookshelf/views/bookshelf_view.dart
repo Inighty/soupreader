@@ -23,12 +23,14 @@ import '../../source/services/rule_parser_engine.dart';
 import 'cache_export_placeholder_view.dart';
 import 'bookshelf_manage_placeholder_view.dart';
 import 'bookshelf_group_manage_placeholder_dialog.dart';
-import 'remote_books_placeholder_view.dart';
+import 'remote_books_servers_view.dart';
 import '../services/book_add_service.dart';
+import '../services/bookshelf_book_group_store.dart';
 import '../services/bookshelf_booklist_import_service.dart';
 import '../services/bookshelf_catalog_update_service.dart';
 import '../services/bookshelf_import_export_service.dart';
 import '../models/book.dart';
+import '../models/bookshelf_book_group.dart';
 
 enum _ImportFolderAction {
   select,
@@ -49,16 +51,20 @@ class BookshelfView extends StatefulWidget {
 }
 
 class _BookshelfViewState extends State<BookshelfView> {
+  static const String _bookGroupMembershipSettingKey =
+      'bookshelf.book_group_membership_map';
   bool _isGridView = true;
   int _gridCrossAxisCount = 3;
   // 与 legado 一致：图墙/列表都可展示“更新中”状态。
   final Set<String> _updatingBookIds = <String>{};
   final ScrollController _scrollController = ScrollController();
+  late final DatabaseService _database;
   late final BookRepository _bookRepo;
   late final SourceRepository _sourceRepo;
   late final BookAddService _bookAddService;
   late final ImportService _importService;
   late final BookImportFileNameRuleService _bookImportFileNameRuleService;
+  late final BookshelfBookGroupStore _bookGroupStore;
   late final SettingsService _settingsService;
   late final BookshelfImportExportService _bookshelfIo;
   late final BookshelfBooklistImportService _booklistImporter;
@@ -73,6 +79,63 @@ class _BookshelfViewState extends State<BookshelfView> {
   bool _isUpdatingCatalog = false;
   String? _initError;
   int? _lastExternalReselectVersion;
+  List<BookshelfBookGroup> _bookGroups = _defaultBookGroups;
+  Map<String, int> _bookGroupMembershipMap = const <String, int>{};
+  // 与 legado style2 一致：根态是独立的 IdRoot，而不是“全部”分组本身。
+  int _selectedGroupId = BookshelfBookGroup.idRoot;
+
+  // 与 legado 对齐：内置分组的语义和顺序需要稳定保底，避免旧数据缺项导致 UI 行为漂移。
+  static const List<BookshelfBookGroup> _defaultBookGroups =
+      <BookshelfBookGroup>[
+    BookshelfBookGroup(
+      groupId: BookshelfBookGroup.idAll,
+      groupName: '全部',
+      show: true,
+      order: -10,
+      bookSort: -1,
+      enableRefresh: true,
+    ),
+    BookshelfBookGroup(
+      groupId: BookshelfBookGroup.idLocal,
+      groupName: '本地',
+      show: true,
+      order: -9,
+      bookSort: -1,
+      enableRefresh: false,
+    ),
+    BookshelfBookGroup(
+      groupId: BookshelfBookGroup.idAudio,
+      groupName: '音频',
+      show: true,
+      order: -8,
+      bookSort: -1,
+      enableRefresh: true,
+    ),
+    BookshelfBookGroup(
+      groupId: BookshelfBookGroup.idNetNone,
+      groupName: '网络未分组',
+      show: true,
+      order: -7,
+      bookSort: -1,
+      enableRefresh: true,
+    ),
+    BookshelfBookGroup(
+      groupId: BookshelfBookGroup.idLocalNone,
+      groupName: '本地未分组',
+      show: false,
+      order: -6,
+      bookSort: -1,
+      enableRefresh: true,
+    ),
+    BookshelfBookGroup(
+      groupId: BookshelfBookGroup.idError,
+      groupName: '更新失败',
+      show: true,
+      order: -1,
+      bookSort: -1,
+      enableRefresh: true,
+    ),
+  ];
 
   @override
   void initState() {
@@ -80,11 +143,13 @@ class _BookshelfViewState extends State<BookshelfView> {
     try {
       debugPrint('[bookshelf] init start');
       final db = DatabaseService();
+      _database = db;
       _bookRepo = BookRepository(db);
       _sourceRepo = SourceRepository(db);
       _bookAddService = BookAddService(database: db);
       _importService = ImportService();
       _bookImportFileNameRuleService = BookImportFileNameRuleService();
+      _bookGroupStore = BookshelfBookGroupStore(database: db);
       _settingsService = SettingsService();
       _bookshelfIo = BookshelfImportExportService();
       _booklistImporter = BookshelfBooklistImportService();
@@ -99,6 +164,7 @@ class _BookshelfViewState extends State<BookshelfView> {
       _lastExternalReselectVersion = widget.reselectSignal?.value;
       widget.reselectSignal?.addListener(_onExternalReselectSignal);
       _loadBooks();
+      unawaited(_reloadBookGroupContext(showError: false));
       _booksSubscription = _bookRepo.watchAllBooks().listen((books) {
         if (!mounted) return;
         setState(() {
@@ -141,6 +207,11 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   void _scrollToTop() {
     if (!_scrollController.hasClients) return;
+    // 与 legado 一致：E-Ink 模式不做平滑动画，避免刷新残影。
+    if (_settingsService.appSettings.appearanceMode == AppAppearanceMode.eInk) {
+      _scrollController.jumpTo(0);
+      return;
+    }
     _scrollController.animateTo(
       0,
       duration: const Duration(milliseconds: 260),
@@ -170,6 +241,10 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   void _sortBooks(int sortIndex) {
+    _sortBookList(_books, sortIndex);
+  }
+
+  void _sortBookList(List<Book> books, int sortIndex) {
     int compareDateTimeDesc(DateTime? a, DateTime? b) {
       final aTime = a ?? DateTime(2000);
       final bTime = b ?? DateTime(2000);
@@ -182,7 +257,7 @@ class _BookshelfViewState extends State<BookshelfView> {
       return;
     }
 
-    _books.sort((a, b) {
+    books.sort((a, b) {
       switch (normalized) {
         case 0:
           return compareDateTimeDesc(
@@ -210,6 +285,224 @@ class _BookshelfViewState extends State<BookshelfView> {
     if (a == null) return b;
     if (b == null) return a;
     return a.isAfter(b) ? a : b;
+  }
+
+  bool get _isStyle2Enabled {
+    return _settingsService.appSettings.bookshelfGroupStyle == 1;
+  }
+
+  Future<void> _reloadBookGroupContext({required bool showError}) async {
+    try {
+      final groups = await _bookGroupStore.getGroups();
+      if (!mounted) return;
+      final normalizedGroups = _normalizeGroups(groups);
+      final groupMembership = _readBookGroupMembershipMap();
+      var nextSelectedGroupId = _selectedGroupId;
+      final hasSelectedGroup = nextSelectedGroupId ==
+              BookshelfBookGroup.idRoot ||
+          normalizedGroups.any((group) => group.groupId == nextSelectedGroupId);
+      if (!hasSelectedGroup) {
+        nextSelectedGroupId = BookshelfBookGroup.idRoot;
+      }
+      setState(() {
+        _bookGroups = normalizedGroups;
+        _bookGroupMembershipMap = groupMembership;
+        _selectedGroupId = nextSelectedGroupId;
+      });
+    } catch (error, stackTrace) {
+      debugPrint('[bookshelf] 加载分组失败: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!showError || !mounted) return;
+      _showMessage('加载分组失败：$error');
+    }
+  }
+
+  List<BookshelfBookGroup> _normalizeGroups(List<BookshelfBookGroup> groups) {
+    final byId = <int, BookshelfBookGroup>{
+      for (final group in groups) group.groupId: group,
+    };
+    for (final fallback in _defaultBookGroups) {
+      byId.putIfAbsent(fallback.groupId, () => fallback);
+    }
+    final normalized = byId.values.toList(growable: false);
+    normalized.sort((a, b) {
+      final byOrder = a.order.compareTo(b.order);
+      if (byOrder != 0) return byOrder;
+      return a.groupId.compareTo(b.groupId);
+    });
+    return normalized;
+  }
+
+  Map<String, int> _readBookGroupMembershipMap() {
+    final raw = _database.getSetting(
+      _bookGroupMembershipSettingKey,
+      defaultValue: const <String, dynamic>{},
+    );
+    if (raw is! Map) return const <String, int>{};
+    final parsed = <String, int>{};
+    raw.forEach((key, value) {
+      final bookId = '$key'.trim();
+      if (bookId.isEmpty) return;
+      parsed[bookId] = _parseGroupBits(value);
+    });
+    return parsed;
+  }
+
+  int _parseGroupBits(dynamic raw) {
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    if (raw is String) return int.tryParse(raw.trim()) ?? 0;
+    return 0;
+  }
+
+  int _resolveCustomGroupMask() {
+    var mask = 0;
+    for (final group in _bookGroups) {
+      if (group.groupId > 0) {
+        mask |= group.groupId;
+      }
+    }
+    return mask;
+  }
+
+  List<Book> _filterBooksByGroup(List<Book> books, int groupId) {
+    switch (groupId) {
+      case BookshelfBookGroup.idAll:
+        return books;
+      case BookshelfBookGroup.idLocal:
+        return books.where((book) => book.isLocal).toList(growable: false);
+      case BookshelfBookGroup.idAudio:
+      case BookshelfBookGroup.idError:
+        // 当前模型未承载 legado 音频/更新失败类型位，保持入口但回落空集。
+        return const <Book>[];
+      case BookshelfBookGroup.idNetNone:
+        final customMask = _resolveCustomGroupMask();
+        return books.where((book) {
+          if (book.isLocal) return false;
+          final membership = _bookGroupMembershipMap[book.id] ?? 0;
+          return (membership & customMask) == 0;
+        }).toList(growable: false);
+      case BookshelfBookGroup.idLocalNone:
+        final customMask = _resolveCustomGroupMask();
+        return books.where((book) {
+          if (!book.isLocal) return false;
+          final membership = _bookGroupMembershipMap[book.id] ?? 0;
+          return (membership & customMask) == 0;
+        }).toList(growable: false);
+      default:
+        if (groupId == BookshelfBookGroup.longMinValue) {
+          return books.where((book) {
+            final membership = _bookGroupMembershipMap[book.id] ?? 0;
+            return membership == groupId;
+          }).toList(growable: false);
+        }
+        if (groupId > 0) {
+          return books.where((book) {
+            final membership = _bookGroupMembershipMap[book.id] ?? 0;
+            return (membership & groupId) > 0;
+          }).toList(growable: false);
+        }
+        return const <Book>[];
+    }
+  }
+
+  List<BookshelfBookGroup> _visibleGroupsForRoot() {
+    final visible = _bookGroups
+        .where((group) => _shouldShowGroupOnRoot(group))
+        .toList(growable: false);
+    visible.sort((a, b) {
+      final byOrder = a.order.compareTo(b.order);
+      if (byOrder != 0) return byOrder;
+      return a.groupId.compareTo(b.groupId);
+    });
+    return visible;
+  }
+
+  /// 与 legado `bookGroupDao.show` 对齐：
+  /// 根态只展示“可见且存在匹配书籍”的分组；`全部`分组始终展示。
+  bool _shouldShowGroupOnRoot(BookshelfBookGroup group) {
+    if (!group.show) return false;
+    if (group.groupId == BookshelfBookGroup.idAll) return true;
+    return _filterBooksByGroup(_books, group.groupId).isNotEmpty;
+  }
+
+  int _resolveSortIndexForCurrentGroup() {
+    var sortIndex = _settingsService.appSettings.bookshelfSortIndex;
+    if (!_isStyle2Enabled || _selectedGroupId == BookshelfBookGroup.idRoot) {
+      return sortIndex;
+    }
+    BookshelfBookGroup? selectedGroup;
+    for (final group in _bookGroups) {
+      if (group.groupId == _selectedGroupId) {
+        selectedGroup = group;
+        break;
+      }
+    }
+    if (selectedGroup != null && selectedGroup.bookSort >= 0) {
+      sortIndex = selectedGroup.bookSort;
+    }
+    return sortIndex;
+  }
+
+  List<Book> _displayBooks() {
+    final source = List<Book>.from(_books);
+    final grouped = _isStyle2Enabled
+        ? (_selectedGroupId == BookshelfBookGroup.idRoot
+            ? source
+            : _filterBooksByGroup(source, _selectedGroupId))
+        : source;
+    final sorted = List<Book>.from(grouped);
+    _sortBookList(sorted, _resolveSortIndexForCurrentGroup());
+    return sorted;
+  }
+
+  List<Object> _displayItems() {
+    final books = _displayBooks();
+    // style2 根态（IdRoot）展示“分组卡 + 书籍列表”；子分组只展示书籍。
+    if (!_isStyle2Enabled || _selectedGroupId != BookshelfBookGroup.idRoot) {
+      return books;
+    }
+    final groups = _visibleGroupsForRoot();
+    return <Object>[...groups, ...books];
+  }
+
+  String _resolveGroupTitleById(int groupId) {
+    for (final group in _bookGroups) {
+      if (group.groupId == groupId) {
+        return group.groupName;
+      }
+    }
+    switch (groupId) {
+      case BookshelfBookGroup.idAll:
+        return '全部';
+      case BookshelfBookGroup.idLocal:
+        return '本地';
+      case BookshelfBookGroup.idAudio:
+        return '音频';
+      case BookshelfBookGroup.idNetNone:
+        return '网络未分组';
+      case BookshelfBookGroup.idLocalNone:
+        return '本地未分组';
+      case BookshelfBookGroup.idError:
+        return '更新失败';
+      default:
+        return '未分组';
+    }
+  }
+
+  String _currentBookshelfTitle() {
+    if (!_isStyle2Enabled || _selectedGroupId == BookshelfBookGroup.idRoot) {
+      return '书架';
+    }
+    return '书架(${_resolveGroupTitleById(_selectedGroupId)})';
+  }
+
+  bool _tryHandleStyle2Back() {
+    if (!_isStyle2Enabled) return false;
+    if (_selectedGroupId == BookshelfBookGroup.idRoot) return false;
+    debugPrint('[bookshelf] style2 back to root from group=$_selectedGroupId');
+    setState(() => _selectedGroupId = BookshelfBookGroup.idRoot);
+    return true;
   }
 
   Future<void> _importLocalBook() async {
@@ -780,7 +1073,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   Future<void> _openRemoteBooks() async {
     await Navigator.of(context, rootNavigator: true).push(
       CupertinoPageRoute<void>(
-        builder: (_) => const RemoteBooksPlaceholderView(),
+        builder: (_) => const RemoteBooksServersView(),
       ),
     );
   }
@@ -791,6 +1084,9 @@ class _BookshelfViewState extends State<BookshelfView> {
         builder: (_) => const BookshelfManagePlaceholderView(),
       ),
     );
+    if (!mounted) return;
+    await _reloadBookGroupContext(showError: true);
+    _loadBooks();
   }
 
   Future<void> _openCacheExport() async {
@@ -806,6 +1102,9 @@ class _BookshelfViewState extends State<BookshelfView> {
       context: context,
       builder: (_) => const BookshelfGroupManagePlaceholderDialog(),
     );
+    if (!mounted) return;
+    await _reloadBookGroupContext(showError: true);
+    _loadBooks();
   }
 
   String? _extractBaseUrl(String rawUrl) {
@@ -1276,10 +1575,11 @@ class _BookshelfViewState extends State<BookshelfView> {
     required int layoutIndex,
     required int sortIndex,
   }) async {
+    final normalizedGroupStyle = groupStyle.clamp(0, 1);
     final normalizedLayout = _normalizeLayoutIndex(layoutIndex);
     final normalizedSort = _normalizeSortIndex(sortIndex);
     final nextSettings = _settingsService.appSettings.copyWith(
-      bookshelfGroupStyle: groupStyle.clamp(0, 1),
+      bookshelfGroupStyle: normalizedGroupStyle,
       bookshelfShowUnread: showUnread,
       bookshelfShowLastUpdateTime: showLastUpdateTime,
       bookshelfShowWaitUpCount: showWaitUpCount,
@@ -1294,7 +1594,11 @@ class _BookshelfViewState extends State<BookshelfView> {
     setState(() {
       _isGridView = normalizedLayout > 0;
       _gridCrossAxisCount = _gridColumnsForLayoutIndex(normalizedLayout);
+      if (normalizedGroupStyle != 1) {
+        _selectedGroupId = BookshelfBookGroup.idRoot;
+      }
     });
+    await _reloadBookGroupContext(showError: true);
     _loadBooks();
   }
 
@@ -1446,7 +1750,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     showCupertinoModalPopup(
       context: context,
       builder: (context) => CupertinoActionSheet(
-        title: const Text('书架'),
+        title: Text(_currentBookshelfTitle()),
         actions: [
           CupertinoActionSheetAction(
             child: Text(_updateCatalogMenuText()),
@@ -1579,7 +1883,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   Future<void> _updateBookshelfCatalog() async {
     if (_isImporting || _isUpdatingCatalog) return;
 
-    final snapshot = _books.toList(growable: false);
+    final snapshot = _displayBooks();
     final remoteCandidates =
         snapshot.where((book) => !book.isLocal).toList(growable: false);
     if (remoteCandidates.isEmpty) {
@@ -1647,8 +1951,8 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
   }
 
-  int _waitUpCount() {
-    return _books.where((book) {
+  int _waitUpCount(List<Book> books) {
+    return books.where((book) {
       if (book.isLocal) return false;
       return _settingsService.getBookCanUpdate(book.id);
     }).length;
@@ -1656,15 +1960,19 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   Widget? _buildBookshelfMiddleTitle() {
     final settings = _settingsService.appSettings;
+    final pageTitle = _currentBookshelfTitle();
+    if (_isStyle2Enabled && _selectedGroupId != BookshelfBookGroup.idRoot) {
+      return Text(pageTitle);
+    }
     if (!settings.bookshelfShowWaitUpCount) return null;
-    final count = _waitUpCount();
+    final count = _waitUpCount(_displayBooks());
     if (count <= 0) {
-      return const Text('书架');
+      return Text(pageTitle);
     }
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('书架'),
+        Text(pageTitle),
         const SizedBox(width: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -1689,7 +1997,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   @override
   Widget build(BuildContext context) {
     final page = AppCupertinoPageScaffold(
-      title: '书架',
+      title: _currentBookshelfTitle(),
       useSliverNavigationBar: true,
       sliverScrollController: _scrollController,
       middle: _buildBookshelfMiddleTitle(),
@@ -1713,10 +2021,20 @@ class _BookshelfViewState extends State<BookshelfView> {
       child: const SizedBox.shrink(),
       sliverBodyBuilder: (_) => _buildBodySliver(),
     );
-    return _wrapWithFastScroller(page);
+    return PopScope<void>(
+      canPop:
+          !_isStyle2Enabled || _selectedGroupId == BookshelfBookGroup.idRoot,
+      // 与 legado style2 保持同义：处于子分组时先返回根分组，而不是直接退出主界面。
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _tryHandleStyle2Back();
+      },
+      child: _wrapWithFastScroller(page),
+    );
   }
 
   Widget _buildBodySliver() {
+    final displayItems = _displayItems();
     if (_initError != null) {
       return SliverSafeArea(
         top: false,
@@ -1727,7 +2045,7 @@ class _BookshelfViewState extends State<BookshelfView> {
         ),
       );
     }
-    if (_books.isEmpty) {
+    if (displayItems.isEmpty) {
       return SliverSafeArea(
         top: false,
         bottom: true,
@@ -1740,7 +2058,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     return SliverSafeArea(
       top: false,
       bottom: true,
-      sliver: _buildBookList(),
+      sliver: _buildBookList(displayItems),
     );
   }
 
@@ -1811,16 +2129,16 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
   }
 
-  Widget _buildBookList() {
+  Widget _buildBookList(List<Object> displayItems) {
     if (_isGridView) {
-      return _buildGridSliver();
+      return _buildGridSliver(displayItems);
     } else {
-      return _buildListSliver();
+      return _buildListSliver(displayItems);
     }
   }
 
   Widget _wrapWithFastScroller(Widget child) {
-    if (_initError != null || _books.isEmpty) return child;
+    if (_initError != null || _displayItems().isEmpty) return child;
     if (!_settingsService.appSettings.bookshelfShowFastScroller) {
       return child;
     }
@@ -1831,7 +2149,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
   }
 
-  Widget _buildGridSliver() {
+  Widget _buildGridSliver(List<Object> displayItems) {
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 16),
       sliver: SliverGrid(
@@ -1843,10 +2161,59 @@ class _BookshelfViewState extends State<BookshelfView> {
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) {
-            final book = _books[index];
-            return _buildBookCard(book);
+            final item = displayItems[index];
+            if (item is BookshelfBookGroup) {
+              return _buildGroupGridCard(item);
+            }
+            if (item is Book) {
+              return _buildBookCard(item);
+            }
+            return const SizedBox.shrink();
           },
-          childCount: _books.length,
+          childCount: displayItems.length,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroupGridCard(BookshelfBookGroup group) {
+    return GestureDetector(
+      onTap: () => _onGroupTap(group),
+      onLongPress: () => _onGroupLongPress(group),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: CupertinoColors.systemGrey5.resolveFrom(context),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: AppCoverImage(
+                  urlOrPath: group.cover,
+                  title: group.groupName,
+                  author: '',
+                  width: double.infinity,
+                  height: double.infinity,
+                  borderRadius: 8,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              group.groupName,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                height: 1.25,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1995,14 +2362,15 @@ class _BookshelfViewState extends State<BookshelfView> {
         );
   }
 
-  Widget _buildListSliver() {
+  Widget _buildListSliver(List<Object> displayItems) {
     final theme = CupertinoTheme.of(context);
     final metaTextStyle = _buildListMetaStyle();
     final titleTextStyle = _buildListTitleStyle();
     final secondaryLabel = CupertinoColors.secondaryLabel.resolveFrom(context);
     final showLastUpdateTime =
         _settingsService.appSettings.bookshelfShowLastUpdateTime;
-    final sliverItemCount = _books.isEmpty ? 0 : _books.length * 2 - 1;
+    final sliverItemCount =
+        displayItems.isEmpty ? 0 : displayItems.length * 2 - 1;
 
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -2010,7 +2378,12 @@ class _BookshelfViewState extends State<BookshelfView> {
         delegate: SliverChildBuilderDelegate(
           (context, index) {
             if (index.isOdd) return const SizedBox(height: 8);
-            final book = _books[index ~/ 2];
+            final item = displayItems[index ~/ 2];
+            if (item is BookshelfBookGroup) {
+              return _buildGroupListTile(item);
+            }
+            if (item is! Book) return const SizedBox.shrink();
+            final book = item;
             final readAgo = _formatReadAgo(book.lastReadTime);
             final isUpdating = _isUpdating(book);
             return GestureDetector(
@@ -2156,6 +2529,80 @@ class _BookshelfViewState extends State<BookshelfView> {
         ),
       ),
     );
+  }
+
+  Widget _buildGroupListTile(BookshelfBookGroup group) {
+    final metaTextStyle = _buildListMetaStyle();
+    final titleTextStyle = _buildListTitleStyle();
+    final secondaryLabel = CupertinoColors.secondaryLabel.resolveFrom(context);
+
+    return GestureDetector(
+      onTap: () => _onGroupTap(group),
+      onLongPress: () => _onGroupLongPress(group),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        decoration: _buildListCardDecoration(),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppCoverImage(
+              urlOrPath: group.cover,
+              title: group.groupName,
+              author: '',
+              width: 66,
+              height: 90,
+              borderRadius: 8,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    group.groupName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: titleTextStyle,
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    '分组',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: metaTextStyle,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(
+                CupertinoIcons.chevron_forward,
+                size: 16,
+                color: secondaryLabel,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _onGroupTap(BookshelfBookGroup group) {
+    if (!_isStyle2Enabled) return;
+    if (_selectedGroupId == group.groupId) return;
+    debugPrint(
+      '[bookshelf] style2 enter group id=${group.groupId}, name=${group.groupName}',
+    );
+    setState(() => _selectedGroupId = group.groupId);
+    _scrollToTop();
+  }
+
+  void _onGroupLongPress(BookshelfBookGroup _) {
+    if (!_isStyle2Enabled) return;
+    // 当前迁移阶段以“分组管理”作为分组编辑统一入口。
+    _openBookshelfGroupManageDialog();
   }
 
   String _buildReadLine(Book book) {

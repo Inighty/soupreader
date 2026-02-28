@@ -144,7 +144,6 @@ class _ReaderDictLookupSheetState extends State<ReaderDictLookupSheet> {
           final selected = index == _selectedIndex;
           return CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            minSize: 32,
             color: selected
                 ? CupertinoTheme.of(context).primaryColor
                 : CupertinoColors.systemGrey5.resolveFrom(context),
@@ -159,7 +158,7 @@ class _ReaderDictLookupSheetState extends State<ReaderDictLookupSheet> {
                     ? CupertinoColors.white
                     : CupertinoColors.label.resolveFrom(context),
               ),
-            ),
+            ), minimumSize: Size(32, 32),
           );
         },
       ),
@@ -204,9 +203,8 @@ class _ReaderDictLookupSheetState extends State<ReaderDictLookupSheet> {
                   children: [
                     CupertinoButton(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minSize: 30,
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('关闭'),
+                      child: const Text('关闭'), minimumSize: Size(30, 30),
                     ),
                     Expanded(
                       child: Column(

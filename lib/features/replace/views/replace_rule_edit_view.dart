@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -286,15 +285,13 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
         children: [
           CupertinoButton(
             padding: EdgeInsets.zero,
-            minSize: 30,
             onPressed: _saving ? null : _save,
-            child: const Text('保存'),
+            child: const Text('保存'), minimumSize: Size(30, 30),
           ),
           CupertinoButton(
             padding: EdgeInsets.zero,
-            minSize: 30,
             onPressed: _saving ? null : _showMoreMenu,
-            child: const Icon(CupertinoIcons.ellipsis),
+            child: const Icon(CupertinoIcons.ellipsis), minimumSize: Size(30, 30),
           ),
         ],
       ),

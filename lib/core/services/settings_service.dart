@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/migration_exclusions.dart';
 import '../models/app_settings.dart';
 import '../../features/reader/models/reading_settings.dart';
 
@@ -73,6 +74,8 @@ class SettingsService {
   static const String _keyWelcomeShowIcon = 'welcomeShowIcon';
   static const String _keyWelcomeShowTextDark = 'welcomeShowTextDark';
   static const String _keyWelcomeShowIconDark = 'welcomeShowIconDark';
+  static const String _keyLastSeenWebDavBackupMillis =
+      'last_seen_webdav_backup_millis';
   static const String _defaultImageStyle = 'DEFAULT';
   static const Set<String> _validImageStyles = <String>{
     'DEFAULT',
@@ -80,7 +83,7 @@ class SettingsService {
     'TEXT',
     'SINGLE',
   };
-  static const int _readingSettingsSchemaVersion = 3;
+  static const int _readingSettingsSchemaVersion = 4;
   static const int _maxReaderImageSizeSnapshotBytes = 120 * 1024;
 
   late SharedPreferences _prefs;
@@ -678,6 +681,13 @@ class SettingsService {
   }
 
   Future<void> saveContentSelectSpeakMode(int mode) async {
+    // 迁移排除（EX-03）：TTS 在当前构建为 blocked，避免误写入形成“伪可用”。
+    if (MigrationExclusions.excludeTts) {
+      debugPrint(
+        '[settings] 迁移排除：阻断 saveContentSelectSpeakMode（excludeTts=true），不写入',
+      );
+      return;
+    }
     if (!_isInitialized) return;
     await _prefs.setInt(_keyContentSelectSpeakMod, mode == 1 ? 1 : 0);
   }
@@ -1191,12 +1201,24 @@ class SettingsService {
   }
 
   Future<void> saveShowRss(bool enabled) async {
+    // 迁移排除（EX-02）：RSS 在当前构建为 blocked，禁止写入开关避免误开放入口。
+    if (MigrationExclusions.excludeRss) {
+      debugPrint('[settings] 迁移排除：阻断 saveShowRss（excludeRss=true），不写入');
+      return;
+    }
     await _saveAppSettingsPatch(
       (current) => current.copyWith(showRss: enabled),
     );
   }
 
   Future<void> saveDefaultHomePage(MainDefaultHomePage value) async {
+    // 迁移排除（EX-02）：RSS 在当前构建为 blocked，默认主页选择仅保留锚点，不允许写入为 rss。
+    if (MigrationExclusions.excludeRss && value == MainDefaultHomePage.rss) {
+      debugPrint(
+        '[settings] 迁移排除：阻断 saveDefaultHomePage（excludeRss=true, value=rss），不写入',
+      );
+      return;
+    }
     await _saveAppSettingsPatch(
       (current) => current.copyWith(defaultHomePage: value),
     );
@@ -1221,6 +1243,13 @@ class SettingsService {
   }
 
   Future<void> saveImageRetainNum(int value) async {
+    // 迁移排除（EX-04）：漫画模块 blocked，相关配置仅保留锚点与回显，不允许持久化改动。
+    if (MigrationExclusions.excludeManga) {
+      debugPrint(
+        '[settings] 迁移排除：阻断 saveImageRetainNum（excludeManga=true），不写入',
+      );
+      return;
+    }
     await _saveAppSettingsPatch(
       (current) => current.copyWith(imageRetainNum: value),
     );
@@ -1245,18 +1274,39 @@ class SettingsService {
   }
 
   Future<void> saveMediaButtonOnExit(bool enabled) async {
+    // 迁移排除（EX-03）：TTS 在当前构建为 blocked，避免耳机按键相关开关被误写入。
+    if (MigrationExclusions.excludeTts) {
+      debugPrint(
+        '[settings] 迁移排除：阻断 saveMediaButtonOnExit（excludeTts=true），不写入',
+      );
+      return;
+    }
     await _saveAppSettingsPatch(
       (current) => current.copyWith(mediaButtonOnExit: enabled),
     );
   }
 
   Future<void> saveReadAloudByMediaButton(bool enabled) async {
+    // 迁移排除（EX-03）：TTS 在当前构建为 blocked，避免形成“开关可改但功能不可用”的状态错觉。
+    if (MigrationExclusions.excludeTts) {
+      debugPrint(
+        '[settings] 迁移排除：阻断 saveReadAloudByMediaButton（excludeTts=true），不写入',
+      );
+      return;
+    }
     await _saveAppSettingsPatch(
       (current) => current.copyWith(readAloudByMediaButton: enabled),
     );
   }
 
   Future<void> saveIgnoreAudioFocus(bool enabled) async {
+    // 迁移排除（EX-03）：TTS 在当前构建为 blocked，相关音频焦点配置不允许写入。
+    if (MigrationExclusions.excludeTts) {
+      debugPrint(
+        '[settings] 迁移排除：阻断 saveIgnoreAudioFocus（excludeTts=true），不写入',
+      );
+      return;
+    }
     await _saveAppSettingsPatch(
       (current) => current.copyWith(ignoreAudioFocus: enabled),
     );
@@ -1284,6 +1334,13 @@ class SettingsService {
   }
 
   Future<void> saveShowMangaUi(bool enabled) async {
+    // 迁移排除（EX-04）：漫画模块 blocked，禁止写入漫画浏览开关，避免业务链路回流。
+    if (MigrationExclusions.excludeManga) {
+      debugPrint(
+        '[settings] 迁移排除：阻断 saveShowMangaUi（excludeManga=true），不写入',
+      );
+      return;
+    }
     await _saveAppSettingsPatch(
       (current) => current.copyWith(showMangaUi: enabled),
     );
@@ -1401,6 +1458,32 @@ class SettingsService {
     await _saveAppSettingsPatch(
       (current) => current.copyWith(autoCheckNewBackup: enabled),
     );
+  }
+
+  /// 读取“自动检查新备份”最近一次已提示的远端备份时间（毫秒时间戳）。
+  ///
+  /// 说明：
+  /// - 该值用于避免重复提示同一个 WebDav 备份；
+  /// - 读取失败或未初始化时返回 [fallback]；
+  /// - 返回值始终保证 `>= 0`。
+  int getLastSeenWebDavBackupMillis({int fallback = 0}) {
+    if (!_isInitialized) {
+      return fallback < 0 ? 0 : fallback;
+    }
+    final value = _prefs.getInt(_keyLastSeenWebDavBackupMillis);
+    if (value == null || value < 0) {
+      return fallback < 0 ? 0 : fallback;
+    }
+    return value;
+  }
+
+  /// 保存“自动检查新备份”最近一次已提示的远端备份时间（毫秒时间戳）。
+  ///
+  /// 约束：负值会被强制归零，避免脏数据导致重复弹窗判断异常。
+  Future<void> saveLastSeenWebDavBackupMillis(int millis) async {
+    if (!_isInitialized) return;
+    final normalized = millis < 0 ? 0 : millis;
+    await _prefs.setInt(_keyLastSeenWebDavBackupMillis, normalized);
   }
 
   Future<void> saveCoverLoadOnlyWifi(bool enabled) async {

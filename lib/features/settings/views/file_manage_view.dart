@@ -150,12 +150,6 @@ class _FileManageViewState extends State<FileManageView> {
     return true;
   }
 
-  Future<bool> _onWillPop() async {
-    if (_atRoot) return true;
-    await _goParent();
-    return false;
-  }
-
   Future<void> _openFile(File file) async {
     try {
       final launched = await launchUrl(
@@ -462,9 +456,9 @@ class _FileManageViewState extends State<FileManageView> {
     final pathButtons = <Widget>[
       CupertinoButton(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        minSize: 28,
         onPressed: _openRoot,
         child: const Text('root', maxLines: 1, overflow: TextOverflow.ellipsis),
+        minimumSize: Size(28, 28),
       ),
     ];
     for (var i = 0; i < _subDirs.length; i++) {
@@ -478,13 +472,13 @@ class _FileManageViewState extends State<FileManageView> {
       pathButtons.add(
         CupertinoButton(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          minSize: 28,
           onPressed: () => _openPathAt(i),
           child: Text(
             _displayName(dir),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          minimumSize: Size(28, 28),
         ),
       );
     }
@@ -586,16 +580,20 @@ class _FileManageViewState extends State<FileManageView> {
       title: '文件管理',
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
-        minSize: 30,
         onPressed: (_currentDir != null && !_creatingFolder)
             ? _showCreateFolderDialog
             : null,
         child: _creatingFolder
             ? const CupertinoActivityIndicator()
             : const Text('新建文件夹'),
+        minimumSize: Size(30, 30),
       ),
-      child: WillPopScope(
-        onWillPop: _onWillPop,
+      child: PopScope<void>(
+        canPop: _atRoot,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          _goParent();
+        },
         child: Column(
           children: [
             _buildPathBar(),

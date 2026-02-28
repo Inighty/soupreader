@@ -160,11 +160,10 @@ class _BookshelfGroupManagePlaceholderDialogState
                         ),
                         CupertinoButton(
                           padding: const EdgeInsets.all(4),
-                          minSize: 30,
                           onPressed: _adding ? null : _handleAddGroup,
                           child: _adding
                               ? const CupertinoActivityIndicator(radius: 8)
-                              : const Icon(CupertinoIcons.add),
+                              : const Icon(CupertinoIcons.add), minimumSize: Size(30, 30),
                         ),
                       ],
                     ),
@@ -214,9 +213,8 @@ class _BookshelfGroupManagePlaceholderDialogState
                       alignment: Alignment.centerRight,
                       child: CupertinoButton(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minSize: 30,
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('完成'),
+                        child: const Text('完成'), minimumSize: Size(30, 30),
                       ),
                     ),
                   ),
@@ -361,17 +359,15 @@ class _AddGroupDialogState extends State<_AddGroupDialog> {
                 CupertinoButton(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  minSize: 26,
                   onPressed: _pickingCover ? null : _pickCover,
                   child: _pickingCover
                       ? const CupertinoActivityIndicator(radius: 7)
-                      : const Text('选择封面'),
+                      : const Text('选择封面'), minimumSize: Size(26, 26),
                 ),
                 if ((_coverPath ?? '').trim().isNotEmpty)
                   CupertinoButton(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    minSize: 26,
                     onPressed: () {
                       setState(() {
                         _coverPath = null;
@@ -381,7 +377,7 @@ class _AddGroupDialogState extends State<_AddGroupDialog> {
                     child: Text(
                       '清除',
                       style: TextStyle(color: destructiveColor),
-                    ),
+                    ), minimumSize: Size(26, 26),
                   ),
               ],
             ),
@@ -408,9 +404,8 @@ class _AddGroupDialogState extends State<_AddGroupDialog> {
                 CupertinoButton(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  minSize: 26,
                   onPressed: _pickSort,
-                  child: Text(_groupSortLabel(_bookSort)),
+                  child: Text(_groupSortLabel(_bookSort)), minimumSize: Size(26, 26),
                 ),
               ],
             ),

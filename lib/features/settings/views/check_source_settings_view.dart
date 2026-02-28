@@ -159,15 +159,13 @@ class _CheckSourceSettingsViewState extends State<CheckSourceSettingsView> {
       title: '校验设置',
       leading: CupertinoButton(
         padding: EdgeInsets.zero,
-        minSize: 30,
         onPressed: () => Navigator.of(context).pop(false),
-        child: const Text('取消'),
+        child: const Text('取消'), minimumSize: Size(30, 30),
       ),
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
-        minSize: 30,
         onPressed: _saveAndClose,
-        child: const Text('确定'),
+        child: const Text('确定'), minimumSize: Size(30, 30),
       ),
       child: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 20),

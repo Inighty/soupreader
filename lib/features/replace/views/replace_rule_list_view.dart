@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -2196,7 +2195,7 @@ class _ReplaceRuleImportCandidateTile extends StatelessWidget {
               const SizedBox(width: 10),
               DecoratedBox(
                 decoration: BoxDecoration(
-                  color: stateColor.withOpacity(0.14),
+                  color: stateColor.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Padding(

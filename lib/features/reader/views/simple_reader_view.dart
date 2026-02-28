@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
@@ -14,6 +13,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/config/migration_exclusions.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
@@ -69,6 +69,7 @@ import '../services/reader_search_navigation_helper.dart';
 import '../services/reader_source_action_helper.dart';
 import '../services/reader_source_switch_helper.dart';
 import '../services/reader_system_ui_helper.dart';
+import '../services/reader_theme_mode_helper.dart';
 import '../services/reader_top_bar_action_helper.dart';
 import '../services/reader_tip_selection_helper.dart';
 import '../services/read_aloud_service.dart';
@@ -197,6 +198,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       const ReadAloudStatusSnapshot.stopped();
   FlutterTts? _contentSelectReadAloudTts;
   bool _contentSelectReadAloudTtsReady = false;
+  bool _showingReadAloudExclusionDialog = false;
+
+  /// 迁移排除：朗读（TTS）入口提示文案（与全局排除口径一致）。
+  static const String _readAloudExclusionHint =
+      '迁移排除：朗读（TTS）功能暂不开放\n该入口仅保留锚点，不可操作';
 
   // 当前书籍信息
   String _bookAuthor = '';
@@ -553,6 +559,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
     _settingsService.readingSettingsListenable
         .addListener(_handleReadingSettingsChanged);
+    _settingsService.appSettingsListenable
+        .addListener(_handleAppSettingsChanged);
     _warmUpReadStyleBackgroundDirectoryPath();
     _autoPager.setSpeed(_settings.autoReadSpeed);
     _autoPager.setMode(_settings.pageTurnMode == PageTurnMode.scroll
@@ -662,6 +670,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _stopSourceSwitchCandidateSearch();
     _settingsService.readingSettingsListenable
         .removeListener(_handleReadingSettingsChanged);
+    _settingsService.appSettingsListenable
+        .removeListener(_handleAppSettingsChanged);
     _pageFactory.removeContentChangedListener(_handlePageFactoryContentChanged);
     unawaited(_saveProgress(forcePersistReadRecord: true));
     _scrollController.removeListener(_handleScrollControllerTick);
@@ -862,6 +872,28 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
     if (_isSameReadingSettings(_settings, latest)) return;
     _updateSettings(latest, persist: false);
+  }
+
+  /// 监听全局设置变化（外观模式、系统文本处理开关等）。
+  ///
+  /// 说明：
+  /// - 本页菜单项可见性依赖 `AppSettings.processText`；
+  /// - 主题模式解析依赖全局外观设置，变更后需要触发重建。
+  void _handleAppSettingsChanged() {
+    if (!mounted) return;
+    final appSettings = _settingsService.appSettings;
+    final resolvedMode = ReaderThemeModeHelper.resolveMode(
+      appearanceMode: appSettings.appearanceMode,
+      effectiveBrightness:
+          WidgetsBinding.instance.platformDispatcher.platformBrightness,
+    );
+    debugPrint(
+      '[reader] appSettings changed: '
+      'appearance=${appSettings.appearanceMode.name}, '
+      'mode=${resolvedMode.name}, '
+      'processText=${appSettings.processText}',
+    );
+    setState(() {});
   }
 
   bool _isSameReadingSettings(ReadingSettings a, ReadingSettings b) {
@@ -3145,12 +3177,26 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         }
         break;
       case ClickAction.readAloudPrevParagraph:
+        if (MigrationExclusions.excludeTts) {
+          unawaited(_showReadAloudExcludedHint(entry: 'click_action.prev'));
+          break;
+        }
         unawaited(_triggerReadAloudPreviousParagraph());
         break;
       case ClickAction.readAloudNextParagraph:
+        if (MigrationExclusions.excludeTts) {
+          unawaited(_showReadAloudExcludedHint(entry: 'click_action.next'));
+          break;
+        }
         unawaited(_triggerReadAloudNextParagraph());
         break;
       case ClickAction.readAloudPauseResume:
+        if (MigrationExclusions.excludeTts) {
+          unawaited(
+            _showReadAloudExcludedHint(entry: 'click_action.pause_resume'),
+          );
+          break;
+        }
         unawaited(_triggerReadAloudPauseResume());
         break;
       default:
@@ -4968,99 +5014,222 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _contentSelectMenuLongPressHandled = false;
     _contentSelectMenuLongPressResetTimer?.cancel();
     _contentSelectMenuLongPressResetTimer = null;
-    await showCupertinoModalPopup<void>(
-      context: context,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('文本操作'),
-        message: Text(_selectedTextActionPreview(selectedText)),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              if (_contentSelectMenuLongPressHandled) {
-                _contentSelectMenuLongPressHandled = false;
-                return;
-              }
-              Navigator.pop(sheetContext);
-              await _openReplaceRuleEditorFromSelectedText(selectedText);
-            },
-            child: _buildTextActionMenuLabel('替换'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              if (_contentSelectMenuLongPressHandled) {
-                _contentSelectMenuLongPressHandled = false;
-                return;
-              }
-              Navigator.pop(sheetContext);
-              await _copySelectedTextFromMenu(selection.text);
-            },
-            child: _buildTextActionMenuLabel('复制'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              if (_contentSelectMenuLongPressHandled) {
-                _contentSelectMenuLongPressHandled = false;
-                return;
-              }
-              Navigator.pop(sheetContext);
-              await _openBookmarkEditorFromSelectedText(selectedText);
-            },
-            child: _buildTextActionMenuLabel('书签'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              if (_contentSelectMenuLongPressHandled) {
-                _contentSelectMenuLongPressHandled = false;
-                return;
-              }
-              Navigator.pop(sheetContext);
-              await _handleSelectedTextReadAloud(selectedText);
-            },
-            child: _buildTextActionMenuLabel('朗读'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              if (_contentSelectMenuLongPressHandled) {
-                _contentSelectMenuLongPressHandled = false;
-                return;
-              }
-              Navigator.pop(sheetContext);
-              await _openDictDialogFromSelectedText(selectedText);
-            },
-            child: _buildTextActionMenuLabel('字典'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              if (_contentSelectMenuLongPressHandled) {
-                _contentSelectMenuLongPressHandled = false;
-                return;
-              }
-              Navigator.pop(sheetContext);
-              await _openBrowserFromSelectedText(selectedText);
-            },
-            child: _buildTextActionMenuLabel('浏览器'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              if (_contentSelectMenuLongPressHandled) {
-                _contentSelectMenuLongPressHandled = false;
-                return;
-              }
-              Navigator.pop(sheetContext);
-              await _shareSelectedText(selectedText);
-            },
-            child: _buildTextActionMenuLabel('分享'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
-        ),
-      ),
+    await _showTextActionMenu(
+      selectedText: selectedText,
+      rawSelectedText: selection.text,
     );
     _contentSelectMenuLongPressHandled = false;
     _contentSelectMenuLongPressResetTimer?.cancel();
     _contentSelectMenuLongPressResetTimer = null;
+  }
+
+  Future<void> _showTextActionMenu({
+    required String selectedText,
+    required String rawSelectedText,
+  }) async {
+    var expanded = false;
+    while (mounted) {
+      final selectedAction =
+          await showCupertinoModalPopup<_ReaderTextActionMenuAction>(
+        context: context,
+        builder: (sheetContext) => CupertinoActionSheet(
+          title: const Text('文本操作'),
+          message: Text(_selectedTextActionPreview(selectedText)),
+          actions: _buildTextActionMenuActions(
+            sheetContext: sheetContext,
+            expanded: expanded,
+          ),
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(sheetContext),
+            child: const Text('取消'),
+          ),
+        ),
+      );
+
+      _contentSelectMenuLongPressHandled = false;
+      _contentSelectMenuLongPressResetTimer?.cancel();
+      _contentSelectMenuLongPressResetTimer = null;
+      if (selectedAction == null) {
+        debugPrint('[reader][text-action] menu dismissed');
+        return;
+      }
+      if (selectedAction == _ReaderTextActionMenuAction.more) {
+        debugPrint('[reader][text-action] expand more');
+        expanded = true;
+        continue;
+      }
+      if (selectedAction == _ReaderTextActionMenuAction.collapse) {
+        debugPrint('[reader][text-action] collapse to primary');
+        expanded = false;
+        continue;
+      }
+      try {
+        await _handleTextActionMenuAction(
+          selectedAction,
+          selectedText: selectedText,
+          rawSelectedText: rawSelectedText,
+        );
+      } catch (error, stackTrace) {
+        ExceptionLogService().record(
+          node: 'reader.menu.content_select_action.execute',
+          message: '文本操作执行失败',
+          error: error,
+          stackTrace: stackTrace,
+          context: <String, dynamic>{
+            'action': _textActionMenuActionName(selectedAction),
+            'bookId': widget.bookId,
+            'chapterIndex': _currentChapterIndex,
+            'textLength': selectedText.length,
+          },
+        );
+        _showToast(_resolveTextActionErrorMessage(error));
+      }
+      return;
+    }
+  }
+
+  List<CupertinoActionSheetAction> _buildTextActionMenuActions({
+    required BuildContext sheetContext,
+    required bool expanded,
+  }) {
+    if (!expanded) {
+      return <CupertinoActionSheetAction>[
+        _buildTextActionMenuAction(
+          sheetContext: sheetContext,
+          action: _ReaderTextActionMenuAction.replace,
+          label: '替换',
+        ),
+        _buildTextActionMenuAction(
+          sheetContext: sheetContext,
+          action: _ReaderTextActionMenuAction.copy,
+          label: '复制',
+        ),
+        _buildTextActionMenuAction(
+          sheetContext: sheetContext,
+          action: _ReaderTextActionMenuAction.bookmark,
+          label: '书签',
+        ),
+        _buildTextActionMenuAction(
+          sheetContext: sheetContext,
+          action: _ReaderTextActionMenuAction.readAloud,
+          label: '朗读',
+        ),
+        _buildTextActionMenuAction(
+          sheetContext: sheetContext,
+          action: _ReaderTextActionMenuAction.dict,
+          label: '字典',
+        ),
+        _buildTextActionMenuAction(
+          sheetContext: sheetContext,
+          action: _ReaderTextActionMenuAction.more,
+          label: '更多',
+        ),
+      ];
+    }
+
+    final expandedActions = <CupertinoActionSheetAction>[
+      _buildTextActionMenuAction(
+        sheetContext: sheetContext,
+        action: _ReaderTextActionMenuAction.searchContent,
+        label: '搜索正文',
+      ),
+      _buildTextActionMenuAction(
+        sheetContext: sheetContext,
+        action: _ReaderTextActionMenuAction.browser,
+        label: '浏览器',
+      ),
+      _buildTextActionMenuAction(
+        sheetContext: sheetContext,
+        action: _ReaderTextActionMenuAction.share,
+        label: '分享',
+      ),
+      if (_settingsService.appSettings.processText)
+        _buildTextActionMenuAction(
+          sheetContext: sheetContext,
+          action: _ReaderTextActionMenuAction.processText,
+          label: '系统处理文本',
+        ),
+      _buildTextActionMenuAction(
+        sheetContext: sheetContext,
+        action: _ReaderTextActionMenuAction.collapse,
+        label: '收起',
+      ),
+    ];
+    return expandedActions;
+  }
+
+  CupertinoActionSheetAction _buildTextActionMenuAction({
+    required BuildContext sheetContext,
+    required _ReaderTextActionMenuAction action,
+    required String label,
+  }) {
+    return CupertinoActionSheetAction(
+      onPressed: () {
+        if (_contentSelectMenuLongPressHandled) {
+          _contentSelectMenuLongPressHandled = false;
+          return;
+        }
+        Navigator.pop(sheetContext, action);
+      },
+      child: _buildTextActionMenuLabel(label),
+    );
+  }
+
+  Future<void> _handleTextActionMenuAction(
+    _ReaderTextActionMenuAction action, {
+    required String selectedText,
+    required String rawSelectedText,
+  }) async {
+    debugPrint('[reader][text-action] selected=${_textActionMenuActionName(action)}');
+    switch (action) {
+      case _ReaderTextActionMenuAction.replace:
+        await _openReplaceRuleEditorFromSelectedText(selectedText);
+        return;
+      case _ReaderTextActionMenuAction.copy:
+        await _copySelectedTextFromMenu(rawSelectedText);
+        return;
+      case _ReaderTextActionMenuAction.bookmark:
+        await _openBookmarkEditorFromSelectedText(selectedText);
+        return;
+      case _ReaderTextActionMenuAction.readAloud:
+        await _handleSelectedTextReadAloud(selectedText);
+        return;
+      case _ReaderTextActionMenuAction.dict:
+        await _openDictDialogFromSelectedText(selectedText);
+        return;
+      case _ReaderTextActionMenuAction.searchContent:
+        await _searchSelectedTextInContent(selectedText);
+        return;
+      case _ReaderTextActionMenuAction.browser:
+        await _openBrowserFromSelectedText(selectedText);
+        return;
+      case _ReaderTextActionMenuAction.share:
+        await _shareSelectedText(selectedText);
+        return;
+      case _ReaderTextActionMenuAction.processText:
+        await _processSelectedTextWithSystem(selectedText);
+        return;
+      case _ReaderTextActionMenuAction.more:
+      case _ReaderTextActionMenuAction.collapse:
+        return;
+    }
+  }
+
+  /// 统一文本操作枚举名称，便于日志与异常记录定位。
+  String _textActionMenuActionName(_ReaderTextActionMenuAction action) {
+    return switch (action) {
+      _ReaderTextActionMenuAction.replace => 'replace',
+      _ReaderTextActionMenuAction.copy => 'copy',
+      _ReaderTextActionMenuAction.bookmark => 'bookmark',
+      _ReaderTextActionMenuAction.readAloud => 'readAloud',
+      _ReaderTextActionMenuAction.dict => 'dict',
+      _ReaderTextActionMenuAction.searchContent => 'searchContent',
+      _ReaderTextActionMenuAction.browser => 'browser',
+      _ReaderTextActionMenuAction.share => 'share',
+      _ReaderTextActionMenuAction.processText => 'processText',
+      _ReaderTextActionMenuAction.more => 'more',
+      _ReaderTextActionMenuAction.collapse => 'collapse',
+    };
   }
 
   Widget _buildTextActionMenuLabel(String label) {
@@ -5177,6 +5346,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (normalizedText.isEmpty) {
       return;
     }
+    if (MigrationExclusions.excludeTts) {
+      await _showReadAloudExcludedHint(entry: 'text_action_menu.read_aloud');
+      return;
+    }
     if (_contentSelectSpeakMode == 1) {
       await _startReadAloudFromSelectedText(normalizedText);
       return;
@@ -5222,6 +5395,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
   }
 
+  Future<void> _searchSelectedTextInContent(String selectedText) async {
+    final normalizedText = _normalizeSelectedTextForTextAction(selectedText);
+    if (normalizedText.isEmpty) {
+      return;
+    }
+    await _applyContentSearch(normalizedText);
+  }
+
   Future<void> _copySelectedTextFromMenu(String selectedText) async {
     if (selectedText.isEmpty) {
       return;
@@ -5260,6 +5441,38 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       );
     } catch (_) {
       // 对齐 legado Context.share：分享异常静默吞掉，不追加提示。
+    }
+  }
+
+  Future<void> _processSelectedTextWithSystem(String selectedText) async {
+    final normalizedText = _normalizeSelectedTextForTextAction(selectedText);
+    if (normalizedText.isEmpty) {
+      return;
+    }
+    if (!_settingsService.appSettings.processText) {
+      _showToast('系统文本处理已关闭');
+      return;
+    }
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: normalizedText,
+          subject: '系统处理文本',
+        ),
+      );
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'reader.menu.content_select_action.process_text.failed',
+        message: '系统处理文本失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'bookId': widget.bookId,
+          'chapterIndex': _currentChapterIndex,
+          'textLength': normalizedText.length,
+        },
+      );
+      _showToast('ERROR');
     }
   }
 
@@ -5968,11 +6181,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   void _openReadAloudFromMenu() {
     _closeReaderMenuOverlay();
+    if (MigrationExclusions.excludeTts) {
+      unawaited(_showReadAloudExcludedHint(entry: 'bottom_menu.tap'));
+      return;
+    }
     unawaited(_openReadAloudAction());
   }
 
   void _openReadAloudDialogFromMenu() {
     _closeReaderMenuOverlay();
+    if (MigrationExclusions.excludeTts) {
+      unawaited(_showReadAloudExcludedHint(entry: 'bottom_menu.long_press'));
+      return;
+    }
     unawaited(_showAudioPlayActionsFromMenu());
   }
 
@@ -6512,6 +6733,45 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     _updateSettings(_settings.copyWith(themeIndex: targetIndex));
   }
 
+  /// 迁移排除态提示：朗读（TTS）仅保留锚点，不进入业务实现。
+  ///
+  /// 约束：
+  /// - 需要用户可感知（避免“静默无反应”）；
+  /// - 文案与全局排除口径一致；
+  /// - 避免重复弹窗堆叠导致交互异常。
+  Future<void> _showReadAloudExcludedHint({required String entry}) async {
+    if (!mounted) return;
+    debugPrint('[migration-exclusion][tts] blocked entry=$entry');
+
+    if (_showingReadAloudExclusionDialog) {
+      _showToast('朗读（TTS）功能暂不开放');
+      return;
+    }
+
+    _showingReadAloudExclusionDialog = true;
+    try {
+      await showCupertinoDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('扩展阶段'),
+          content: Text('\n$_readAloudExclusionHint'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('好'),
+            ),
+          ],
+        ),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('[migration-exclusion][tts] dialog failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      _showToast('朗读（TTS）功能暂不开放');
+    } finally {
+      _showingReadAloudExclusionDialog = false;
+    }
+  }
+
   Future<void> _triggerReadAloudPreviousParagraph() async {
     final result = await _readAloudService.previousParagraph();
     if (!mounted) return;
@@ -6596,6 +6856,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _syncReadAloudChapterContext() {
+    // 迁移排除态下不进入朗读业务链路：不主动同步章节上下文。
+    if (MigrationExclusions.excludeTts) return;
     unawaited(
       _readAloudService.updateChapter(
         chapterIndex: _currentChapterIndex,
@@ -6753,10 +7015,39 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     });
     _setSearchMenuVisible(true);
 
-    final hits = await _collectBookContentSearchHits(
-      normalized,
-      taskToken: taskToken,
+    debugPrint(
+      '[reader][content-search] start token=$taskToken queryLength=${normalized.length}',
     );
+    late final List<_ReaderSearchHit> hits;
+    try {
+      hits = await _collectBookContentSearchHits(
+        normalized,
+        taskToken: taskToken,
+      );
+    } catch (error, stackTrace) {
+      if (!mounted || taskToken != _contentSearchTaskToken) {
+        return;
+      }
+      ExceptionLogService().record(
+        node: 'reader.menu.search_content.collect',
+        message: '全文搜索失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'bookId': widget.bookId,
+          'chapterIndex': _currentChapterIndex,
+          'queryLength': normalized.length,
+          'searchableChapterCount': _effectiveReadableChapters().length,
+        },
+      );
+      setState(() {
+        _isSearchingContent = false;
+        _contentSearchHits = const <_ReaderSearchHit>[];
+        _currentSearchHitIndex = -1;
+      });
+      _showToast('全文搜索失败');
+      return;
+    }
     if (!mounted || taskToken != _contentSearchTaskToken) {
       return;
     }
@@ -6766,6 +7057,9 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _contentSearchHits = hits;
       _currentSearchHitIndex = hits.isEmpty ? -1 : 0;
     });
+    debugPrint(
+      '[reader][content-search] done token=$taskToken hits=${hits.length}',
+    );
 
     if (hits.isNotEmpty) {
       unawaited(_jumpToSearchHit(hits.first));
@@ -7124,6 +7418,10 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _exitSearchMenu() {
+    debugPrint(
+      '[reader][content-search] exit queryLength=${_contentSearchQuery.length} '
+      'hits=${_contentSearchHits.length}',
+    );
     _contentSearchTaskToken += 1;
     setState(() {
       _showSearchMenu = false;
@@ -7392,13 +7690,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }) {
     return CupertinoButton(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      minSize: 30,
       onPressed: onTap,
       child: Icon(
         icon,
         size: 18,
         color: onTap == null ? _uiTextSubtle : _uiTextStrong,
-      ),
+      ), minimumSize: Size(30, 30),
     );
   }
 
@@ -7412,7 +7709,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final color = enabled ? (activeColor ?? _uiTextStrong) : _uiTextSubtle;
     return CupertinoButton(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      minSize: 0,
       onPressed: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -7428,7 +7724,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             ),
           ),
         ],
-      ),
+      ), minimumSize: Size(0, 0),
     );
   }
 
@@ -12107,13 +12403,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         ),
                         CupertinoButton(
                           padding: EdgeInsets.zero,
-                          minSize: 30,
                           onPressed: () => Navigator.pop(dialogContext),
                           child: Icon(
                             CupertinoIcons.xmark_circle_fill,
                             color: _uiTextSubtle,
                             size: 24,
-                          ),
+                          ), minimumSize: Size(30, 30),
                         ),
                       ],
                     ),
@@ -12647,14 +12942,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             height: 24,
             child: CupertinoButton(
               padding: EdgeInsets.zero,
-              minSize: 24,
               onPressed:
                   safeProgress > 0 ? () => onChanged(safeProgress - 1) : null,
               child: Icon(
                 CupertinoIcons.minus,
                 size: 18,
                 color: safeProgress > 0 ? _uiTextStrong : _uiTextSubtle,
-              ),
+              ), minimumSize: Size(24, 24),
             ),
           ),
           Expanded(
@@ -12671,7 +12965,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
             height: 24,
             child: CupertinoButton(
               padding: EdgeInsets.zero,
-              minSize: 24,
               onPressed: safeProgress < safeMax
                   ? () => onChanged(safeProgress + 1)
                   : null,
@@ -12679,7 +12972,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 CupertinoIcons.add,
                 size: 18,
                 color: safeProgress < safeMax ? _uiTextStrong : _uiTextSubtle,
-              ),
+              ), minimumSize: Size(24, 24),
             ),
           ),
           SizedBox(
@@ -15283,7 +15576,6 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 CupertinoButton(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minSize: 30,
                   onPressed: () =>
                       unawaited(_onSelectDefaultSystemTypeface(parentSetState)),
                   child: Text(
@@ -15293,12 +15585,11 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
-                  ),
+                  ), minimumSize: Size(30, 30),
                 ),
                 CupertinoButton(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minSize: 30,
                   onPressed: () => unawaited(
                     _onSelectOtherFontFolder(parentSetState, setDialogState),
                   ),
@@ -15309,17 +15600,16 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
-                  ),
+                  ), minimumSize: Size(30, 30),
                 ),
                 CupertinoButton(
                   padding: EdgeInsets.zero,
-                  minSize: 30,
                   onPressed: () => Navigator.of(context).pop(),
                   child: Icon(
                     CupertinoIcons.xmark_circle_fill,
                     color: _uiTextSubtle,
                     size: 24,
-                  ),
+                  ), minimumSize: Size(30, 30),
                 ),
               ],
             ),
@@ -16416,6 +16706,20 @@ class _ReaderOfflineCacheRange {
     required this.startIndex,
     required this.endIndex,
   });
+}
+
+enum _ReaderTextActionMenuAction {
+  replace,
+  copy,
+  bookmark,
+  readAloud,
+  dict,
+  searchContent,
+  browser,
+  share,
+  processText,
+  more,
+  collapse,
 }
 
 enum _ReaderAudioPlayMenuAction {

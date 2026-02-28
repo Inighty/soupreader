@@ -828,9 +828,8 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
                       children: [
                         CupertinoButton(
                           padding: const EdgeInsets.all(4),
-                          minSize: 30,
                           onPressed: () => Navigator.of(context).pop(),
-                          child: const Icon(CupertinoIcons.xmark),
+                          child: const Icon(CupertinoIcons.xmark), minimumSize: Size(30, 30),
                         ),
                         Expanded(
                           child: Text(
@@ -844,9 +843,8 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
                         ),
                         CupertinoButton(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
-                          minSize: 30,
                           onPressed: widget.onDownload,
-                          child: const Text('下载'),
+                          child: const Text('下载'), minimumSize: Size(30, 30),
                         ),
                       ],
                     ),

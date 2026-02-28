@@ -251,9 +251,8 @@ class _DirectLinkUploadConfigViewState
       title: '直链上传配置',
       trailing: CupertinoButton(
         padding: EdgeInsets.zero,
-        minSize: 30,
         onPressed: _showMoreMenu,
-        child: const Icon(CupertinoIcons.ellipsis),
+        child: const Icon(CupertinoIcons.ellipsis), minimumSize: Size(30, 30),
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())

@@ -4,10 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/rendering.dart' show RenderBox;
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart'
-    show ReorderableDragStartListener, SliverReorderableList;
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
