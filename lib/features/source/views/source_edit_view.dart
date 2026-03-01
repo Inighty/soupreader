@@ -2470,7 +2470,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     final debugKey = _debugKeyCtrl.text.trim();
 
     final lines = <String>[
-      'SoupReader 最小复现信息',
+      '最小复现信息',
       '生成时间：$now',
       'Debug Key：${debugKey.isEmpty ? '-' : debugKey}',
       if (source != null) '书源名称：${source.bookSourceName}',
@@ -3640,7 +3640,7 @@ class _SourceEditViewState extends State<SourceEditView> {
 
     final report = _ruleLintService.lintFromJson(map);
     final lines = <String>[
-      'SoupReader 规则体检报告',
+      '规则体检报告',
       '错误：${report.errorCount}',
       '警告：${report.warningCount}',
       '建议：${report.infoCount}',

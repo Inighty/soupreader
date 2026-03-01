@@ -263,7 +263,7 @@ class _SourceAvailabilityCheckViewState
         : _items;
 
     final lines = <String>[
-      'SoupReader 书源可用性检测报告',
+      '书源可用性检测报告',
       '生成时间：$now',
       '范围：${activeConfig.includeDisabled ? '全部书源' : '仅启用书源'}',
       if (activeConfig.normalizedKeyword().isNotEmpty)
