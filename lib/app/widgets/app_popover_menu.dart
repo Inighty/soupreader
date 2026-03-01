@@ -3,6 +3,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
 
+import '../theme/ui_tokens.dart';
+
 const double _screenEdgePadding = 10.0;
 const double _popoverVerticalGap = 8.0;
 
@@ -59,8 +61,8 @@ Future<T?> showAppPopoverMenu<T>({
   required GlobalKey anchorKey,
   required List<AppPopoverMenuItem<T>> items,
   double width = 196,
-  double itemHeight = 44,
-  double radius = 12,
+  double itemHeight = kMinInteractiveDimensionCupertino,
+  double? radius,
   double verticalPadding = 6,
   double backdropBlurSigma = 10,
 }) {
@@ -85,14 +87,16 @@ Future<T?> showAppPopoverMenu<T>({
     // 在 iOS 上更接近原生 Popover：背景略模糊 + 轻微遮罩。
     barrierColor: CupertinoColors.transparent,
     pageBuilder: (popupContext, __, ___) {
+      final uiTokens = AppUiTokens.resolve(popupContext);
+      final resolvedRadius = radius ?? uiTokens.radii.popover;
       final isDark = CupertinoTheme.of(popupContext).brightness == Brightness.dark;
       final backdropMask = isDark
           ? CupertinoColors.black.withValues(alpha: 0.18)
           : CupertinoColors.black.withValues(alpha: 0.06);
-      final labelColor = CupertinoColors.label.resolveFrom(popupContext);
-      final iconColor = CupertinoColors.secondaryLabel.resolveFrom(popupContext);
-      final destructiveColor = CupertinoColors.systemRed.resolveFrom(popupContext);
-      final bg = CupertinoColors.systemBackground.resolveFrom(popupContext);
+      final labelColor = uiTokens.colors.label;
+      final iconColor = uiTokens.colors.secondaryLabel;
+      final destructiveColor = uiTokens.colors.destructive;
+      final bg = uiTokens.colors.surfaceBackground;
 
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -118,7 +122,7 @@ Future<T?> showAppPopoverMenu<T>({
               width: width,
               child: _PopoverSurface(
                 backgroundColor: bg,
-                radius: radius,
+                radius: resolvedRadius,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxHeight: layout.maxHeight),
                   child: Padding(

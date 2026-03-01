@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 
-import '../theme/design_tokens.dart';
+import '../theme/ui_tokens.dart';
 
 class AppActionListItem<T> {
   final T value;
@@ -47,10 +47,8 @@ Future<T?> showAppActionListSheet<T>({
 }
 
 class _AppActionListSheet<T> extends StatelessWidget {
-  static const double _radius = 18;
   static const double _maxHeightFactor = 0.74;
   static const double _rowHeight = 48;
-  static const double _dividerHeight = 0.5;
 
   final String title;
   final String? message;
@@ -72,16 +70,15 @@ class _AppActionListSheet<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = _ActionListTokens.resolve(
-      context: context,
-      accentColor: accentColor,
-    );
+    final ui = AppUiTokens.resolve(context);
+    final resolvedAccent = accentColor ?? ui.colors.accent;
     final bottomInset = math.max(MediaQuery.of(context).padding.bottom, 8.0);
     final trimmedMessage = (message ?? '').trim();
     final maxHeight = MediaQuery.sizeOf(context).height * _maxHeightFactor;
     final children = _buildChildren(
       context,
-      tokens: tokens,
+      ui: ui,
+      accent: resolvedAccent,
       trimmedMessage: trimmedMessage,
     );
 
@@ -90,12 +87,13 @@ class _AppActionListSheet<T> extends StatelessWidget {
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: tokens.sheetBg,
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(_radius)),
+          color: ui.colors.groupedBackground,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(ui.radii.sheet),
+          ),
         ),
         child: Padding(
-          padding: EdgeInsets.fromLTRB(0, 10, 0, bottomInset),
+          padding: EdgeInsets.fromLTRB(10, 10, 10, bottomInset),
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxHeight),
             child: ListView(
@@ -111,51 +109,63 @@ class _AppActionListSheet<T> extends StatelessWidget {
 
   List<Widget> _buildChildren(
     BuildContext context, {
-    required _ActionListTokens tokens,
+    required AppUiTokens ui,
+    required Color accent,
     required String trimmedMessage,
   }) {
-    final dividerColor = CupertinoColors.systemGrey5.resolveFrom(context);
+    final dividerColor = ui.colors.separator;
+    final dividerHeight = ui.sizes.dividerThickness;
+    final cardRadius = ui.radii.card;
+    final cardBg = ui.colors.surfaceBackground;
 
-    final children = <Widget>[
+    final actionCardChildren = <Widget>[
       _SheetHeader(
         title: title,
         message: trimmedMessage,
         titleAlign: titleAlign,
-        titleColor: tokens.labelColor,
-        messageColor: tokens.subtleColor,
+        titleColor: ui.colors.label,
+        messageColor: ui.colors.secondaryLabel,
       ),
+      if (items.isNotEmpty)
+        Container(height: dividerHeight, color: dividerColor),
+      if (items.isNotEmpty)
+        for (var i = 0; i < items.length; i++) ...[
+          _ActionRow<T>(
+            height: _rowHeight,
+            item: items[i],
+            accent: accent,
+            labelColor: ui.colors.label,
+            destructiveColor: ui.colors.destructive,
+          ),
+          if (i != items.length - 1)
+            Container(height: dividerHeight, color: dividerColor),
+        ],
     ];
 
-    if (items.isNotEmpty) {
-      children.add(
-        Column(
+    final children = <Widget>[
+      _SheetCard(
+        backgroundColor: cardBg,
+        radius: cardRadius,
+        child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = 0; i < items.length; i++) ...[
-              _ActionRow<T>(
-                height: _rowHeight,
-                item: items[i],
-                accent: tokens.accent,
-                labelColor: tokens.labelColor,
-                destructiveColor: tokens.destructiveColor,
-              ),
-              if (i != items.length - 1)
-                Container(height: _dividerHeight, color: dividerColor),
-            ],
-          ],
+          children: actionCardChildren,
         ),
-      );
-    }
+      ),
+    ];
 
     if (showCancel) {
       children.addAll(
         [
           const SizedBox(height: 10),
-          _CancelRow(
-            height: _rowHeight,
-            label: cancelText,
-            labelColor: tokens.labelColor,
-            onTap: () => Navigator.of(context).pop(),
+          _SheetCard(
+            backgroundColor: cardBg,
+            radius: cardRadius,
+            child: _CancelRow(
+              height: _rowHeight,
+              label: cancelText,
+              labelColor: ui.colors.label,
+              onTap: () => Navigator.of(context).pop(),
+            ),
           ),
         ],
       );
@@ -164,36 +174,26 @@ class _AppActionListSheet<T> extends StatelessWidget {
   }
 }
 
-class _ActionListTokens {
-  final Color accent;
-  final Color labelColor;
-  final Color subtleColor;
-  final Color destructiveColor;
-  final Color sheetBg;
+class _SheetCard extends StatelessWidget {
+  final Widget child;
+  final Color backgroundColor;
+  final double radius;
 
-  const _ActionListTokens({
-    required this.accent,
-    required this.labelColor,
-    required this.subtleColor,
-    required this.destructiveColor,
-    required this.sheetBg,
+  const _SheetCard({
+    required this.child,
+    required this.backgroundColor,
+    required this.radius,
   });
 
-  factory _ActionListTokens.resolve({
-    required BuildContext context,
-    required Color? accentColor,
-  }) {
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final accent = accentColor ??
-        (isDark
-            ? AppDesignTokens.brandSecondary
-            : AppDesignTokens.brandPrimary);
-    return _ActionListTokens(
-      accent: accent,
-      labelColor: CupertinoColors.label.resolveFrom(context),
-      subtleColor: CupertinoColors.secondaryLabel.resolveFrom(context),
-      destructiveColor: CupertinoColors.systemRed.resolveFrom(context),
-      sheetBg: CupertinoColors.systemBackground.resolveFrom(context),
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
     );
   }
 }
@@ -324,30 +324,23 @@ class _CancelRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dividerColor = CupertinoColors.systemGrey5.resolveFrom(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(height: _AppActionListSheet._dividerHeight, color: dividerColor),
-        CupertinoButton(
-          padding: EdgeInsets.zero,
-          minimumSize: Size.zero,
-          onPressed: onTap,
-          child: SizedBox(
-            height: height,
-            width: double.infinity,
-            child: Center(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: labelColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: SizedBox(
+        height: height,
+        width: double.infinity,
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: labelColor,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }

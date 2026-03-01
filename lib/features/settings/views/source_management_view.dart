@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../core/config/migration_exclusions.dart';
 import '../../reader/views/speak_engine_manage_view.dart';
 import '../../reader/views/txt_toc_rule_manage_view.dart';
@@ -19,16 +20,15 @@ class SourceManagementView extends StatelessWidget {
     final showSpeakManagement = !MigrationExclusions.excludeTts;
     return AppCupertinoPageScaffold(
       title: '源管理',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('管理'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('书源管理'),
                 additionalInfo: const Text('导入/导出/启用'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () {
                   Navigator.of(context).push(
                     CupertinoPageRoute<void>(
@@ -38,10 +38,9 @@ class SourceManagementView extends StatelessWidget {
                 },
               ),
               if (showRssManagement)
-                CupertinoListTile.notched(
+                AppListTile(
                   title: const Text('订阅管理'),
                   additionalInfo: const Text('搜索/分组/启停'),
-                  trailing: const CupertinoListTileChevron(),
                   onTap: () {
                     Navigator.of(context).push(
                       CupertinoPageRoute<void>(
@@ -51,10 +50,9 @@ class SourceManagementView extends StatelessWidget {
                   },
                 ),
               if (showSpeakManagement)
-                CupertinoListTile.notched(
+                AppListTile(
                   title: const Text('语音管理'),
                   additionalInfo: const Text('系统/HTTP 引擎'),
-                  trailing: const CupertinoListTileChevron(),
                   onTap: () {
                     Navigator.of(context).push(
                       CupertinoPageRoute<void>(
@@ -65,13 +63,13 @@ class SourceManagementView extends StatelessWidget {
                 ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('规则'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('替换净化'),
                 additionalInfo: const Text('净化/繁简'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () {
                   Navigator.of(context).push(
                     CupertinoPageRoute<void>(
@@ -80,10 +78,9 @@ class SourceManagementView extends StatelessWidget {
                   );
                 },
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('目录规则'),
                 additionalInfo: const Text('书源编辑'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () {
                   Navigator.of(context).push(
                     CupertinoPageRoute<void>(
@@ -92,13 +89,12 @@ class SourceManagementView extends StatelessWidget {
                   );
                 },
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('广告屏蔽'),
                 additionalInfo: const Text(
                   SettingsUiTokens.plannedLabel,
                   style: TextStyle(color: CupertinoColors.secondaryLabel),
                 ),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => SettingsPlaceholders.showNotImplemented(
                   context,
                   title: '广告屏蔽规则暂未实现',

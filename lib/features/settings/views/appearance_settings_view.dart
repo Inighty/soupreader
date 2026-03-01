@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -460,20 +461,19 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
 
     return AppCupertinoPageScaffold(
       title: '外观与通用',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('外观'),
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('跟随系统外观'),
                 trailing: CupertinoSwitch(
                   value: followSystem,
                   onChanged: (_) => _showThemeModeManagedHint(),
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('深色模式'),
                 trailing: CupertinoSwitch(
                   value: effectiveIsDark,
@@ -482,80 +482,73 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('主题底层配置'),
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('启动图标'),
                 additionalInfo:
                     Text(_launcherIconLabel(_settings.launcherIcon)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _pickLauncherIcon,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('沉浸状态栏'),
                 trailing: CupertinoSwitch(
                   value: _settings.transparentStatusBar,
                   onChanged: _toggleTransparentStatusBar,
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('沉浸导航栏'),
                 trailing: CupertinoSwitch(
                   value: _settings.immNavigationBar,
                   onChanged: _toggleImmNavigationBar,
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('导航栏阴影'),
                 additionalInfo: Text(_barElevationSummary),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _pickBarElevation,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('字体缩放'),
                 additionalInfo: Text(_fontScaleSummary),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _pickFontScale,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('白天背景图'),
                 additionalInfo: Text(
                   _backgroundImageSummary(_settings.backgroundImage),
                 ),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editBackgroundImage(night: false),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('白天模糊度'),
                 additionalInfo: Text(
                   _settings.backgroundImageBlurring.toString(),
                 ),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _pickBackgroundImageBlurring(night: false),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('夜间背景图'),
                 additionalInfo: Text(
                   _backgroundImageSummary(_settings.backgroundImageNight),
                 ),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editBackgroundImage(night: true),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('夜间模糊度'),
                 additionalInfo: Text(
                   _settings.backgroundImageNightBlurring.toString(),
                 ),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _pickBackgroundImageBlurring(night: true),
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('说明'),
-            children: const [
-              CupertinoListTile(
+            children: [
+              const AppListTile(
                 title: Text('本页用于应用外观与主题底层配置，不影响阅读主题。'),
               ),
             ],

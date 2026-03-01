@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../../app/theme/cupertino_theme.dart';
@@ -315,69 +316,60 @@ class _ThemeSettingsViewState extends State<ThemeSettingsView> {
         padding: EdgeInsets.zero,
         onPressed: _showThemeModeManagedHint,
         child: const Text('主题模式'),
-        minimumSize: Size(30, 30),
+        minimumSize: const Size(30, 30),
       ),
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: Text('主题模式：${_themeModeSummary(context)}'),
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('启动界面样式'),
                 additionalInfo: const Text('启动界面图片和是否显示文字等'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _openWelcomeStyle,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('封面设置'),
                 additionalInfo: const Text('通用封面规则及默认封面样式'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _openCoverConfig,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('主题列表'),
                 additionalInfo: const Text('使用、保存、导入或分享主题'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _openThemeList,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('保存白天主题'),
                 additionalInfo: const Text('保存当前白天主题快照'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _saveThemeSnapshot(isNightTheme: false),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('保存夜间主题'),
                 additionalInfo: const Text('保存当前夜间主题快照'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _saveThemeSnapshot(isNightTheme: true),
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('界面与阅读'),
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('外观与主题底层'),
                 additionalInfo: Text(_appearanceSummary()),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _openAppearanceSettings,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('阅读主题'),
                 additionalInfo: const Text('主题 / 字体 / 排版'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => Navigator.of(context).push(
                   CupertinoPageRoute<void>(
                     builder: (context) => const ReadingThemeSettingsView(),
                   ),
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('阅读界面样式'),
                 additionalInfo: const Text('页眉页脚 / 排版 / 标题'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => Navigator.of(context).push(
                   CupertinoPageRoute<void>(
                     builder: (context) =>

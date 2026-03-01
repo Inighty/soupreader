@@ -7,6 +7,7 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_popover_menu.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -791,7 +792,7 @@ class _SourceListViewState extends State<SourceListView> {
       itemCount: visible.length,
       separatorBuilder: (_, __) => Container(
         height: 0.5,
-        color: CupertinoColors.systemGrey4.resolveFrom(context),
+        color: CupertinoColors.separator.resolveFrom(context),
       ),
       itemBuilder: (context, index) {
         final source = visible[index];
@@ -3875,8 +3876,9 @@ class _SourceSortSheetState extends State<_SourceSortSheet> {
             physics: const BouncingScrollPhysics(),
             children: [
               _buildHeader(handleColor: handleColor, titleColor: titleColor),
-              CupertinoListSection.insetGrouped(
+              AppListSection(
                 header: const Text('类型'),
+                hasLeading: false,
                 children: [
                   for (final mode in _SourceSortSheet._modeOrder)
                     _buildOptionRow(
@@ -3886,11 +3888,20 @@ class _SourceSortSheetState extends State<_SourceSortSheet> {
                     ),
                 ],
               ),
-              CupertinoListSection.insetGrouped(
+              AppListSection(
                 header: const Text('顺序'),
+                hasLeading: false,
                 children: [
-                  _buildOptionRow(title: '升序', selected: _ascending, onTap: () => _update(ascending: true)),
-                  _buildOptionRow(title: '降序', selected: !_ascending, onTap: () => _update(ascending: false)),
+                  _buildOptionRow(
+                    title: '升序',
+                    selected: _ascending,
+                    onTap: () => _update(ascending: true),
+                  ),
+                  _buildOptionRow(
+                    title: '降序',
+                    selected: !_ascending,
+                    onTap: () => _update(ascending: false),
+                  ),
                 ],
               ),
             ],
@@ -3937,7 +3948,7 @@ class _SourceSortSheetState extends State<_SourceSortSheet> {
     required VoidCallback onTap,
   }) {
     final accent = CupertinoTheme.of(context).primaryColor;
-    return CupertinoListTile.notched(
+    return AppListTile(
       title: Text(
         title,
         style: TextStyle(
@@ -3949,6 +3960,7 @@ class _SourceSortSheetState extends State<_SourceSortSheet> {
           ? Icon(CupertinoIcons.check_mark, size: 18, color: accent)
           : null,
       onTap: onTap,
+      showChevron: false,
     );
   }
 }
@@ -4031,11 +4043,11 @@ class _SourceGroupFilterSheet extends StatelessWidget {
   }
 
   Widget _buildManageSection(BuildContext context) {
-    return CupertinoListSection.insetGrouped(
+    return AppListSection(
+      hasLeading: false,
       children: [
-        CupertinoListTile.notched(
+        AppListTile(
           title: const Text('分组管理'),
-          trailing: const CupertinoListTileChevron(),
           onTap: () => onOpenGroupManage(context),
         ),
         _buildCheckRow(
@@ -4049,7 +4061,8 @@ class _SourceGroupFilterSheet extends StatelessWidget {
   }
 
   Widget _buildPresetFiltersSection(BuildContext context) {
-    return CupertinoListSection.insetGrouped(
+    return AppListSection(
+      hasLeading: false,
       children: [
         _buildActionRow(title: '已启用', onTap: () => onApplyQuery('已启用', context)),
         _buildActionRow(title: '已禁用', onTap: () => onApplyQuery('已禁用', context)),
@@ -4062,8 +4075,9 @@ class _SourceGroupFilterSheet extends StatelessWidget {
   }
 
   Widget _buildGroupsSection(BuildContext context) {
-    return CupertinoListSection.insetGrouped(
+    return AppListSection(
       header: const Text('分组'),
+      hasLeading: false,
       children: [
         for (final group in groups)
           _buildActionRow(
@@ -4075,11 +4089,13 @@ class _SourceGroupFilterSheet extends StatelessWidget {
   }
 
   Widget _buildCancelSection(BuildContext context) {
-    return CupertinoListSection.insetGrouped(
+    return AppListSection(
+      hasLeading: false,
       children: [
-        CupertinoListTile.notched(
+        AppListTile(
           title: const Text('取消'),
           onTap: () => Navigator.of(context).pop(),
+          showChevron: false,
         ),
       ],
     );
@@ -4120,12 +4136,13 @@ class _SourceGroupFilterSheet extends StatelessWidget {
     required String title,
     required VoidCallback onTap,
   }) {
-    return CupertinoListTile.notched(
+    return AppListTile(
       title: Text(
         title,
         style: const TextStyle(fontWeight: FontWeight.w600),
       ),
       onTap: onTap,
+      showChevron: false,
     );
   }
 
@@ -4136,7 +4153,7 @@ class _SourceGroupFilterSheet extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     final accent = CupertinoTheme.of(context).primaryColor;
-    return CupertinoListTile.notched(
+    return AppListTile(
       title: Text(
         title,
         style: TextStyle(
@@ -4148,6 +4165,7 @@ class _SourceGroupFilterSheet extends StatelessWidget {
           ? Icon(CupertinoIcons.check_mark, size: 18, color: accent)
           : null,
       onTap: onTap,
+      showChevron: false,
     );
   }
 }
