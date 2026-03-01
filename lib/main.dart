@@ -61,12 +61,10 @@ void main() {
     return true;
   };
 
-  runZonedGuarded(() async {
-    final bootFailure = await _bootstrapApp();
-
-    debugPrint('[boot] runApp start');
-    runApp(SoupReaderApp(initialBootFailure: bootFailure));
-    debugPrint('[boot] runApp done');
+  runZonedGuarded(() {
+    // 先渲染启动界面，再异步执行 bootstrap。
+    // 这能避免 iOS Release 下“长时间停留在白屏/启动图”的问题。
+    runApp(const _BootHostApp());
   }, (Object error, StackTrace stack) {
     debugPrint('[zone-error] $error');
     ExceptionLogService().record(
@@ -79,17 +77,166 @@ void main() {
   });
 }
 
-Future<BootFailure?> _bootstrapApp() async {
+class _BootHostApp extends StatefulWidget {
+  const _BootHostApp();
+
+  @override
+  State<_BootHostApp> createState() => _BootHostAppState();
+}
+
+class _BootHostAppState extends State<_BootHostApp> {
+  static const Duration _kTickerInterval = Duration(seconds: 1);
+  static const double _kHorizontalPadding = 24;
+  static const double _kTitleFontSize = 16;
+  static const double _kMetaFontSize = 12;
+  static const double _kGapLg = 14;
+  static const double _kGapMd = 8;
+  static const double _kGapSm = 6;
+
+  BootFailure? _bootFailure;
+  bool _bootFinished = false;
+  String _bootStep = 'boot.start';
+  Timer? _ticker;
+  int _startedAtMs = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startedAtMs = DateTime.now().millisecondsSinceEpoch;
+    // 让“已用时”每秒刷新一次；同时也能验证首帧是否正常渲染。
+    _ticker = Timer.periodic(_kTickerInterval, (_) {
+      if (!mounted || _bootFinished) return;
+      setState(() {});
+    });
+    unawaited(_runBootstrap());
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _runBootstrap() async {
+    BootFailure? failure;
+    try {
+      failure = await _bootstrapApp(
+        onStepChanged: (step) {
+          if (!mounted) return;
+          setState(() => _bootStep = step);
+        },
+      );
+    } catch (e, st) {
+      debugPrint('[boot] unexpected error: $e');
+      debugPrintStack(stackTrace: st);
+      ExceptionLogService().record(
+        node: 'bootstrap.unexpected',
+        message: '启动流程发生未捕获异常',
+        error: e,
+        stackTrace: st,
+      );
+      failure = BootFailure(
+        stepName: 'unknown',
+        error: e,
+        stack: st,
+      );
+    }
+    if (!mounted) return;
+    setState(() {
+      _bootFailure = failure;
+      _bootFinished = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_bootFinished) {
+      return SoupReaderApp(initialBootFailure: _bootFailure);
+    }
+
+    return _buildBootingApp();
+  }
+
+  CupertinoApp _buildBootingApp() {
+    final brightness =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    final theme = AppCupertinoTheme.build(brightness);
+
+    return CupertinoApp(
+      title: 'SoupReader',
+      debugShowCheckedModeBanner: false,
+      theme: theme,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('zh', 'CN'),
+        Locale('en', 'US'),
+      ],
+      home: _buildBootingHome(),
+    );
+  }
+
+  CupertinoPageScaffold _buildBootingHome() {
+    final elapsedSeconds =
+        (DateTime.now().millisecondsSinceEpoch - _startedAtMs) / 1000.0;
+
+    return CupertinoPageScaffold(
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: _kHorizontalPadding),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CupertinoActivityIndicator(),
+                const SizedBox(height: _kGapLg),
+                const Text(
+                  '正在初始化…',
+                  style: TextStyle(fontSize: _kTitleFontSize),
+                ),
+                const SizedBox(height: _kGapMd),
+                Text(
+                  '步骤：$_bootStep',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: _kMetaFontSize,
+                    color: CupertinoColors.secondaryLabel,
+                  ),
+                ),
+                const SizedBox(height: _kGapSm),
+                Text(
+                  '已用时：${elapsedSeconds.toStringAsFixed(0)}s',
+                  style: const TextStyle(
+                    fontSize: _kMetaFontSize,
+                    color: CupertinoColors.tertiaryLabel,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<BootFailure?> _bootstrapApp({
+  ValueChanged<String>? onStepChanged,
+}) async {
   try {
     await _runBootStep('DatabaseService.init', () async {
       await DatabaseService().init();
-    });
+    }, onStepChanged: onStepChanged);
     await _runBootStep('ExceptionLogService.bootstrap', () async {
       await ExceptionLogService().bootstrap();
-    });
+    }, onStepChanged: onStepChanged);
     await _runBootStep('SourceRepository.bootstrap', () async {
       await SourceRepository.bootstrap(DatabaseService());
-    });
+    }, onStepChanged: onStepChanged);
     await _runBootStep('MigrationExclusions.bootstrapRssRepositories',
         () async {
       if (MigrationExclusions.excludeRss) {
@@ -100,22 +247,22 @@ Future<BootFailure?> _bootstrapApp() async {
         return;
       }
       await MigrationExclusions.bootstrapRssRepositories(DatabaseService());
-    });
+    }, onStepChanged: onStepChanged);
     await _runBootStep('BookRepository.bootstrap', () async {
       await BookRepository.bootstrap(DatabaseService());
-    });
+    }, onStepChanged: onStepChanged);
     await _runBootStep('ChapterRepository.bootstrap', () async {
       await ChapterRepository.bootstrap(DatabaseService());
-    });
+    }, onStepChanged: onStepChanged);
     await _runBootStep('ReplaceRuleRepository.bootstrap', () async {
       await ReplaceRuleRepository.bootstrap(DatabaseService());
-    });
+    }, onStepChanged: onStepChanged);
     await _runBootStep('SettingsService.init', () async {
       await SettingsService().init();
-    });
+    }, onStepChanged: onStepChanged);
     await _runBootStep('CookieStore.setup', () async {
       await CookieStore.setup();
-    });
+    }, onStepChanged: onStepChanged);
     return null;
   } on _BootStepException catch (e) {
     return BootFailure(
@@ -134,8 +281,10 @@ Future<BootFailure?> _bootstrapApp() async {
 
 Future<void> _runBootStep(
   String name,
-  Future<void> Function() action,
-) async {
+  Future<void> Function() action, {
+  ValueChanged<String>? onStepChanged,
+}) async {
+  onStepChanged?.call(name);
   debugPrint('[boot] $name start');
   try {
     await action();
