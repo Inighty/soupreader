@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../../app/theme/cupertino_theme.dart';
 import '../../core/bootstrap/boot_log.dart';
+import '../../core/build/build_info.dart';
 import '../../core/services/exception_log_service.dart';
 import '../soup_reader_app.dart';
 import 'app_bootstrap.dart';
@@ -137,10 +138,24 @@ class _BootHostAppState extends State<BootHostApp> {
       home: Builder(
         builder: (innerContext) {
           return CupertinoPageScaffold(
+            backgroundColor: const Color(0xFFFFF4D6),
             child: SafeArea(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
                 children: [
+                  Text(
+                    'BOOT HOST  '
+                    'ref=${BuildInfo.gitRef}  '
+                    'sha=${BuildInfo.gitShaShort}  '
+                    'build=${BuildInfo.buildNumber}  '
+                    '${BuildInfo.isRelease ? 'release' : 'debug'}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: CupertinoColors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   const SizedBox(height: 6),
                   const Center(child: CupertinoActivityIndicator()),
                   const SizedBox(height: 14),

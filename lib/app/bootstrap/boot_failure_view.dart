@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/build/build_info.dart';
 import 'app_bootstrap.dart';
 
 class BootFailureView extends StatelessWidget {
@@ -20,6 +21,11 @@ class BootFailureView extends StatelessWidget {
   String _payload() {
     final out = StringBuffer()
       ..writeln('BootFailure')
+      ..writeln(
+        'build: ref=${BuildInfo.gitRef} sha=${BuildInfo.gitSha} '
+        'build=${BuildInfo.buildNumber} '
+        '${BuildInfo.isRelease ? 'release' : 'debug'}',
+      )
       ..writeln('step=${failure.stepName}')
       ..writeln('error=${failure.error}')
       ..writeln('')
@@ -37,6 +43,7 @@ class BootFailureView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
+      backgroundColor: const Color(0xFFFFF4D6),
       navigationBar: const CupertinoNavigationBar(
         middle: Text('启动异常'),
       ),
@@ -44,6 +51,17 @@ class BootFailureView extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
           children: [
+            Text(
+              'ref=${BuildInfo.gitRef}  sha=${BuildInfo.gitShaShort}  '
+              'build=${BuildInfo.buildNumber}  '
+              '${BuildInfo.isRelease ? 'release' : 'debug'}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.black,
+              ),
+            ),
+            const SizedBox(height: 10),
             const Text(
               '应用初始化失败，已阻止进入主界面以避免后续导入/书源管理出现连锁异常。',
               style: TextStyle(fontSize: 15),
@@ -85,4 +103,3 @@ class BootFailureView extends StatelessWidget {
     );
   }
 }
-
