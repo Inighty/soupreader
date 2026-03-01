@@ -31,11 +31,8 @@ Future<T?> showAppActionListSheet<T>({
   bool barrierDismissible = true,
   Color? accentColor,
 }) {
-  final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-  final barrier = isDark ? const Color(0x80000000) : const Color(0x4D000000);
   return showCupertinoModalPopup<T>(
     context: context,
-    barrierColor: barrier,
     barrierDismissible: barrierDismissible,
     builder: (_) => _AppActionListSheet<T>(
       title: title,
