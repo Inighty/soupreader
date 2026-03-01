@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform;
@@ -76,19 +77,18 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '翻页与按键',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 24),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('翻页触发'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: _tileTitle('翻页触发阈值'),
                 additionalInfo: _tileMeta(_touchSlopLabel),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _pickTouchSlop,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: _tileTitle('滚动翻页无动画'),
                 trailing: CupertinoSwitch(
                   value: _settings.noAnimScrollPage,
@@ -99,11 +99,12 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('按键'),
+            hasLeading: false,
             children: [
               if (_supportsVolumeKeyPaging)
-                CupertinoListTile.notched(
+                AppListTile(
                   title: _tileTitle('音量键翻页'),
                   trailing: CupertinoSwitch(
                     value: _settings.volumeKeyPage,
@@ -112,7 +113,7 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
                         _update(_settings.copyWith(volumeKeyPage: v)),
                   ),
                 ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: _tileTitle('鼠标滚轮翻页'),
                 trailing: CupertinoSwitch(
                   value: _settings.mouseWheelPage,
@@ -121,7 +122,7 @@ class _ReadingPageSettingsViewState extends State<ReadingPageSettingsView> {
                       _update(_settings.copyWith(mouseWheelPage: v)),
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: _tileTitle('长按按键翻页'),
                 trailing: CupertinoSwitch(
                   value: _settings.keyPageOnLongPress,

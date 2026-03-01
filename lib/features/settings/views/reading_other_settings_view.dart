@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
-
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_ui_kit.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
@@ -73,7 +73,7 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return CupertinoListTile.notched(
+    return AppListTile(
       title: _tileTitle(title),
       trailing: CupertinoSwitch(
         value: value,
@@ -88,10 +88,9 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
     required String info,
     required VoidCallback onTap,
   }) {
-    return CupertinoListTile.notched(
+    return AppListTile(
       title: _tileTitle(title),
       additionalInfo: _tileMeta(info),
-      trailing: const CupertinoListTileChevron(),
       onTap: onTap,
     );
   }
@@ -100,11 +99,11 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '其他',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('阅读行为'),
+            hasLeading: false,
             children: [
               _buildSwitchItem(
                 title: '屏幕常亮',
@@ -136,8 +135,9 @@ class _ReadingOtherSettingsViewState extends State<ReadingOtherSettingsView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('文本处理'),
+            hasLeading: false,
             children: [
               _buildOptionItem(
                 title: '简繁转换',

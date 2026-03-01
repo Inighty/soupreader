@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -79,62 +80,54 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
       child: ValueListenableBuilder<List<ExceptionLogEntry>>(
         valueListenable: _exceptionLogService.listenable,
         builder: (context, logs, _) {
-          return ListView(
-            padding: const EdgeInsets.only(top: 8, bottom: 20),
+          return AppListView(
             children: [
-              CupertinoListSection.insetGrouped(
+              AppListSection(
+                hasLeading: false,
                 children: [
-                  CupertinoListTile.notched(
+                  AppListTile(
                     title: const Text('开发人员'),
                     additionalInfo: const Text(_contributorsSummary),
-                    trailing: const CupertinoListTileChevron(),
                     onTap: _openContributors,
                   ),
-                  CupertinoListTile.notched(
+                  AppListTile(
                     title: const Text('更新日志'),
                     additionalInfo: Text(_versionSummary),
-                    trailing: const CupertinoListTileChevron(),
                     onTap: _openUpdateLog,
                   ),
-                  CupertinoListTile.notched(
+                  AppListTile(
                     title: const Text('检查更新'),
-                    trailing: const CupertinoListTileChevron(),
                     onTap: _checkUpdate,
                   ),
                 ],
               ),
-              CupertinoListSection.insetGrouped(
+              AppListSection(
                 header: const Text('其它'),
+                hasLeading: false,
                 children: [
-                  CupertinoListTile.notched(
+                  AppListTile(
                     title: const Text('崩溃日志'),
                     additionalInfo: Text('${logs.length} 条'),
-                    trailing: const CupertinoListTileChevron(),
                     onTap: _openCrashLogs,
                   ),
-                  CupertinoListTile.notched(
+                  AppListTile(
                     title: const Text('保存日志'),
-                    trailing: const CupertinoListTileChevron(),
                     onTap: _saveLog,
                   ),
-                  CupertinoListTile.notched(
+                  AppListTile(
                     title: const Text('创建堆转储'),
-                    trailing: const CupertinoListTileChevron(),
                     onTap: _createHeapDump,
                   ),
-                  CupertinoListTile.notched(
+                  AppListTile(
                     title: const Text('用户隐私与协议'),
-                    trailing: const CupertinoListTileChevron(),
                     onTap: _openPrivacyPolicy,
                   ),
-                  CupertinoListTile.notched(
+                  AppListTile(
                     title: const Text('开源许可'),
-                    trailing: const CupertinoListTileChevron(),
                     onTap: _openLicense,
                   ),
-                  CupertinoListTile.notched(
+                  AppListTile(
                     title: const Text('免责声明'),
-                    trailing: const CupertinoListTileChevron(),
                     onTap: _openDisclaimer,
                   ),
                 ],

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart';
 
@@ -402,7 +403,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     required bool value,
     required Future<void> Function(bool enabled) save,
   }) {
-    return CupertinoListTile.notched(
+    return AppListTile(
       title: Text(title),
       additionalInfo: additionalInfo == null ? null : Text(additionalInfo),
       trailing: CupertinoSwitch(
@@ -417,13 +418,13 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '其它设置',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('基本设置'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('自动刷新'),
                 additionalInfo: const Text('打开软件时自动更新书籍'),
                 trailing: CupertinoSwitch(
@@ -434,7 +435,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                   !_appSettings.autoRefresh,
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('自动跳转最近阅读'),
                 additionalInfo: const Text('默认打开书架'),
                 trailing: CupertinoSwitch(
@@ -445,7 +446,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                   !_appSettings.defaultToRead,
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('显示发现'),
                 trailing: CupertinoSwitch(
                   value: _appSettings.showDiscovery,
@@ -456,7 +457,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                 ),
               ),
               if (!_excludeRss)
-                CupertinoListTile.notched(
+                AppListTile(
                   title: const Text('显示订阅'),
                   trailing: CupertinoSwitch(
                     value: _appSettings.showRss,
@@ -466,26 +467,25 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                     !_appSettings.showRss,
                   ),
                 ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('默认主页'),
                 additionalInfo: Text(
                   _defaultHomePageLabel(_appSettings.defaultHomePage),
                 ),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _pickDefaultHomePage,
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('源设置'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('用户代理'),
                 additionalInfo: Text(_brief(_userAgentSummary)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _editUserAgent,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('书籍保存位置'),
                 additionalInfo: Text(
                   _brief(
@@ -493,60 +493,53 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                     fallback: '从其它应用打开的书籍保存位置',
                   ),
                 ),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _selectDefaultBookTreeUri,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('源编辑框最大行数'),
                 additionalInfo: Text(_brief(_sourceEditMaxLineSummary)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _editSourceEditMaxLine,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('校验设置'),
                 additionalInfo: Text(_brief(_checkSourceSummary)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _openCheckSourceSettings,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('直链上传规则'),
                 additionalInfo: Text(_brief(_directLinkUploadSummary)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _openDirectLinkUploadConfig,
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('缓存与净化'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('预下载'),
                 additionalInfo: Text('预先下载 ${_appSettings.preDownloadNum} 章正文'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _editPreDownloadNum,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('线程数量'),
                 additionalInfo: Text('当前线程数 ${_appSettings.threadCount}'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _editThreadCount,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('图片绘制缓存'),
                 additionalInfo:
                     Text('当前最大缓存 ${_appSettings.bitmapCacheSize} MB'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _editBitmapCacheSize,
               ),
               if (!_excludeManga)
-                CupertinoListTile.notched(
+                AppListTile(
                   title: const Text('漫画保留数量'),
                   additionalInfo:
                       Text('保留已读章节数量 ${_appSettings.imageRetainNum}'),
-                  trailing: const CupertinoListTileChevron(),
                   onTap: _editImageRetainNum,
                 ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('默认启用替换净化'),
                 additionalInfo: const Text('新加入书架的书是否启用替换净化'),
                 trailing: CupertinoSwitch(
@@ -557,10 +550,9 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                   !_appSettings.replaceEnableDefault,
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('下载与缓存'),
                 additionalInfo: const Text('缓存清理、WebView 数据、数据库维护'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => Navigator.of(context).push(
                   CupertinoPageRoute<void>(
                     builder: (context) => const StorageSettingsView(),
@@ -569,10 +561,11 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('调试与系统'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('文字操作显示搜索'),
                 additionalInfo: const Text('长按文字在操作菜单中显示阅读·搜索'),
                 trailing: CupertinoSwitch(
@@ -583,7 +576,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                   !_appSettings.processText,
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('记录日志'),
                 additionalInfo: const Text('记录调试日志'),
                 trailing: CupertinoSwitch(
@@ -593,7 +586,7 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                 onTap: () =>
                     _settingsService.saveRecordLog(!_appSettings.recordLog),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('记录堆转储'),
                 additionalInfo: const Text('当应用发生 OOM 崩溃时保存堆转储'),
                 trailing: CupertinoSwitch(
@@ -607,8 +600,9 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             ],
           ),
           if (!kIsWeb)
-            CupertinoListSection.insetGrouped(
+            AppListSection(
               header: const Text('非 Web 其它设置'),
+              hasLeading: false,
               children: [
                 _buildBooleanTile(
                   title: 'Cronet',
@@ -655,14 +649,13 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                   value: _appSettings.showAddToShelfAlert,
                   save: _settingsService.saveShowAddToShelfAlert,
                 ),
-                CupertinoListTile.notched(
+                AppListTile(
                   title: const Text('检查更新查找版本'),
                   additionalInfo: Text(
                     AppSettings.updateToVariantLabel(
                       _appSettings.updateToVariant,
                     ),
                   ),
-                  trailing: const CupertinoListTileChevron(),
                   onTap: _pickUpdateToVariant,
                 ),
                 if (!_excludeManga)
@@ -674,14 +667,15 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               ],
             ),
           if (!_excludeWebService)
-            CupertinoListSection.insetGrouped(
+            AppListSection(
               header: const Text('Web 服务（未启用）'),
+              hasLeading: false,
               children: [
-                CupertinoListTile.notched(
+                AppListTile(
                   title: const Text('Web 端口'),
                   additionalInfo: Text('未启用（当前: ${_appSettings.webPort}）'),
                 ),
-                CupertinoListTile.notched(
+                AppListTile(
                   title: const Text('WebService 唤醒锁'),
                   additionalInfo: Text(
                     '未启用（当前: ${_appSettings.webServiceWakeLock ? '开' : '关'}）',

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -320,12 +321,12 @@ class _CoverConfigViewState extends State<CoverConfigView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '封面设置',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('仅 WiFi'),
                 additionalInfo: const Text('仅在 WiFi 下加载网络封面'),
                 trailing: CupertinoSwitch(
@@ -337,13 +338,12 @@ class _CoverConfigViewState extends State<CoverConfigView> {
                   },
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('封面规则'),
                 additionalInfo: const Text('进入详情页时使用封面规则重新获取封面'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _editCoverRule,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('总是使用默认封面'),
                 additionalInfo: const Text('总是显示默认封面（不显示网络封面）'),
                 trailing: CupertinoSwitch(
@@ -357,16 +357,16 @@ class _CoverConfigViewState extends State<CoverConfigView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('白天'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('默认封面'),
                 additionalInfo: Text(_pathSummary(_defaultCoverPath)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editDefaultCover(night: false),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('显示书名'),
                 additionalInfo: const Text('封面上显示书名'),
                 trailing: CupertinoSwitch(
@@ -378,7 +378,7 @@ class _CoverConfigViewState extends State<CoverConfigView> {
                   },
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('显示作者'),
                 additionalInfo: const Text('封面上显示作者'),
                 trailing: CupertinoSwitch(
@@ -394,16 +394,16 @@ class _CoverConfigViewState extends State<CoverConfigView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('夜间'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('默认封面'),
                 additionalInfo: Text(_pathSummary(_defaultCoverDarkPath)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editDefaultCover(night: true),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('显示书名'),
                 additionalInfo: const Text('封面上显示书名'),
                 trailing: CupertinoSwitch(
@@ -415,7 +415,7 @@ class _CoverConfigViewState extends State<CoverConfigView> {
                   },
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('显示作者'),
                 additionalInfo: const Text('封面上显示作者'),
                 trailing: CupertinoSwitch(

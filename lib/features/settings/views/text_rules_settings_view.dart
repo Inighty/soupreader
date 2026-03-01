@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
@@ -35,13 +36,13 @@ class _TextRulesSettingsViewState extends State<TextRulesSettingsView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '替换净化',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('内置开关'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('净化章节标题'),
                 trailing: CupertinoSwitch(
                   value: _settings.cleanChapterTitle,
@@ -49,34 +50,33 @@ class _TextRulesSettingsViewState extends State<TextRulesSettingsView> {
                       _update(_settings.copyWith(cleanChapterTitle: v)),
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('简繁转换'),
                 additionalInfo: Text(
                     ChineseConverterType.label(_settings.chineseConverterType)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _pickChineseConverterType,
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('规则列表'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('文本替换规则'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _openReplaceRules,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('字典规则'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _openDictRules,
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
-            header: const Text('说明'),
-            children: const [
-              CupertinoListTile(title: Text('本页用于净化正文内容与标题。')),
+          const AppListSection(
+            header: Text('说明'),
+            hasLeading: false,
+            children: [
+              AppListTile(title: Text('本页用于净化正文内容与标题。')),
             ],
           ),
           const SizedBox(height: 24),

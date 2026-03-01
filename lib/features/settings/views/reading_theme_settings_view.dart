@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 
@@ -51,16 +52,16 @@ class _ReadingThemeSettingsViewState extends State<ReadingThemeSettingsView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '阅读主题',
-      child: ListView(
+      child: AppListView(
         padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('选择主题'),
             children: AppColors.readingThemes.asMap().entries.map((entry) {
               final index = entry.key;
               final theme = entry.value;
               final selected = index == _settings.themeIndex;
-              return CupertinoListTile.notched(
+              return AppListTile(
                 leading: Container(
                   width: 20,
                   height: 20,
@@ -93,6 +94,7 @@ class _ReadingThemeSettingsViewState extends State<ReadingThemeSettingsView> {
                         size: 18,
                       )
                     : null,
+                showChevron: false,
                 onTap: () => _updateThemeIndex(index),
               );
             }).toList(),

@@ -8,6 +8,7 @@ import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
@@ -210,40 +211,37 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '样式与排版',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 24),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('样式'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: _tileTitle('主题'),
                 additionalInfo: _tileMeta(_themeLabel),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _pickTheme,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: _tileTitle('字体'),
                 additionalInfo: _tileMeta(_fontLabel),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _pickFontFamily,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: _tileTitle('字重'),
                 additionalInfo: _tileMeta(_fontWeightLabel),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _pickFontWeight,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: _tileTitle('翻页模式'),
                 additionalInfo: _tileMeta(_settings.pageTurnMode.name),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _pickPageTurnMode,
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('排版'),
+            hasLeading: false,
             children: [
               _SliderTile(
                 title: '字号',
@@ -282,7 +280,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                 onChanged: (v) =>
                     _update(_settings.copyWith(paragraphSpacing: v)),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: _tileTitle('两端对齐'),
                 trailing: CupertinoSwitch(
                   value: _settings.textFullJustify,
@@ -291,7 +289,7 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
                       _update(_settings.copyWith(textFullJustify: value)),
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: _tileTitle('段首缩进'),
                 trailing: CupertinoSwitch(
                   value: _settings.paragraphIndent.isNotEmpty,
@@ -303,13 +301,13 @@ class _ReadingPreferencesViewState extends State<ReadingPreferencesView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('高级'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: _tileTitle('排版与边距（高级）'),
                 additionalInfo: _tileMeta('更多选项'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _openAdvancedTypography,
               ),
             ],

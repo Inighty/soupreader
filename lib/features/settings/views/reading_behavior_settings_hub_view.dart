@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import 'reading_other_settings_view.dart';
 import 'reading_page_settings_view.dart';
 import 'reading_status_action_settings_view.dart';
@@ -14,10 +15,9 @@ class ReadingBehaviorSettingsHubView extends StatelessWidget {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     return AppCupertinoPageScaffold(
       title: '设置（行为）',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: Text(
               '阅读行为与操作',
               style: TextStyle(
@@ -77,7 +77,7 @@ class ReadingBehaviorSettingsHubView extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    return CupertinoListTile.notched(
+    return AppListTile(
       leading: Icon(
         leading,
         size: 20,
@@ -101,7 +101,6 @@ class ReadingBehaviorSettingsHubView extends StatelessWidget {
           color: ReaderSettingsTokens.rowMetaColor(isDark: isDark),
         ),
       ),
-      trailing: const CupertinoListTileChevron(),
       onTap: onTap,
     );
   }

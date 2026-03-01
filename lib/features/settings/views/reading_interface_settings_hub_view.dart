@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../reader/widgets/typography_settings_dialog.dart';
@@ -73,10 +74,9 @@ class _ReadingInterfaceSettingsHubViewState
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '阅读界面样式',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 24),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('阅读样式与排版'),
             children: [
               _buildItem(
@@ -93,7 +93,7 @@ class _ReadingInterfaceSettingsHubViewState
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('排版细项'),
             children: [
               _buildItem(
@@ -116,7 +116,7 @@ class _ReadingInterfaceSettingsHubViewState
     required String description,
     required VoidCallback onTap,
   }) {
-    return CupertinoListTile.notched(
+    return AppListTile(
       leading: Icon(
         leading,
         size: 20,
@@ -140,7 +140,6 @@ class _ReadingInterfaceSettingsHubViewState
           color: ReaderSettingsTokens.rowMetaColor(isDark: _isDark),
         ),
       ),
-      trailing: const CupertinoListTileChevron(),
       onTap: onTap,
     );
   }

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -57,13 +58,13 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
 
     return AppCupertinoPageScaffold(
       title: '下载与缓存',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('下载'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('仅 Wi‑Fi 下载'),
                 trailing: CupertinoSwitch(
                   value: wifiOnly,
@@ -78,44 +79,45 @@ class _StorageSettingsViewState extends State<StorageSettingsView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('缓存'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('章节缓存占用'),
                 additionalInfo:
                     Text(SettingsUiTokens.status(cacheText, chapterText)),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('清理缓存'),
                 additionalInfo: const Text('清除已下载书籍和字体缓存'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _confirmClearCache,
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('维护'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('清除 WebView 数据'),
                 additionalInfo: const Text('清除内置浏览器所有数据'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _confirmClearWebViewData,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('压缩数据库'),
                 additionalInfo: const Text('减小数据库文件的大小'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _confirmShrinkDatabase,
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          const AppListSection(
             header: const Text('说明'),
-            children: const [
-              CupertinoListTile(
+            hasLeading: false,
+            children: [
+              AppListTile(
                 title: Text('清理缓存不会影响书架与阅读进度；本地导入书籍正文不会被清理。'),
+                showChevron: false,
               ),
             ],
           ),

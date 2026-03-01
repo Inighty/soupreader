@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../bookshelf/views/reading_history_view.dart';
 import 'backup_settings_view.dart';
 import 'global_reading_settings_view.dart';
@@ -17,10 +18,9 @@ class FunctionSettingsView extends StatelessWidget {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     return AppCupertinoPageScaffold(
       title: '功能 & 设置',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('核心', isDark: isDark),
             children: [
               _buildItem(
@@ -68,7 +68,7 @@ class FunctionSettingsView extends StatelessWidget {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('更多', isDark: isDark),
             children: [
               _buildItem(
@@ -108,7 +108,7 @@ class FunctionSettingsView extends StatelessWidget {
     required String description,
     required VoidCallback onTap,
   }) {
-    return CupertinoListTile.notched(
+    return AppListTile(
       leading: Icon(
         leading,
         size: 20,
@@ -130,7 +130,6 @@ class FunctionSettingsView extends StatelessWidget {
           fontSize: ReaderSettingsTokens.rowMetaSize,
         ),
       ),
-      trailing: const CupertinoListTileChevron(),
       onTap: onTap,
     );
   }

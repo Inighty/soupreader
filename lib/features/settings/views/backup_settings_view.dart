@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_popover_menu.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
@@ -198,10 +199,11 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
 
     if (_checkingAutoCheckNewBackup) {
       return <Widget>[
-        const CupertinoListTile.notched(
+        const AppListTile(
           title: Text('自动检查新备份'),
           additionalInfo: Text('正在检查 WebDav 远端备份'),
           trailing: CupertinoActivityIndicator(),
+          showChevron: false,
         ),
       ];
     }
@@ -209,12 +211,12 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     final detected = _detectedNewBackup;
     if (detected != null) {
       return <Widget>[
-        CupertinoListTile.notched(
+        AppListTile(
           title: const Text('检测到较新的 WebDav 备份'),
           additionalInfo: Text(_backupEntrySummary(detected)),
           trailing: _restoringDetectedBackup
               ? const CupertinoActivityIndicator()
-              : const CupertinoListTileChevron(),
+              : null,
           onTap: _restoringDetectedBackup
               ? null
               : () => _confirmRestoreDetectedBackup(detected),
@@ -225,10 +227,9 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     if (_autoCheckNewBackupError != null &&
         _autoCheckNewBackupError!.trim().isNotEmpty) {
       return <Widget>[
-        CupertinoListTile.notched(
+        AppListTile(
           title: const Text('自动检查失败'),
           additionalInfo: Text(_brief(_autoCheckNewBackupError!)),
-          trailing: const CupertinoListTileChevron(),
           onTap: () => _triggerAutoCheckNewBackupOnPageEnter(force: true),
         ),
       ];
@@ -310,52 +311,49 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     return AppCupertinoPageScaffold(
       title: '备份与恢复',
       trailing: _buildTrailingActions(),
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('导出'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('导出备份（推荐）'),
                 additionalInfo: const Text('不含在线缓存'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _export(includeOnlineCache: false),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('导出（含在线缓存）'),
                 additionalInfo: const Text('体积大'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _export(includeOnlineCache: true),
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('导入'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('从文件导入（合并）'),
                 additionalInfo: const Text('不清空当前数据'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _import(overwrite: false),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('从文件导入（覆盖）'),
                 additionalInfo: const Text('会清空当前数据'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _import(overwrite: true),
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('WebDav 同步'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('服务器地址'),
                 additionalInfo: Text(
                   _brief(settings.webDavUrl),
                 ),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editWebDavField(
                   title: '服务器地址',
                   placeholder: 'https://dav.example.com/dav/',
@@ -367,12 +365,11 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                   },
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('账号'),
                 additionalInfo: Text(
                   _brief(settings.webDavAccount),
                 ),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editWebDavField(
                   title: 'WebDav 账号',
                   placeholder: '请输入账号',
@@ -385,12 +382,11 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                   },
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('密码'),
                 additionalInfo: Text(
                   _maskSecret(settings.webDavPassword),
                 ),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editWebDavField(
                   title: 'WebDav 密码',
                   placeholder: '请输入密码',
@@ -404,12 +400,11 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                   },
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('同步目录'),
                 additionalInfo: Text(
                   _brief(settings.webDavDir, fallback: 'legado'),
                 ),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editWebDavField(
                   title: '同步目录',
                   placeholder: '可留空，例如 booksync',
@@ -421,10 +416,9 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                   },
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('设备名称'),
                 additionalInfo: Text(_brief(settings.webDavDeviceName)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editWebDavField(
                   title: '设备名称',
                   placeholder: '可留空，用于区分备份来源设备',
@@ -432,7 +426,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                   onSave: _settingsService.saveWebDavDeviceName,
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('同步阅读进度'),
                 additionalInfo: const Text('进入退出阅读界面时同步阅读进度'),
                 trailing: CupertinoSwitch(
@@ -440,7 +434,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                   onChanged: _settingsService.saveSyncBookProgress,
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('同步增强'),
                 additionalInfo: const Text(
                   '重新进入页面（息屏、后台返回等）或者网络变为可用时同步云端进度',
@@ -452,56 +446,51 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                       : null,
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('测试连接'),
                 additionalInfo: const Text('检查授权并准备 books 目录'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _testWebDavConnection,
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('备份恢复'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('备份路径'),
                 additionalInfo: Text(
                   _brief(settings.backupPath, fallback: '请选择备份路径'),
                 ),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _editBackupPath,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('备份到 WebDav'),
                 additionalInfo: const Text('上传当前备份到云端'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _backupToWebDav,
               ),
               GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onLongPress: _restoreFromLocal,
-                child: CupertinoListTile.notched(
+                child: AppListTile(
                   title: const Text('从 WebDav 恢复'),
                   additionalInfo: const Text('优先从 WebDav 恢复，长按从本地恢复'),
-                  trailing: const CupertinoListTileChevron(),
                   onTap: _restoreFromWebDav,
                 ),
               ),
               ..._buildAutoCheckNewBackupPromptTiles(),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('恢复时忽略'),
                 additionalInfo: Text(_brief(_restoreIgnoreConfig.summary())),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _editRestoreIgnore,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 key: const Key('import_old'),
                 title: const Text('导入旧数据'),
                 additionalInfo: const Text('选择旧版备份文件夹'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _importOldData,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('仅保留最新备份'),
                 additionalInfo: const Text('本地备份仅保留最新备份文件'),
                 trailing: CupertinoSwitch(
@@ -509,7 +498,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
                   onChanged: _settingsService.saveOnlyLatestBackup,
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('自动检查新备份'),
                 additionalInfo: const Text('打开软件时检查是否有新备份，有新备份时提示是否更新'),
                 trailing: CupertinoSwitch(
@@ -519,11 +508,13 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
-            header: const Text('说明'),
-            children: const [
-              CupertinoListTile(
+          const AppListSection(
+            header: Text('说明'),
+            hasLeading: false,
+            children: [
+              AppListTile(
                 title: Text('备份包含：设置、书源、书架、本地书籍章节内容，以及“本书独立阅读设置”。'),
+                showChevron: false,
               ),
             ],
           ),

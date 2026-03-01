@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import 'reading_behavior_settings_hub_view.dart';
 import 'reading_interface_settings_hub_view.dart';
 
@@ -13,10 +14,9 @@ class GlobalReadingSettingsView extends StatelessWidget {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     return AppCupertinoPageScaffold(
       title: '阅读器配置',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader(
               title: '入口与阅读页保持一致',
               isDark: isDark,
@@ -75,7 +75,7 @@ class GlobalReadingSettingsView extends StatelessWidget {
     required String description,
     required VoidCallback onTap,
   }) {
-    return CupertinoListTile.notched(
+    return AppListTile(
       leading: Icon(
         leading,
         size: 20,
@@ -99,7 +99,6 @@ class GlobalReadingSettingsView extends StatelessWidget {
           fontSize: ReaderSettingsTokens.rowMetaSize,
         ),
       ),
-      trailing: const CupertinoListTileChevron(),
       onTap: onTap,
     );
   }

@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
@@ -81,11 +82,11 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '页眉页脚与标题',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('标题'),
+            hasLeading: false,
             children: [
               _optionTile(
                 title: '章节标题位置',
@@ -125,15 +126,16 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('页眉'),
+            hasLeading: false,
             children: [
               _optionTile(
                 title: '显示模式',
                 value: _headerModeLabel(_settings.headerMode),
                 onTap: _pickHeaderMode,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: _tileTitle('页眉分割线'),
                 trailing: CupertinoSwitch(
                   value: _settings.showHeaderLine,
@@ -177,15 +179,16 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('页脚'),
+            hasLeading: false,
             children: [
               _optionTile(
                 title: '显示模式',
                 value: _footerModeLabel(_settings.footerMode),
                 onTap: _pickFooterMode,
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: _tileTitle('页脚分割线'),
                 trailing: CupertinoSwitch(
                   value: _settings.showFooterLine,
@@ -229,8 +232,9 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('页眉页脚样式'),
+            hasLeading: false,
             children: [
               _optionTile(
                 title: '文字颜色',
@@ -255,10 +259,9 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
     required String value,
     required VoidCallback onTap,
   }) {
-    return CupertinoListTile.notched(
+    return AppListTile(
       title: _tileTitle(title),
       additionalInfo: _tileMeta(value),
-      trailing: const CupertinoListTileChevron(),
       onTap: onTap,
     );
   }

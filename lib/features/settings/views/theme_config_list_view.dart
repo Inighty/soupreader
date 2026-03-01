@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
-
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_ui_kit.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
 import '../models/theme_config_entry.dart';
@@ -169,25 +169,26 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
         padding: EdgeInsets.zero,
         onPressed: _importFromClipboard,
         child: const Text('剪贴板导入'),
-        minimumSize: Size(30, 30),
+        minimumSize: const Size(30, 30),
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())
-          : ListView(
-              padding: const EdgeInsets.only(top: 8, bottom: 20),
+          : AppListView(
               children: [
-                CupertinoListSection.insetGrouped(
+                AppListSection(
                   header: const Text('已保存主题'),
+                  hasLeading: false,
                   children: _configs.isEmpty
                       ? const [
-                          CupertinoListTile(
+                          AppListTile(
                             title: Text('暂无主题配置'),
+                            showChevron: false,
                           ),
                         ]
                       : _configs.asMap().entries.map((entry) {
                           final index = entry.key;
                           final config = entry.value;
-                          return CupertinoListTile.notched(
+                          return AppListTile(
                             title: Text(_titleText(config)),
                             additionalInfo: Text(_modeText(config)),
                             trailing: Row(
@@ -199,11 +200,11 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
                                     vertical: 0,
                                   ),
                                   onPressed: () => _shareConfig(index),
+                                  minimumSize: const Size(28, 28),
                                   child: const Icon(
                                     CupertinoIcons.share,
                                     size: 18,
                                   ),
-                                  minimumSize: Size(28, 28),
                                 ),
                                 CupertinoButton(
                                   padding: const EdgeInsets.symmetric(
@@ -211,11 +212,11 @@ class _ThemeConfigListViewState extends State<ThemeConfigListView> {
                                     vertical: 0,
                                   ),
                                   onPressed: () => _deleteConfig(index),
+                                  minimumSize: const Size(28, 28),
                                   child: const Icon(
                                     CupertinoIcons.delete,
                                     size: 18,
                                   ),
-                                  minimumSize: Size(28, 28),
                                 ),
                               ],
                             ),

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
@@ -213,12 +214,12 @@ class _WelcomeStyleSettingsViewState extends State<WelcomeStyleSettingsView> {
 
     return AppCupertinoPageScaffold(
       title: '启动界面样式',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('自定义欢迎页'),
                 additionalInfo: const Text('是否使用自定义欢迎页'),
                 trailing: CupertinoSwitch(
@@ -232,16 +233,16 @@ class _WelcomeStyleSettingsViewState extends State<WelcomeStyleSettingsView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('白天'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('背景图片'),
                 additionalInfo: Text(_pathSummary(_welcomeImagePath)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editWelcomeImage(night: false),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('显示文字'),
                 additionalInfo: const Text('阅读|享受美好时光'),
                 trailing: CupertinoSwitch(
@@ -255,7 +256,7 @@ class _WelcomeStyleSettingsViewState extends State<WelcomeStyleSettingsView> {
                       : null,
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('显示图标'),
                 additionalInfo: const Text('显示默认书籍图标'),
                 trailing: CupertinoSwitch(
@@ -271,16 +272,16 @@ class _WelcomeStyleSettingsViewState extends State<WelcomeStyleSettingsView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('夜间'),
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('背景图片'),
                 additionalInfo: Text(_pathSummary(_welcomeImageDarkPath)),
-                trailing: const CupertinoListTileChevron(),
                 onTap: () => _editWelcomeImage(night: true),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('显示文字'),
                 additionalInfo: const Text('阅读|享受美好时光'),
                 trailing: CupertinoSwitch(
@@ -294,7 +295,7 @@ class _WelcomeStyleSettingsViewState extends State<WelcomeStyleSettingsView> {
                       : null,
                 ),
               ),
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('显示图标'),
                 additionalInfo: const Text('显示默认书籍图标'),
                 trailing: CupertinoSwitch(

@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../reader/widgets/click_action_config_dialog.dart';
@@ -72,7 +73,7 @@ class _ReadingStatusActionSettingsViewState
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return CupertinoListTile.notched(
+    return AppListTile(
       title: _tileTitle(title),
       trailing: CupertinoSwitch(
         value: value,
@@ -87,10 +88,9 @@ class _ReadingStatusActionSettingsViewState
     required String info,
     required VoidCallback onTap,
   }) {
-    return CupertinoListTile.notched(
+    return AppListTile(
       title: _tileTitle(title),
       additionalInfo: _tileMeta(info),
-      trailing: const CupertinoListTileChevron(),
       onTap: onTap,
     );
   }
@@ -99,11 +99,11 @@ class _ReadingStatusActionSettingsViewState
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
       title: '状态栏与操作',
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('状态栏'),
+            hasLeading: false,
             children: [
               _buildSwitchItem(
                 title: '显示状态栏',
@@ -145,8 +145,9 @@ class _ReadingStatusActionSettingsViewState
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: _sectionHeader('操作'),
+            hasLeading: false,
             children: [
               _buildOptionItem(
                 title: '点击区域（9 宫格）',

@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
@@ -145,7 +146,7 @@ class _CheckSourceSettingsViewState extends State<CheckSourceSettingsView> {
     required bool value,
     required ValueChanged<bool>? onChanged,
   }) {
-    return CupertinoListTile.notched(
+    return AppListTile(
       title: Text(title),
       trailing: CupertinoSwitch(
         value: value,
@@ -171,21 +172,21 @@ class _CheckSourceSettingsViewState extends State<CheckSourceSettingsView> {
         child: const Text('确定'),
         minimumSize: Size(30, 30),
       ),
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 20),
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
+            hasLeading: false,
             children: [
-              CupertinoListTile.notched(
+              AppListTile(
                 title: const Text('单个书源校验超时（秒）'),
                 additionalInfo: Text('${_draft.timeoutMs ~/ 1000}'),
-                trailing: const CupertinoListTileChevron(),
                 onTap: _editTimeoutSeconds,
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('校验项目'),
+            hasLeading: false,
             children: [
               _buildSwitchTile(
                 title: '搜索',
@@ -214,11 +215,13 @@ class _CheckSourceSettingsViewState extends State<CheckSourceSettingsView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('摘要'),
+            hasLeading: false,
             children: [
-              CupertinoListTile(
+              AppListTile(
                 title: Text(_draft.summary()),
+                showChevron: false,
               ),
             ],
           ),
