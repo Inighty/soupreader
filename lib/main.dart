@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'app/theme/cupertino_theme.dart';
+import 'app/widgets/app_error_widget.dart';
 import 'core/config/migration_exclusions.dart';
 import 'core/database/database_service.dart';
 import 'core/database/repositories/book_repository.dart';
@@ -21,6 +22,15 @@ import 'features/settings/views/settings_view.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 在 Release 下默认 ErrorWidget 往往只是一块灰屏，无法定位异常根因。
+  // 这里强制把异常信息渲染到屏幕上，便于截图/复制回传。
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return AppErrorWidget(
+      message: details.exceptionAsString(),
+      stackTrace: details.stack?.toString(),
+    );
+  };
 
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
