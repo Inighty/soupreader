@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
 
@@ -61,6 +62,7 @@ Future<T?> showAppPopoverMenu<T>({
   double itemHeight = 44,
   double radius = 12,
   double verticalPadding = 6,
+  double backdropBlurSigma = 10,
 }) {
   assert(items.isNotEmpty, 'items should not be empty');
   final anchor = _resolveAnchor(context: context, anchorKey: anchorKey);
@@ -80,8 +82,13 @@ Future<T?> showAppPopoverMenu<T>({
     useRootNavigator: true,
     barrierDismissible: true,
     barrierLabel: barrierLabel,
-    barrierColor: CupertinoColors.black.withValues(alpha: 0.06),
+    // 在 iOS 上更接近原生 Popover：背景略模糊 + 轻微遮罩。
+    barrierColor: CupertinoColors.transparent,
     pageBuilder: (popupContext, __, ___) {
+      final isDark = CupertinoTheme.of(popupContext).brightness == Brightness.dark;
+      final backdropMask = isDark
+          ? CupertinoColors.black.withValues(alpha: 0.18)
+          : CupertinoColors.black.withValues(alpha: 0.06);
       final labelColor = CupertinoColors.label.resolveFrom(popupContext);
       final iconColor = CupertinoColors.secondaryLabel.resolveFrom(popupContext);
       final destructiveColor = CupertinoColors.systemRed.resolveFrom(popupContext);
@@ -92,6 +99,19 @@ Future<T?> showAppPopoverMenu<T>({
         onTap: () => Navigator.of(popupContext).pop(),
         child: Stack(
           children: [
+            Positioned.fill(
+              child: ClipRect(
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(
+                    sigmaX: backdropBlurSigma,
+                    sigmaY: backdropBlurSigma,
+                  ),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(color: backdropMask),
+                  ),
+                ),
+              ),
+            ),
             Positioned(
               left: layout.position.left,
               top: layout.position.top,
