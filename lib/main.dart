@@ -523,7 +523,6 @@ class _MainScreenState extends State<MainScreen> {
       tabBuilder: (context, index) {
         final tabId = _tabs[index].id;
         return CupertinoTabView(
-          defaultTitle: 'SoupReader',
           builder: (context) {
             switch (tabId) {
               case _MainTabId.bookshelf:
