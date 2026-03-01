@@ -50,12 +50,32 @@ void main() {
   };
 
   runZonedGuarded(() async {
-    // 在 runApp 之前完成全部初始化（platform channel 在干净的 event loop 中执行，
-    // 避免与 Widget 渲染循环竞争导致 iOS Release 模式下白屏/hang）。
     debugPrint('[boot] bootstrap start');
-    final bootFailure = await bootstrapApp();
-    debugPrint('[boot] bootstrap done, failure=$bootFailure');
 
+    BootFailure? bootFailure;
+    try {
+      // 超时保护：如果 bootstrap 某步 hang 住（如 platform channel 死锁），
+      // 30 秒后强制跳过并展示启动失败页面，避免永远卡在白色闪屏上。
+      bootFailure = await bootstrapApp().timeout(const Duration(seconds: 30),
+          onTimeout: () {
+        debugPrint('[boot] bootstrapApp TIMEOUT after 30s');
+        return BootFailure(
+          stepName: 'timeout',
+          error: 'Bootstrap 超时（30 秒），可能某步初始化 hang 住了。',
+          stack: StackTrace.current,
+        );
+      });
+    } catch (e, st) {
+      debugPrint('[boot] bootstrapApp threw: $e');
+      debugPrintStack(stackTrace: st);
+      bootFailure = BootFailure(
+        stepName: 'bootstrapApp',
+        error: e,
+        stack: st,
+      );
+    }
+
+    debugPrint('[boot] bootstrap done, failure=$bootFailure');
     debugPrint('[boot] runApp start');
     runApp(SoupReaderApp(initialBootFailure: bootFailure));
     debugPrint('[boot] runApp done');
