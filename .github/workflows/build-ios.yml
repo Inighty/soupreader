@@ -1,13 +1,9 @@
 # SoupReader iOS Build Workflow
-# 每次推送代码自动编译生成未签名的IPA
+# 手动触发编译生成未签名的IPA
 
 name: Build iOS
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -87,7 +83,8 @@ jobs:
           name: Nightly Build
           body: |
             📦 Commit: ${{ github.sha }}
-            ⏰ ${{ github.event.head_commit.timestamp }}
+            🌿 Branch: ${{ github.ref_name }}
+            ▶️ Trigger: workflow_dispatch
           artifacts: "build/ios/ipa/SoupReader-unsigned.ipa"
           token: ${{ secrets.GITHUB_TOKEN }}
           removeArtifacts: true
