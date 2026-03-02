@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -717,16 +718,9 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
+      child: AppCard(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        decoration: BoxDecoration(
-          color: uiTokens.colors.card,
-          borderRadius: BorderRadius.circular(uiTokens.radii.control),
-          border: Border.all(
-            color: uiTokens.colors.separator.withValues(alpha: 0.72),
-            width: 0.8,
-          ),
-        ),
+        borderWidth: 0.8,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

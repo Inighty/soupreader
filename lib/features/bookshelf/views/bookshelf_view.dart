@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_popover_menu.dart';
@@ -2410,8 +2411,15 @@ class _BookshelfViewState extends State<BookshelfView> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: CupertinoColors.systemGrey5.resolveFrom(context),
+                  color: AppUiTokens.resolve(context).colors.card,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppUiTokens.resolve(context)
+                        .colors
+                        .separator
+                        .withValues(alpha: 0.72),
+                    width: 0.8,
+                  ),
                 ),
                 child: AppCoverImage(
                   urlOrPath: group.cover,
@@ -2462,8 +2470,15 @@ class _BookshelfViewState extends State<BookshelfView> {
                   Positioned.fill(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: CupertinoColors.systemGrey5.resolveFrom(context),
+                        color: AppUiTokens.resolve(context).colors.card,
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppUiTokens.resolve(context)
+                              .colors
+                              .separator
+                              .withValues(alpha: 0.72),
+                          width: 0.8,
+                        ),
                       ),
                       child: AppCoverImage(
                         urlOrPath: book.coverUrl,
@@ -2556,15 +2571,14 @@ class _BookshelfViewState extends State<BookshelfView> {
     return _updatingBookIds.contains(book.id);
   }
 
-  BoxDecoration _buildListCardDecoration() {
+  BoxDecoration _buildListCardDecoration(BuildContext context) {
+    final uiTokens = AppUiTokens.resolve(context);
     return BoxDecoration(
-      color:
-          CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context),
-      borderRadius: BorderRadius.circular(12),
+      color: uiTokens.colors.card,
+      borderRadius: BorderRadius.circular(uiTokens.radii.card),
       border: Border.all(
-        color: CupertinoColors.separator
-            .resolveFrom(context)
-            .withValues(alpha: 0.35),
+        color: uiTokens.colors.separator.withValues(alpha: 0.72),
+        width: 0.8,
       ),
     );
   }
@@ -2613,7 +2627,7 @@ class _BookshelfViewState extends State<BookshelfView> {
               onLongPress: () => _onBookLongPress(book),
               child: Container(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                decoration: _buildListCardDecoration(),
+                decoration: _buildListCardDecoration(context),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -2763,7 +2777,7 @@ class _BookshelfViewState extends State<BookshelfView> {
       onLongPress: () => _onGroupLongPress(group),
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-        decoration: _buildListCardDecoration(),
+        decoration: _buildListCardDecoration(context),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

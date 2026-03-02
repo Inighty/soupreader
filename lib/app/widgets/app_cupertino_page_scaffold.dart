@@ -185,8 +185,11 @@ class AppCupertinoPageScaffold extends StatelessWidget {
 
     // 底部留白：TabBar 嵌套在 CupertinoTabScaffold 中时，
     // SliverSafeArea(bottom: true) 只处理物理安全区（Home Indicator），
-    // 不包含 TabBar 占据的空间。这里统一追加 TabBar 高度的 padding。
-    const tabBarExtraPadding = kMinInteractiveDimensionCupertino;
+    // 不包含 TabBar 占据的空间。由于本组件被广泛用作 Tab 的子页面根组件，
+    // 需要确保底部内容不被 TabBar 遮挡。这里统一加上标准的 TabBar 高度 + 安全区。
+    final bottomPadding = includeBottomSafeArea
+        ? MediaQuery.paddingOf(context).bottom + 50.0 // 50.0 is standard CupertinoTabBar height
+        : 50.0;
 
     return CupertinoPageScaffold(
       backgroundColor: baseBackground,
@@ -198,7 +201,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
         slivers: [
           bodySliver,
           SliverPadding(
-            padding: EdgeInsets.only(bottom: tabBarExtraPadding),
+            padding: EdgeInsets.only(bottom: bottomPadding),
           ),
         ],
       ),
