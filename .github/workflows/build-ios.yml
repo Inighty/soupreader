@@ -1,9 +1,14 @@
 # SoupReader iOS Build Workflow
-# 手动触发编译生成未签名的IPA
+# push / 手动触发编译生成未签名的 IPA
+# - push：仅上传 Actions Artifact（跟随触发分支）
+# - workflow_dispatch：额外发布到 nightly Release（保持旧行为）
 
 name: Build iOS
 
 on:
+  push:
+    branches:
+      - '**'
   workflow_dispatch:
 
 permissions:
@@ -17,6 +22,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Compute build vars
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref_name="${GITHUB_REF_NAME}"
+          safe_ref_name="$(echo "${ref_name}" | tr '/ ' '--')"
+          short_sha="${GITHUB_SHA::7}"
+          ipa_file="SoupReader-unsigned-${safe_ref_name}-${short_sha}.ipa"
+          echo "safe_ref_name=${safe_ref_name}" >> "${GITHUB_OUTPUT}"
+          echo "short_sha=${short_sha}" >> "${GITHUB_OUTPUT}"
+          echo "ipa_file=${ipa_file}" >> "${GITHUB_OUTPUT}"
 
       # Flutter 缓存（包含 SDK 和 pub 缓存）
       - name: Setup Flutter
@@ -75,10 +93,18 @@ jobs:
           cd build/ios/iphoneos
           mkdir Payload
           cp -r Runner.app Payload/
-          zip -rq ../ipa/SoupReader-unsigned.ipa Payload
+          zip -rq "../ipa/${{ steps.vars.outputs.ipa_file }}" Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.vars.outputs.ipa_file }}
+          path: build/ios/ipa/${{ steps.vars.outputs.ipa_file }}
+          if-no-files-found: error
 
       # 发布到 Releases
       - name: Deploy
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
@@ -88,8 +114,8 @@ jobs:
           body: |
             📦 Commit: ${{ github.sha }}
             🌿 Branch: ${{ github.ref_name }}
-            ▶️ Trigger: workflow_dispatch
-          artifacts: "build/ios/ipa/SoupReader-unsigned.ipa"
+            ▶️ Trigger: ${{ github.event_name }}
+          artifacts: "build/ios/ipa/${{ steps.vars.outputs.ipa_file }}"
           token: ${{ secrets.GITHUB_TOKEN }}
           removeArtifacts: true
           replacesArtifacts: true
