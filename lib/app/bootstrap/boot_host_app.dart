@@ -197,6 +197,7 @@ class _BootHostAppState extends State<BootHostApp>
         (DateTime.now().millisecondsSinceEpoch - _startedAtMs) / 1000.0;
 
     return CupertinoApp(
+      key: const ValueKey('boot'),
       title: 'SoupReader',
       debugShowCheckedModeBanner: false,
       theme: theme,
@@ -359,6 +360,7 @@ class _BootHostAppState extends State<BootHostApp>
     }
 
     return CupertinoApp(
+      key: const ValueKey('main'),
       title: 'SoupReader',
       debugShowCheckedModeBanner: false,
       theme: theme,
