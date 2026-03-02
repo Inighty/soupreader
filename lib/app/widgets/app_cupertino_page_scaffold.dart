@@ -67,8 +67,11 @@ class AppCupertinoPageScaffold extends StatelessWidget {
 
   Widget _buildDefaultSliverBody() {
     return SliverSafeArea(
-      // Sliver 导航栏已处理顶部安全区，这里只处理底部，避免双重 SafeArea。
-      top: false,
+      // Sliver 模式下使用 CupertinoNavigationBar（可能为半透明）。
+      // 当导航栏半透明时，CupertinoPageScaffold 会通过 MediaQuery.padding.top
+      // 传递“被导航栏遮挡的区域高度”，需要由 SliverSafeArea 在滚动内容里消化，
+      // 否则首屏内容会被导航栏覆盖（看起来像“顶部菜单项消失”）。
+      top: includeTopSafeArea,
       bottom: includeBottomSafeArea,
       sliver: SliverFillRemaining(
         hasScrollBody: true,

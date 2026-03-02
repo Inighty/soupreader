@@ -2172,7 +2172,7 @@ class _BookshelfViewState extends State<BookshelfView> {
       sliverScrollController: _scrollController,
       child: const SizedBox.shrink(),
       sliverBodyBuilder: (_) => SliverSafeArea(
-        top: false,
+        top: true,
         bottom: true,
         sliver: SliverFillRemaining(
           hasScrollBody: false,
@@ -2185,7 +2185,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   Widget _buildBodySliver() {
     if (_initError != null) {
       return SliverSafeArea(
-        top: false,
+        top: true,
         bottom: true,
         sliver: SliverFillRemaining(
           hasScrollBody: false,
@@ -2202,13 +2202,13 @@ class _BookshelfViewState extends State<BookshelfView> {
         : _buildBookList(displayItems);
     if (_isStyle2Enabled) {
       return SliverSafeArea(
-        top: false,
+        top: true,
         bottom: true,
         sliver: contentSliver,
       );
     }
     return SliverSafeArea(
-      top: false,
+      top: true,
       bottom: true,
       sliver: SliverMainAxisGroup(
         slivers: [

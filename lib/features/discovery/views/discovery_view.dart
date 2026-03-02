@@ -581,7 +581,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       sliverScrollController: _scrollController,
       child: const SizedBox.shrink(),
       sliverBodyBuilder: (_) => SliverSafeArea(
-        top: false,
+        top: true,
         bottom: true,
         sliver: SliverFillRemaining(
           hasScrollBody: false,
@@ -644,7 +644,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
     if (visible.isEmpty) {
       return SliverSafeArea(
-        top: false,
+        top: true,
         bottom: true,
         sliver: SliverFillRemaining(
           hasScrollBody: false,
@@ -666,7 +666,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     }
 
     return SliverSafeArea(
-      top: false,
+      top: true,
       bottom: true,
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(

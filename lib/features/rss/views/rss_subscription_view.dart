@@ -182,7 +182,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
 
     if (visible.isEmpty) {
       return SliverSafeArea(
-        top: false,
+        top: true,
         bottom: true,
         sliver: SliverFillRemaining(
           hasScrollBody: false,
@@ -203,7 +203,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
     final bottomSpacerIndex = listStartIndex + listPartCount;
 
     return SliverSafeArea(
-      top: false,
+      top: true,
       bottom: true,
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(

@@ -219,7 +219,7 @@ class _SettingsViewState extends State<SettingsView> {
   Widget _buildBodySliver(BuildContext context) {
     final tokens = AppUiTokens.resolve(context);
     return SliverSafeArea(
-      top: false,
+      top: true,
       bottom: true,
       sliver: SliverToBoxAdapter(
         child: Padding(
