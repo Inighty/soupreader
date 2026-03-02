@@ -241,19 +241,40 @@ class _MainScreenState extends State<MainScreen> {
         return CupertinoTabView(
           key: ValueKey(tabId),
           builder: (context) {
-            switch (tabId) {
-              case _MainTabId.bookshelf:
-                return BookshelfView(
-                  reselectSignal: _bookshelfReselectSignal,
-                );
-              case _MainTabId.discovery:
-                return DiscoveryView(
-                  compressSignal: _discoveryCompressSignal,
-                );
-              case _MainTabId.rss:
-                return const RssSubscriptionView();
-              case _MainTabId.my:
-                return const SettingsView();
+            try {
+              switch (tabId) {
+                case _MainTabId.bookshelf:
+                  return BookshelfView(
+                    reselectSignal: _bookshelfReselectSignal,
+                  );
+                case _MainTabId.discovery:
+                  return DiscoveryView(
+                    compressSignal: _discoveryCompressSignal,
+                  );
+                case _MainTabId.rss:
+                  return const RssSubscriptionView();
+                case _MainTabId.my:
+                  return const SettingsView();
+              }
+            } catch (e, st) {
+              debugPrint('[main-tab] tab $tabId build error: $e');
+              debugPrintStack(stackTrace: st);
+              return CupertinoPageScaffold(
+                navigationBar: CupertinoNavigationBar(
+                  middle: Text('${tabId.name} 异常'),
+                ),
+                child: SafeArea(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                        '页面构建异常:\n$e',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+              );
             }
           },
         );

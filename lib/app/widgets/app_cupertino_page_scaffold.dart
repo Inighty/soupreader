@@ -128,8 +128,27 @@ class AppCupertinoPageScaffold extends StatelessWidget {
       );
     }
 
-    final bodySliver =
-        sliverBodyBuilder?.call(context) ?? _buildDefaultSliverBody();
+    Widget bodySliver;
+    try {
+      bodySliver =
+          sliverBodyBuilder?.call(context) ?? _buildDefaultSliverBody();
+    } catch (e, st) {
+      debugPrint('[scaffold] sliverBodyBuilder error: $e');
+      debugPrintStack(stackTrace: st);
+      bodySliver = SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Text(
+              '页面构建异常:\n$e',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+        ),
+      );
+    }
     final resolvedMiddle = middle ?? Text(title);
     final resolvedLargeTitle =
         showLargeTitle ? (largeTitle ?? Text(title)) : null;
