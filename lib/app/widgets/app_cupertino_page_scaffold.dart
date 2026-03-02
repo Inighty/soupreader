@@ -81,6 +81,30 @@ class AppCupertinoPageScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    try {
+      return _buildInner(context);
+    } catch (e, st) {
+      debugPrint('[AppCupertinoPageScaffold] build error: $e');
+      debugPrintStack(stackTrace: st);
+      // 降级为最简单的非 Sliver 页面，显示具体异常信息。
+      return CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(
+          middle: Text(title),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              '页面框架异常:\n$e\n\n$st',
+              style: const TextStyle(fontSize: 11),
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildInner(BuildContext context) {
     final theme = CupertinoTheme.of(context);
     final brightness = theme.brightness ??
         MediaQuery.maybeOf(context)?.platformBrightness ??
