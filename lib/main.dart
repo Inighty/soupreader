@@ -5,7 +5,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import 'app/bootstrap/boot_host_app.dart';
-import 'app/widgets/app_error_widget.dart';
 import 'core/services/exception_log_service.dart';
 
 const MethodChannel _bootOverlayChannel = MethodChannel('soupreader/boot_overlay');
@@ -23,14 +22,11 @@ void _hideNativeBootOverlayAfterFirstFrame() {
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 在 Release 下默认 ErrorWidget 往往只是一块灰屏，无法定位异常根因。
-  // 这里强制把异常信息渲染到屏幕上，便于截图/复制回传。
-  ErrorWidget.builder = (FlutterErrorDetails details) {
-    return AppErrorWidget(
-      message: details.exceptionAsString(),
-      stackTrace: details.stack?.toString(),
-    );
-  };
+  // ── 全局错误处理 ──
+  // 注意：不设置 ErrorWidget.builder。
+  // 在 Release 模式下，默认 ErrorWidget 显示为灰色方块，虽然不好看但不会引发
+  // 递归 Stack Overflow。自定义 ErrorWidget（如 CupertinoPageScaffold 等）在缺少
+  // CupertinoTheme 上下文时自身也会 crash，导致无限递归白屏。
 
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);

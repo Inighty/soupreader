@@ -7,8 +7,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import '../../app/theme/cupertino_theme.dart';
 import '../../core/bootstrap/boot_log.dart';
 import '../../core/build/build_info.dart';
+import '../../core/models/app_settings.dart';
 import '../../core/services/exception_log_service.dart';
-import '../soup_reader_app.dart';
+import '../../core/services/settings_service.dart';
+import '../main_screen.dart';
 import 'app_bootstrap.dart';
 import 'boot_failure_view.dart';
 
@@ -19,7 +21,8 @@ class BootHostApp extends StatefulWidget {
   State<BootHostApp> createState() => _BootHostAppState();
 }
 
-class _BootHostAppState extends State<BootHostApp> {
+class _BootHostAppState extends State<BootHostApp>
+    with WidgetsBindingObserver {
   static const Duration _kTickerInterval = Duration(seconds: 1);
   static const int _kMaxLogLines = 160;
   static const int _kVisibleLogLines = 18;
@@ -32,9 +35,17 @@ class _BootHostAppState extends State<BootHostApp> {
   BootFailure? _failure;
   bool _booting = true;
 
+  // ── bootstrap 成功后使用 ──
+  final SettingsService _settingsService = SettingsService();
+  late Brightness _platformBrightness;
+  bool _settingsReady = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _platformBrightness =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
     _startedAtMs = DateTime.now().millisecondsSinceEpoch;
 
     BootLog.bind(_appendLog);
@@ -57,7 +68,51 @@ class _BootHostAppState extends State<BootHostApp> {
   void dispose() {
     _ticker?.cancel();
     BootLog.unbind();
+    WidgetsBinding.instance.removeObserver(this);
+    if (_settingsReady) {
+      _settingsService.appSettingsListenable
+          .removeListener(_onAppSettingsChanged);
+    }
     super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    setState(() {
+      _platformBrightness =
+          WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    });
+    _applySystemUiOverlayStyle();
+  }
+
+  void _onAppSettingsChanged() {
+    if (!mounted) return;
+    setState(() {});
+    _applySystemUiOverlayStyle();
+  }
+
+  Brightness get _effectiveBrightness {
+    if (!_settingsReady) return _platformBrightness;
+    final settings = _settingsService.appSettings;
+    switch (settings.appearanceMode) {
+      case AppAppearanceMode.followSystem:
+        return _platformBrightness;
+      case AppAppearanceMode.light:
+        return Brightness.light;
+      case AppAppearanceMode.dark:
+        return Brightness.dark;
+      case AppAppearanceMode.eInk:
+        return Brightness.light;
+    }
+  }
+
+  void _applySystemUiOverlayStyle() {
+    final brightness = _effectiveBrightness;
+    SystemChrome.setSystemUIOverlayStyle(
+      brightness == Brightness.dark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark,
+    );
   }
 
   void _appendLog(String message) {
@@ -101,17 +156,22 @@ class _BootHostAppState extends State<BootHostApp> {
     }
 
     if (!mounted) return;
-    setState(() {
-      _failure = failure;
-      _booting = false;
-    });
 
     if (failure == null) {
       _appendLog('[boot-host] bootstrap ok');
       BootLog.unbind();
+      // Bootstrap 成功，开始监听设置变化。
+      _settingsReady = true;
+      _settingsService.appSettingsListenable.addListener(_onAppSettingsChanged);
+      _applySystemUiOverlayStyle();
     } else {
       _appendLog('[boot-host] bootstrap failed: ${failure.stepName}');
     }
+
+    setState(() {
+      _failure = failure;
+      _booting = false;
+    });
   }
 
   String _bootLogPayload() => _logLines.join('\n').trim();
@@ -278,31 +338,40 @@ class _BootHostAppState extends State<BootHostApp> {
     if (_booting) {
       return _buildBootingApp();
     }
+
+    final brightness = _effectiveBrightness;
+    final theme = AppCupertinoTheme.build(brightness);
+
+    final Widget home;
     if (failure != null) {
-      final brightness =
-          WidgetsBinding.instance.platformDispatcher.platformBrightness;
-      final theme = AppCupertinoTheme.build(brightness);
-      return CupertinoApp(
-        title: 'SoupReader',
-        debugShowCheckedModeBanner: false,
-        theme: theme,
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-        ],
-        supportedLocales: const [
-          Locale('zh', 'CN'),
-          Locale('en', 'US'),
-        ],
-        home: BootFailureView(
-          failure: failure,
-          retrying: false,
-          onRetry: () => unawaited(_runBootstrap()),
-          bootLog: _bootLogPayload(),
-        ),
+      home = BootFailureView(
+        failure: failure,
+        retrying: false,
+        onRetry: () => unawaited(_runBootstrap()),
+        bootLog: _bootLogPayload(),
+      );
+    } else {
+      home = MainScreen(
+        brightness: brightness,
+        appSettings:
+            _settingsReady ? _settingsService.appSettings : const AppSettings(),
       );
     }
-    return const SoupReaderApp();
+
+    return CupertinoApp(
+      title: 'SoupReader',
+      debugShowCheckedModeBanner: false,
+      theme: theme,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('zh', 'CN'),
+        Locale('en', 'US'),
+      ],
+      home: home,
+    );
   }
 }
