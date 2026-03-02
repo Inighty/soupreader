@@ -229,6 +229,7 @@ class _SourceListViewState extends State<SourceListView> {
       },
       child: AppCupertinoPageScaffold(
         title: '书源管理',
+        transitionBetweenRoutes: false,
         trailing: CupertinoButton(
           key: _moreMenuKey,
           onPressed: _showMainOptions,

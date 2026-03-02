@@ -11,6 +11,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
   final Widget? middle;
   final Widget? leading;
   final Widget? trailing;
+  final bool transitionBetweenRoutes;
   final bool includeTopSafeArea;
   final bool includeBottomSafeArea;
   final bool useSliverNavigationBar;
@@ -27,6 +28,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     this.middle,
     this.leading,
     this.trailing,
+    this.transitionBetweenRoutes = true,
     this.includeTopSafeArea = true,
     this.includeBottomSafeArea = true,
     this.useSliverNavigationBar = false,
@@ -139,6 +141,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
         trailing,
         alignment: Alignment.centerRight,
       ),
+      transitionBetweenRoutes: transitionBetweenRoutes,
       backgroundColor: navBarBackground,
       border: border,
     );
