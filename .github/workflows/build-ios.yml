@@ -82,6 +82,7 @@ jobs:
       - name: Build iOS
         run: |
           flutter build ios --release --no-codesign -v \
+            --build-number=${{ github.run_number }} \
             --dart-define=GIT_SHA=${{ github.sha }} \
             --dart-define=GIT_REF=${{ github.ref_name }} \
             --dart-define=BUILD_NUMBER=${{ github.run_number }}
@@ -91,9 +92,11 @@ jobs:
         run: |
           mkdir -p build/ios/ipa
           cd build/ios/iphoneos
+          rm -rf Payload
           mkdir Payload
-          cp -r Runner.app Payload/
-          zip -rq "../ipa/${{ steps.vars.outputs.ipa_file }}" Payload
+          cp -R Runner.app Payload/
+          # Use ditto to preserve metadata/symlinks; more robust than zip on macOS.
+          ditto -c -k --sequesterRsrc --keepParent Payload "../ipa/${{ steps.vars.outputs.ipa_file }}"
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
