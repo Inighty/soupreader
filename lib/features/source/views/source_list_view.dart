@@ -6,7 +6,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../../app/widgets/app_action_list_sheet.dart';
-import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
@@ -227,10 +226,12 @@ class _SourceListViewState extends State<SourceListView> {
       },
       child: AppCupertinoPageScaffold(
         title: '书源管理',
-        trailing: AppNavBarButton(
+        trailing: CupertinoButton(
           key: _moreMenuKey,
           onPressed: _showMainOptions,
-          child: const Text('更多'),
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(30, 30),
+          child: const Icon(CupertinoIcons.line_horizontal_3),
         ),
         child: StreamBuilder<List<BookSource>>(
           stream: _sourceRepo.watchAllSources(),
