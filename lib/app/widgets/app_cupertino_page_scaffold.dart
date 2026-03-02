@@ -154,10 +154,10 @@ class AppCupertinoPageScaffold extends StatelessWidget {
       );
     }
 
-    // Sliver 模式：CupertinoSliverNavigationBar 实现大标题折叠效果。
-    // ⚠️ primary 必须为 false：在 CupertinoTabScaffold 中多个 tab 同时存活，
-    // primary: true 会导致多个 CustomScrollView 竞争同一个 PrimaryScrollController，
-    // 在 Release 模式下 layout 阶段崩溃导致灰屏。
+    // Sliver 模式：使用普通 CupertinoNavigationBar + CustomScrollView 承载 bodySliver。
+    // ⚠️ CupertinoSliverNavigationBar 在 iOS Release 模式下 layout 阶段崩溃导致灰屏，
+    // 即使 primary: false 也无法解决。暂用普通导航栏替代。
+    // primary 强制为 false，避免多个 tab 的 CustomScrollView 竞争同一 PrimaryScrollController。
     Widget bodySliver;
     try {
       bodySliver =
@@ -179,36 +179,24 @@ class AppCupertinoPageScaffold extends StatelessWidget {
         ),
       );
     }
-    final resolvedMiddle = middle ?? Text(title);
-    final resolvedLargeTitle =
-        showLargeTitle ? (largeTitle ?? Text(title)) : null;
+
+    // 底部留白：TabBar 嵌套在 CupertinoTabScaffold 中时，
+    // SliverSafeArea(bottom: true) 只处理物理安全区（Home Indicator），
+    // 不包含 TabBar 占据的空间。这里统一追加 TabBar 高度的 padding。
+    const tabBarExtraPadding = kMinInteractiveDimensionCupertino;
 
     return CupertinoPageScaffold(
       backgroundColor: baseBackground,
+      navigationBar: navBar,
       child: CustomScrollView(
         primary: false,
         controller: sliverScrollController,
         physics: sliverScrollPhysics,
         slivers: [
-          CupertinoSliverNavigationBar(
-            largeTitle: resolvedLargeTitle,
-            middle: resolvedMiddle,
-            alwaysShowMiddle: !showLargeTitle,
-            previousPageTitle: '',
-            leading: _buildNavBarItem(
-              context,
-              leading,
-              alignment: Alignment.centerLeft,
-            ),
-            trailing: _buildNavBarItem(
-              context,
-              trailing,
-              alignment: Alignment.centerRight,
-            ),
-            backgroundColor: navBarBackground,
-            border: border,
-          ),
           bodySliver,
+          SliverPadding(
+            padding: EdgeInsets.only(bottom: tabBarExtraPadding),
+          ),
         ],
       ),
     );

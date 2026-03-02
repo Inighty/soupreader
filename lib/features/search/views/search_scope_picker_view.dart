@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
-import '../../../app/theme/cupertino_theme_adapter.dart';
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../models/search_scope.dart';
 import '../models/search_scope_group_helper.dart';
@@ -91,7 +91,7 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
   @override
   Widget build(BuildContext context) {
     final theme = CupertinoTheme.of(context);
-    final tokens = AppCupertinoThemeAdapter.resolve(context);
+    final uiTokens = AppUiTokens.resolve(context);
 
     return AppCupertinoPageScaffold(
       title: '搜索范围',
@@ -130,15 +130,15 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
           ),
           Expanded(
             child: _mode == _SearchScopeMode.group
-                ? _buildGroupList(theme, tokens)
-                : _buildSourceList(theme, tokens),
+                ? _buildGroupList(theme, uiTokens)
+                : _buildSourceList(theme, uiTokens),
           ),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
             decoration: BoxDecoration(
               border: Border(
-                top: BorderSide(color: tokens.border, width: 1),
+                top: BorderSide(color: uiTokens.colors.separator, width: 1),
               ),
             ),
             child: Row(
@@ -175,7 +175,7 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
 
   Widget _buildScopeOptionTile({
     Key? key,
-    required AppThemeTokens tokens,
+    required AppUiTokens uiTokens,
     required bool selected,
     required VoidCallback onPressed,
     required Widget child,
@@ -191,12 +191,12 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
         padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
         decoration: BoxDecoration(
           color:
-              selected ? tokens.primary.withValues(alpha: 0.08) : tokens.card,
-          borderRadius: tokens.controlRadius,
+              selected ? uiTokens.colors.accent.withValues(alpha: 0.08) : uiTokens.colors.card,
+          borderRadius: BorderRadius.circular(uiTokens.radii.control),
           border: Border.all(
             color: selected
-                ? tokens.primary.withValues(alpha: 0.42)
-                : tokens.border.withValues(alpha: 0.72),
+                ? uiTokens.colors.accent.withValues(alpha: 0.42)
+                : uiTokens.colors.separator.withValues(alpha: 0.72),
             width: 0.8,
           ),
         ),
@@ -205,13 +205,13 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
     );
   }
 
-  Widget _buildGroupList(CupertinoThemeData theme, AppThemeTokens tokens) {
+  Widget _buildGroupList(CupertinoThemeData theme, AppUiTokens uiTokens) {
     if (_groups.isEmpty) {
       return Center(
         child: Text(
           '没有可选分组',
           style: theme.textTheme.textStyle.copyWith(
-            color: tokens.mutedForeground,
+            color: uiTokens.colors.mutedForeground,
           ),
         ),
       );
@@ -225,7 +225,7 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
         final selected = _selectedGroups.contains(group);
         return _buildScopeOptionTile(
           key: ValueKey('group-$group'),
-          tokens: tokens,
+          uiTokens: uiTokens,
           selected: selected,
           onPressed: () => _toggleGroup(group),
           child: Row(
@@ -236,7 +236,7 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.textStyle.copyWith(
-                    color: tokens.cardForeground,
+                    color: uiTokens.colors.cardForeground,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -247,7 +247,7 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
                     ? CupertinoIcons.check_mark_circled_solid
                     : CupertinoIcons.circle,
                 size: 20,
-                color: selected ? tokens.primary : tokens.mutedForeground,
+                color: selected ? uiTokens.colors.accent : uiTokens.colors.mutedForeground,
               ),
             ],
           ),
@@ -256,14 +256,14 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
     );
   }
 
-  Widget _buildSourceList(CupertinoThemeData theme, AppThemeTokens tokens) {
+  Widget _buildSourceList(CupertinoThemeData theme, AppUiTokens uiTokens) {
     final filtered = _filteredSources;
     if (filtered.isEmpty) {
       return Center(
         child: Text(
           '未找到匹配书源',
           style: theme.textTheme.textStyle.copyWith(
-            color: tokens.mutedForeground,
+            color: uiTokens.colors.mutedForeground,
           ),
         ),
       );
@@ -277,7 +277,7 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
         final selected = _selectedSource?.bookSourceUrl == source.bookSourceUrl;
         return _buildScopeOptionTile(
           key: ValueKey(source.bookSourceUrl),
-          tokens: tokens,
+          uiTokens: uiTokens,
           selected: selected,
           onPressed: () => _toggleSource(source),
           child: Row(
@@ -288,7 +288,7 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.textStyle.copyWith(
-                    color: tokens.cardForeground,
+                    color: uiTokens.colors.cardForeground,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -299,7 +299,7 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
                     ? CupertinoIcons.check_mark_circled_solid
                     : CupertinoIcons.circle,
                 size: 20,
-                color: selected ? tokens.primary : tokens.mutedForeground,
+                color: selected ? uiTokens.colors.accent : uiTokens.colors.mutedForeground,
               ),
             ],
           ),

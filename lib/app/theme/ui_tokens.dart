@@ -58,6 +58,18 @@ class AppUiColors {
   final Color accent;
   final Color destructive;
 
+  /// 主前景色（等同于 label，与旧 AppThemeTokens.foreground 对齐）。
+  Color get foreground => label;
+
+  /// 弱化前景色（与旧 AppThemeTokens.mutedForeground 对齐）。
+  Color get mutedForeground => secondaryLabel;
+
+  /// 卡片/分组内背景色（与旧 AppThemeTokens.card 对齐）。
+  Color get card => sectionBackground;
+
+  /// 卡片前景色（与旧 AppThemeTokens.cardForeground 对齐）。
+  Color get cardForeground => label;
+
   const AppUiColors({
     required this.pageBackground,
     required this.groupedBackground,

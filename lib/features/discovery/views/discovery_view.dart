@@ -4,7 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../../app/theme/cupertino_theme_adapter.dart';
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
@@ -606,7 +606,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     required bool showEmptyMessage,
   }) {
     final theme = CupertinoTheme.of(context);
-    final tokens = AppCupertinoThemeAdapter.resolve(context);
+    final uiTokens = AppUiTokens.resolve(context);
 
     final header = Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -623,7 +623,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                 '书源 ${visible.length}',
                 style: theme.textTheme.textStyle.copyWith(
                   fontSize: 12,
-                  color: tokens.mutedForeground,
+                  color: uiTokens.colors.mutedForeground,
                 ),
               ),
               if (query.startsWith('group:')) ...[
@@ -632,7 +632,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                   '分组筛选',
                   style: theme.textTheme.textStyle.copyWith(
                     fontSize: 12,
-                    color: tokens.primary,
+                    color: uiTokens.colors.accent,
                   ),
                 ),
               ],
@@ -708,7 +708,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
   Widget _buildSourceItem(BookSource source) {
     final theme = CupertinoTheme.of(context);
-    final tokens = AppCupertinoThemeAdapter.resolve(context);
+    final uiTokens = AppUiTokens.resolve(context);
 
     final sourceUrl = source.bookSourceUrl;
     final expanded = _expandedSourceUrl == sourceUrl;
@@ -720,10 +720,10 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         decoration: BoxDecoration(
-          color: tokens.card,
-          borderRadius: tokens.controlRadius,
+          color: uiTokens.colors.card,
+          borderRadius: BorderRadius.circular(uiTokens.radii.control),
           border: Border.all(
-            color: tokens.border.withValues(alpha: 0.72),
+            color: uiTokens.colors.separator.withValues(alpha: 0.72),
             width: 0.8,
           ),
         ),
@@ -741,7 +741,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                         ? CupertinoIcons.chevron_down
                         : CupertinoIcons.chevron_forward,
                     size: 16,
-                    color: tokens.mutedForeground,
+                    color: uiTokens.colors.mutedForeground,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -754,7 +754,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.textStyle.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: tokens.foreground,
+                            color: uiTokens.colors.foreground,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -764,7 +764,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.textStyle.copyWith(
                             fontSize: 12,
-                            color: tokens.mutedForeground,
+                            color: uiTokens.colors.mutedForeground,
                           ),
                         ),
                         if ((source.bookSourceGroup ?? '')
@@ -777,7 +777,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.textStyle.copyWith(
                               fontSize: 12,
-                              color: tokens.mutedForeground,
+                              color: uiTokens.colors.mutedForeground,
                             ),
                           ),
                         ],
@@ -789,7 +789,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
             ),
             if (expanded) ...[
               const SizedBox(height: 10),
-              Container(height: 1, color: tokens.border),
+              Container(height: 1, color: uiTokens.colors.separator),
               const SizedBox(height: 10),
               if (loadingKinds)
                 Row(
@@ -800,7 +800,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                       '正在加载发现入口…',
                       style: theme.textTheme.textStyle.copyWith(
                         fontSize: 12,
-                        color: tokens.mutedForeground,
+                        color: uiTokens.colors.mutedForeground,
                       ),
                     ),
                   ],
@@ -810,7 +810,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                   '暂无发现入口',
                   style: theme.textTheme.textStyle.copyWith(
                     fontSize: 12,
-                    color: tokens.mutedForeground,
+                    color: uiTokens.colors.mutedForeground,
                   ),
                 )
               else
@@ -828,7 +828,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                         source,
                         kind,
                         theme: theme,
-                        tokens: tokens,
+                        uiTokens: uiTokens,
                       );
                       if (width == null) {
                         chips.add(child);
@@ -875,7 +875,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     BookSource source,
     SourceExploreKind kind, {
     required CupertinoThemeData theme,
-    required AppThemeTokens tokens,
+    required AppUiTokens uiTokens,
   }) {
     final title = kind.title.trim().isEmpty ? '发现' : kind.title.trim();
     final url = kind.url?.trim() ?? '';
@@ -883,15 +883,15 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     final isError = title.startsWith('ERROR:');
 
     final borderColor = isError
-        ? tokens.destructive
+        ? uiTokens.colors.destructive
         : isEnabled
-            ? tokens.primary
-            : tokens.border;
+            ? uiTokens.colors.accent
+            : uiTokens.colors.separator;
     final textColor = isError
-        ? tokens.destructive
+        ? uiTokens.colors.destructive
         : isEnabled
-            ? tokens.primary
-            : tokens.mutedForeground;
+            ? uiTokens.colors.accent
+            : uiTokens.colors.mutedForeground;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -900,7 +900,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
           color: textColor.withValues(alpha: 0.09),
-          borderRadius: tokens.controlRadius,
+          borderRadius: BorderRadius.circular(uiTokens.radii.control),
           border: Border.all(color: borderColor, width: 1),
         ),
         child: Text(

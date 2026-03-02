@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../models/book.dart';
-import '../../../app/theme/colors.dart';
+import '../../../app/theme/ui_tokens.dart';
 
 /// 书籍封面卡片组件
 class BookCoverCard extends StatelessWidget {
@@ -24,6 +24,7 @@ class BookCoverCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final height = width * 1.4; // 封面比例
     final textTheme = CupertinoTheme.of(context).textTheme;
+    final uiTokens = AppUiTokens.resolve(context);
 
     return GestureDetector(
       onTap: onTap,
@@ -71,8 +72,8 @@ class BookCoverCard extends StatelessWidget {
                             alignment: Alignment.centerLeft,
                             widthFactor: book.readProgress,
                             child: Container(
-                              decoration: const BoxDecoration(
-                                color: AppColors.accent,
+                              decoration: BoxDecoration(
+                                color: uiTokens.colors.accent,
                               ),
                             ),
                           ),
@@ -93,7 +94,7 @@ class BookCoverCard extends StatelessWidget {
               style: textTheme.textStyle.copyWith(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: uiTokens.colors.label,
               ),
             ),
 
@@ -106,7 +107,7 @@ class BookCoverCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: textTheme.textStyle.copyWith(
                 fontSize: 12,
-                color: AppColors.textMuted,
+                color: uiTokens.colors.mutedForeground,
               ),
             ),
           ],
