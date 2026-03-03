@@ -31,6 +31,9 @@ class DiscoveryExploreResultsView extends StatefulWidget {
 
 class _DiscoveryExploreResultsViewState
     extends State<DiscoveryExploreResultsView> {
+  static const double _scrollLoadThreshold = 220;
+  static const double _minTapSize = kMinInteractiveDimensionCupertino;
+
   late final RuleParserEngine _engine;
   late final BookAddService _addService;
   final ScrollController _scrollController = ScrollController();
@@ -69,7 +72,7 @@ class _DiscoveryExploreResultsViewState
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
     if (position.maxScrollExtent <= 0) return;
-    if (position.pixels >= position.maxScrollExtent - 220) {
+    if (position.pixels >= position.maxScrollExtent - _scrollLoadThreshold) {
       unawaited(_loadMore(trigger: 'scroll'));
     }
   }
@@ -263,10 +266,10 @@ class _DiscoveryExploreResultsViewState
 
   @override
   Widget build(BuildContext context) {
-    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
-    final secondaryTextColor = CupertinoColors.secondaryLabel.resolveFrom(
-      context,
-    );
+    final theme = CupertinoTheme.of(context);
+    final textStyle = theme.textTheme.textStyle;
+    final secondaryTextColor =
+        CupertinoColors.secondaryLabel.resolveFrom(context);
 
     return AppCupertinoPageScaffold(
       title: widget.exploreName,
@@ -288,7 +291,7 @@ class _DiscoveryExploreResultsViewState
                   ),
                 ),
                 Text(
-                  '已加载 ${_results.length}',
+                  '已加载 ${_results.length} 本',
                   style: textStyle.copyWith(
                     fontSize: 12,
                     color: secondaryTextColor,
@@ -312,7 +315,7 @@ class _DiscoveryExploreResultsViewState
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
       itemCount: _results.length + 1,
       itemBuilder: (context, index) {
         if (index == _results.length) {
@@ -337,10 +340,14 @@ class _DiscoveryExploreResultsViewState
       result,
       bookshelfKeys: _bookshelfKeys,
     );
+    final author = result.author.trim().isEmpty ? '未知作者' : result.author.trim();
+    final lastChapter = result.lastChapter.trim();
+    final intro = result.intro.trim();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () => _openBookInfo(result),
         child: DecoratedBox(
           decoration: BoxDecoration(
@@ -349,59 +356,40 @@ class _DiscoveryExploreResultsViewState
             border: Border.all(color: borderColor),
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppCoverImage(
-                  urlOrPath: result.coverUrl,
-                  title: result.name,
-                  author: result.author,
-                  width: 40,
-                  height: 56,
-                  borderRadius: 6,
-                  fit: BoxFit.cover,
-                  showTextOnPlaceholder: false,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        result.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textStyle.copyWith(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: primaryTextColor,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        result.author.isNotEmpty ? result.author : '未知作者',
-                        style: textStyle.copyWith(
-                          fontSize: 12,
-                          color: secondaryTextColor,
-                        ),
-                      ),
-                      if (result.intro.trim().isNotEmpty) ...[
-                        const SizedBox(height: 2),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: _minTapSize),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppCoverImage(
+                    urlOrPath: result.coverUrl,
+                    title: result.name,
+                    author: result.author,
+                    width: 42,
+                    height: 60,
+                    borderRadius: 7,
+                    fit: BoxFit.cover,
+                    showTextOnPlaceholder: false,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          result.intro.trim(),
-                          maxLines: 2,
+                          result.name,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: textStyle.copyWith(
-                            fontSize: 12,
-                            color: secondaryTextColor,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: primaryTextColor,
                           ),
                         ),
-                      ],
-                      if (result.lastChapter.trim().isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
-                          '最新: ${result.lastChapter.trim()}',
+                          author,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: textStyle.copyWith(
@@ -409,19 +397,49 @@ class _DiscoveryExploreResultsViewState
                             color: secondaryTextColor,
                           ),
                         ),
+                        if (lastChapter.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '最新：$lastChapter',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textStyle.copyWith(
+                              fontSize: 12,
+                              color: secondaryTextColor,
+                            ),
+                          ),
+                        ],
+                        if (intro.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            intro,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textStyle.copyWith(
+                              fontSize: 12,
+                              color: secondaryTextColor,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  inBookshelf
-                      ? CupertinoIcons.book_fill
-                      : CupertinoIcons.chevron_right,
-                  size: inBookshelf ? 17 : 16,
-                  color: inBookshelf ? inShelfColor : secondaryTextColor,
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: _minTapSize,
+                    height: _minTapSize,
+                    child: Center(
+                      child: Icon(
+                        inBookshelf
+                            ? CupertinoIcons.book_fill
+                            : CupertinoIcons.chevron_right,
+                        size: inBookshelf ? 17 : 16,
+                        color: inBookshelf ? inShelfColor : secondaryTextColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -463,6 +481,7 @@ class _DiscoveryExploreResultsViewState
       return Padding(
         padding: const EdgeInsets.only(top: 8, bottom: 12),
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => unawaited(_onFooterTap()),
           child: Column(
             children: [
@@ -511,6 +530,7 @@ class _DiscoveryExploreResultsViewState
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () => unawaited(_onFooterTap()),
         child: Center(
           child: Text(

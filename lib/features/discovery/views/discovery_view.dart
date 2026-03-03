@@ -46,6 +46,9 @@ class DiscoveryView extends StatefulWidget {
 }
 
 class _DiscoveryViewState extends State<DiscoveryView> {
+  static const int _collapsedKindsLimit = 10;
+  static const double _minTapSize = kMinInteractiveDimensionCupertino;
+
   late final SourceRepository _sourceRepo;
   late final SourceExploreKindsService _exploreKindsService;
   final SettingsService _settingsService = SettingsService();
@@ -53,6 +56,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   String? _initError;
 
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
 
   List<BookSource> _allSources = <BookSource>[];
@@ -60,6 +64,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
   String? _expandedSourceUrl;
   final Set<String> _loadingKindsSources = <String>{};
+  final Set<String> _expandedKindsSources = <String>{};
   final Map<String, List<SourceExploreKind>> _sourceKindsCache =
       <String, List<SourceExploreKind>>{};
 
@@ -73,6 +78,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
       _allSources = _sourceRepo.getAllSources();
       _searchController.addListener(_onQueryChanged);
+      _searchFocusNode.addListener(_onSearchFocusChanged);
       _lastExternalCompressVersion = widget.compressSignal?.value;
       widget.compressSignal?.addListener(_onExternalCompressSignal);
       _sourceSub = _sourceRepo.watchAllSources().listen((sources) {
@@ -114,6 +120,9 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     _searchController
       ..removeListener(_onQueryChanged)
       ..dispose();
+    _searchFocusNode
+      ..removeListener(_onSearchFocusChanged)
+      ..dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -127,6 +136,11 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   void _onQueryChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _onSearchFocusChanged() {
     if (!mounted) return;
     setState(() {});
   }
@@ -165,6 +179,11 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     _searchController.selection = TextSelection.fromPosition(
       TextPosition(offset: query.length),
     );
+  }
+
+  void _clearQuery() {
+    _searchController.clear();
+    _searchFocusNode.unfocus();
   }
 
   Future<void> _showGroupFilterMenu() async {
@@ -220,12 +239,26 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   Future<void> _toggleSource(BookSource source) async {
     final sourceUrl = source.bookSourceUrl;
     if (_expandedSourceUrl == sourceUrl) {
-      setState(() => _expandedSourceUrl = null);
+      setState(() {
+        _expandedSourceUrl = null;
+        _expandedKindsSources.remove(sourceUrl);
+      });
       return;
     }
 
-    setState(() => _expandedSourceUrl = sourceUrl);
+    setState(() {
+      _expandedSourceUrl = sourceUrl;
+      _expandedKindsSources.remove(sourceUrl);
+    });
     await _loadKinds(source, forceRefresh: false);
+  }
+
+  void _toggleKindsExpanded(String sourceUrl) {
+    if (_expandedKindsSources.contains(sourceUrl)) {
+      setState(() => _expandedKindsSources.remove(sourceUrl));
+      return;
+    }
+    setState(() => _expandedKindsSources.add(sourceUrl));
   }
 
   Future<void> _loadKinds(
@@ -615,38 +648,11 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     final theme = CupertinoTheme.of(context);
     final uiTokens = AppUiTokens.resolve(context);
 
-    final header = Padding(
-      padding: AppManageSearchField.outerPadding,
-      child: Column(
-        children: [
-          AppManageSearchField(
-            controller: _searchController,
-            placeholder: '请输入关键字搜索书源...',
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Text(
-                '书源 ${visible.length}',
-                style: theme.textTheme.textStyle.copyWith(
-                  fontSize: 12,
-                  color: uiTokens.colors.mutedForeground,
-                ),
-              ),
-              if (query.startsWith('group:')) ...[
-                const SizedBox(width: 10),
-                Text(
-                  '分组筛选',
-                  style: theme.textTheme.textStyle.copyWith(
-                    fontSize: 12,
-                    color: uiTokens.colors.accent,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
+    final header = _buildSearchHeader(
+      visibleCount: visible.length,
+      query: query,
+      theme: theme,
+      uiTokens: uiTokens,
     );
 
     if (visible.isEmpty) {
@@ -694,6 +700,93 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     );
   }
 
+  Widget _buildSearchHeader({
+    required int visibleCount,
+    required String query,
+    required CupertinoThemeData theme,
+    required AppUiTokens uiTokens,
+  }) {
+    final showCancel = _searchFocusNode.hasFocus || query.isNotEmpty;
+
+    return Padding(
+      padding: AppManageSearchField.outerPadding,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: AppManageSearchField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  placeholder: '请输入关键字搜索书源...',
+                  onSubmitted: (_) => _searchFocusNode.unfocus(),
+                ),
+              ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                child: showCancel
+                    ? CupertinoButton(
+                        key: const ValueKey<String>('discovery_search_cancel'),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        minimumSize: const Size(_minTapSize, _minTapSize),
+                        onPressed: _clearQuery,
+                        child: Text(
+                          '取消',
+                          style: theme.textTheme.actionTextStyle.copyWith(
+                            color: uiTokens.colors.accent,
+                          ),
+                        ),
+                      )
+                    : const SizedBox(
+                        key: ValueKey<String>(
+                          'discovery_search_cancel_placeholder',
+                        ),
+                        width: 0,
+                        height: _minTapSize,
+                      ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Text(
+                '书源（$visibleCount）',
+                style: theme.textTheme.textStyle.copyWith(
+                  fontSize: 12,
+                  color: uiTokens.colors.mutedForeground,
+                ),
+              ),
+              if (query.startsWith('group:')) ...[
+                const SizedBox(width: 8),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: uiTokens.colors.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(uiTokens.radii.control),
+                  ),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    child: Text(
+                      '分组筛选',
+                      style: theme.textTheme.textStyle.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: uiTokens.colors.accent,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyState({
     required int eligibleCount,
     required String query,
@@ -721,11 +814,17 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     final expanded = _expandedSourceUrl == sourceUrl;
     final loadingKinds = _loadingKindsSources.contains(sourceUrl);
     final kinds = _sourceKindsCache[sourceUrl] ?? const <SourceExploreKind>[];
+    final kindsExpanded = _expandedKindsSources.contains(sourceUrl);
+    final visibleKinds = kindsExpanded || kinds.length <= _collapsedKindsLimit
+        ? kinds
+        : kinds.take(_collapsedKindsLimit).toList(growable: false);
+    final hasHiddenKinds = visibleKinds.length < kinds.length;
+    final groupText = (source.bookSourceGroup ?? '').trim();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
         borderWidth: 0.8,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -734,45 +833,26 @@ class _DiscoveryViewState extends State<DiscoveryView> {
               behavior: HitTestBehavior.opaque,
               onTap: () => _toggleSource(source),
               onLongPress: () => _showSourceActions(source),
-              child: Row(
-                children: [
-                  Icon(
-                    expanded
-                        ? CupertinoIcons.chevron_down
-                        : CupertinoIcons.chevron_forward,
-                    size: 16,
-                    color: uiTokens.colors.mutedForeground,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          source.bookSourceName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.textStyle.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: uiTokens.colors.foreground,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: _minTapSize),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            source.bookSourceName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.textStyle.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: uiTokens.colors.foreground,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          source.bookSourceUrl,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.textStyle.copyWith(
-                            fontSize: 12,
-                            color: uiTokens.colors.mutedForeground,
-                          ),
-                        ),
-                        if ((source.bookSourceGroup ?? '')
-                            .trim()
-                            .isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
-                            '分组: ${source.bookSourceGroup!.trim()}',
+                            source.bookSourceUrl,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.textStyle.copyWith(
@@ -780,11 +860,31 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                               color: uiTokens.colors.mutedForeground,
                             ),
                           ),
+                          if (groupText.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              '分组：$groupText',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.textStyle.copyWith(
+                                fontSize: 12,
+                                color: uiTokens.colors.mutedForeground,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    Icon(
+                      expanded
+                          ? CupertinoIcons.chevron_down
+                          : CupertinoIcons.chevron_forward,
+                      size: 16,
+                      color: uiTokens.colors.mutedForeground,
+                    ),
+                  ],
+                ),
               ),
             ),
             if (expanded) ...[
@@ -818,7 +918,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                   builder: (context, constraints) {
                     final maxWidth = constraints.maxWidth;
                     final chips = <Widget>[];
-                    for (final kind in kinds) {
+                    for (final kind in visibleKinds) {
                       if (kind.style?.layoutWrapBefore == true) {
                         chips.add(SizedBox(width: maxWidth, height: 0));
                       }
@@ -841,6 +941,18 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                         );
                       }
                     }
+                    if (hasHiddenKinds || kindsExpanded) {
+                      final hiddenCount = kinds.length - visibleKinds.length;
+                      chips.add(
+                        _buildKindsToggleChip(
+                          expanded: kindsExpanded,
+                          hiddenCount: hiddenCount,
+                          theme: theme,
+                          uiTokens: uiTokens,
+                          onTap: () => _toggleKindsExpanded(sourceUrl),
+                        ),
+                      );
+                    }
 
                     return Wrap(
                       spacing: 8,
@@ -851,6 +963,39 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                 ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKindsToggleChip({
+    required bool expanded,
+    required int hiddenCount,
+    required CupertinoThemeData theme,
+    required AppUiTokens uiTokens,
+    required VoidCallback onTap,
+  }) {
+    final title = expanded ? '收起' : '更多 $hiddenCount';
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: _minTapSize),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: uiTokens.colors.accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(uiTokens.radii.control),
+            border: Border.all(color: uiTokens.colors.accent, width: 1),
+          ),
+          child: Text(
+            title,
+            style: theme.textTheme.textStyle.copyWith(
+              fontSize: 12,
+              color: uiTokens.colors.accent,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ),
     );
@@ -882,35 +1027,35 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     final isEnabled = url.isNotEmpty;
     final isError = title.startsWith('ERROR:');
 
-    final borderColor = isError
-        ? uiTokens.colors.destructive
-        : isEnabled
-            ? uiTokens.colors.accent
-            : uiTokens.colors.separator;
-    final textColor = isError
-        ? uiTokens.colors.destructive
-        : isEnabled
-            ? uiTokens.colors.accent
-            : uiTokens.colors.mutedForeground;
+    final borderColor =
+        isError ? uiTokens.colors.destructive : uiTokens.colors.separator;
+    final textColor =
+        isError ? uiTokens.colors.destructive : uiTokens.colors.foreground;
+    final backgroundColor = isError
+        ? uiTokens.colors.destructive.withValues(alpha: 0.12)
+        : uiTokens.colors.surfaceBackground;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: isEnabled ? () => _openExploreKind(source, kind) : null,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: textColor.withValues(alpha: 0.09),
-          borderRadius: BorderRadius.circular(uiTokens.radii.control),
-          border: Border.all(color: borderColor, width: 1),
-        ),
-        child: Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.textStyle.copyWith(
-            fontSize: 12,
-            color: textColor,
-            fontWeight: FontWeight.w600,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: _minTapSize),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(uiTokens.radii.control),
+            border: Border.all(color: borderColor, width: 1),
+          ),
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.textStyle.copyWith(
+              fontSize: 12,
+              color: textColor,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),

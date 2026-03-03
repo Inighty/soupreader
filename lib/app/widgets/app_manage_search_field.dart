@@ -8,13 +8,17 @@ class AppManageSearchField extends StatelessWidget {
 
   final TextEditingController controller;
   final String placeholder;
+  final FocusNode? focusNode;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
 
   const AppManageSearchField({
     super.key,
     required this.controller,
     required this.placeholder,
+    this.focusNode,
     this.onChanged,
+    this.onSubmitted,
   });
 
   @override
@@ -26,7 +30,9 @@ class AppManageSearchField extends StatelessWidget {
       child: CupertinoSearchTextField(
         controller: controller,
         placeholder: placeholder,
+        focusNode: focusNode,
         onChanged: onChanged,
+        onSubmitted: onSubmitted,
         itemColor: ui.colors.secondaryLabel,
         style: baseStyle.copyWith(
           fontSize: 14,
