@@ -7112,7 +7112,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                   Navigator.pop(sheetContext);
                   await _executeLegacyReadMenuAction(action);
                 },
-                child: Text(_readerActionLabel(action)),
+                child: _buildReaderActionSheetLabel(action),
               ),
             )
             .toList(growable: false),
@@ -7124,9 +7124,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  String _readerActionLabel(ReaderLegacyReadMenuAction action) {
-    final raw = ReaderLegacyMenuHelper.readMenuLabel(action);
-    final checked = switch (action) {
+  bool _isReaderActionChecked(ReaderLegacyReadMenuAction action) {
+    return switch (action) {
       ReaderLegacyReadMenuAction.enableReplace => _useReplaceRule,
       ReaderLegacyReadMenuAction.sameTitleRemoved =>
         _isCurrentChapterSameTitleRemoved(),
@@ -7135,7 +7134,25 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       ReaderLegacyReadMenuAction.delHTag => _delHTag,
       _ => false,
     };
-    return checked ? '✓ $raw' : raw;
+  }
+
+  Widget _buildReaderActionSheetLabel(ReaderLegacyReadMenuAction action) {
+    final label = ReaderLegacyMenuHelper.readMenuLabel(action);
+    if (!_isReaderActionChecked(action)) {
+      return Text(label);
+    }
+    final checkColor = CupertinoTheme.of(context).primaryColor;
+    return Row(
+      children: [
+        Expanded(child: Text(label)),
+        const SizedBox(width: 8),
+        Icon(
+          CupertinoIcons.check_mark,
+          size: 16,
+          color: checkColor,
+        ),
+      ],
+    );
   }
 
   void _showContentSearchDialog() {
@@ -13138,13 +13155,14 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     required int max,
     required String valueLabel,
     required ValueChanged<int> onChanged,
+    EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 16),
   }) {
     final safeMax = max < 1 ? 1 : max;
     final safeProgress = progress.clamp(0, safeMax).toInt();
     final sliderValue = safeProgress.toDouble();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: padding,
       child: Row(
         children: [
           SizedBox(
@@ -13368,44 +13386,42 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         children: [
           _buildLegacyTipSectionTitle('正文标题'),
           _buildLegacyTitleModeSegment(setPopupState),
-          _buildLegacyTipSliderRow(
-            label: '标题字号',
-            value: _settings.titleSize.toDouble(),
-            min: 0,
+          _buildLegacyTipSeekBarRow(
+            title: '标题字号',
+            progress: _settings.titleSize.clamp(0, 10).toInt(),
             max: 10,
-            onChanged: (value) {
+            valueLabel: _settings.titleSize.toString(),
+            onChanged: (progress) {
               _updateSettingsFromSheet(
                 setPopupState,
-                _settings.copyWith(titleSize: value.round()),
+                _settings.copyWith(titleSize: progress),
               );
             },
-            displayFormat: (value) => value.toInt().toString(),
           ),
-          _buildLegacyTipSliderRow(
-            label: '顶部间距',
-            value: _settings.titleTopSpacing,
-            min: 0,
+          _buildLegacyTipSeekBarRow(
+            title: '顶部间距',
+            progress: _settings.titleTopSpacing.round().clamp(0, 100).toInt(),
             max: 100,
-            onChanged: (value) {
+            valueLabel: _settings.titleTopSpacing.round().toString(),
+            onChanged: (progress) {
               _updateSettingsFromSheet(
                 setPopupState,
-                _settings.copyWith(titleTopSpacing: value),
+                _settings.copyWith(titleTopSpacing: progress.toDouble()),
               );
             },
-            displayFormat: (value) => value.toInt().toString(),
           ),
-          _buildLegacyTipSliderRow(
-            label: '底部间距',
-            value: _settings.titleBottomSpacing,
-            min: 0,
+          _buildLegacyTipSeekBarRow(
+            title: '底部间距',
+            progress:
+                _settings.titleBottomSpacing.round().clamp(0, 100).toInt(),
             max: 100,
-            onChanged: (value) {
+            valueLabel: _settings.titleBottomSpacing.round().toString(),
+            onChanged: (progress) {
               _updateSettingsFromSheet(
                 setPopupState,
-                _settings.copyWith(titleBottomSpacing: value),
+                _settings.copyWith(titleBottomSpacing: progress.toDouble()),
               );
             },
-            displayFormat: (value) => value.toInt().toString(),
           ),
           const SizedBox(height: 8),
           _buildLegacyTipSectionTitle('页眉'),
@@ -13627,8 +13643,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       child: Text(
         title,
         style: TextStyle(
-          color: _uiAccent,
-          fontSize: 18,
+          color: _uiTextStrong,
+          fontSize: 16,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -13637,8 +13653,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   Widget _buildLegacyTitleModeSegment(StateSetter setPopupState) {
     final safeGroupValue = _settings.titleMode.clamp(0, 2).toInt();
-    final selectedTitleTextColor = _uiAccent.computeLuminance() > 0.55
-        ? AppDesignTokens.textStrong
+    final thumbColor = _isUiDark
+        ? CupertinoColors.systemGrey4.resolveFrom(context)
         : CupertinoColors.white;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -13650,7 +13666,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       child: CupertinoSlidingSegmentedControl<int>(
         groupValue: safeGroupValue,
         backgroundColor: _uiCardBg,
-        thumbColor: _uiAccent,
+        thumbColor: thumbColor,
         children: {
           for (final option in _titleModeOptions)
             option.value: Padding(
@@ -13659,7 +13675,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                 option.label,
                 style: TextStyle(
                   color: safeGroupValue == option.value
-                      ? selectedTitleTextColor
+                      ? _uiTextStrong
                       : _uiTextNormal,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -13718,13 +13734,12 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     );
   }
 
-  Widget _buildLegacyTipSliderRow({
-    required String label,
-    required double value,
-    required double min,
-    required double max,
-    required ValueChanged<double> onChanged,
-    required String Function(double) displayFormat,
+  Widget _buildLegacyTipSeekBarRow({
+    required String title,
+    required int progress,
+    required int max,
+    required String valueLabel,
+    required ValueChanged<int> onChanged,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -13733,13 +13748,13 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           bottom: BorderSide(color: _uiBorder.withValues(alpha: 0.55)),
         ),
       ),
-      child: _buildSliderSetting(
-        label,
-        value,
-        min,
-        max,
-        onChanged,
-        displayFormat: displayFormat,
+      child: _buildReadStyleSeekBar(
+        title: title,
+        progress: progress,
+        max: max,
+        valueLabel: valueLabel,
+        padding: EdgeInsets.zero,
+        onChanged: onChanged,
       ),
     );
   }

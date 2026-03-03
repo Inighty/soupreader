@@ -45,10 +45,6 @@ class _ReaderPaddingConfigDialogState extends State<ReaderPaddingConfigDialog> {
       ? ReaderOverlayTokens.textNormalDark
       : ReaderOverlayTokens.textNormalLight;
 
-  Color get _sectionAccent => widget.isDarkMode
-      ? AppDesignTokens.brandSecondary
-      : AppDesignTokens.brandPrimary;
-
   Color get _accent => widget.isDarkMode
       ? AppDesignTokens.brandSecondary
       : AppDesignTokens.brandPrimary;
@@ -245,9 +241,9 @@ class _ReaderPaddingConfigDialogState extends State<ReaderPaddingConfigDialog> {
       child: Text(
         title,
         style: TextStyle(
-          color: _sectionAccent,
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
+          color: _textStrong,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -267,9 +263,9 @@ class _ReaderPaddingConfigDialogState extends State<ReaderPaddingConfigDialog> {
             child: Text(
               title,
               style: TextStyle(
-                color: _sectionAccent,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+                color: _textStrong,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -304,7 +300,7 @@ class _ReaderPaddingConfigDialogState extends State<ReaderPaddingConfigDialog> {
       child: Row(
         children: [
           SizedBox(
-            width: 44,
+            width: 52,
             child: Text(
               label,
               style: TextStyle(
@@ -320,7 +316,6 @@ class _ReaderPaddingConfigDialogState extends State<ReaderPaddingConfigDialog> {
               min: 0,
               max: max,
               activeColor: _accent,
-              thumbColor: _accent,
               onChanged: canSlide ? onChanged : null,
             ),
           ),

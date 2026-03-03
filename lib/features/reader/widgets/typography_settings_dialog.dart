@@ -328,7 +328,6 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
               min: safeMin,
               max: safeMax,
               activeColor: _accent,
-              thumbColor: _accent,
               onChanged: canSlide ? onChanged : null,
             ),
           ),
