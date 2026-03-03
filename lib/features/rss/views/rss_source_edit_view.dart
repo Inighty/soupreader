@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
 import '../../../core/utils/legado_json.dart';
@@ -213,14 +215,11 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(30, 30),
+          AppNavBarButton(
             onPressed: _saving || _loading ? null : _openDebugSource,
             child: const Icon(CupertinoIcons.ant),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed: _saving || _loading ? null : _save,
             child: _saving
                 ? const CupertinoActivityIndicator()
@@ -233,7 +232,7 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())
-          : ListView(
+          : AppListView(
               padding: const EdgeInsets.only(top: 12, bottom: 24),
               children: [
                 CupertinoFormSection.insetGrouped(

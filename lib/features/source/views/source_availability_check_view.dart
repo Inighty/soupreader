@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../services/source_availability_check_task_service.dart';
@@ -505,23 +507,19 @@ class _SourceAvailabilityCheckViewState
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(30, 30),
+          AppNavBarButton(
             onPressed: _copyReport,
             child: const Text('复制'),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(30, 30),
+          AppNavBarButton(
             onPressed: _exportReportToFile,
             child: const Text('导出'),
           ),
         ],
       ),
-      child: ListView(
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('概览'),
             children: [
               CupertinoListTile.notched(
@@ -572,7 +570,7 @@ class _SourceAvailabilityCheckViewState
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: Text('列表（显示 ${visibleItems.length} / 总计 $total）'),
             children: visibleItems.map((item) {
               final statusText = _statusText(item.status);

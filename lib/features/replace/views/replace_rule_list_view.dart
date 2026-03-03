@@ -8,7 +8,9 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
@@ -126,16 +128,13 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(30, 30),
+              AppNavBarButton(
                 onPressed:
                     _menuBusy ? null : () => _showGroupFilterOptions(allRules),
                 child: const Icon(CupertinoIcons.square_grid_2x2),
               ),
-              CupertinoButton(
+              AppNavBarButton(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                minimumSize: const Size(30, 30),
                 onPressed: _menuBusy || (!_selectionMode && allRules.isEmpty)
                     ? null
                     : () => _toggleSelectionMode(allRules),
@@ -144,10 +143,8 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
-              CupertinoButton(
+              AppNavBarButton(
                 key: _moreMenuKey,
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(30, 30),
                 onPressed: _selectionMode
                     ? (hasSelection && !_menuBusy
                         ? () => _showSelectionMoreMenu(rules)
@@ -808,63 +805,78 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   Widget _buildList(List<ReplaceRule> rules) {
-    return ListView.builder(
-      itemCount: rules.length,
-      itemBuilder: (context, index) {
-        final rule = rules[index];
-        final selected = _selectedRuleIds.contains(rule.id);
-        final title = rule.name.isEmpty ? '(未命名)' : rule.name;
-        final subtitle = [
-          if (rule.group != null && rule.group!.trim().isNotEmpty) rule.group!,
-          rule.isRegex ? '正则' : '普通',
-          rule.isEnabled ? '启用' : '未启用',
-        ].join(' · ');
-        final tile = CupertinoListTile.notched(
-          title: Text(title),
-          subtitle: Text(subtitle),
-          trailing: _selectionMode
-              ? Icon(
-                  selected
-                      ? CupertinoIcons.check_mark_circled_solid
-                      : CupertinoIcons.circle,
-                  color: selected
-                      ? CupertinoColors.activeBlue.resolveFrom(context)
-                      : CupertinoColors.secondaryLabel.resolveFrom(context),
-                  size: 20,
-                )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CupertinoSwitch(
-                      value: rule.isEnabled,
-                      onChanged: (v) =>
-                          _repo.updateRule(rule.copyWith(isEnabled: v)),
-                    ),
-                    CupertinoButton(
-                      padding: const EdgeInsets.only(left: 4, right: 2),
-                      minimumSize: const Size(30, 30),
-                      onPressed: () => _showRuleItemMenu(rule),
-                      child: const Icon(
-                        CupertinoIcons.ellipsis,
-                        size: 18,
+    return AppListView(
+      padding: const EdgeInsets.only(top: 8, bottom: 20),
+      children: [
+        for (var index = 0; index < rules.length; index++) ...[
+          Builder(
+            builder: (context) {
+              final rule = rules[index];
+              final selected = _selectedRuleIds.contains(rule.id);
+              final title = rule.name.isEmpty ? '(未命名)' : rule.name;
+              final subtitle = [
+                if (rule.group != null && rule.group!.trim().isNotEmpty)
+                  rule.group!,
+                rule.isRegex ? '正则' : '普通',
+                rule.isEnabled ? '启用' : '未启用',
+              ].join(' · ');
+              final tile = CupertinoListTile.notched(
+                title: Text(title),
+                subtitle: Text(subtitle),
+                trailing: _selectionMode
+                    ? Icon(
+                        selected
+                            ? CupertinoIcons.check_mark_circled_solid
+                            : CupertinoIcons.circle,
+                        color: selected
+                            ? CupertinoColors.activeBlue.resolveFrom(context)
+                            : CupertinoColors.secondaryLabel
+                                .resolveFrom(context),
+                        size: 20,
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CupertinoSwitch(
+                            value: rule.isEnabled,
+                            onChanged: (v) =>
+                                _repo.updateRule(rule.copyWith(isEnabled: v)),
+                          ),
+                          CupertinoButton(
+                            padding: const EdgeInsets.only(left: 4, right: 2),
+                            minimumSize: const Size(30, 30),
+                            onPressed: () => _showRuleItemMenu(rule),
+                            child: const Icon(
+                              CupertinoIcons.ellipsis,
+                              size: 18,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                onTap: _selectionMode
+                    ? () => _toggleRuleSelection(rule.id)
+                    : () => _editRule(rule),
+              );
+              final child = (!_selectionMode || !selected)
+                  ? tile
+                  : DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.systemGrey6.resolveFrom(context),
+                      ),
+                      child: tile,
+                    );
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: AppCard(
+                  padding: EdgeInsets.zero,
+                  child: child,
                 ),
-          onTap: _selectionMode
-              ? () => _toggleRuleSelection(rule.id)
-              : () => _editRule(rule),
-        );
-        if (!_selectionMode || !selected) {
-          return tile;
-        }
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: CupertinoColors.systemGrey6.resolveFrom(context),
+              );
+            },
           ),
-          child: tile,
-        );
-      },
+          if (index < rules.length - 1) const SizedBox(height: 8),
+        ],
+      ],
     );
   }
 
@@ -1670,12 +1682,9 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                                     const SizedBox(height: 6),
                                 itemBuilder: (context, index) {
                                   final item = history[index];
-                                  return Container(
-                                    decoration: BoxDecoration(
-                                      color: CupertinoColors.systemGrey6
-                                          .resolveFrom(context),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
+                                  return AppCard(
+                                    backgroundColor: CupertinoColors.systemGrey6
+                                        .resolveFrom(context),
                                     padding:
                                         const EdgeInsets.fromLTRB(10, 8, 8, 8),
                                     child: Row(
@@ -2326,84 +2335,78 @@ class _ReplaceRuleImportCandidateTile extends StatelessWidget {
         : candidate.rule.name.trim();
     final group = candidate.rule.group?.trim();
     final subtitle = group == null || group.isEmpty ? '未分组' : '分组：$group';
+    final backgroundColor = selected
+        ? CupertinoColors.systemGrey5.resolveFrom(context)
+        : CupertinoColors.systemBackground.resolveFrom(context);
     return CupertinoButton(
       padding: EdgeInsets.zero,
       onPressed: onTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: selected
-              ? CupertinoColors.systemGrey5.resolveFrom(context)
-              : CupertinoColors.systemBackground.resolveFrom(context),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: CupertinoColors.separator.resolveFrom(context),
-            width: 0.5,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          child: Row(
-            children: [
-              Icon(
-                selected
-                    ? CupertinoIcons.check_mark_circled_solid
-                    : CupertinoIcons.circle,
-                color: selected
-                    ? CupertinoColors.activeBlue.resolveFrom(context)
-                    : CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: CupertinoColors.secondaryLabel.resolveFrom(
-                          context,
-                        ),
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: stateColor.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  child: Text(
-                    stateLabel,
-                    style: TextStyle(
-                      color: stateColor,
-                      fontSize: 12,
+      child: AppCard(
+        backgroundColor: backgroundColor,
+        borderColor: CupertinoColors.separator.resolveFrom(context),
+        borderWidth: 0.5,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Row(
+          children: [
+            Icon(
+              selected
+                  ? CupertinoIcons.check_mark_circled_solid
+                  : CupertinoIcons.circle,
+              color: selected
+                  ? CupertinoColors.activeBlue.resolveFrom(context)
+                  : CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: CupertinoColors.secondaryLabel.resolveFrom(
+                        context,
+                      ),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: stateColor.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 2,
+                ),
+                child: Text(
+                  stateLabel,
+                  style: TextStyle(
+                    color: stateColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

@@ -6,7 +6,9 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
@@ -92,23 +94,17 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(28, 28),
+          AppNavBarButton(
             onPressed: _openSubscriptions,
             child: const Icon(CupertinoIcons.dot_radiowaves_left_right),
           ),
-          CupertinoButton(
+          AppNavBarButton(
             key: _groupMenuKey,
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(28, 28),
             onPressed: _openGroupMenuSheet,
             child: const Icon(CupertinoIcons.folder),
           ),
-          CupertinoButton(
+          AppNavBarButton(
             key: _mainMenuKey,
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(28, 28),
             onPressed: _openMainOptions,
             child: const Icon(CupertinoIcons.ellipsis_circle),
           ),
@@ -199,62 +195,69 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
   }
 
   Widget _buildList(List<RssSource> sources) {
-    return ListView.separated(
+    return AppListView(
       padding: const EdgeInsets.only(top: 4, bottom: 20),
-      itemCount: sources.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final source = sources[index];
-        final sourceUrl = source.sourceUrl.trim();
-        final selected = _selectedSourceUrls.contains(sourceUrl);
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: CupertinoColors.secondarySystemGroupedBackground
-                .resolveFrom(context),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: CupertinoListTile.notched(
-            leading: CupertinoButton(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(30, 30),
-              onPressed: () => _toggleSelection(sourceUrl),
-              child: Icon(
-                selected
-                    ? CupertinoIcons.check_mark_circled_solid
-                    : CupertinoIcons.circle,
-                size: 22,
-                color: selected
-                    ? CupertinoColors.activeBlue.resolveFrom(context)
-                    : CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-            ),
-            title: Text(source.getDisplayNameGroup()),
-            additionalInfo: Text(
-              source.sourceUrl,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CupertinoSwitch(
-                  value: source.enabled,
-                  onChanged: (value) => _updateEnabled(source, value),
-                ),
-                CupertinoButton(
+      children: [
+        for (var index = 0; index < sources.length; index++) ...[
+          Builder(
+            builder: (context) {
+              final source = sources[index];
+              final sourceUrl = source.sourceUrl.trim();
+              final selected = _selectedSourceUrls.contains(sourceUrl);
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: AppCard(
                   padding: EdgeInsets.zero,
-                  minimumSize: const Size(28, 28),
-                  onPressed: () => _showSourceActions(source),
-                  child: const Icon(CupertinoIcons.ellipsis_circle, size: 20),
+                  child: CupertinoListTile.notched(
+                    leading: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(30, 30),
+                      onPressed: () => _toggleSelection(sourceUrl),
+                      child: Icon(
+                        selected
+                            ? CupertinoIcons.check_mark_circled_solid
+                            : CupertinoIcons.circle,
+                        size: 22,
+                        color: selected
+                            ? CupertinoColors.activeBlue.resolveFrom(context)
+                            : CupertinoColors.secondaryLabel
+                                .resolveFrom(context),
+                      ),
+                    ),
+                    title: Text(source.getDisplayNameGroup()),
+                    additionalInfo: Text(
+                      source.sourceUrl,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CupertinoSwitch(
+                          value: source.enabled,
+                          onChanged: (value) => _updateEnabled(source, value),
+                        ),
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(28, 28),
+                          onPressed: () => _showSourceActions(source),
+                          child: const Icon(
+                            CupertinoIcons.ellipsis_circle,
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
+                    onTap: () => _openEditSource(source),
+                  ),
                 ),
-              ],
-            ),
-            onTap: () => _openEditSource(source),
+              );
+            },
           ),
-        );
-      },
+          if (index < sources.length - 1) const SizedBox(height: 8),
+        ],
+      ],
     );
   }
 
@@ -1174,12 +1177,9 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                                     const SizedBox(height: 6),
                                 itemBuilder: (context, index) {
                                   final item = history[index];
-                                  return Container(
-                                    decoration: BoxDecoration(
-                                      color: CupertinoColors.systemGrey6
-                                          .resolveFrom(context),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
+                                  return AppCard(
+                                    backgroundColor: CupertinoColors.systemGrey6
+                                        .resolveFrom(context),
                                     padding:
                                         const EdgeInsets.fromLTRB(10, 8, 8, 8),
                                     child: Row(
@@ -1437,51 +1437,51 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                           ],
                         ),
                       ),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 12),
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-                        decoration: BoxDecoration(
-                          color:
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: AppCard(
+                          backgroundColor:
                               CupertinoColors.systemGrey6.resolveFrom(context),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                          children: [
-                            _buildImportPolicySwitchRow(
-                              title: '保留原名',
-                              value: keepName,
-                              onChanged: (value) {
-                                setDialogState(() => keepName = value);
-                              },
-                            ),
-                            _buildImportPolicySwitchRow(
-                              title: '保留分组',
-                              value: keepGroup,
-                              onChanged: (value) {
-                                setDialogState(() => keepGroup = value);
-                              },
-                            ),
-                            _buildImportPolicySwitchRow(
-                              title: '保留启用状态',
-                              value: keepEnabled,
-                              onChanged: (value) {
-                                setDialogState(() => keepEnabled = value);
-                              },
-                            ),
-                            const SizedBox(height: 8),
-                            CupertinoTextField(
-                              controller: customGroupController,
-                              placeholder: '自定义分组（可选）',
-                            ),
-                            const SizedBox(height: 6),
-                            _buildImportPolicySwitchRow(
-                              title: '追加到已有分组',
-                              value: appendCustomGroup,
-                              onChanged: (value) {
-                                setDialogState(() => appendCustomGroup = value);
-                              },
-                            ),
-                          ],
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                          child: Column(
+                            children: [
+                              _buildImportPolicySwitchRow(
+                                title: '保留原名',
+                                value: keepName,
+                                onChanged: (value) {
+                                  setDialogState(() => keepName = value);
+                                },
+                              ),
+                              _buildImportPolicySwitchRow(
+                                title: '保留分组',
+                                value: keepGroup,
+                                onChanged: (value) {
+                                  setDialogState(() => keepGroup = value);
+                                },
+                              ),
+                              _buildImportPolicySwitchRow(
+                                title: '保留启用状态',
+                                value: keepEnabled,
+                                onChanged: (value) {
+                                  setDialogState(() => keepEnabled = value);
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              CupertinoTextField(
+                                controller: customGroupController,
+                                placeholder: '自定义分组（可选）',
+                              ),
+                              const SizedBox(height: 6),
+                              _buildImportPolicySwitchRow(
+                                title: '追加到已有分组',
+                                value: appendCustomGroup,
+                                onChanged: (value) {
+                                  setDialogState(
+                                      () => appendCustomGroup = value);
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -1505,19 +1505,17 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                                   }
                                 });
                               },
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: CupertinoColors.systemGrey6
-                                      .resolveFrom(context),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: selected
-                                        ? CupertinoColors.activeBlue
-                                            .resolveFrom(context)
-                                        : CupertinoColors.separator
-                                            .resolveFrom(context),
-                                  ),
+                              child: AppCard(
+                                backgroundColor:
+                                    CupertinoColors.systemGrey6.resolveFrom(
+                                  context,
                                 ),
+                                borderColor: selected
+                                    ? CupertinoColors.activeBlue
+                                        .resolveFrom(context)
+                                    : CupertinoColors.separator
+                                        .resolveFrom(context),
+                                borderWidth: 0.6,
                                 padding:
                                     const EdgeInsets.fromLTRB(10, 8, 10, 8),
                                 child: Row(

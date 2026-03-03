@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
 import '../services/rss_source_manage_helper.dart';
@@ -99,48 +100,47 @@ class _RssGroupManageViewState extends State<RssGroupManageView> {
             ),
           );
         }
-        return ListView.separated(
+        return AppListView(
           padding: const EdgeInsets.only(top: 12, bottom: 20),
-          itemCount: groups.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
-          itemBuilder: (context, index) {
-            final group = groups[index];
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: CupertinoColors.secondarySystemGroupedBackground
-                    .resolveFrom(context),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: CupertinoListTile.notched(
-                title: Text(group),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(28, 28),
-                      onPressed: () => _editGroup(group),
-                      child: const Icon(
-                        CupertinoIcons.pencil,
-                        size: 18,
-                      ),
+          children: [
+            for (var index = 0; index < groups.length; index++) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: AppCard(
+                  padding: EdgeInsets.zero,
+                  child: CupertinoListTile.notched(
+                    title: Text(groups[index]),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(28, 28),
+                          onPressed: () => _editGroup(groups[index]),
+                          child: const Icon(
+                            CupertinoIcons.pencil,
+                            size: 18,
+                          ),
+                        ),
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(28, 28),
+                          onPressed: () => _removeGroup(groups[index]),
+                          child: Icon(
+                            CupertinoIcons.delete,
+                            color:
+                                CupertinoColors.systemRed.resolveFrom(context),
+                            size: 18,
+                          ),
+                        ),
+                      ],
                     ),
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(28, 28),
-                      onPressed: () => _removeGroup(group),
-                      child: Icon(
-                        CupertinoIcons.delete,
-                        color: CupertinoColors.systemRed.resolveFrom(context),
-                        size: 18,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            );
-          },
+              if (index < groups.length - 1) const SizedBox(height: 8),
+            ],
+          ],
         );
       },
     );

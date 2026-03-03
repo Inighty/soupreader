@@ -2790,12 +2790,9 @@ class _SourceListViewState extends State<SourceListView> {
                                   const SizedBox(height: 6),
                               itemBuilder: (context, index) {
                                 final item = history[index];
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    color: CupertinoColors.systemGrey6
-                                        .resolveFrom(context),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
+                                return AppCard(
+                                  backgroundColor: CupertinoColors.systemGrey6
+                                      .resolveFrom(context),
                                   padding:
                                       const EdgeInsets.fromLTRB(10, 8, 8, 8),
                                   child: Row(
@@ -3146,46 +3143,46 @@ class _SourceListViewState extends State<SourceListView> {
                         ],
                       ),
                     ),
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 12),
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.systemGrey6.resolveFrom(context),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        children: [
-                          _buildPolicySwitchRow(
-                            title: '保留原名',
-                            value: keepName,
-                            onChanged: (value) {
-                              setDialogState(() => keepName = value);
-                              unawaited(
-                                _settingsPut(_prefImportKeepName, value),
-                              );
-                            },
-                          ),
-                          _buildPolicySwitchRow(
-                            title: '保留分组',
-                            value: keepGroup,
-                            onChanged: (value) {
-                              setDialogState(() => keepGroup = value);
-                              unawaited(
-                                _settingsPut(_prefImportKeepGroup, value),
-                              );
-                            },
-                          ),
-                          _buildPolicySwitchRow(
-                            title: '保留启用状态',
-                            value: keepEnable,
-                            onChanged: (value) {
-                              setDialogState(() => keepEnable = value);
-                              unawaited(
-                                _settingsPut(_prefImportKeepEnable, value),
-                              );
-                            },
-                          ),
-                        ],
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: AppCard(
+                        backgroundColor:
+                            CupertinoColors.systemGrey6.resolveFrom(context),
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                        child: Column(
+                          children: [
+                            _buildPolicySwitchRow(
+                              title: '保留原名',
+                              value: keepName,
+                              onChanged: (value) {
+                                setDialogState(() => keepName = value);
+                                unawaited(
+                                  _settingsPut(_prefImportKeepName, value),
+                                );
+                              },
+                            ),
+                            _buildPolicySwitchRow(
+                              title: '保留分组',
+                              value: keepGroup,
+                              onChanged: (value) {
+                                setDialogState(() => keepGroup = value);
+                                unawaited(
+                                  _settingsPut(_prefImportKeepGroup, value),
+                                );
+                              },
+                            ),
+                            _buildPolicySwitchRow(
+                              title: '保留启用状态',
+                              value: keepEnable,
+                              onChanged: (value) {
+                                setDialogState(() => keepEnable = value);
+                                unawaited(
+                                  _settingsPut(_prefImportKeepEnable, value),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     Padding(

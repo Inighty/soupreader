@@ -4,6 +4,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/replace_rule.dart';
 import '../services/replace_rule_engine.dart';
@@ -286,23 +288,19 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed: _saving ? null : _save,
             child: const Text('保存'),
-            minimumSize: Size(30, 30),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed: _saving ? null : _showMoreMenu,
             child: const Icon(CupertinoIcons.ellipsis),
-            minimumSize: Size(30, 30),
           ),
         ],
       ),
-      child: ListView(
+      child: AppListView(
         children: [
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('基础'),
             children: [
               CupertinoListTile.notched(
@@ -326,7 +324,7 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('替换'),
             children: [
               CupertinoListTile.notched(
@@ -357,7 +355,7 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('范围'),
             children: [
               _TextFieldTile(
@@ -392,7 +390,7 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('排序/超时'),
             children: [
               _TextFieldTile(
@@ -411,7 +409,7 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
               ),
             ],
           ),
-          CupertinoListSection.insetGrouped(
+          AppListSection(
             header: const Text('测试'),
             children: [
               _TextFieldTile(

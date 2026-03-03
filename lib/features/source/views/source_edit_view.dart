@@ -6,6 +6,8 @@ import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/cookie_store.dart';
@@ -457,15 +459,11 @@ class _SourceEditViewState extends State<SourceEditView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(30, 30),
+          AppNavBarButton(
             onPressed: _save,
             child: const Text('保存'),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(30, 30),
+          AppNavBarButton(
             onPressed: _showMore,
             child: const Icon(CupertinoIcons.ellipsis),
           ),
@@ -500,9 +498,9 @@ class _SourceEditViewState extends State<SourceEditView> {
     final hasPreviewChapterUrl =
         _previewChapterUrl != null && _previewChapterUrl!.trim().isNotEmpty;
 
-    return ListView(
+    return AppListView(
       children: [
-        CupertinoListSection.insetGrouped(
+        AppListSection(
           header: const Text('搜索规则（ruleSearch）'),
           footer: const Text(
             '常用规则为 CSS 选择器，可用 “selector@href/@src/@text/@html” 等形式取值。',
@@ -532,7 +530,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                 placeholder: 'ruleSearch.bookUrl（@href）'),
           ],
         ),
-        CupertinoListSection.insetGrouped(
+        AppListSection(
           header: const Text('发现规则（ruleExplore）'),
           children: [
             _buildTextFieldTile('书籍列表', _exploreBookListCtrl,
@@ -557,7 +555,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                 placeholder: 'ruleExplore.bookUrl'),
           ],
         ),
-        CupertinoListSection.insetGrouped(
+        AppListSection(
           header: const Text('详情规则（ruleBookInfo）'),
           children: [
             _buildTextFieldTile('根节点', _infoInitCtrl,
@@ -582,7 +580,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                 placeholder: 'ruleBookInfo.tocUrl（@href）'),
           ],
         ),
-        CupertinoListSection.insetGrouped(
+        AppListSection(
           header: const Text('目录规则（ruleToc）'),
           children: [
             _buildTextFieldTile('章节列表', _tocChapterListCtrl,
@@ -599,7 +597,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                 placeholder: 'ruleToc.formatJs（可选，JS）', maxLines: 4),
           ],
         ),
-        CupertinoListSection.insetGrouped(
+        AppListSection(
           header: const Text('正文规则（ruleContent）'),
           children: [
             _buildTextFieldTile('标题（可选）', _contentTitleCtrl,
@@ -613,7 +611,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                 maxLines: 4),
           ],
         ),
-        CupertinoListSection.insetGrouped(
+        AppListSection(
           header: const Text('字段即时预览（基于最近一次调试）'),
           children: [
             CupertinoListTile.notched(
@@ -677,7 +675,7 @@ class _SourceEditViewState extends State<SourceEditView> {
             ),
           ],
         ),
-        CupertinoListSection.insetGrouped(
+        AppListSection(
           header: const Text('规则页快速测试'),
           footer: const Text('会自动切到调试页并执行，便于边改规则边验证。'),
           children: [
@@ -699,7 +697,7 @@ class _SourceEditViewState extends State<SourceEditView> {
             ),
           ],
         ),
-        CupertinoListSection.insetGrouped(
+        AppListSection(
           children: [
             CupertinoListTile.notched(
               title: const Text('规则体检（Lint）'),
@@ -726,9 +724,9 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Widget _buildBasicTab() {
-    return ListView(
+    return AppListView(
       children: [
-        CupertinoListSection.insetGrouped(
+        AppListSection(
           header: const Text('基础信息'),
           children: [
             _buildTextFieldTile('名称', _nameCtrl, placeholder: 'bookSourceName'),
@@ -759,7 +757,7 @@ class _SourceEditViewState extends State<SourceEditView> {
             ),
           ],
         ),
-        CupertinoListSection.insetGrouped(
+        AppListSection(
           header: const Text('网络/登录'),
           children: [
             _buildTextFieldTile(
@@ -845,7 +843,7 @@ class _SourceEditViewState extends State<SourceEditView> {
             ),
           ],
         ),
-        CupertinoListSection.insetGrouped(
+        AppListSection(
           header: const Text('URL'),
           children: [
             _buildTextFieldTile(
@@ -867,7 +865,7 @@ class _SourceEditViewState extends State<SourceEditView> {
             ),
           ],
         ),
-        CupertinoListSection.insetGrouped(
+        AppListSection(
           header: const Text('备注'),
           children: [
             _buildTextFieldTile(
@@ -884,7 +882,7 @@ class _SourceEditViewState extends State<SourceEditView> {
             ),
           ],
         ),
-        CupertinoListSection.insetGrouped(
+        AppListSection(
           children: [
             CupertinoListTile.notched(
               title: const Text('同步到 JSON'),
@@ -981,7 +979,7 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Widget _buildDebugTab() {
-    return ListView(
+    return AppListView(
       controller: _debugTabScrollController,
       children: [
         _buildDebugOverviewSection(),
@@ -1095,7 +1093,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     final hasError = (_debugError ?? '').trim().isNotEmpty;
     final statusColor = _debugStatusColor();
 
-    return CupertinoListSection.insetGrouped(
+    return AppListSection(
       header: const Text('调试状态'),
       children: [
         Padding(
@@ -1220,7 +1218,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       context,
     );
 
-    return CupertinoListSection.insetGrouped(
+    return AppListSection(
       header: const Text('快速输入'),
       footer: const Text('关键字/URL/前缀调试；完整语法见“工具 -> 菜单 -> 调试帮助”。'),
       children: [
@@ -1270,7 +1268,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     final quickToggleDesc =
         _showDebugQuickHelp ? '减少首屏占用，保留核心输入与结果' : '重新展开“我的/系统/发现候选/++/--”快捷区';
 
-    return CupertinoListSection.insetGrouped(
+    return AppListSection(
       header: const Text('工具'),
       children: [
         CupertinoListTile.notched(
@@ -1574,7 +1572,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       CupertinoPageRoute<void>(
         builder: (_) => AppCupertinoPageScaffold(
           title: '高级调试',
-          child: ListView(
+          child: AppListView(
             children: [
               _buildDiagnosisSection(),
               _buildDebugSourcesSection(),
@@ -1690,7 +1688,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       ),
     ];
 
-    return CupertinoListSection.insetGrouped(
+    return AppListSection(
       header: const Text('快捷'),
       children: [
         Padding(
@@ -2100,7 +2098,7 @@ class _SourceEditViewState extends State<SourceEditView> {
         ? _prettyJson(LegadoJson.encode(_buildStructuredDebugSummary()))
         : null;
 
-    return CupertinoListSection.insetGrouped(
+    return AppListSection(
       header: const Text('源码 & 结果'),
       children: [
         CupertinoListTile.notched(
@@ -2276,7 +2274,7 @@ class _SourceEditViewState extends State<SourceEditView> {
           title: Text('暂无日志'),
         ),
       );
-      return CupertinoListSection.insetGrouped(
+      return AppListSection(
         header: const Text('控制台'),
         children: children,
       );
@@ -2318,7 +2316,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       );
     }
 
-    return CupertinoListSection.insetGrouped(
+    return AppListSection(
       header: Text('控制台（共 $totalLines 行）'),
       children: children,
     );
@@ -2578,7 +2576,7 @@ class _SourceEditViewState extends State<SourceEditView> {
     final labels = _debugDiagnosisLabels(summary);
     final hints = _debugDiagnosisHints(summary);
 
-    return CupertinoListSection.insetGrouped(
+    return AppListSection(
       header: const Text('诊断标签'),
       children: [
         CupertinoListTile.notched(

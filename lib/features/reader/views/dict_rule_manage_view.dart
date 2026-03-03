@@ -8,7 +8,9 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
 import '../../settings/views/app_help_dialog.dart';
@@ -601,12 +603,9 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                                     const SizedBox(height: 6),
                                 itemBuilder: (context, index) {
                                   final item = history[index];
-                                  return Container(
-                                    decoration: BoxDecoration(
-                                      color: CupertinoColors.systemGrey6
-                                          .resolveFrom(context),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
+                                  return AppCard(
+                                    backgroundColor: CupertinoColors.systemGrey6
+                                        .resolveFrom(context),
                                     padding:
                                         const EdgeInsets.fromLTRB(10, 8, 8, 8),
                                     child: Row(
@@ -944,13 +943,12 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (!_selectionMode)
-            CupertinoButton(
+            AppNavBarButton(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               onPressed: _menuBusy ? null : _createRule,
               child: const Icon(CupertinoIcons.add),
-              minimumSize: Size(30, 30),
             ),
-          CupertinoButton(
+          AppNavBarButton(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             onPressed: _menuBusy || (!_selectionMode && _rules.isEmpty)
                 ? null
@@ -959,11 +957,9 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
               _selectionMode ? '完成' : '多选',
               style: const TextStyle(fontSize: 13),
             ),
-            minimumSize: Size(30, 30),
           ),
-          CupertinoButton(
+          AppNavBarButton(
             key: _moreMenuKey,
-            padding: EdgeInsets.zero,
             onPressed: _selectionMode
                 ? (hasSelection && !_menuBusy ? _showSelectionMoreMenu : null)
                 : (_menuBusy ? null : _showMoreMenu),
@@ -977,7 +973,6 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                 : (_menuBusy
                     ? const CupertinoActivityIndicator(radius: 9)
                     : const Icon(CupertinoIcons.ellipsis)),
-            minimumSize: Size(30, 30),
           ),
         ],
       ),
@@ -986,10 +981,10 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
           : Column(
               children: [
                 Expanded(
-                  child: ListView(
+                  child: AppListView(
                     padding: const EdgeInsets.only(top: 8, bottom: 20),
                     children: [
-                      CupertinoListSection.insetGrouped(
+                      AppListSection(
                         header: const Text('字典规则'),
                         children: _rules.isEmpty
                             ? const [
@@ -1193,84 +1188,78 @@ class _DictRuleImportCandidateTile extends StatelessWidget {
     final subtitle = candidate.rule.urlRule.trim().isEmpty
         ? '未配置 URL 规则'
         : candidate.rule.urlRule.trim();
+    final backgroundColor = selected
+        ? CupertinoColors.systemGrey5.resolveFrom(context)
+        : CupertinoColors.systemBackground.resolveFrom(context);
     return CupertinoButton(
       padding: EdgeInsets.zero,
       onPressed: onTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: selected
-              ? CupertinoColors.systemGrey5.resolveFrom(context)
-              : CupertinoColors.systemBackground.resolveFrom(context),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: CupertinoColors.separator.resolveFrom(context),
-            width: 0.5,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          child: Row(
-            children: [
-              Icon(
-                selected
-                    ? CupertinoIcons.check_mark_circled_solid
-                    : CupertinoIcons.circle,
-                color: selected
-                    ? CupertinoColors.activeBlue.resolveFrom(context)
-                    : CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: CupertinoColors.secondaryLabel.resolveFrom(
-                          context,
-                        ),
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: stateColor.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  child: Text(
-                    stateLabel,
-                    style: TextStyle(
-                      color: stateColor,
-                      fontSize: 12,
+      child: AppCard(
+        backgroundColor: backgroundColor,
+        borderColor: CupertinoColors.separator.resolveFrom(context),
+        borderWidth: 0.5,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Row(
+          children: [
+            Icon(
+              selected
+                  ? CupertinoIcons.check_mark_circled_solid
+                  : CupertinoIcons.circle,
+              color: selected
+                  ? CupertinoColors.activeBlue.resolveFrom(context)
+                  : CupertinoColors.secondaryLabel.resolveFrom(context),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: CupertinoColors.secondaryLabel.resolveFrom(
+                        context,
+                      ),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: stateColor.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 2,
+                ),
+                child: Text(
+                  stateLabel,
+                  style: TextStyle(
+                    color: stateColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
