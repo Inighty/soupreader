@@ -73,6 +73,11 @@ typedef _SearchBookInfoMoreActionConfig = ({
   Future<void> Function() action,
 });
 
+typedef _BookshelfTocCacheResult = ({
+  List<TocItem> toc,
+  String? error,
+});
+
 /// 搜索/发现结果详情页（对标 legado：点击结果先进入详情，再决定阅读/加书架/目录）。
 /// 也可从书架进入：若历史数据缺少 bookUrl，则降级展示缓存信息。
 class SearchBookInfoView extends StatefulWidget {
@@ -374,6 +379,56 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     return chapters;
   }
 
+  Future<_BookshelfTocCacheResult> _cacheFetchedBookshelfToc({
+    required String bookId,
+    required List<TocItem> remoteToc,
+  }) async {
+    if (remoteToc.isEmpty) {
+      return (
+        toc: const <TocItem>[],
+        error: '目录为空（书架缓存中无章节，请先刷新目录）',
+      );
+    }
+    final chapters = _buildStoredChapters(bookId: bookId, toc: remoteToc);
+    if (chapters.isEmpty) {
+      ExceptionLogService().record(
+        node: 'search_book_info.load_context.cache_bookshelf_toc',
+        message: '目录落库失败',
+        error: '章节为空',
+        context: <String, dynamic>{
+          'bookId': bookId,
+          'remoteTocCount': remoteToc.length,
+        },
+      );
+      return (
+        toc: remoteToc,
+        error: '目录解析失败：章节名或章节链接为空',
+      );
+    }
+    try {
+      await _chapterRepo.clearChaptersForBook(bookId);
+      await _chapterRepo.addChapters(chapters);
+      final stored = _loadStoredToc(bookId);
+      return (toc: stored.isEmpty ? remoteToc : stored, error: null);
+    } catch (e, st) {
+      ExceptionLogService().record(
+        node: 'search_book_info.load_context.cache_bookshelf_toc',
+        message: '目录落库失败',
+        error: e,
+        stackTrace: st,
+        context: <String, dynamic>{
+          'bookId': bookId,
+          'remoteTocCount': remoteToc.length,
+          'chapterCount': chapters.length,
+        },
+      );
+      return (
+        toc: remoteToc,
+        error: '目录写入失败：${_compactReason(e.toString())}',
+      );
+    }
+  }
+
   BookDetail _buildFallbackDetail(Book book) {
     return BookDetail(
       name: book.title,
@@ -544,21 +599,36 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     if (!mounted) return false;
 
     _refreshBookshelfState();
-    final useBookshelfToc =
-        _inBookshelf && _bookId != null && _bookId!.trim().isNotEmpty;
-    final localToc =
-        useBookshelfToc ? _loadStoredToc(_bookId!.trim()) : const <TocItem>[];
+    var resolvedToc = toc;
+    var resolvedTocError = tocError;
+    if (_inBookshelf && _bookId != null && _bookId!.trim().isNotEmpty) {
+      final id = _bookId!.trim();
+      final localToc = _loadStoredToc(id);
+      if (localToc.isNotEmpty) {
+        resolvedToc = localToc;
+        resolvedTocError = null;
+      } else {
+        final cacheResult = await _cacheFetchedBookshelfToc(
+          bookId: id,
+          remoteToc: toc,
+        );
+        resolvedToc = cacheResult.toc;
+        resolvedTocError = resolvedToc.isEmpty
+            ? (cacheResult.error ?? tocError)
+            : cacheResult.error;
+      }
+    } else if (resolvedToc.isNotEmpty) {
+      resolvedTocError = null;
+    }
     setState(() {
       _source = source;
       _detail = detail ??
           (shelfBook != null ? _buildFallbackDetail(shelfBook) : null);
-      _toc = useBookshelfToc ? localToc : toc;
+      _toc = resolvedToc;
       _loading = false;
       _loadingToc = false;
       _error = detailError;
-      _tocError = useBookshelfToc
-          ? (localToc.isEmpty ? '目录为空（书架缓存中无章节，请先刷新目录）' : null)
-          : tocError;
+      _tocError = resolvedToc.isEmpty ? resolvedTocError : null;
     });
 
     return detailError == null;
@@ -2627,6 +2697,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
       navigationBarBackgroundColor: CupertinoColors.transparent,
       navigationBarBorder: const Border(),
       navigationBarEnableBackgroundFilterBlur: false,
+      navigationBarAutomaticBackgroundVisibility: false,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

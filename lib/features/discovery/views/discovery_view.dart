@@ -809,6 +809,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   Widget _buildSourceItem(BookSource source) {
     final theme = CupertinoTheme.of(context);
     final uiTokens = AppUiTokens.resolve(context);
+    final secondaryLabel = uiTokens.colors.secondaryLabel;
 
     final sourceUrl = source.bookSourceUrl;
     final expanded = _expandedSourceUrl == sourceUrl;
@@ -824,7 +825,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: AppCard(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
         borderWidth: 0.6,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -856,8 +857,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.textStyle.copyWith(
-                              fontSize: 12,
-                              color: uiTokens.colors.mutedForeground,
+                              fontSize: 13,
+                              color: secondaryLabel,
                             ),
                           ),
                           if (groupText.isNotEmpty) ...[
@@ -868,7 +869,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.textStyle.copyWith(
                                 fontSize: 12,
-                                color: uiTokens.colors.tertiaryLabel,
+                                color: secondaryLabel.withValues(alpha: 0.9),
                               ),
                             ),
                           ],
@@ -897,8 +898,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                     Text(
                       '正在加载发现入口…',
                       style: theme.textTheme.textStyle.copyWith(
-                        fontSize: 12,
-                        color: uiTokens.colors.mutedForeground,
+                        fontSize: 13,
+                        color: secondaryLabel,
                       ),
                     ),
                   ],
@@ -907,8 +908,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                 Text(
                   '暂无发现入口',
                   style: theme.textTheme.textStyle.copyWith(
-                    fontSize: 12,
-                    color: uiTokens.colors.mutedForeground,
+                    fontSize: 13,
+                    color: secondaryLabel,
                   ),
                 )
               else
@@ -953,8 +954,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                     }
 
                     return Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: chips,
                     );
                   },
@@ -973,28 +974,58 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     required AppUiTokens uiTokens,
     required VoidCallback onTap,
   }) {
-    final title = expanded ? '收起' : '更多$hiddenCount';
-    final borderColor = uiTokens.colors.separator.withValues(alpha: 0.85);
+    final title = expanded ? '收起' : '更多 $hiddenCount';
+    final textColor = uiTokens.colors.secondaryLabel;
+    final backgroundColor =
+        CupertinoColors.tertiarySystemFill.resolveFrom(context);
+    final borderColor = uiTokens.colors.separator.withValues(alpha: 0.55);
+    return _buildKindPill(
+      onTap: onTap,
+      uiTokens: uiTokens,
+      backgroundColor: backgroundColor,
+      borderColor: borderColor,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            title,
+            style: theme.textTheme.textStyle.copyWith(
+              fontSize: 13,
+              color: textColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(
+            expanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
+            size: 12,
+            color: textColor,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKindPill({
+    required Widget child,
+    required Color backgroundColor,
+    required Color borderColor,
+    required AppUiTokens uiTokens,
+    required VoidCallback? onTap,
+  }) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: _minTapSize),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: uiTokens.colors.surfaceBackground,
+            color: backgroundColor,
             borderRadius: BorderRadius.circular(uiTokens.radii.control),
-            border: Border.all(color: borderColor, width: 1),
+            border: Border.all(color: borderColor, width: 0.8),
           ),
-          child: Text(
-            title,
-            style: theme.textTheme.textStyle.copyWith(
-              fontSize: 12,
-              color: uiTokens.colors.mutedForeground,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          child: child,
         ),
       ),
     );
@@ -1025,45 +1056,38 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     final url = kind.url?.trim() ?? '';
     final isEnabled = url.isNotEmpty;
     final isError = title.startsWith('ERROR:');
+    final normalBackground =
+        CupertinoColors.tertiarySystemFill.resolveFrom(context);
+    final enabledBackground =
+        CupertinoColors.secondarySystemFill.resolveFrom(context);
 
-    final borderColor = isError
-        ? uiTokens.colors.destructive
+    final backgroundColor = isError
+        ? uiTokens.colors.destructive.withValues(alpha: 0.1)
         : isEnabled
-            ? uiTokens.colors.accent.withValues(alpha: 0.45)
-            : uiTokens.colors.separator.withValues(alpha: 0.9);
+            ? enabledBackground
+            : normalBackground;
+    final borderColor = isError
+        ? uiTokens.colors.destructive.withValues(alpha: 0.4)
+        : uiTokens.colors.separator.withValues(alpha: isEnabled ? 0.6 : 0.45);
     final textColor = isError
         ? uiTokens.colors.destructive
         : isEnabled
-            ? uiTokens.colors.accent
-            : uiTokens.colors.foreground;
-    final backgroundColor = isError
-        ? uiTokens.colors.destructive.withValues(alpha: 0.12)
-        : isEnabled
-            ? uiTokens.colors.accent.withValues(alpha: 0.12)
-            : uiTokens.colors.surfaceBackground;
+            ? uiTokens.colors.foreground
+            : uiTokens.colors.secondaryLabel;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return _buildKindPill(
       onTap: isEnabled ? () => _openExploreKind(source, kind) : null,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: _minTapSize),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(uiTokens.radii.control),
-            border: Border.all(color: borderColor, width: 1),
-          ),
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.textStyle.copyWith(
-              fontSize: 12,
-              color: textColor,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+      uiTokens: uiTokens,
+      backgroundColor: backgroundColor,
+      borderColor: borderColor,
+      child: Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.textStyle.copyWith(
+          fontSize: 13,
+          color: textColor,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
