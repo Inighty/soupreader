@@ -2,23 +2,9 @@ import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 
 import 'app/bootstrap/boot_host_app.dart';
 import 'core/services/exception_log_service.dart';
-
-const MethodChannel _bootOverlayChannel =
-    MethodChannel('soupreader/boot_overlay');
-
-void _hideNativeBootOverlayAfterFirstFrame() {
-  WidgetsBinding.instance.addPostFrameCallback((_) async {
-    try {
-      await _bootOverlayChannel.invokeMethod<void>('hide');
-    } catch (e) {
-      debugPrint('[boot-overlay] hide failed: $e');
-    }
-  });
-}
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,7 +47,6 @@ void main() {
 
   runZonedGuarded(() {
     runApp(const BootHostApp());
-    _hideNativeBootOverlayAfterFirstFrame();
   }, (Object error, StackTrace stack) {
     debugPrint('[zone-error] $error');
     ExceptionLogService().record(
