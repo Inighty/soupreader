@@ -112,8 +112,8 @@ class AppUiRadii {
   const AppUiRadii({
     this.control = AppDesignTokens.radiusControl,
     this.card = AppDesignTokens.radiusCard,
-    this.popover = 12,
-    this.sheet = 18,
+    this.popover = AppDesignTokens.radiusPopup,
+    this.sheet = AppDesignTokens.radiusSheet,
   });
 }
 

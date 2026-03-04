@@ -16,30 +16,44 @@ class AppDesignTokens {
   static const Color info = Color(0xFF0A84FF);
 
   // ===== 中性色（UI 管理页） =====
-  static const Color textStrong = Color(0xFF1C1C1E);
-  static const Color textNormal = Color(0xFF3A3A3C);
-  static const Color textMuted = Color(0xFF8E8E93);
-  static const Color textInverse = Color(0xFFF2F2F7);
+  static const Color textStrong = Color(0xFF15171C);
+  static const Color textNormal = Color(0xFF2C3442);
+  static const Color textMuted = Color(0xFF6D7482);
+  static const Color textInverse = Color(0xFFEFF2FF);
 
-  static const Color pageBgLight = Color(0xFFF2F2F7);
-  static const Color pageBgDark = Color(0xFF000000);
+  static const Color pageBgLight = Color(0xFFF3F7FF);
+  static const Color pageBgDark = Color(0xFF090C12);
   static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color surfaceDark = Color(0xFF1C1C1E);
+  static const Color surfaceDark = Color(0xFF171A22);
 
-  static const Color borderLight = Color(0xFFD1D1D6);
-  static const Color borderDark = Color(0xFF3A3A3C);
-  static const Color dividerLight = Color(0xFFC6C6C8);
-  static const Color dividerDark = Color(0xFF2C2C2E);
+  static const Color borderLight = Color(0xFFD2DCEE);
+  static const Color borderDark = Color(0xFF38404F);
+  static const Color dividerLight = Color(0xFFC7D3E8);
+  static const Color dividerDark = Color(0xFF2B3446);
 
-  // ===== 统一圆角 =====
-  static const double radiusControl = 8;
-  static const double radiusCard = 12;
-  static const double radiusPopup = 16;
+  // ===== 玻璃材质 =====
+  static const Color glassLightMaterial = Color(0x99FFFFFF);
+  static const Color glassDarkMaterial = Color(0x991C1C1E);
+  static const Color glassInnerHighlightLight = Color(0x66FFFFFF);
+  static const Color glassInnerHighlightDark = Color(0x33FFFFFF);
+  static const Color ambientTopLight = Color(0x66B3DBFF);
+  static const Color ambientBottomLight = Color(0x4D8FE7D9);
+  static const Color ambientTopDark = Color(0x404A8CFF);
+  static const Color ambientBottomDark = Color(0x3356D8BA);
+
+  // ===== 统一几何 =====
+  static const double radiusControl = 12;
+  static const double radiusCard = 20;
+  static const double radiusPopup = 24;
+  static const double radiusSheet = 30;
+  static const double hairlineBorderWidth = 0.5;
+  static const double glassBlurSigma = 20;
 
   // ===== 统一动效节奏 =====
   static const Duration motionQuick = Duration(milliseconds: 150);
   static const Duration motionNormal = Duration(milliseconds: 220);
   static const Duration motionPageTurn = Duration(milliseconds: 300);
+  static const Duration motionSpring = Duration(milliseconds: 420);
 }
 
 /// 阅读菜单与浮层的统一色板（对标 legado「正文优先」配色语义）。

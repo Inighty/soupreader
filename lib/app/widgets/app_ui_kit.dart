@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../theme/design_tokens.dart';
 import '../theme/ui_tokens.dart';
+import 'app_squircle_surface.dart';
 
 /// 管理页统一 UI Kit（薄封装，强制收敛列表/分组/卡片的基础样式）。
 ///
@@ -53,18 +55,36 @@ class AppListSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = AppUiTokens.resolve(context);
-    return CupertinoListSection.insetGrouped(
-      header: header,
-      footer: footer,
-      hasLeading: hasLeading,
-      margin: margin,
-      backgroundColor: tokens.colors.groupedBackground,
-      decoration: BoxDecoration(
-        color: tokens.colors.sectionBackground,
-        borderRadius: BorderRadius.circular(tokens.radii.card),
+    final borderColor = tokens.colors.separator.withValues(alpha: 0.76);
+    final cardBackground =
+        tokens.colors.sectionBackground.withValues(alpha: 0.9);
+    final sectionShape = ContinuousRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(tokens.radii.card)),
+      side: BorderSide(
+        color: borderColor,
+        width: AppDesignTokens.hairlineBorderWidth,
       ),
-      separatorColor: tokens.colors.separator,
-      children: children,
+    );
+    return ClipPath(
+      clipper: ShapeBorderClipper(shape: sectionShape),
+      child: CupertinoListSection.insetGrouped(
+        header: header,
+        footer: footer,
+        hasLeading: hasLeading,
+        margin: margin,
+        backgroundColor: tokens.colors.groupedBackground,
+        decoration: BoxDecoration(
+          color: cardBackground,
+          border: Border.fromBorderSide(
+            BorderSide(
+              color: borderColor,
+              width: AppDesignTokens.hairlineBorderWidth,
+            ),
+          ),
+        ),
+        separatorColor: borderColor,
+        children: children,
+      ),
     );
   }
 }
@@ -151,26 +171,31 @@ class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = AppUiTokens.resolve(context);
-    final resolvedBackground =
-        backgroundColor ?? tokens.colors.sectionBackground;
+    final resolvedBackground = backgroundColor ??
+        tokens.colors.sectionBackground.withValues(alpha: 0.88);
     final resolvedBorder = borderColor ?? tokens.colors.separator;
     final radius = borderRadius ?? tokens.radii.card;
+    final shadowColor = tokens.isDark
+        ? CupertinoColors.black.withValues(alpha: 0.28)
+        : const Color(0x16042852);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: resolvedBackground,
-        borderRadius: BorderRadius.circular(radius),
-        border: borderWidth <= 0
-            ? null
-            : Border.all(
-                color: resolvedBorder,
-                width: borderWidth,
-              ),
-      ),
-      child: Padding(
-        padding: padding,
-        child: child,
-      ),
+    return AppSquircleSurface(
+      padding: padding,
+      backgroundColor: resolvedBackground,
+      borderColor: resolvedBorder.withValues(alpha: 0.74),
+      borderWidth:
+          borderWidth <= 0 ? AppDesignTokens.hairlineBorderWidth : borderWidth,
+      radius: radius,
+      blurBackground: true,
+      shadows: <BoxShadow>[
+        BoxShadow(
+          color: shadowColor,
+          offset: const Offset(0, 8),
+          blurRadius: 24,
+          spreadRadius: -12,
+        ),
+      ],
+      child: child,
     );
   }
 }

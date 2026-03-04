@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 
 import 'theme/cupertino_theme.dart';
 import '../core/config/migration_exclusions.dart';
@@ -88,6 +89,7 @@ class _MainScreenState extends State<MainScreen> {
       );
       return;
     }
+    HapticFeedback.selectionClick();
     if (index != _tabController.index) return;
     final now = DateTime.now().millisecondsSinceEpoch;
     switch (_tabs[index].id) {

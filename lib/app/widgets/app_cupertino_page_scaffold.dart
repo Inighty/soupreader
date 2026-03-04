@@ -6,6 +6,10 @@ typedef AppSliverBodyBuilder = Widget Function(BuildContext context);
 
 /// 统一页面容器：导航栏 + 页面背景 + SafeArea。
 class AppCupertinoPageScaffold extends StatelessWidget {
+  static const double _kTabBarHeight = 50.0;
+  static const double _kAmbientGlowLarge = 320.0;
+  static const double _kAmbientGlowSmall = 240.0;
+
   final String title;
   final Widget child;
   final Widget? middle;
@@ -68,11 +72,58 @@ class AppCupertinoPageScaffold extends StatelessWidget {
 
   Widget _buildBackground({
     required Color backgroundColor,
+    required Brightness brightness,
     required Widget child,
   }) {
+    final isDark = brightness == Brightness.dark;
+    final topGlowColor = isDark
+        ? AppDesignTokens.ambientTopDark
+        : AppDesignTokens.ambientTopLight;
+    final bottomGlowColor = isDark
+        ? AppDesignTokens.ambientBottomDark
+        : AppDesignTokens.ambientBottomLight;
+    final gradientTop =
+        isDark ? AppDesignTokens.pageBgDark : AppDesignTokens.pageBgLight;
+    final gradientBottom =
+        isDark ? const Color(0xFF06080D) : const Color(0xFFE8F0FF);
+
     return DecoratedBox(
-      decoration: BoxDecoration(color: backgroundColor),
-      child: child,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[gradientTop, backgroundColor, gradientBottom],
+          stops: const <double>[0.0, 0.38, 1.0],
+        ),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          IgnorePointer(
+            child: RepaintBoundary(
+              child: Stack(
+                children: [
+                  Align(
+                    alignment: const Alignment(-0.9, -1.15),
+                    child: _AmbientGlow(
+                      color: topGlowColor,
+                      diameter: _kAmbientGlowLarge,
+                    ),
+                  ),
+                  Align(
+                    alignment: const Alignment(1.2, 1.15),
+                    child: _AmbientGlow(
+                      color: bottomGlowColor,
+                      diameter: _kAmbientGlowSmall,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          child,
+        ],
+      ),
     );
   }
 
@@ -124,18 +175,28 @@ class AppCupertinoPageScaffold extends StatelessWidget {
         MediaQuery.maybeOf(context)?.platformBrightness ??
         Brightness.light;
     final isDark = brightness == Brightness.dark;
-    final borderColor = isDark
-        ? AppDesignTokens.borderDark.withValues(alpha: 0.85)
-        : AppDesignTokens.borderLight;
     final baseBackground = theme.scaffoldBackgroundColor;
     final navSurface = isDark
-        ? AppDesignTokens.surfaceDark.withValues(alpha: 0.78)
-        : AppDesignTokens.surfaceLight.withValues(alpha: 0.96);
+        ? AppDesignTokens.glassDarkMaterial.withValues(alpha: 0.9)
+        : AppDesignTokens.glassLightMaterial.withValues(alpha: 0.9);
     final defaultNavBarBackground = Color.alphaBlend(
       navSurface,
-      theme.barBackgroundColor,
+      baseBackground,
     );
-    final border = Border(bottom: BorderSide(color: borderColor, width: 0.5));
+    final border = Border(
+      top: BorderSide(
+        color: isDark
+            ? AppDesignTokens.glassInnerHighlightDark
+            : AppDesignTokens.glassInnerHighlightLight,
+        width: AppDesignTokens.hairlineBorderWidth,
+      ),
+      bottom: BorderSide(
+        color: isDark
+            ? AppDesignTokens.borderDark.withValues(alpha: 0.9)
+            : AppDesignTokens.borderLight.withValues(alpha: 0.92),
+        width: AppDesignTokens.hairlineBorderWidth,
+      ),
+    );
     final resolvedNavBarBackground =
         navigationBarBackgroundColor ?? defaultNavBarBackground;
     final resolvedNavBarBorder = navigationBarBorder ?? border;
@@ -165,6 +226,7 @@ class AppCupertinoPageScaffold extends StatelessWidget {
         navigationBar: navBar,
         child: _buildBackground(
           backgroundColor: baseBackground,
+          brightness: brightness,
           child: SafeArea(
             top: includeTopSafeArea,
             bottom: includeBottomSafeArea,
@@ -206,22 +268,60 @@ class AppCupertinoPageScaffold extends StatelessWidget {
     // 需要确保底部内容不被 TabBar 遮挡。这里统一加上标准的 TabBar 高度 + 安全区。
     final bottomPadding = includeBottomSafeArea
         ? MediaQuery.paddingOf(context).bottom +
-            50.0 // 50.0 is standard CupertinoTabBar height
-        : 50.0;
+            _kTabBarHeight // Standard CupertinoTabBar height.
+        : _kTabBarHeight;
 
     return CupertinoPageScaffold(
       backgroundColor: baseBackground,
       navigationBar: navBar,
-      child: CustomScrollView(
-        primary: false,
-        controller: sliverScrollController,
-        physics: sliverScrollPhysics,
-        slivers: [
-          bodySliver,
-          SliverPadding(
-            padding: EdgeInsets.only(bottom: bottomPadding),
+      child: _buildBackground(
+        backgroundColor: baseBackground,
+        brightness: brightness,
+        child: CustomScrollView(
+          primary: false,
+          controller: sliverScrollController,
+          physics: sliverScrollPhysics ??
+              const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+          slivers: [
+            bodySliver,
+            SliverPadding(
+              padding: EdgeInsets.only(bottom: bottomPadding),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AmbientGlow extends StatelessWidget {
+  const _AmbientGlow({
+    required this.color,
+    required this.diameter,
+  });
+
+  final Color color;
+  final double diameter;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: diameter,
+      height: diameter,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: <Color>[
+              color,
+              color.withValues(alpha: color.a * 0.28),
+              const Color(0x00000000),
+            ],
+            stops: const <double>[0.0, 0.55, 1.0],
           ),
-        ],
+        ),
       ),
     );
   }

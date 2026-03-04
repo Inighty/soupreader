@@ -6,7 +6,7 @@ class AppTypography {
   AppTypography._();
 
   // ===== 字体族 =====
-  static const String fontFamilySystem = '.SF Pro Text'; // iOS 系统字体
+  static const String fontFamilySystem = '.AppleSystemUIFont'; // iOS 系统字体
   // 按 AGENTS 规范：UI 默认统一使用 SF 字体族。
   static const String fontFamilySans = fontFamilySystem;
   static const String fontFamilySerif = fontFamilySystem;
