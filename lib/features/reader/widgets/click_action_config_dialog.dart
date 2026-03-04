@@ -398,7 +398,7 @@ class _ClickActionConfigDialogState extends State<ClickActionConfigDialog> {
   }
 
   void _showMenuRecoveryNotice() {
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

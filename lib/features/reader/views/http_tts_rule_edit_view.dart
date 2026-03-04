@@ -126,7 +126,7 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -343,7 +343,7 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
     final sourceKey = 'httpTts:${draftRule.id}';
     final headerText = await SourceLoginStore.getLoginHeaderText(sourceKey);
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('登录头'),

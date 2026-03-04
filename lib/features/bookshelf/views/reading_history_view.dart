@@ -373,7 +373,7 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
   Future<bool> _showDeleteConfirm({
     required String message,
   }) async {
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('删除'),

@@ -686,7 +686,7 @@ class _SourceSwitchCandidateSheetState
   Future<bool> _confirmDeleteSourceCandidate(
     ReaderSourceSwitchCandidate candidate,
   ) async {
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提醒'),
@@ -806,7 +806,7 @@ class _SourceSwitchCandidateSheetState
   }
 
   Future<bool> _confirmSwitchGroupToAll(String group) async {
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('搜索结果为空'),

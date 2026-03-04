@@ -306,7 +306,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
   }
 
   Future<void> _confirmDeleteRule(TxtTocRule rule) async {
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提醒'),
@@ -358,7 +358,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
   Future<void> _confirmDeleteSelectedRules() async {
     final selectedIds = _selectedRuleIds.toSet();
     if (selectedIds.isEmpty) return;
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提醒'),
@@ -543,7 +543,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
       if (isHttpPath) '',
       if (isHttpPath) '检测到网络链接，可直接复制后分享。',
     ];
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('导出成功'),
@@ -1038,7 +1038,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
 
   Future<void> _runImportingTask(Future<void> Function() task) async {
     final navigator = Navigator.of(context, rootNavigator: true);
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => const CupertinoAlertDialog(
@@ -1060,7 +1060,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
     required String message,
   }) async {
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),

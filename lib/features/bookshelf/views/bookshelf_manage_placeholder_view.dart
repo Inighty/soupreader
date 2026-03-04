@@ -725,7 +725,7 @@ class _BookshelfManagePlaceholderViewState
   }
 
   Future<void> _openGroupManageDialog() {
-    return showCupertinoDialog<void>(
+    return showCupertinoBottomDialog<void>(
       context: context,
       builder: (_) => const BookshelfGroupManagePlaceholderDialog(),
     );
@@ -924,7 +924,7 @@ class _BookshelfManagePlaceholderViewState
       return;
     }
 
-    final selectedGroupBits = await showCupertinoDialog<int>(
+    final selectedGroupBits = await showCupertinoBottomDialog<int>(
       context: context,
       builder: (_) => _BookshelfManageGroupSelectDialog(
         groups: selectableGroups,
@@ -1028,7 +1028,7 @@ class _BookshelfManagePlaceholderViewState
 
   Future<bool?> _confirmDeleteSelection() async {
     var deleteOriginal = _settingsService.getDeleteBookOriginal();
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -1187,7 +1187,7 @@ class _BookshelfManagePlaceholderViewState
     var dialogVisible = true;
 
     setState(() => _isBatchChangingSource = true);
-    final dialogFuture = showCupertinoDialog<void>(
+    final dialogFuture = showCupertinoBottomDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
@@ -1305,7 +1305,7 @@ class _BookshelfManagePlaceholderViewState
       _showMessage('导出成功');
       return;
     }
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(
@@ -1338,7 +1338,7 @@ class _BookshelfManagePlaceholderViewState
   }
 
   void _showMessage(String message) {
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(

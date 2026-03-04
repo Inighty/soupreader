@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../widgets/cupertino_bottom_dialog.dart';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -278,7 +279,7 @@ class _BootHostAppState extends State<BootHostApp> with WidgetsBindingObserver {
                           ClipboardData(text: _bootLogPayload()),
                         );
                         if (!innerContext.mounted) return;
-                        await showCupertinoDialog<void>(
+                        await showCupertinoBottomDialog<void>(
                           context: innerContext,
                           builder: (ctx) => CupertinoAlertDialog(
                             title: const Text('已复制'),

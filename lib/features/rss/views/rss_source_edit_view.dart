@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import 'package:flutter/cupertino.dart';
 
@@ -192,7 +193,7 @@ class _RssSourceEditViewState extends State<RssSourceEditView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('提示'),

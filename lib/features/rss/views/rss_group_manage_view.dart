@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
@@ -186,7 +187,7 @@ class _RssGroupManageViewState extends State<RssGroupManageView> {
     String initialValue = '',
   }) async {
     final controller = TextEditingController(text: initialValue);
-    final result = await showCupertinoDialog<String>(
+    final result = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: Text(title),

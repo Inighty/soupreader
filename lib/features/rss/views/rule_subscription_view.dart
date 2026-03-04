@@ -281,7 +281,7 @@ class _RuleSubscriptionViewState extends State<RuleSubscriptionView> {
     var selectedType = _normalizeType(subscription.type);
 
     try {
-      return await showCupertinoDialog<_RuleSubscriptionDraft>(
+      return await showCupertinoBottomDialog<_RuleSubscriptionDraft>(
         context: context,
         builder: (dialogContext) {
           return StatefulBuilder(
@@ -377,7 +377,7 @@ class _RuleSubscriptionViewState extends State<RuleSubscriptionView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

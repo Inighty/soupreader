@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import '../widgets/cupertino_bottom_dialog.dart';
 
 import '../../core/build/build_info.dart';
 import 'app_bootstrap.dart';
@@ -81,7 +82,7 @@ class BootFailureView extends StatelessWidget {
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: _payload()));
                 if (!context.mounted) return;
-                await showCupertinoDialog<void>(
+                await showCupertinoBottomDialog<void>(
                   context: context,
                   builder: (ctx) => CupertinoAlertDialog(
                     title: const Text('已复制'),

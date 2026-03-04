@@ -298,7 +298,7 @@ class _CacheExportViewState extends State<CacheExportView> {
   }
 
   Future<bool> _confirmStartDownload() async {
-    final result = await showCupertinoDialog<bool>(
+    final result = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(
@@ -322,7 +322,7 @@ class _CacheExportViewState extends State<CacheExportView> {
 
   Future<void> _showMessage(String message) async {
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(
@@ -700,7 +700,7 @@ class _CacheExportViewState extends State<CacheExportView> {
       text: _exportService.getBookExportFileName() ?? '',
     );
     try {
-      final shouldSave = await showCupertinoDialog<bool>(
+      final shouldSave = await showCupertinoBottomDialog<bool>(
         context: context,
         builder: (dialogContext) {
           return CupertinoAlertDialog(
@@ -813,7 +813,7 @@ class _CacheExportViewState extends State<CacheExportView> {
       text: _exportService.getExportCharset(),
     );
     try {
-      final result = await showCupertinoDialog<String>(
+      final result = await showCupertinoBottomDialog<String>(
         context: context,
         builder: (dialogContext) {
           return CupertinoAlertDialog(

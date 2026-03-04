@@ -101,14 +101,14 @@ class _BookshelfGroupManagePlaceholderDialogState
   }
 
   Future<_AddGroupDraft?> _showAddGroupDialog() {
-    return showCupertinoDialog<_AddGroupDraft>(
+    return showCupertinoBottomDialog<_AddGroupDraft>(
       context: context,
       builder: (dialogContext) => const _AddGroupDialog(),
     );
   }
 
   Future<void> _showHintDialog(String message) {
-    return showCupertinoDialog<void>(
+    return showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

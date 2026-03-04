@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import 'package:flutter/cupertino.dart';
 
@@ -224,7 +225,7 @@ class _DiscoveryExploreResultsViewState
   }
 
   Future<bool> _showLoadErrorDialog(String detail) async {
-    final result = await showCupertinoDialog<bool>(
+    final result = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('加载失败'),
@@ -249,7 +250,7 @@ class _DiscoveryExploreResultsViewState
   }
 
   void _showMessage(String message, {String title = '提示'}) {
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
         title: Text(title),

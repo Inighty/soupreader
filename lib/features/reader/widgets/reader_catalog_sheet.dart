@@ -1025,7 +1025,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   }
 
   Future<bool> _confirmDeleteBookmark(BookmarkEntity bookmark) async {
-    return await showCupertinoDialog<bool>(
+    return await showCupertinoBottomDialog<bool>(
           context: context,
           builder: (context) => CupertinoAlertDialog(
             title: const Text('删除书签'),
@@ -1047,7 +1047,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   }
 
   void _showToast(String message) {
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -1090,7 +1090,7 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       return;
     }
 
-    final ok = await showCupertinoDialog<bool>(
+    final ok = await showCupertinoBottomDialog<bool>(
           context: context,
           builder: (context) => CupertinoAlertDialog(
             title: const Text('清理缓存'),

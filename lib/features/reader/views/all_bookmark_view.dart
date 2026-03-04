@@ -242,7 +242,7 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
     final progressPercent =
         (_decodeBookmarkChapterProgress(bookmark.chapterPos) * 100)
             .toStringAsFixed(1);
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(chapter),

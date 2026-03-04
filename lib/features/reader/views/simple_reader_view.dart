@@ -6929,7 +6929,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     _showingReadAloudExclusionDialog = true;
     try {
-      await showCupertinoDialog<void>(
+      await showCupertinoBottomDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('扩展阶段'),
@@ -7057,7 +7057,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     if (_settings.progressBarBehavior == ProgressBarBehavior.chapter &&
         _settings.confirmSkipChapter &&
         !_chapterSeekConfirmed) {
-      final confirmed = await showCupertinoDialog<bool>(
+      final confirmed = await showCupertinoBottomDialog<bool>(
             context: context,
             builder: (dialogContext) => CupertinoAlertDialog(
               title: const Text('章节跳转确认'),
@@ -7161,7 +7161,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       _closeReaderMenuOverlay();
     }
     final controller = TextEditingController(text: _contentSearchQuery);
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('搜索正文'),
@@ -7647,7 +7647,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   Future<bool> _confirmRestoreSearchProgress() async {
-    return await showCupertinoDialog<bool>(
+    return await showCupertinoBottomDialog<bool>(
           context: context,
           builder: (dialogContext) => CupertinoAlertDialog(
             title: const Text('恢复进度'),
@@ -7982,7 +7982,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
           ),
         ],
       ),
-      minimumSize: Size(0, 0),
+      minimumSize: const Size.square(kMinInteractiveDimensionCupertino),
     );
   }
 
@@ -8132,7 +8132,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   void _showToast(String message) {
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -8463,7 +8463,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
     if (remoteBehindLocal) {
       if (!mounted) return;
-      final confirmOverride = await showCupertinoDialog<bool>(
+      final confirmOverride = await showCupertinoBottomDialog<bool>(
             context: context,
             builder: (dialogContext) => CupertinoAlertDialog(
               title: const Text('获取进度'),
@@ -8881,7 +8881,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     required String initialValue,
   }) async {
     final controller = TextEditingController(text: initialValue);
-    final result = await showCupertinoDialog<String>(
+    final result = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('设置编码'),
@@ -9229,7 +9229,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       text: _simulatedDailyChaptersForDialogDefault().toString(),
     );
     try {
-      return await showCupertinoDialog<_ReaderSimulatedReadingInput>(
+      return await showCupertinoBottomDialog<_ReaderSimulatedReadingInput>(
         context: context,
         builder: (dialogContext) {
           return StatefulBuilder(
@@ -9574,7 +9574,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       text: totalChapters.toString(),
     );
     try {
-      return await showCupertinoDialog<_ReaderOfflineCacheInput>(
+      return await showCupertinoBottomDialog<_ReaderOfflineCacheInput>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('离线缓存'),
@@ -9971,7 +9971,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       await showAppHelpDialog(context, markdownText: markdownText);
     } catch (error) {
       if (!mounted) return;
-      await showCupertinoDialog<void>(
+      await showCupertinoBottomDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('帮助'),
@@ -10083,7 +10083,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     }
 
     final currentOpenInBrowser = _settingsService.readerChapterUrlOpenInBrowser;
-    final nextOpenInBrowser = await showCupertinoDialog<bool>(
+    final nextOpenInBrowser = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('章节链接打开方式'),
@@ -10335,7 +10335,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final chapterIsVip = _resolveCurrentChapterIsVip();
     final chapterIsPay = _resolveCurrentChapterIsPay();
 
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
           context: context,
           builder: (dialogContext) => CupertinoAlertDialog(
             title: const Text('章节购买'),
@@ -11182,7 +11182,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   }
 
   Future<bool> _confirmSwitchChangeSourceGroupToAll(String group) async {
-    final result = await showCupertinoDialog<bool>(
+    final result = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('搜索结果为空'),
@@ -12491,7 +12491,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               _showToast('数量已是最少,不能删除.');
               return;
             }
-            final confirmed = await showCupertinoDialog<bool>(
+            final confirmed = await showCupertinoBottomDialog<bool>(
               context: dialogContext,
               builder: (confirmContext) => CupertinoAlertDialog(
                 title: const Text('删除样式'),
@@ -12805,7 +12805,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     required String initialValue,
   }) async {
     final controller = TextEditingController(text: initialValue);
-    final result = await showCupertinoDialog<String>(
+    final result = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('样式名称'),
@@ -13061,7 +13061,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   Future<String?> _showReadStyleImportUrlInputDialog() async {
     final controller = TextEditingController();
-    final result = await showCupertinoDialog<String>(
+    final result = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('网络导入'),
@@ -15227,7 +15227,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   Future<void> _showPageTouchSlopPicker(StateSetter setPopupState) async {
     final controller =
         TextEditingController(text: _settings.pageTouchSlop.toString());
-    final result = await showCupertinoDialog<int>(
+    final result = await showCupertinoBottomDialog<int>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('翻页触发阈值'),
@@ -15302,7 +15302,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     final nextController = TextEditingController(
       text: _settings.nextKeys.join(','),
     );
-    final result = await showCupertinoDialog<Map<String, List<int>>?>(
+    final result = await showCupertinoBottomDialog<Map<String, List<int>>?>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('翻页按键'),
@@ -16152,7 +16152,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   ) async {
     final bookTextController = TextEditingController(text: draft.pageText);
     final noteController = TextEditingController();
-    final result = await showCupertinoDialog<_ReaderBookmarkEditResult>(
+    final result = await showCupertinoBottomDialog<_ReaderBookmarkEditResult>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('书签'),

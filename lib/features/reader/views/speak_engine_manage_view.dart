@@ -108,7 +108,7 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
       await _reloadRules();
     } catch (error) {
       if (!mounted) return;
-      await showCupertinoDialog<void>(
+      await showCupertinoBottomDialog<void>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('导入默认规则'),
@@ -667,7 +667,7 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
 
   Future<void> _runImportingTask(Future<void> Function() task) async {
     final navigator = Navigator.of(context, rootNavigator: true);
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => const CupertinoAlertDialog(
@@ -689,7 +689,7 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
     required String message,
   }) async {
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: Text(title),
@@ -717,7 +717,7 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
       if (isHttpPath) '检测到网络链接，可直接复制后分享。',
     ];
     if (!mounted) return;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('导出成功'),

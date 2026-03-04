@@ -723,7 +723,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   Future<String?> _showCreateFolderNameDialog() async {
     final controller = TextEditingController();
     String? name;
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) {
         String? errorText;
@@ -837,7 +837,7 @@ class _BookshelfViewState extends State<BookshelfView> {
         candidates.map((candidate) => candidate.filePath).toSet();
     var deletingSelection = false;
 
-    return showCupertinoDialog<List<String>>(
+    return showCupertinoBottomDialog<List<String>>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -1115,7 +1115,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     final controller = TextEditingController(
       text: _bookImportFileNameRuleService.getRule(),
     );
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(
@@ -1189,7 +1189,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   Future<void> _openBookshelfGroupManageDialog() async {
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (_) => const BookshelfGroupManagePlaceholderDialog(),
     );
@@ -1257,7 +1257,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     var progressDialogClosed = false;
     Future<void>? progressDialogFuture;
     if (mounted) {
-      progressDialogFuture = showCupertinoDialog<void>(
+      progressDialogFuture = showCupertinoBottomDialog<void>(
         context: context,
         barrierDismissible: false,
         builder: (dialogContext) {
@@ -1359,7 +1359,7 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   Future<void> _showAddBookByUrlDialog() async {
     final controller = TextEditingController();
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(
@@ -1410,7 +1410,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   void _showExportSuccessDialog(String pathOrHint) {
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('导出成功'),
@@ -1440,7 +1440,7 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   Future<void> _showImportBookshelfDialog() async {
     final controller = TextEditingController();
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) {
         return CupertinoAlertDialog(
@@ -1703,7 +1703,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     var layoutIndex = _normalizeLayoutIndex(settings.bookshelfLayoutIndex);
     var sortIndex = _normalizeSortIndex(settings.bookshelfSortIndex);
 
-    await showCupertinoDialog<void>(
+    await showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(

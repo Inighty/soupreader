@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
+import 'cupertino_bottom_dialog.dart';
 
 /// 在 Release 模式下，Flutter 默认的 ErrorWidget 往往只是一块灰色区域，
 /// 导致真正在构建期发生的异常无法被用户感知与回传。
@@ -47,7 +48,7 @@ class AppErrorWidget extends StatelessWidget {
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: payload));
                 if (!context.mounted) return;
-                await showCupertinoDialog<void>(
+                await showCupertinoBottomDialog<void>(
                   context: context,
                   builder: (ctx) => CupertinoAlertDialog(
                     title: const Text('已复制'),

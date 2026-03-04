@@ -1584,7 +1584,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     if (!mounted) return;
 
     final controller = TextEditingController(text: current);
-    final result = await showCupertinoDialog<String>(
+    final result = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('设置源变量'),
@@ -1643,7 +1643,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     if (!mounted) return;
 
     final controller = TextEditingController(text: current);
-    final result = await showCupertinoDialog<String>(
+    final result = await showCupertinoBottomDialog<String>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('设置书籍变量'),
@@ -1702,7 +1702,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     final existingRemoteUrl =
         bookId.isEmpty ? null : _settingsService.getBookRemoteUploadUrl(bookId);
     if (existingRemoteUrl != null) {
-      final confirmed = await showCupertinoDialog<bool>(
+      final confirmed = await showCupertinoBottomDialog<bool>(
             context: context,
             builder: (dialogContext) => CupertinoAlertDialog(
               title: const Text('提醒'),
@@ -3098,7 +3098,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -3510,7 +3510,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                         ),
                       ),
                     ),
-                    minimumSize: Size(0, 0),
+                    minimumSize: const Size.square(SourceUiTokens.minTapSize),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -3545,7 +3545,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                         ),
                       ),
                     ),
-                    minimumSize: Size(0, 0),
+                    minimumSize: const Size.square(SourceUiTokens.minTapSize),
                   ),
                 ),
               ],

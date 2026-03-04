@@ -101,7 +101,7 @@ Future<void> _showRssLoginMessage(
   String message,
 ) async {
   if (!context.mounted) return;
-  await showCupertinoDialog<void>(
+  await showCupertinoBottomDialog<void>(
     context: context,
     builder: (dialogContext) => CupertinoAlertDialog(
       title: const Text('提示'),
@@ -1188,7 +1188,7 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
     final titleController = TextEditingController(text: article.title);
     final groupController = TextEditingController(text: article.group);
     try {
-      final action = await showCupertinoDialog<_RssFavoriteDialogAction>(
+      final action = await showCupertinoBottomDialog<_RssFavoriteDialogAction>(
         context: context,
         builder: (dialogContext) => CupertinoAlertDialog(
           title: const Text('收藏设置'),
@@ -1631,7 +1631,7 @@ class _RssFavoritesPlaceholderViewState
   Future<void> _deleteCurrentGroup(String currentGroup) async {
     final group = currentGroup.trim();
     if (group.isEmpty || !mounted) return;
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),
@@ -1667,7 +1667,7 @@ class _RssFavoritesPlaceholderViewState
 
   Future<void> _deleteAllFavorites() async {
     if (!mounted) return;
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提示'),

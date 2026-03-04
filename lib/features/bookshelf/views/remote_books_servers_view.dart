@@ -84,7 +84,7 @@ class _RemoteBooksServersViewState extends State<RemoteBooksServersView> {
 
   Future<void> _confirmDeleteServer(RemoteServer server) async {
     if (_loading) return;
-    final confirmed = await showCupertinoDialog<bool>(
+    final confirmed = await showCupertinoBottomDialog<bool>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('提醒'),

@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
@@ -54,7 +55,7 @@ class _RssReadRecordViewState extends State<RssReadRecordView> {
       return;
     }
     if (!mounted) return;
-    final shouldClear = await showCupertinoDialog<bool>(
+    final shouldClear = await showCupertinoBottomDialog<bool>(
           context: context,
           builder: (ctx) => CupertinoAlertDialog(
             title: const Text('提醒'),

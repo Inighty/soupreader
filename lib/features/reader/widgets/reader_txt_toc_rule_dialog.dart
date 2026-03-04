@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../import/txt_parser.dart';
 
@@ -20,7 +21,7 @@ class ReaderTxtTocRuleDialog extends StatefulWidget {
     Color? accentColor,
     List<TxtTocRuleOption> options = TxtParser.defaultTocRuleOptions,
   }) {
-    return showCupertinoDialog<String?>(
+    return showCupertinoBottomDialog<String?>(
       context: context,
       builder: (_) => ReaderTxtTocRuleDialog(
         currentRegex: currentRegex,
@@ -98,7 +99,8 @@ class _ReaderTxtTocRuleDialogState extends State<ReaderTxtTocRuleDialog> {
                           ),
                       ],
                     ),
-                    minimumSize: Size(0, 0),
+                    minimumSize:
+                        const Size.square(kMinInteractiveDimensionCupertino),
                   ),
                   if (index != choices.length - 1)
                     Container(

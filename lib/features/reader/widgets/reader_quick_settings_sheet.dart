@@ -252,7 +252,7 @@ class _ReaderQuickSettingsSheetState extends State<ReaderQuickSettingsSheet> {
   }
 
   void _confirmResetDefaults() {
-    showCupertinoDialog<void>(
+    showCupertinoBottomDialog<void>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
         title: const Text('恢复默认设置'),
