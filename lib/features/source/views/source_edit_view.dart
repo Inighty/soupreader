@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../../app/theme/typography.dart';
 import '../../../app/theme/ui_tokens.dart';
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_ui_kit.dart';
@@ -65,6 +66,42 @@ class SourceEditView extends StatefulWidget {
 
   @override
   State<SourceEditView> createState() => _SourceEditViewState();
+}
+
+enum _SourceEditDebugMenuAction {
+  scanDebugKeyFromQr,
+  openSearchSource,
+  openBookSource,
+  openTocSource,
+  openContentSource,
+  refreshExploreQuickActions,
+  openDebugHelp,
+}
+
+enum _SourceEditDebugToolsAction {
+  openWebVerify,
+  openDebugAdvancedPanel,
+  openStructuredSummary,
+  copyStructuredSummary,
+  exportDebugBundleQuick,
+  exportDebugBundleMore,
+  openRuntimeSnapshot,
+  copyRuntimeSnapshot,
+  copyDebugConsole,
+  copyMinimalReproInfo,
+  clearDebugConsole,
+}
+
+enum _SourceEditExportBundleAction {
+  copyBundleWithoutRawSources,
+  saveBundleWithoutRawSources,
+  saveBundleWithRawSources,
+}
+
+enum _SourceEditMoreAction {
+  clearCookie,
+  copyJson,
+  pasteJsonFromClipboard,
 }
 
 class _SourceEditViewState extends State<SourceEditView> {
@@ -1381,195 +1418,213 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Future<void> _showDebugLegacyMenuSheet() async {
-    await showCupertinoBottomDialog<void>(
+    final selected = await showAppActionListSheet<_SourceEditDebugMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) {
-        void closeThen(VoidCallback action) {
-          Navigator.pop(sheetContext);
-          Future<void>.delayed(Duration.zero, () {
-            if (!mounted) return;
-            action();
-          });
-        }
-
-        return CupertinoActionSheet(
-          title: const Text('菜单'),
-          actions: [
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                if (_debugLoading) {
-                  _showMessage('调试运行中，请稍后再试');
-                  return;
-                }
-                _scanDebugKeyFromQr();
-              }),
-              child: const Text('扫码填充 Key'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                _openDebugSourceFromMenu('列表页源码', _debugListSrcHtml);
-              }),
-              child: const Text('查看搜索源码'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                _openDebugSourceFromMenu('详情页源码', _debugBookSrcHtml);
-              }),
-              child: const Text('查看详情源码'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                _openDebugSourceFromMenu('目录页源码', _debugTocSrcHtml);
-              }),
-              child: const Text('查看目录源码'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                _openDebugSourceFromMenu('正文页源码', _debugContentSrcHtml);
-              }),
-              child: const Text('查看正文源码'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                if (_refreshingExploreQuickActions) {
-                  _showMessage('发现快捷项刷新中，请稍后再试');
-                  return;
-                }
-                _refreshExploreQuickActions();
-              }),
-              child: const Text('刷新发现快捷项'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                _showDebugHelp();
-              }),
-              child: const Text('调试帮助'),
-            ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(sheetContext),
-            child: const Text('取消'),
-          ),
-        );
-      },
+      title: '菜单',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_SourceEditDebugMenuAction>(
+          value: _SourceEditDebugMenuAction.scanDebugKeyFromQr,
+          icon: CupertinoIcons.qrcode_viewfinder,
+          label: '扫码填充 Key',
+        ),
+        AppActionListItem<_SourceEditDebugMenuAction>(
+          value: _SourceEditDebugMenuAction.openSearchSource,
+          icon: CupertinoIcons.search,
+          label: '查看搜索源码',
+        ),
+        AppActionListItem<_SourceEditDebugMenuAction>(
+          value: _SourceEditDebugMenuAction.openBookSource,
+          icon: CupertinoIcons.book,
+          label: '查看详情源码',
+        ),
+        AppActionListItem<_SourceEditDebugMenuAction>(
+          value: _SourceEditDebugMenuAction.openTocSource,
+          icon: CupertinoIcons.list_bullet,
+          label: '查看目录源码',
+        ),
+        AppActionListItem<_SourceEditDebugMenuAction>(
+          value: _SourceEditDebugMenuAction.openContentSource,
+          icon: CupertinoIcons.doc_text,
+          label: '查看正文源码',
+        ),
+        AppActionListItem<_SourceEditDebugMenuAction>(
+          value: _SourceEditDebugMenuAction.refreshExploreQuickActions,
+          icon: CupertinoIcons.refresh,
+          label: '刷新发现快捷项',
+        ),
+        AppActionListItem<_SourceEditDebugMenuAction>(
+          value: _SourceEditDebugMenuAction.openDebugHelp,
+          icon: CupertinoIcons.question_circle,
+          label: '调试帮助',
+        ),
+      ],
     );
+    if (selected == null || !mounted) return;
+    switch (selected) {
+      case _SourceEditDebugMenuAction.scanDebugKeyFromQr:
+        if (_debugLoading) {
+          _showMessage('调试运行中，请稍后再试');
+          return;
+        }
+        await _scanDebugKeyFromQr();
+        return;
+      case _SourceEditDebugMenuAction.openSearchSource:
+        _openDebugSourceFromMenu('列表页源码', _debugListSrcHtml);
+        return;
+      case _SourceEditDebugMenuAction.openBookSource:
+        _openDebugSourceFromMenu('详情页源码', _debugBookSrcHtml);
+        return;
+      case _SourceEditDebugMenuAction.openTocSource:
+        _openDebugSourceFromMenu('目录页源码', _debugTocSrcHtml);
+        return;
+      case _SourceEditDebugMenuAction.openContentSource:
+        _openDebugSourceFromMenu('正文页源码', _debugContentSrcHtml);
+        return;
+      case _SourceEditDebugMenuAction.refreshExploreQuickActions:
+        if (_refreshingExploreQuickActions) {
+          _showMessage('发现快捷项刷新中，请稍后再试');
+          return;
+        }
+        await _refreshExploreQuickActions();
+        return;
+      case _SourceEditDebugMenuAction.openDebugHelp:
+        await _showDebugHelp();
+        return;
+    }
   }
 
   Future<void> _showDebugMoreToolsSheet() async {
-    await showCupertinoBottomDialog<void>(
+    final selected = await showAppActionListSheet<_SourceEditDebugToolsAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) {
-        void closeThen(VoidCallback action) {
-          Navigator.pop(sheetContext);
-          Future<void>.delayed(Duration.zero, () {
-            if (!mounted) return;
-            action();
-          });
-        }
-
-        return CupertinoActionSheet(
-          title: const Text('高级工具'),
-          message: const Text('问题复现与导出能力，集中在二级入口。'),
-          actions: [
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(_openWebVerify),
-              child: const Text('网页验证（Cloudflare）'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                _openDebugAdvancedPanel();
-              }),
-              child: const Text('高级诊断与源码'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                final text = _structuredSummaryText();
-                if (text == null) {
-                  _showMessage('暂无调试摘要，请先执行调试');
-                  return;
-                }
-                _openDebugText(title: '结构化调试摘要', text: text);
-              }),
-              child: const Text('结构化调试摘要（脱敏）'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                final text = _structuredSummaryText();
-                if (text == null) {
-                  _showMessage('暂无调试摘要，请先执行调试');
-                  return;
-                }
-                Clipboard.setData(ClipboardData(text: text));
-                _showMessage('已复制调试摘要（脱敏）');
-              }),
-              child: const Text('复制调试摘要（脱敏）'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                if (_debugLinesAll.isEmpty) {
-                  _showMessage('暂无调试日志，请先执行调试');
-                  return;
-                }
-                _exportDebugBundleToFile(includeRawSources: false);
-              }),
-              child: const Text('一键导出调试包（推荐）'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                if (_debugLinesAll.isEmpty) {
-                  _showMessage('暂无调试日志，请先执行调试');
-                  return;
-                }
-                _showExportDebugBundleSheet();
-              }),
-              child: const Text('导出调试包（更多选项）'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                final text = _runtimeSnapshotText();
-                if (text == null) {
-                  _showMessage('暂无变量快照');
-                  return;
-                }
-                _openDebugText(title: '运行时变量快照（脱敏）', text: text);
-              }),
-              child: const Text('运行时变量快照（脱敏）'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(() {
-                final text = _runtimeSnapshotText();
-                if (text == null) {
-                  _showMessage('暂无变量快照');
-                  return;
-                }
-                Clipboard.setData(ClipboardData(text: text));
-                _showMessage('已复制变量快照（脱敏）');
-              }),
-              child: const Text('复制变量快照（脱敏）'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(_copyDebugConsole),
-              child: const Text('复制控制台（全部）'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => closeThen(_copyMinimalReproInfo),
-              child: const Text('复制最小复现信息'),
-            ),
-            CupertinoActionSheetAction(
-              isDestructiveAction: true,
-              onPressed: () => closeThen(_clearDebugConsole),
-              child: const Text('清空控制台'),
-            ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(sheetContext),
-            child: const Text('取消'),
-          ),
-        );
-      },
+      title: '高级工具',
+      message: '问题复现与导出能力，集中在二级入口。',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_SourceEditDebugToolsAction>(
+          value: _SourceEditDebugToolsAction.openWebVerify,
+          icon: CupertinoIcons.cloud,
+          label: '网页验证（Cloudflare）',
+        ),
+        AppActionListItem<_SourceEditDebugToolsAction>(
+          value: _SourceEditDebugToolsAction.openDebugAdvancedPanel,
+          icon: CupertinoIcons.wrench,
+          label: '高级诊断与源码',
+        ),
+        AppActionListItem<_SourceEditDebugToolsAction>(
+          value: _SourceEditDebugToolsAction.openStructuredSummary,
+          icon: CupertinoIcons.doc_text_search,
+          label: '结构化调试摘要（脱敏）',
+        ),
+        AppActionListItem<_SourceEditDebugToolsAction>(
+          value: _SourceEditDebugToolsAction.copyStructuredSummary,
+          icon: CupertinoIcons.doc_on_doc,
+          label: '复制调试摘要（脱敏）',
+        ),
+        AppActionListItem<_SourceEditDebugToolsAction>(
+          value: _SourceEditDebugToolsAction.exportDebugBundleQuick,
+          icon: CupertinoIcons.square_arrow_up,
+          label: '一键导出调试包（推荐）',
+        ),
+        AppActionListItem<_SourceEditDebugToolsAction>(
+          value: _SourceEditDebugToolsAction.exportDebugBundleMore,
+          icon: CupertinoIcons.ellipsis_circle,
+          label: '导出调试包（更多选项）',
+        ),
+        AppActionListItem<_SourceEditDebugToolsAction>(
+          value: _SourceEditDebugToolsAction.openRuntimeSnapshot,
+          icon: CupertinoIcons.clock,
+          label: '运行时变量快照（脱敏）',
+        ),
+        AppActionListItem<_SourceEditDebugToolsAction>(
+          value: _SourceEditDebugToolsAction.copyRuntimeSnapshot,
+          icon: CupertinoIcons.doc_on_clipboard,
+          label: '复制变量快照（脱敏）',
+        ),
+        AppActionListItem<_SourceEditDebugToolsAction>(
+          value: _SourceEditDebugToolsAction.copyDebugConsole,
+          icon: CupertinoIcons.text_bubble,
+          label: '复制控制台（全部）',
+        ),
+        AppActionListItem<_SourceEditDebugToolsAction>(
+          value: _SourceEditDebugToolsAction.copyMinimalReproInfo,
+          icon: CupertinoIcons.info_circle,
+          label: '复制最小复现信息',
+        ),
+        AppActionListItem<_SourceEditDebugToolsAction>(
+          value: _SourceEditDebugToolsAction.clearDebugConsole,
+          icon: CupertinoIcons.delete,
+          label: '清空控制台',
+          isDestructiveAction: true,
+        ),
+      ],
     );
+    if (selected == null || !mounted) return;
+    switch (selected) {
+      case _SourceEditDebugToolsAction.openWebVerify:
+        _openWebVerify();
+        return;
+      case _SourceEditDebugToolsAction.openDebugAdvancedPanel:
+        await _openDebugAdvancedPanel();
+        return;
+      case _SourceEditDebugToolsAction.openStructuredSummary:
+        final structuredSummary = _structuredSummaryText();
+        if (structuredSummary == null) {
+          _showMessage('暂无调试摘要，请先执行调试');
+          return;
+        }
+        await _openDebugText(title: '结构化调试摘要', text: structuredSummary);
+        return;
+      case _SourceEditDebugToolsAction.copyStructuredSummary:
+        final structuredSummary = _structuredSummaryText();
+        if (structuredSummary == null) {
+          _showMessage('暂无调试摘要，请先执行调试');
+          return;
+        }
+        await Clipboard.setData(ClipboardData(text: structuredSummary));
+        _showMessage('已复制调试摘要（脱敏）');
+        return;
+      case _SourceEditDebugToolsAction.exportDebugBundleQuick:
+        if (_debugLinesAll.isEmpty) {
+          _showMessage('暂无调试日志，请先执行调试');
+          return;
+        }
+        await _exportDebugBundleToFile(includeRawSources: false);
+        return;
+      case _SourceEditDebugToolsAction.exportDebugBundleMore:
+        if (_debugLinesAll.isEmpty) {
+          _showMessage('暂无调试日志，请先执行调试');
+          return;
+        }
+        await _showExportDebugBundleSheet();
+        return;
+      case _SourceEditDebugToolsAction.openRuntimeSnapshot:
+        final runtimeSnapshot = _runtimeSnapshotText();
+        if (runtimeSnapshot == null) {
+          _showMessage('暂无变量快照');
+          return;
+        }
+        await _openDebugText(title: '运行时变量快照（脱敏）', text: runtimeSnapshot);
+        return;
+      case _SourceEditDebugToolsAction.copyRuntimeSnapshot:
+        final runtimeSnapshot = _runtimeSnapshotText();
+        if (runtimeSnapshot == null) {
+          _showMessage('暂无变量快照');
+          return;
+        }
+        await Clipboard.setData(ClipboardData(text: runtimeSnapshot));
+        _showMessage('已复制变量快照（脱敏）');
+        return;
+      case _SourceEditDebugToolsAction.copyDebugConsole:
+        _copyDebugConsole();
+        return;
+      case _SourceEditDebugToolsAction.copyMinimalReproInfo:
+        _copyMinimalReproInfo();
+        return;
+      case _SourceEditDebugToolsAction.clearDebugConsole:
+        _clearDebugConsole();
+        return;
+    }
   }
 
   Future<void> _openDebugAdvancedPanel() async {
@@ -1780,28 +1835,21 @@ class _SourceEditViewState extends State<SourceEditView> {
   Future<void> _showExploreQuickPicker(
     List<MapEntry<String, String>> entries,
   ) async {
-    await showCupertinoBottomDialog<void>(
+    final selected = await showAppActionListSheet<int>(
       context: context,
-      barrierDismissible: true,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('选择发现入口'),
-        actions: entries
-            .map(
-              (entry) => CupertinoActionSheetAction(
-                child: Text(entry.value),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _setDebugKeyAndMaybeRun(entry.key, run: true);
-                },
-              ),
-            )
-            .toList(growable: false),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '选择发现入口',
+      showCancel: true,
+      items: [
+        for (var i = 0; i < entries.length; i++)
+          AppActionListItem<int>(
+            value: i,
+            icon: CupertinoIcons.compass,
+            label: entries[i].value,
+          ),
+      ],
     );
+    if (selected == null || selected < 0 || selected >= entries.length) return;
+    _setDebugKeyAndMaybeRun(entries[selected].key, run: true);
   }
 
   List<MapEntry<String, String>> _collectExploreQuickEntries() {
@@ -2689,44 +2737,45 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Future<void> _showExportDebugBundleSheet() async {
-    showCupertinoBottomDialog<void>(
+    final selected =
+        await showAppActionListSheet<_SourceEditExportBundleAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (context) => CupertinoActionSheet(
-        title: const Text('导出调试包'),
-        message: const Text('调试包可能很大，建议优先保存到文件。'),
-        actions: [
-          CupertinoActionSheetAction(
-            child: const Text('复制调试包（不含源码，推荐）'),
-            onPressed: () {
-              Navigator.pop(context);
-              final bundle = _buildDebugBundle(includeRawSources: false);
-              final json = _prettyJson(LegadoJson.encode(bundle));
-              Clipboard.setData(ClipboardData(text: json));
-              _showMessage('已复制调试包（不含源码）');
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('保存调试包到文件（不含源码，推荐）'),
-            onPressed: () async {
-              Navigator.pop(context);
-              await _exportDebugBundleToFile(includeRawSources: false);
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('保存调试包到文件（含源码）'),
-            onPressed: () async {
-              Navigator.pop(context);
-              await _exportDebugBundleToFile(includeRawSources: true);
-            },
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          child: const Text('取消'),
-          onPressed: () => Navigator.pop(context),
+      title: '导出调试包',
+      message: '调试包可能很大，建议优先保存到文件。',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_SourceEditExportBundleAction>(
+          value: _SourceEditExportBundleAction.copyBundleWithoutRawSources,
+          icon: CupertinoIcons.doc_on_doc,
+          label: '复制调试包（不含源码，推荐）',
         ),
-      ),
+        AppActionListItem<_SourceEditExportBundleAction>(
+          value: _SourceEditExportBundleAction.saveBundleWithoutRawSources,
+          icon: CupertinoIcons.square_arrow_up,
+          label: '保存调试包到文件（不含源码，推荐）',
+        ),
+        AppActionListItem<_SourceEditExportBundleAction>(
+          value: _SourceEditExportBundleAction.saveBundleWithRawSources,
+          icon: CupertinoIcons.archivebox,
+          label: '保存调试包到文件（含源码）',
+        ),
+      ],
     );
+    if (selected == null || !mounted) return;
+    switch (selected) {
+      case _SourceEditExportBundleAction.copyBundleWithoutRawSources:
+        final bundle = _buildDebugBundle(includeRawSources: false);
+        final json = _prettyJson(LegadoJson.encode(bundle));
+        Clipboard.setData(ClipboardData(text: json));
+        _showMessage('已复制调试包（不含源码）');
+        return;
+      case _SourceEditExportBundleAction.saveBundleWithoutRawSources:
+        await _exportDebugBundleToFile(includeRawSources: false);
+        return;
+      case _SourceEditExportBundleAction.saveBundleWithRawSources:
+        await _exportDebugBundleToFile(includeRawSources: true);
+        return;
+    }
   }
 
   Future<void> _exportDebugBundleToFile({
@@ -3130,42 +3179,42 @@ class _SourceEditViewState extends State<SourceEditView> {
     );
   }
 
-  void _showMore() {
-    showCupertinoBottomDialog<void>(
+  void _showMore() async {
+    final selected = await showAppActionListSheet<_SourceEditMoreAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (context) => CupertinoActionSheet(
-        title: const Text('更多'),
-        actions: [
-          CupertinoActionSheetAction(
-            child: const Text('清 Cookie'),
-            onPressed: () {
-              Navigator.pop(context);
-              _clearCookie();
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('复制 JSON'),
-            onPressed: () {
-              Navigator.pop(context);
-              Clipboard.setData(ClipboardData(text: _jsonCtrl.text));
-              _showMessage('已复制 JSON');
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('从剪贴板粘贴 JSON'),
-            onPressed: () {
-              Navigator.pop(context);
-              _pasteJsonFromClipboard();
-            },
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          child: const Text('取消'),
-          onPressed: () => Navigator.pop(context),
+      title: '更多',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_SourceEditMoreAction>(
+          value: _SourceEditMoreAction.clearCookie,
+          icon: CupertinoIcons.delete_solid,
+          label: '清 Cookie',
         ),
-      ),
+        AppActionListItem<_SourceEditMoreAction>(
+          value: _SourceEditMoreAction.copyJson,
+          icon: CupertinoIcons.doc_on_doc,
+          label: '复制 JSON',
+        ),
+        AppActionListItem<_SourceEditMoreAction>(
+          value: _SourceEditMoreAction.pasteJsonFromClipboard,
+          icon: CupertinoIcons.doc_on_clipboard,
+          label: '从剪贴板粘贴 JSON',
+        ),
+      ],
     );
+    if (selected == null || !mounted) return;
+    switch (selected) {
+      case _SourceEditMoreAction.clearCookie:
+        await _clearCookie();
+        return;
+      case _SourceEditMoreAction.copyJson:
+        Clipboard.setData(ClipboardData(text: _jsonCtrl.text));
+        _showMessage('已复制 JSON');
+        return;
+      case _SourceEditMoreAction.pasteJsonFromClipboard:
+        await _pasteJsonFromClipboard();
+        return;
+    }
   }
 
   Future<void> _clearCookie() async {

@@ -1,12 +1,19 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/ui_tokens.dart';
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../source/views/source_debug_text_view.dart';
 import '../models/rss_source.dart';
 import '../services/rss_source_debug_service.dart';
+
+enum _RssSourceDebugMenuAction {
+  openListRawSource,
+  openContentRawSource,
+}
 
 class RssSourceDebugView extends StatefulWidget {
   const RssSourceDebugView({
@@ -79,33 +86,32 @@ class _RssSourceDebugViewState extends State<RssSourceDebugView> {
 
   Future<void> _showMoreMenu() async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    final selected = await showAppActionListSheet<_RssSourceDebugMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (popupContext) => CupertinoActionSheet(
-        title: const Text('更多'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _openListRawSource();
-            },
-            child: const Text('列表源码'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _openContentRawSource();
-            },
-            child: const Text('正文源码'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(popupContext),
-          child: const Text('取消'),
+      title: '更多',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_RssSourceDebugMenuAction>(
+          value: _RssSourceDebugMenuAction.openListRawSource,
+          icon: CupertinoIcons.list_bullet,
+          label: '列表源码',
         ),
-      ),
+        AppActionListItem<_RssSourceDebugMenuAction>(
+          value: _RssSourceDebugMenuAction.openContentRawSource,
+          icon: CupertinoIcons.doc_text,
+          label: '正文源码',
+        ),
+      ],
     );
+    if (selected == null || !mounted) return;
+    switch (selected) {
+      case _RssSourceDebugMenuAction.openListRawSource:
+        await _openListRawSource();
+        return;
+      case _RssSourceDebugMenuAction.openContentRawSource:
+        await _openContentRawSource();
+        return;
+    }
   }
 
   Widget _buildLogList() {
@@ -116,14 +122,22 @@ class _RssSourceDebugViewState extends State<RssSourceDebugView> {
         message: '请点击刷新重新发起调试',
       );
     }
+    final tokens = AppUiTokens.resolve(context);
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
       itemCount: _logs.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (_, index) {
-        return Text(
-          _logs[index],
-          style: const TextStyle(fontSize: 13),
+        return AppCard(
+          padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+          borderColor: tokens.colors.separator.withValues(alpha: 0.72),
+          child: Text(
+            _logs[index],
+            style: TextStyle(
+              fontSize: 13,
+              color: tokens.colors.label,
+            ),
+          ),
         );
       },
     );

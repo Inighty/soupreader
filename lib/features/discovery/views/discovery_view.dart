@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/theme/ui_tokens.dart';
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
@@ -47,6 +48,15 @@ class DiscoveryView extends StatefulWidget {
 
   @override
   State<DiscoveryView> createState() => _DiscoveryViewState();
+}
+
+enum _DiscoverySourceMenuAction {
+  edit,
+  moveToTop,
+  login,
+  search,
+  refresh,
+  delete,
 }
 
 class _DiscoveryViewState extends State<DiscoveryView> {
@@ -201,34 +211,33 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
   Future<void> _showGroupFilterMenu() async {
     final groups = _buildGroups(_eligibleSources(_allSources));
-    await showCupertinoBottomDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('分组'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _setQuery('');
-            },
-            child: const Text('全部'),
-          ),
-          for (final group in groups)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _setQuery('group:$group');
-              },
-              child: Text(group),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('取消'),
+    const allToken = '__all__';
+    final items = <AppActionListItem<String>>[
+      const AppActionListItem<String>(
+        value: allToken,
+        icon: CupertinoIcons.square_grid_2x2,
+        label: '全部',
+      ),
+      ...groups.map(
+        (group) => AppActionListItem<String>(
+          value: group,
+          icon: CupertinoIcons.folder,
+          label: group,
         ),
       ),
+    ];
+    final selected = await showAppActionListSheet<String>(
+      context: context,
+      title: '分组',
+      showCancel: true,
+      items: items,
     );
+    if (selected == null || !mounted) return;
+    if (selected == allToken) {
+      _setQuery('');
+      return;
+    }
+    _setQuery('group:$selected');
   }
 
   void _compressExplore() {
@@ -347,64 +356,69 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   Future<void> _showSourceActions(BookSource source) async {
-    showCupertinoBottomDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => CupertinoActionSheet(
-        title: Text(source.bookSourceName),
-        message: Text(source.bookSourceUrl),
-        actions: [
-          CupertinoActionSheetAction(
-            child: const Text('编辑'),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _openEditor(source.bookSourceUrl);
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('置顶'),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _toTop(source.bookSourceUrl);
-            },
-          ),
-          if ((source.loginUrl ?? '').trim().isNotEmpty)
-            CupertinoActionSheetAction(
-              child: const Text('登录'),
-              onPressed: () {
-                Navigator.pop(ctx);
-                _openSourceLogin(source);
-              },
-            ),
-          CupertinoActionSheetAction(
-            child: const Text('搜索'),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _searchInSource(source);
-            },
-          ),
-          CupertinoActionSheetAction(
-            child: const Text('刷新'),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _refreshSourceKinds(source);
-            },
-          ),
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            child: const Text('删除'),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _confirmDeleteSource(source);
-            },
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          child: const Text('取消'),
-          onPressed: () => Navigator.pop(ctx),
-        ),
+    final hasLogin = (source.loginUrl ?? '').trim().isNotEmpty;
+    final items = <AppActionListItem<_DiscoverySourceMenuAction>>[
+      const AppActionListItem<_DiscoverySourceMenuAction>(
+        value: _DiscoverySourceMenuAction.edit,
+        icon: CupertinoIcons.pencil,
+        label: '编辑',
       ),
+      const AppActionListItem<_DiscoverySourceMenuAction>(
+        value: _DiscoverySourceMenuAction.moveToTop,
+        icon: CupertinoIcons.arrow_up_circle,
+        label: '置顶',
+      ),
+      if (hasLogin)
+        const AppActionListItem<_DiscoverySourceMenuAction>(
+          value: _DiscoverySourceMenuAction.login,
+          icon: CupertinoIcons.person_crop_circle,
+          label: '登录',
+        ),
+      const AppActionListItem<_DiscoverySourceMenuAction>(
+        value: _DiscoverySourceMenuAction.search,
+        icon: CupertinoIcons.search,
+        label: '搜索',
+      ),
+      const AppActionListItem<_DiscoverySourceMenuAction>(
+        value: _DiscoverySourceMenuAction.refresh,
+        icon: CupertinoIcons.refresh,
+        label: '刷新',
+      ),
+      const AppActionListItem<_DiscoverySourceMenuAction>(
+        value: _DiscoverySourceMenuAction.delete,
+        icon: CupertinoIcons.delete,
+        label: '删除',
+        isDestructiveAction: true,
+      ),
+    ];
+    final selected = await showAppActionListSheet<_DiscoverySourceMenuAction>(
+      context: context,
+      title: source.bookSourceName,
+      message: source.bookSourceUrl,
+      showCancel: true,
+      items: items,
     );
+    if (selected == null || !mounted) return;
+    switch (selected) {
+      case _DiscoverySourceMenuAction.edit:
+        await _openEditor(source.bookSourceUrl);
+        return;
+      case _DiscoverySourceMenuAction.moveToTop:
+        await _toTop(source.bookSourceUrl);
+        return;
+      case _DiscoverySourceMenuAction.login:
+        await _openSourceLogin(source);
+        return;
+      case _DiscoverySourceMenuAction.search:
+        await _searchInSource(source);
+        return;
+      case _DiscoverySourceMenuAction.refresh:
+        await _refreshSourceKinds(source);
+        return;
+      case _DiscoverySourceMenuAction.delete:
+        await _confirmDeleteSource(source);
+        return;
+    }
   }
 
   Future<void> _openEditor(String sourceUrl) async {

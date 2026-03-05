@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
@@ -43,6 +44,24 @@ enum _RssSourceMainMenuAction {
   importUrl,
   importQr,
   importDefault,
+}
+
+enum _RssSourceSelectionAction {
+  enableSelection,
+  disableSelection,
+  addGroup,
+  removeGroup,
+  moveToTop,
+  moveToBottom,
+  exportSelection,
+  shareSelection,
+  checkSelectedInterval,
+}
+
+enum _RssSourceItemAction {
+  moveToTop,
+  moveToBottom,
+  delete,
 }
 
 typedef _RssGroupMenuDecision = ({bool openManage, String? query});
@@ -395,82 +414,88 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
 
   Future<void> _showSelectionMoreActions(List<RssSource> visibleSources) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    final selected = await showAppActionListSheet<_RssSourceSelectionAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('批量操作'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _enableSelection(visibleSources);
-            },
-            child: const Text('启用所选'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _disableSelection(visibleSources);
-            },
-            child: const Text('禁用所选'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _addGroupToSelection(visibleSources);
-            },
-            child: const Text('添加分组'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _removeGroupFromSelection(visibleSources);
-            },
-            child: const Text('移除分组'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _moveSelectionToTop(visibleSources);
-            },
-            child: const Text('置顶所选'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _moveSelectionToBottom(visibleSources);
-            },
-            child: const Text('置底所选'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _exportSelection(visibleSources);
-            },
-            child: const Text('导出所选'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _shareSelection(visibleSources);
-            },
-            child: const Text('分享选中源'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _checkSelectedInterval(visibleSources);
-            },
-            child: const Text('选中所选区间'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('取消'),
+      title: '批量操作',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_RssSourceSelectionAction>(
+          value: _RssSourceSelectionAction.enableSelection,
+          icon: CupertinoIcons.check_mark_circled_solid,
+          label: '启用所选',
         ),
-      ),
+        AppActionListItem<_RssSourceSelectionAction>(
+          value: _RssSourceSelectionAction.disableSelection,
+          icon: CupertinoIcons.clear_circled_solid,
+          label: '禁用所选',
+        ),
+        AppActionListItem<_RssSourceSelectionAction>(
+          value: _RssSourceSelectionAction.addGroup,
+          icon: CupertinoIcons.add_circled_solid,
+          label: '添加分组',
+        ),
+        AppActionListItem<_RssSourceSelectionAction>(
+          value: _RssSourceSelectionAction.removeGroup,
+          icon: CupertinoIcons.minus_circle,
+          label: '移除分组',
+        ),
+        AppActionListItem<_RssSourceSelectionAction>(
+          value: _RssSourceSelectionAction.moveToTop,
+          icon: CupertinoIcons.arrow_up_circle,
+          label: '置顶所选',
+        ),
+        AppActionListItem<_RssSourceSelectionAction>(
+          value: _RssSourceSelectionAction.moveToBottom,
+          icon: CupertinoIcons.arrow_down_circle,
+          label: '置底所选',
+        ),
+        AppActionListItem<_RssSourceSelectionAction>(
+          value: _RssSourceSelectionAction.exportSelection,
+          icon: CupertinoIcons.square_arrow_up,
+          label: '导出所选',
+        ),
+        AppActionListItem<_RssSourceSelectionAction>(
+          value: _RssSourceSelectionAction.shareSelection,
+          icon: CupertinoIcons.share,
+          label: '分享选中源',
+        ),
+        AppActionListItem<_RssSourceSelectionAction>(
+          value: _RssSourceSelectionAction.checkSelectedInterval,
+          icon: CupertinoIcons.scope,
+          label: '选中所选区间',
+        ),
+      ],
     );
+    if (selected == null || !mounted) return;
+    switch (selected) {
+      case _RssSourceSelectionAction.enableSelection:
+        await _enableSelection(visibleSources);
+        return;
+      case _RssSourceSelectionAction.disableSelection:
+        await _disableSelection(visibleSources);
+        return;
+      case _RssSourceSelectionAction.addGroup:
+        await _addGroupToSelection(visibleSources);
+        return;
+      case _RssSourceSelectionAction.removeGroup:
+        await _removeGroupFromSelection(visibleSources);
+        return;
+      case _RssSourceSelectionAction.moveToTop:
+        await _moveSelectionToTop(visibleSources);
+        return;
+      case _RssSourceSelectionAction.moveToBottom:
+        await _moveSelectionToBottom(visibleSources);
+        return;
+      case _RssSourceSelectionAction.exportSelection:
+        await _exportSelection(visibleSources);
+        return;
+      case _RssSourceSelectionAction.shareSelection:
+        await _shareSelection(visibleSources);
+        return;
+      case _RssSourceSelectionAction.checkSelectedInterval:
+        _checkSelectedInterval(visibleSources);
+        return;
+    }
   }
 
   Future<void> _enableSelection(List<RssSource> visibleSources) async {
@@ -1706,41 +1731,41 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
 
   Future<void> _showSourceActions(RssSource source) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    final selected = await showAppActionListSheet<_RssSourceItemAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (ctx) => CupertinoActionSheet(
-        title: Text(source.sourceName),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _moveToTop(source);
-            },
-            child: const Text('置顶'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _moveToBottom(source);
-            },
-            child: const Text('置底'),
-          ),
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _deleteSource(source);
-            },
-            child: const Text('删除'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('取消'),
+      title: source.sourceName,
+      showCancel: true,
+      items: const [
+        AppActionListItem<_RssSourceItemAction>(
+          value: _RssSourceItemAction.moveToTop,
+          icon: CupertinoIcons.arrow_up_circle,
+          label: '置顶',
         ),
-      ),
+        AppActionListItem<_RssSourceItemAction>(
+          value: _RssSourceItemAction.moveToBottom,
+          icon: CupertinoIcons.arrow_down_circle,
+          label: '置底',
+        ),
+        AppActionListItem<_RssSourceItemAction>(
+          value: _RssSourceItemAction.delete,
+          icon: CupertinoIcons.delete,
+          label: '删除',
+          isDestructiveAction: true,
+        ),
+      ],
     );
+    if (selected == null || !mounted) return;
+    switch (selected) {
+      case _RssSourceItemAction.moveToTop:
+        await _moveToTop(source);
+        return;
+      case _RssSourceItemAction.moveToBottom:
+        await _moveToBottom(source);
+        return;
+      case _RssSourceItemAction.delete:
+        await _deleteSource(source);
+        return;
+    }
   }
 
   Future<void> _updateEnabled(RssSource source, bool value) async {

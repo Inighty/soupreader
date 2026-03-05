@@ -7,6 +7,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
@@ -459,49 +460,56 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     return text.contains(_noGroupLabel);
   }
 
-  void _showGroupFilterOptions(List<ReplaceRule> allRules) {
+  Future<void> _showGroupFilterOptions(List<ReplaceRule> allRules) async {
     final groups = _buildGroups(allRules);
     final activeGroupQuery = _resolveActiveGroupQuery(groups);
-    showCupertinoBottomDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (popupContext) => CupertinoActionSheet(
-        title: const Text('分组'),
-        actions: <Widget>[
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(popupContext);
-              _showGroupManageSheet();
-            },
-            child: const Text('分组管理'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => _applyGroupQuery(_groupFilterAll, popupContext),
-            child: Text('${activeGroupQuery == _groupFilterAll ? '✓ ' : ''}全部'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () =>
-                _applyGroupQuery(_groupFilterNoGroup, popupContext),
-            child: Text(
-              '${activeGroupQuery == _groupFilterNoGroup ? '✓ ' : ''}$_noGroupLabel',
-            ),
-          ),
-          ...groups.map(
-            (group) => CupertinoActionSheetAction(
-              onPressed: () => _applyGroupQuery(group, popupContext),
-              child: Text('${activeGroupQuery == group ? '✓ ' : ''}$group'),
-            ),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(popupContext),
-          child: const Text('取消'),
+    const manageToken = '__group_manage__';
+    final items = <AppActionListItem<String>>[
+      const AppActionListItem<String>(
+        value: manageToken,
+        icon: CupertinoIcons.square_list,
+        label: '分组管理',
+      ),
+      AppActionListItem<String>(
+        value: _groupFilterAll,
+        icon: activeGroupQuery == _groupFilterAll
+            ? CupertinoIcons.check_mark_circled_solid
+            : CupertinoIcons.square_grid_2x2,
+        label: '${activeGroupQuery == _groupFilterAll ? '✓ ' : ''}全部',
+      ),
+      AppActionListItem<String>(
+        value: _groupFilterNoGroup,
+        icon: activeGroupQuery == _groupFilterNoGroup
+            ? CupertinoIcons.check_mark_circled_solid
+            : CupertinoIcons.circle,
+        label:
+            '${activeGroupQuery == _groupFilterNoGroup ? '✓ ' : ''}$_noGroupLabel',
+      ),
+      ...groups.map(
+        (group) => AppActionListItem<String>(
+          value: group,
+          icon: activeGroupQuery == group
+              ? CupertinoIcons.check_mark_circled_solid
+              : CupertinoIcons.folder,
+          label: '${activeGroupQuery == group ? '✓ ' : ''}$group',
         ),
       ),
+    ];
+    final selected = await showAppActionListSheet<String>(
+      context: context,
+      title: '分组',
+      showCancel: true,
+      items: items,
     );
+    if (selected == null || !mounted) return;
+    if (selected == manageToken) {
+      _showGroupManageSheet();
+      return;
+    }
+    _applyGroupQuery(selected);
   }
 
-  void _applyGroupQuery(String query, BuildContext popupContext) {
+  void _applyGroupQuery(String query) {
     setState(() {
       _activeGroupQuery = query;
       _searchQuery = '';
@@ -510,7 +518,6 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     if (_searchController.text.isNotEmpty) {
       _searchController.clear();
     }
-    Navigator.pop(popupContext);
   }
 
   void _recordViewError({
@@ -960,42 +967,30 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   Future<void> _showRuleItemMenu(ReplaceRule rule) async {
-    final action = await showCupertinoBottomDialog<_ReplaceRuleItemMenuAction>(
+    final action = await showAppActionListSheet<_ReplaceRuleItemMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: Text(rule.name.isEmpty ? '未命名规则' : rule.name),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _ReplaceRuleItemMenuAction.top,
-            ),
-            child: const Text('置顶'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _ReplaceRuleItemMenuAction.bottom,
-            ),
-            child: const Text('置底'),
-          ),
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _ReplaceRuleItemMenuAction.delete,
-            ),
-            child: const Text('删除'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+      title: rule.name.isEmpty ? '未命名规则' : rule.name,
+      showCancel: true,
+      items: const [
+        AppActionListItem<_ReplaceRuleItemMenuAction>(
+          value: _ReplaceRuleItemMenuAction.top,
+          icon: CupertinoIcons.arrow_up_circle,
+          label: '置顶',
         ),
-      ),
+        AppActionListItem<_ReplaceRuleItemMenuAction>(
+          value: _ReplaceRuleItemMenuAction.bottom,
+          icon: CupertinoIcons.arrow_down_circle,
+          label: '置底',
+        ),
+        AppActionListItem<_ReplaceRuleItemMenuAction>(
+          value: _ReplaceRuleItemMenuAction.delete,
+          icon: CupertinoIcons.delete,
+          label: '删除',
+          isDestructiveAction: true,
+        ),
+      ],
     );
-    if (action == null) return;
+    if (action == null || !mounted) return;
     switch (action) {
       case _ReplaceRuleItemMenuAction.top:
         await _moveRuleToTop(rule);

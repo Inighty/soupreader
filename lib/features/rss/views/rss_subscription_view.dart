@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
@@ -33,6 +34,13 @@ class RssSubscriptionView extends StatefulWidget {
 
   @override
   State<RssSubscriptionView> createState() => _RssSubscriptionViewState();
+}
+
+enum _RssSubscriptionSourceAction {
+  moveToTop,
+  edit,
+  disable,
+  delete,
 }
 
 class _RssSubscriptionViewState extends State<RssSubscriptionView> {
@@ -344,27 +352,24 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
     final currentGroup = query.startsWith(RssSubscriptionHelper.groupPrefix)
         ? query.substring(RssSubscriptionHelper.groupPrefix.length).trim()
         : '';
-    await showCupertinoBottomDialog<void>(
+    final items = groups.map((group) {
+      final isCurrent = currentGroup == group;
+      return AppActionListItem<String>(
+        value: group,
+        icon: isCurrent
+            ? CupertinoIcons.check_mark_circled_solid
+            : CupertinoIcons.folder,
+        label: isCurrent ? '✓ $group' : group,
+      );
+    }).toList(growable: false);
+    final selectedGroup = await showAppActionListSheet<String>(
       context: context,
-      barrierDismissible: true,
-      builder: (ctx) => CupertinoActionSheet(
-        actions: [
-          for (final group in groups)
-            CupertinoActionSheetAction(
-              isDefaultAction: currentGroup == group,
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                _setQuery(RssSubscriptionHelper.buildGroupQuery(group));
-              },
-              child: Text(group),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('取消'),
-        ),
-      ),
+      title: '分组',
+      showCancel: true,
+      items: items,
     );
+    if (selectedGroup == null || !mounted) return;
+    _setQuery(RssSubscriptionHelper.buildGroupQuery(selectedGroup));
   }
 
   Future<void> _openFavorites() async {
@@ -445,48 +450,49 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
 
   Future<void> _showSourceActions(RssSource source) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    final selected = await showAppActionListSheet<_RssSubscriptionSourceAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (ctx) => CupertinoActionSheet(
-        title: Text(source.sourceName),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _moveToTop(source);
-            },
-            child: const Text('置顶'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _openEditSource(source);
-            },
-            child: const Text('编辑'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _disableSource(source);
-            },
-            child: const Text('禁用'),
-          ),
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _deleteSource(source);
-            },
-            child: const Text('删除'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('取消'),
+      title: source.sourceName,
+      showCancel: true,
+      items: const [
+        AppActionListItem<_RssSubscriptionSourceAction>(
+          value: _RssSubscriptionSourceAction.moveToTop,
+          icon: CupertinoIcons.arrow_up_circle,
+          label: '置顶',
         ),
-      ),
+        AppActionListItem<_RssSubscriptionSourceAction>(
+          value: _RssSubscriptionSourceAction.edit,
+          icon: CupertinoIcons.pencil,
+          label: '编辑',
+        ),
+        AppActionListItem<_RssSubscriptionSourceAction>(
+          value: _RssSubscriptionSourceAction.disable,
+          icon: CupertinoIcons.pause_circle,
+          label: '禁用',
+        ),
+        AppActionListItem<_RssSubscriptionSourceAction>(
+          value: _RssSubscriptionSourceAction.delete,
+          icon: CupertinoIcons.delete,
+          label: '删除',
+          isDestructiveAction: true,
+        ),
+      ],
     );
+    if (selected == null || !mounted) return;
+    switch (selected) {
+      case _RssSubscriptionSourceAction.moveToTop:
+        await _moveToTop(source);
+        return;
+      case _RssSubscriptionSourceAction.edit:
+        await _openEditSource(source);
+        return;
+      case _RssSubscriptionSourceAction.disable:
+        await _disableSource(source);
+        return;
+      case _RssSubscriptionSourceAction.delete:
+        await _deleteSource(source);
+        return;
+    }
   }
 
   Future<void> _moveToTop(RssSource source) async {

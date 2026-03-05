@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
@@ -13,6 +14,10 @@ class RuleSubscriptionView extends StatefulWidget {
 
   @override
   State<RuleSubscriptionView> createState() => _RuleSubscriptionViewState();
+}
+
+enum _RuleSubscriptionMenuAction {
+  delete,
 }
 
 class _RuleSubscriptionViewState extends State<RuleSubscriptionView> {
@@ -170,31 +175,27 @@ class _RuleSubscriptionViewState extends State<RuleSubscriptionView> {
 
   Future<void> _showSubscriptionActions(RuleSubscription subscription) async {
     if (!mounted) return;
-    await showCupertinoBottomDialog<void>(
+    final selected = await showAppActionListSheet<_RuleSubscriptionMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: Text(
-          subscription.name.trim().isEmpty
-              ? subscription.url.trim()
-              : subscription.name,
+      title: subscription.name.trim().isEmpty
+          ? subscription.url.trim()
+          : subscription.name,
+      showCancel: true,
+      items: const [
+        AppActionListItem<_RuleSubscriptionMenuAction>(
+          value: _RuleSubscriptionMenuAction.delete,
+          icon: CupertinoIcons.delete,
+          label: '删除',
+          isDestructiveAction: true,
         ),
-        actions: [
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.of(sheetContext).pop();
-              _deleteSubscription(subscription);
-            },
-            child: const Text('删除'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(sheetContext).pop(),
-          child: const Text('取消'),
-        ),
-      ),
+      ],
     );
+    if (selected == null || !mounted) return;
+    switch (selected) {
+      case _RuleSubscriptionMenuAction.delete:
+        await _deleteSubscription(subscription);
+        return;
+    }
   }
 
   Future<void> _deleteSubscription(RuleSubscription subscription) async {

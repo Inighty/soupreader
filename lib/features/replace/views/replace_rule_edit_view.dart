@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_ui_kit.dart';
@@ -173,31 +174,22 @@ class _ReplaceRuleEditViewState extends State<ReplaceRuleEditView> {
 
   Future<void> _showMoreMenu() async {
     if (_saving) return;
-    final selected =
-        await showCupertinoBottomDialog<_ReplaceRuleEditMenuAction>(
+    final selected = await showAppActionListSheet<_ReplaceRuleEditMenuAction>(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('编辑规则'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-                sheetContext, _ReplaceRuleEditMenuAction.copyRule),
-            child: const Text('复制规则'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _ReplaceRuleEditMenuAction.pasteRule,
-            ),
-            child: const Text('粘贴规则'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
+      title: '编辑规则',
+      showCancel: true,
+      items: const [
+        AppActionListItem<_ReplaceRuleEditMenuAction>(
+          value: _ReplaceRuleEditMenuAction.copyRule,
+          icon: CupertinoIcons.doc_on_doc,
+          label: '复制规则',
         ),
-      ),
+        AppActionListItem<_ReplaceRuleEditMenuAction>(
+          value: _ReplaceRuleEditMenuAction.pasteRule,
+          icon: CupertinoIcons.doc_on_clipboard,
+          label: '粘贴规则',
+        ),
+      ],
     );
     if (selected == null) return;
     switch (selected) {
