@@ -8,6 +8,7 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../app/widgets/source_aware_cover_image.dart';
 import '../../../core/database/database_service.dart';
@@ -1016,7 +1017,7 @@ class _SearchViewState extends State<SearchView> {
               child: Row(
                 children: [
                   Expanded(
-                    child: CupertinoSearchTextField(
+                    child: AppManageSearchField(
                       controller: _searchController,
                       focusNode: _searchFocusNode,
                       placeholder: '输入书名/作者，进行精准搜索书源...',
@@ -1035,16 +1036,6 @@ class _SearchViewState extends State<SearchView> {
                         setState(() {});
                       },
                       onSubmitted: (_) => _search(),
-                      onSuffixTap: () {
-                        _searchController.clear();
-                        if (_isSearching) {
-                          _cancelOngoingSearch();
-                          return;
-                        }
-                        setState(() {
-                          _hasMore = false;
-                        });
-                      },
                     ),
                   ),
                   CupertinoButton(

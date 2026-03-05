@@ -1,8 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:path/path.dart' as p;
 
+import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../services/remote_books_archive_service.dart';
 
 /// 远程压缩包内容选择页（Cupertino 风格）。
@@ -30,7 +34,14 @@ class RemoteBooksArchiveEntriesView extends StatefulWidget {
 
 class _RemoteBooksArchiveEntriesViewState
     extends State<RemoteBooksArchiveEntriesView> {
+  final TextEditingController _queryController = TextEditingController();
   String _query = '';
+
+  @override
+  void dispose() {
+    _queryController.dispose();
+    super.dispose();
+  }
 
   List<RemoteBooksArchiveCandidate> _filterCandidates() {
     final query = _query.trim().toLowerCase();
@@ -66,19 +77,16 @@ class _RemoteBooksArchiveEntriesViewState
   }
 
   Widget _buildMessageCard(BuildContext context, String message) {
-    final bg = CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
-      context,
-    );
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        message,
-        style: const TextStyle(fontSize: 13),
+    final tokens = AppUiTokens.resolve(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: AppCard(
+        padding: const EdgeInsets.all(12),
+        borderColor: tokens.colors.separator.withValues(alpha: 0.74),
+        child: Text(
+          message,
+          style: const TextStyle(fontSize: 13),
+        ),
       ),
     );
   }
@@ -155,7 +163,8 @@ class _RemoteBooksArchiveEntriesViewState
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-            child: CupertinoSearchTextField(
+            child: AppManageSearchField(
+              controller: _queryController,
               placeholder: '搜索文件名',
               onChanged: (value) => setState(() => _query = value),
             ),
@@ -163,16 +172,7 @@ class _RemoteBooksArchiveEntriesViewState
           if (message.isNotEmpty) _buildMessageCard(context, message),
           Expanded(
             child: candidates.isEmpty
-                ? Center(
-                    child: Text(
-                      '未找到可阅读文件',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color:
-                            CupertinoColors.secondaryLabel.resolveFrom(context),
-                      ),
-                    ),
-                  )
+                ? _buildEmptyState()
                 : ListView.builder(
                     itemCount: candidates.length,
                     itemBuilder: (itemContext, index) {
@@ -185,6 +185,15 @@ class _RemoteBooksArchiveEntriesViewState
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    final isSearching = _query.trim().isNotEmpty;
+    return AppEmptyState(
+      illustration: const AppEmptyPlanetIllustration(size: 82),
+      title: isSearching ? '没有匹配文件' : '未找到可阅读文件',
+      message: isSearching ? '请尝试其他关键字' : '该压缩包可能不包含支持的阅读格式',
     );
   }
 }

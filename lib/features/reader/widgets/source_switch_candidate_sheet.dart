@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/ui_tokens.dart';
+import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../services/reader_source_switch_helper.dart';
 
@@ -1278,30 +1280,19 @@ class _SourceSwitchCandidateSheetState
             if (_filterExpanded)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-                child: CupertinoSearchTextField(
+                child: AppManageSearchField(
                   controller: _queryController,
                   focusNode: _queryFocusNode,
                   placeholder: '筛选',
-                  onSuffixTap: () {
-                    if (_queryController.text.trim().isEmpty) {
-                      _collapseFilter();
-                      return;
-                    }
-                    _queryController.clear();
-                  },
                 ),
               ),
             Expanded(
               child: filtered.isEmpty
-                  ? Center(
-                      child: Text(
-                        _query.trim().isEmpty ? '暂无候选书源' : '无匹配候选',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color:
-                              CupertinoColors.systemGrey.resolveFrom(context),
-                        ),
-                      ),
+                  ? AppEmptyState(
+                      illustration: const AppEmptyPlanetIllustration(size: 82),
+                      title: _query.trim().isEmpty ? '暂无候选书源' : '无匹配候选',
+                      message:
+                          _query.trim().isEmpty ? '可尝试刷新列表或更换分组' : '请尝试更换筛选关键字',
                     )
                   : ListView.separated(
                       itemCount: filtered.length,

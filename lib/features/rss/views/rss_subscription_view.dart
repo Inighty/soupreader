@@ -5,6 +5,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
@@ -144,8 +146,8 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
     required List<RssSource> visible,
   }) {
     final searchField = Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-      child: CupertinoSearchTextField(
+      padding: AppManageSearchField.outerPadding,
+      child: AppManageSearchField(
         controller: _queryController,
         placeholder: '搜索订阅源',
         onChanged: (_) => setState(() {}),
@@ -234,22 +236,14 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
     final noEnabled = enabledCount == 0;
     final title = noEnabled ? '暂无启用订阅源' : '没有匹配结果';
     final action = noEnabled ? '返回订阅源管理' : '清除筛选';
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
-          const SizedBox(height: 10),
-          CupertinoButton(
-            onPressed: noEnabled ? _openSourceSettings : () => _setQuery(''),
-            child: Text(action),
-          ),
-        ],
+    final message = noEnabled ? '请先在订阅源管理中启用订阅源' : '当前筛选条件下暂无结果';
+    return AppEmptyState(
+      illustration: const AppEmptyPlanetIllustration(size: 84),
+      title: title,
+      message: message,
+      action: CupertinoButton(
+        onPressed: noEnabled ? _openSourceSettings : () => _setQuery(''),
+        child: Text(action),
       ),
     );
   }

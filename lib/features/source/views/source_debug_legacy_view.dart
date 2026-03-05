@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
@@ -477,14 +478,11 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
   }
 
   Widget _buildKeyField() {
-    return SizedBox(
-      height: 34,
-      child: CupertinoSearchTextField(
-        controller: _debugKeyCtrl,
-        focusNode: _debugKeyFocusNode,
-        placeholder: '输入关键字',
-        onSubmitted: _runDebug,
-      ),
+    return AppManageSearchField(
+      controller: _debugKeyCtrl,
+      focusNode: _debugKeyFocusNode,
+      placeholder: '输入关键字',
+      onSubmitted: _runDebug,
     );
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../models/search_scope.dart';
 import '../models/search_scope_group_helper.dart';
 import '../services/search_scope_picker_helper.dart';
@@ -98,7 +99,7 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
       trailing: _mode == _SearchScopeMode.source
           ? SizedBox(
               width: 168,
-              child: CupertinoSearchTextField(
+              child: AppManageSearchField(
                 key: _menuScreenFieldKey,
                 controller: _queryController,
                 placeholder: '筛选',

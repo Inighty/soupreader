@@ -15,6 +15,7 @@ import 'package:uuid/uuid.dart';
 import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
@@ -4294,8 +4295,8 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
       title: '目录',
       middle: _searchExpanded
           ? SizedBox(
-              height: 34,
-              child: CupertinoSearchTextField(
+              width: 190,
+              child: AppManageSearchField(
                 key: _menuSearchFieldKey,
                 controller: _searchController,
                 focusNode: _searchFocusNode,

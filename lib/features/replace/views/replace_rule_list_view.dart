@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/app_ui_kit.dart';
@@ -167,7 +169,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-                child: CupertinoSearchTextField(
+                child: AppManageSearchField(
                   controller: _searchController,
                   placeholder: '替换净化搜索',
                   onChanged: _onSearchQueryChanged,
@@ -782,24 +784,13 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   Widget _empty() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(CupertinoIcons.nosign, size: 56),
-          const SizedBox(height: 12),
-          Text(
-            '暂无规则',
-            style: TextStyle(
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
-          const SizedBox(height: 16),
-          CupertinoButton.filled(
-            onPressed: _createRule,
-            child: const Text('新建规则'),
-          ),
-        ],
+    return AppEmptyState(
+      illustration: const AppEmptyPlanetIllustration(size: 86),
+      title: '暂无规则',
+      message: '可通过新建或导入创建替换净化规则',
+      action: CupertinoButton.filled(
+        onPressed: _createRule,
+        child: const Text('新建规则'),
       ),
     );
   }

@@ -6,6 +6,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
@@ -122,6 +124,7 @@ class _BookshelfManagePlaceholderViewState
   int _selectedGroupId = BookshelfBookGroup.idAll;
   String _selectedGroupTitle = '全部';
   String _searchText = '';
+  final TextEditingController _searchController = TextEditingController();
   final Set<String> _selectedBookIds = <String>{};
 
   bool _isExporting = false;
@@ -173,6 +176,7 @@ class _BookshelfManagePlaceholderViewState
   @override
   void dispose() {
     _bookSubscription?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -196,8 +200,9 @@ class _BookshelfManagePlaceholderViewState
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-            child: CupertinoSearchTextField(
+            padding: AppManageSearchField.outerPadding,
+            child: AppManageSearchField(
+              controller: _searchController,
               placeholder: '筛选 • $_selectedGroupTitle',
               onChanged: (value) {
                 setState(() {
@@ -1736,6 +1741,7 @@ class _BookshelfManageSourcePickerView extends StatefulWidget {
 class _BookshelfManageSourcePickerViewState
     extends State<_BookshelfManageSourcePickerView> {
   String _query = '';
+  final TextEditingController _queryController = TextEditingController();
   late int _delaySeconds;
   bool _updatingDelay = false;
 
@@ -1743,6 +1749,12 @@ class _BookshelfManageSourcePickerViewState
   void initState() {
     super.initState();
     _delaySeconds = _normalizeDelaySeconds(widget.initialDelaySeconds);
+  }
+
+  @override
+  void dispose() {
+    _queryController.dispose();
+    super.dispose();
   }
 
   List<BookSource> get _filteredSources {
@@ -1775,8 +1787,9 @@ class _BookshelfManageSourcePickerViewState
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-            child: CupertinoSearchTextField(
+            padding: AppManageSearchField.outerPadding,
+            child: AppManageSearchField(
+              controller: _queryController,
               placeholder: '搜索书源',
               onChanged: (value) {
                 setState(() {
@@ -1809,15 +1822,10 @@ class _BookshelfManageSourcePickerViewState
           ),
           Expanded(
             child: filtered.isEmpty
-                ? Center(
-                    child: Text(
-                      '没有匹配的书源',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color:
-                            CupertinoColors.secondaryLabel.resolveFrom(context),
-                      ),
-                    ),
+                ? const AppEmptyState(
+                    illustration: AppEmptyPlanetIllustration(size: 82),
+                    title: '没有匹配的书源',
+                    message: '请尝试其他关键字',
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(14, 0, 14, 24),

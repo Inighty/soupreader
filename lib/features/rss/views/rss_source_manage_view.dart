@@ -6,6 +6,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/app_ui_kit.dart';
@@ -124,8 +126,8 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                child: CupertinoSearchTextField(
+                padding: AppManageSearchField.outerPadding,
+                child: AppManageSearchField(
                   controller: _queryController,
                   placeholder: '搜索订阅源',
                   onChanged: (_) => setState(() {}),
@@ -174,22 +176,14 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
     final noData = _repo.size == 0;
     final title = noData ? '暂无订阅源' : '没有匹配结果';
     final action = noData ? '新建订阅源' : '清除筛选';
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-          ),
-          const SizedBox(height: 10),
-          CupertinoButton(
-            onPressed: noData ? _openAddSource : () => _setQuery(''),
-            child: Text(action),
-          ),
-        ],
+    final message = noData ? '通过导入或新建来添加第一条订阅源' : '请尝试调整筛选关键字';
+    return AppEmptyState(
+      illustration: const AppEmptyPlanetIllustration(size: 84),
+      title: title,
+      message: message,
+      action: CupertinoButton(
+        onPressed: noData ? _openAddSource : () => _setQuery(''),
+        child: Text(action),
       ),
     );
   }
