@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
@@ -111,21 +112,15 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(28, 28),
+              AppNavBarButton(
                 onPressed: _openFavorites,
                 child: const Icon(CupertinoIcons.star),
               ),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(28, 28),
+              AppNavBarButton(
                 onPressed: _openGroupMenu,
                 child: const Icon(CupertinoIcons.folder),
               ),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(28, 28),
+              AppNavBarButton(
                 onPressed: _openSourceSettings,
                 child: const Icon(CupertinoIcons.settings),
               ),

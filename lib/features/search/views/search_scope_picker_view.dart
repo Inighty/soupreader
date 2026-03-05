@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
 import '../models/search_scope.dart';
 import '../models/search_scope_group_helper.dart';
@@ -209,13 +210,10 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
 
   Widget _buildGroupList(CupertinoThemeData theme, AppUiTokens uiTokens) {
     if (_groups.isEmpty) {
-      return Center(
-        child: Text(
-          '没有可选分组',
-          style: theme.textTheme.textStyle.copyWith(
-            color: uiTokens.colors.mutedForeground,
-          ),
-        ),
+      return const AppEmptyState(
+        illustration: AppEmptyPlanetIllustration(size: 82),
+        title: '没有可选分组',
+        message: '当前启用书源中未配置可用分组',
       );
     }
     return ListView.separated(
@@ -263,13 +261,10 @@ class _SearchScopePickerViewState extends State<SearchScopePickerView> {
   Widget _buildSourceList(CupertinoThemeData theme, AppUiTokens uiTokens) {
     final filtered = _filteredSources;
     if (filtered.isEmpty) {
-      return Center(
-        child: Text(
-          '未找到匹配书源',
-          style: theme.textTheme.textStyle.copyWith(
-            color: uiTokens.colors.mutedForeground,
-          ),
-        ),
+      return const AppEmptyState(
+        illustration: AppEmptyPlanetIllustration(size: 82),
+        title: '未找到匹配书源',
+        message: '请尝试更换筛选关键字',
       );
     }
     return ListView.separated(
