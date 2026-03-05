@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/exception_log_service.dart';
@@ -63,20 +64,10 @@ class _RuleSubscriptionViewState extends State<RuleSubscriptionView> {
               valueListenable: _store.listenable,
               builder: (context, subscriptions, _) {
                 if (subscriptions.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Text(
-                        '新增大佬们提供的规则导入地址\n新增后点击可导入规则',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: CupertinoColors.secondaryLabel.resolveFrom(
-                            context,
-                          ),
-                        ),
-                      ),
-                    ),
+                  return const AppEmptyState(
+                    illustration: AppEmptyPlanetIllustration(size: 86),
+                    title: '暂无规则订阅',
+                    message: '添加大佬们提供的规则导入地址\n添加后点击可导入规则',
                   );
                 }
                 return ListView.separated(

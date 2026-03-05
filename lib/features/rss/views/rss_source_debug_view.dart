@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../source/views/source_debug_text_view.dart';
 import '../models/rss_source.dart';
@@ -108,13 +110,10 @@ class _RssSourceDebugViewState extends State<RssSourceDebugView> {
 
   Widget _buildLogList() {
     if (_logs.isEmpty) {
-      return Center(
-        child: Text(
-          '暂无调试日志',
-          style: TextStyle(
-            color: CupertinoColors.secondaryLabel.resolveFrom(context),
-          ),
-        ),
+      return const AppEmptyState(
+        illustration: AppEmptyPlanetIllustration(size: 82),
+        title: '暂无调试日志',
+        message: '请点击刷新重新发起调试',
       );
     }
     return ListView.separated(
@@ -137,14 +136,12 @@ class _RssSourceDebugViewState extends State<RssSourceDebugView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             minimumSize: const Size(30, 30),
             onPressed: _running ? null : _runDebug,
             child: const Icon(CupertinoIcons.refresh),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             minimumSize: const Size(30, 30),
             onPressed: _showMoreMenu,
             child: const Icon(CupertinoIcons.ellipsis),

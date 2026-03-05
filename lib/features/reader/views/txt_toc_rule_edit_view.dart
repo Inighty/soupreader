@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../models/txt_toc_rule.dart';
 
@@ -171,17 +172,15 @@ class _TxtTocRuleEditViewState extends State<TxtTocRuleEditView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed: _saveRule,
             child: const Text('保存'),
-            minimumSize: Size(30, 30),
+            minimumSize: const Size(30, 30),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed: _showMoreMenu,
             child: const Icon(CupertinoIcons.ellipsis),
-            minimumSize: Size(30, 30),
+            minimumSize: const Size(30, 30),
           ),
         ],
       ),

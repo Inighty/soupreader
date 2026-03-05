@@ -1154,14 +1154,11 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                       const SizedBox(height: 6),
                       Expanded(
                         child: history.isEmpty
-                            ? Center(
-                                child: Text(
-                                  '暂无历史记录',
-                                  style: TextStyle(
-                                    color: CupertinoColors.secondaryLabel
-                                        .resolveFrom(context),
-                                  ),
-                                ),
+                            ? const AppEmptyState(
+                                illustration:
+                                    AppEmptyPlanetIllustration(size: 76),
+                                title: '暂无历史记录',
+                                message: '输入 URL 并导入后会自动保存',
                               )
                             : ListView.separated(
                                 padding:

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
@@ -348,25 +349,10 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
       );
     }
     if (_bookmarks.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.bookmark,
-              size: 64,
-              color: CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              '暂无书签',
-              style: TextStyle(
-                fontSize: 17,
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-            ),
-          ],
-        ),
+      return const AppEmptyState(
+        illustration: AppEmptyPlanetIllustration(size: 88),
+        title: '暂无书签',
+        message: '添加书签后会显示在这里',
       );
     }
     return ListView.builder(

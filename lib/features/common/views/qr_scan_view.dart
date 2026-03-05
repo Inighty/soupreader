@@ -6,6 +6,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../core/services/exception_log_service.dart';
 
 class QrScanView extends StatefulWidget {
@@ -158,14 +159,12 @@ class _QrScanViewState extends State<QrScanView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed:
                 (_handled || _pickingFromGallery) ? null : _chooseFromGallery,
             child: Text(_pickingFromGallery ? '处理中' : '图库'),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('取消'),
           ),

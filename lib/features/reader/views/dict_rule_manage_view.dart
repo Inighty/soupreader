@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/app_ui_kit.dart';
@@ -587,14 +588,11 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                       const SizedBox(height: 6),
                       Expanded(
                         child: history.isEmpty
-                            ? Center(
-                                child: Text(
-                                  '暂无历史记录',
-                                  style: TextStyle(
-                                    color: CupertinoColors.secondaryLabel
-                                        .resolveFrom(context),
-                                  ),
-                                ),
+                            ? const AppEmptyState(
+                                illustration:
+                                    AppEmptyPlanetIllustration(size: 76),
+                                title: '暂无历史记录',
+                                message: '输入 URL 并导入后会自动保存',
                               )
                             : ListView.separated(
                                 padding:
@@ -985,63 +983,66 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
                   child: AppListView(
                     padding: const EdgeInsets.only(top: 8, bottom: 20),
                     children: [
-                      AppListSection(
-                        header: const Text('字典规则'),
-                        children: _rules.isEmpty
-                            ? const [
-                                CupertinoListTile.notched(
-                                  title: Text('暂无规则'),
-                                  subtitle: Text('点击右上角更多菜单本地导入、网络导入或二维码导入'),
-                                ),
-                              ]
-                            : _rules.map((rule) {
-                                final title = rule.name.trim().isEmpty
-                                    ? '未命名规则'
-                                    : rule.name.trim();
-                                final subtitle = rule.urlRule.trim().isEmpty
-                                    ? '未配置 URL 规则'
-                                    : rule.urlRule.trim();
-                                final selected =
-                                    _selectedRuleNames.contains(rule.name);
-                                final tile = CupertinoListTile.notched(
-                                  title: Text(title),
-                                  subtitle: Text(
-                                    subtitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  additionalInfo:
-                                      rule.enabled ? null : const Text('禁用'),
-                                  trailing: _selectionMode
-                                      ? Icon(
-                                          selected
-                                              ? CupertinoIcons
-                                                  .check_mark_circled_solid
-                                              : CupertinoIcons.circle,
-                                          color: selected
-                                              ? CupertinoColors.activeBlue
-                                                  .resolveFrom(context)
-                                              : CupertinoColors.secondaryLabel
-                                                  .resolveFrom(context),
-                                          size: 20,
-                                        )
-                                      : null,
-                                  onTap: _selectionMode
-                                      ? () => _toggleRuleSelection(rule.name)
-                                      : () => _openRuleEditor(rule),
-                                );
-                                if (!_selectionMode || !selected) {
-                                  return tile;
-                                }
-                                return DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: CupertinoColors.systemGrey6
-                                        .resolveFrom(context),
-                                  ),
-                                  child: tile,
-                                );
-                              }).toList(growable: false),
-                      ),
+                      if (_rules.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                          child: AppEmptyState(
+                            illustration: AppEmptyPlanetIllustration(size: 86),
+                            title: '暂无规则',
+                            message: '点击右上角添加，或从更多菜单本地导入、网络导入、二维码导入。',
+                          ),
+                        )
+                      else
+                        AppListSection(
+                          header: const Text('字典规则'),
+                          children: _rules.map((rule) {
+                            final title = rule.name.trim().isEmpty
+                                ? '未命名规则'
+                                : rule.name.trim();
+                            final subtitle = rule.urlRule.trim().isEmpty
+                                ? '未配置 URL 规则'
+                                : rule.urlRule.trim();
+                            final selected =
+                                _selectedRuleNames.contains(rule.name);
+                            final tile = CupertinoListTile.notched(
+                              title: Text(title),
+                              subtitle: Text(
+                                subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              additionalInfo:
+                                  rule.enabled ? null : const Text('禁用'),
+                              trailing: _selectionMode
+                                  ? Icon(
+                                      selected
+                                          ? CupertinoIcons
+                                              .check_mark_circled_solid
+                                          : CupertinoIcons.circle,
+                                      color: selected
+                                          ? CupertinoColors.activeBlue
+                                              .resolveFrom(context)
+                                          : CupertinoColors.secondaryLabel
+                                              .resolveFrom(context),
+                                      size: 20,
+                                    )
+                                  : null,
+                              onTap: _selectionMode
+                                  ? () => _toggleRuleSelection(rule.name)
+                                  : () => _openRuleEditor(rule),
+                            );
+                            if (!_selectionMode || !selected) {
+                              return tile;
+                            }
+                            return DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: CupertinoColors.systemGrey6
+                                    .resolveFrom(context),
+                              ),
+                              child: tile,
+                            );
+                          }).toList(growable: false),
+                        ),
                     ],
                   ),
                 ),

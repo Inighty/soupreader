@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
@@ -1774,14 +1775,10 @@ class _RssFavoritesPlaceholderViewState
       builder: (context, snapshot) {
         final stars = snapshot.data ?? const <RssStar>[];
         if (stars.isEmpty) {
-          return Center(
-            child: Text(
-              '当前分组暂无收藏',
-              style: TextStyle(
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                fontSize: 13,
-              ),
-            ),
+          return const AppEmptyState(
+            illustration: AppEmptyPlanetIllustration(size: 82),
+            title: '当前分组暂无收藏',
+            message: '可切换其它分组查看',
           );
         }
         return ListView.separated(
@@ -1838,16 +1835,10 @@ class _RssFavoritesPlaceholderViewState
                 ),
               Expanded(
                 child: currentGroup.isEmpty
-                    ? Center(
-                        child: Text(
-                          '暂无收藏',
-                          style: TextStyle(
-                            color: CupertinoColors.secondaryLabel.resolveFrom(
-                              context,
-                            ),
-                            fontSize: 13,
-                          ),
-                        ),
+                    ? const AppEmptyState(
+                        illustration: AppEmptyPlanetIllustration(size: 82),
+                        title: '暂无收藏',
+                        message: '添加收藏后会显示在这里',
                       )
                     : _buildGroupList(currentGroup),
               ),

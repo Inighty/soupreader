@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
 import 'http_tts_rule_edit_view.dart';
@@ -393,14 +395,11 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
                       const SizedBox(height: 6),
                       Expanded(
                         child: history.isEmpty
-                            ? Center(
-                                child: Text(
-                                  '暂无历史记录',
-                                  style: TextStyle(
-                                    color: CupertinoColors.secondaryLabel
-                                        .resolveFrom(context),
-                                  ),
-                                ),
+                            ? const AppEmptyState(
+                                illustration:
+                                    AppEmptyPlanetIllustration(size: 76),
+                                title: '暂无历史记录',
+                                message: '输入 URL 并导入后会自动保存',
                               )
                             : ListView.separated(
                                 padding:
@@ -789,19 +788,17 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed: _menuBusy ? null : _addRule,
             child: const Icon(CupertinoIcons.add),
-            minimumSize: Size(30, 30),
+            minimumSize: const Size(30, 30),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed: _menuBusy ? null : _showMoreMenu,
             child: _menuBusy
                 ? const CupertinoActivityIndicator(radius: 9)
                 : const Icon(CupertinoIcons.ellipsis),
-            minimumSize: Size(30, 30),
+            minimumSize: const Size(30, 30),
           ),
         ],
       ),
@@ -819,40 +816,41 @@ class _SpeakEngineManageViewState extends State<SpeakEngineManageView> {
                     ),
                   ],
                 ),
-                CupertinoListSection.insetGrouped(
-                  header: const Text('HTTP 朗读引擎'),
-                  children: _rules.isEmpty
-                      ? const [
-                          CupertinoListTile.notched(
-                            title: Text('暂无规则'),
-                            subtitle: Text('点击右上角添加或更多菜单导入默认规则'),
-                          ),
-                        ]
-                      : _rules.map((rule) {
-                          final fallbackTitle = rule.url.trim().isEmpty
-                              ? '未命名引擎'
-                              : rule.url.trim();
-                          final title = rule.name.trim().isEmpty
-                              ? fallbackTitle
-                              : rule.name.trim();
-                          final subtitle = rule.url.trim().isEmpty
-                              ? '未配置 URL'
-                              : rule.url.trim();
-                          return CupertinoListTile.notched(
-                            title: Text(title),
-                            subtitle: Text(
-                              subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            additionalInfo:
-                                rule.isDefaultRule ? const Text('默认') : null,
-                            onTap: () async {
-                              await _openRuleEditor(rule);
-                            },
-                          );
-                        }).toList(growable: false),
-                ),
+                if (_rules.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: AppEmptyState(
+                      illustration: AppEmptyPlanetIllustration(size: 86),
+                      title: '暂无规则',
+                      message: '点击右上角添加，或从更多菜单导入默认规则。',
+                    ),
+                  )
+                else
+                  CupertinoListSection.insetGrouped(
+                    header: const Text('HTTP 朗读引擎'),
+                    children: _rules.map((rule) {
+                      final fallbackTitle =
+                          rule.url.trim().isEmpty ? '未命名引擎' : rule.url.trim();
+                      final title = rule.name.trim().isEmpty
+                          ? fallbackTitle
+                          : rule.name.trim();
+                      final subtitle =
+                          rule.url.trim().isEmpty ? '未配置 URL' : rule.url.trim();
+                      return CupertinoListTile.notched(
+                        title: Text(title),
+                        subtitle: Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        additionalInfo:
+                            rule.isDefaultRule ? const Text('默认') : null,
+                        onTap: () async {
+                          await _openRuleEditor(rule);
+                        },
+                      );
+                    }).toList(growable: false),
+                  ),
               ],
             ),
     );

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/source_login_store.dart';
@@ -461,21 +462,19 @@ class _HttpTtsRuleEditViewState extends State<HttpTtsRuleEditView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed: _menuBusy ? null : _saveRule,
             child: _saving
                 ? const CupertinoActivityIndicator(radius: 9)
                 : const Text('保存'),
-            minimumSize: Size(30, 30),
+            minimumSize: const Size(30, 30),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed: _menuBusy ? null : _showMoreMenu,
             child: _logining
                 ? const CupertinoActivityIndicator(radius: 9)
                 : const Icon(CupertinoIcons.ellipsis),
-            minimumSize: Size(30, 30),
+            minimumSize: const Size(30, 30),
           ),
         ],
       ),

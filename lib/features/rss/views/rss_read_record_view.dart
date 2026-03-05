@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_article_repository.dart';
@@ -91,14 +92,11 @@ class _RssReadRecordViewState extends State<RssReadRecordView> {
     }
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Text(
-        '暂无阅读记录',
-        style: TextStyle(
-          color: CupertinoColors.secondaryLabel.resolveFrom(context),
-        ),
-      ),
+  Widget _buildEmptyState() {
+    return const AppEmptyState(
+      illustration: AppEmptyPlanetIllustration(size: 84),
+      title: '暂无阅读记录',
+      message: '清空后或尚未阅读时会显示在这里',
     );
   }
 
@@ -152,7 +150,7 @@ class _RssReadRecordViewState extends State<RssReadRecordView> {
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())
           : _records.isEmpty
-              ? _buildEmptyState(context)
+              ? _buildEmptyState()
               : _buildRecordList(),
     );
   }

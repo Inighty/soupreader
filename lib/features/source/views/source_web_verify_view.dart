@@ -9,6 +9,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_webview_toolbar.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -694,14 +695,12 @@ class _SourceWebVerifyViewState extends State<SourceWebVerifyView> {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
+                  AppNavBarButton(
                     minimumSize: const Size(30, 30),
                     onPressed: _confirmAndClose,
                     child: const Icon(CupertinoIcons.check_mark),
                   ),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
+                  AppNavBarButton(
                     minimumSize: const Size(30, 30),
                     onPressed: _showMoreMenu,
                     child: const Icon(CupertinoIcons.ellipsis),

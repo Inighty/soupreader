@@ -8,7 +8,9 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
+import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../app/widgets/source_aware_cover_image.dart';
 import '../../../core/database/database_service.dart';
@@ -1238,16 +1240,12 @@ class _SearchViewState extends State<SearchView> {
     required Color borderColor,
     required Widget child,
   }) {
-    final uiTokens = AppUiTokens.resolve(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      child: Container(
+      child: AppCard(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: uiTokens.colors.card,
-          borderRadius: BorderRadius.circular(uiTokens.radii.control),
-          border: Border.all(color: borderColor, width: 1),
-        ),
+        borderColor: borderColor.withValues(alpha: 0.82),
+        borderWidth: 1,
         child: child,
       ),
     );
@@ -1356,16 +1354,10 @@ class _SearchViewState extends State<SearchView> {
   Widget _buildBookshelfHintPanel(List<Book> books) {
     final theme = CupertinoTheme.of(context);
     final uiTokens = AppUiTokens.resolve(context);
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-      decoration: BoxDecoration(
-        color: uiTokens.colors.card,
-        borderRadius: BorderRadius.circular(uiTokens.radii.control),
-        border: Border.all(
-          color: uiTokens.colors.separator.withValues(alpha: 0.72),
-          width: 0.8,
-        ),
-      ),
+      borderColor: uiTokens.colors.separator.withValues(alpha: 0.72),
+      borderWidth: 0.8,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1423,48 +1415,50 @@ class _SearchViewState extends State<SearchView> {
     final hasQuery =
         SearchInputHintHelper.normalizeKeyword(_searchController.text)
             .isNotEmpty;
+    if (historyHints.isEmpty) {
+      return AppEmptyState(
+        illustration: const AppEmptyPlanetIllustration(size: 72),
+        title: hasQuery ? '无匹配历史词' : '暂无历史记录',
+        message: hasQuery ? '可调整关键词后重试' : '搜索后会自动保存历史词',
+      );
+    }
     final headerColor = CupertinoColors.secondaryLabel.resolveFrom(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              '搜索历史',
-              style: theme.textTheme.textStyle.copyWith(
-                color: headerColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const Spacer(),
-            if (historyHints.isNotEmpty)
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(0, 28),
-                onPressed: _clearHistory,
-                child: Text(
-                  '清除',
-                  style: TextStyle(
-                    color: uiTokens.colors.accent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      borderColor: uiTokens.colors.separator.withValues(alpha: 0.72),
+      borderWidth: 0.8,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '搜索历史',
+                style: theme.textTheme.textStyle.copyWith(
+                  color: headerColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (historyHints.isEmpty)
-          Text(
-            hasQuery ? '无匹配历史词' : '暂无历史记录',
-            style: theme.textTheme.textStyle.copyWith(
-              fontSize: 12,
-              color: uiTokens.colors.mutedForeground,
-            ),
-          )
-        else
+              const Spacer(),
+              if (historyHints.isNotEmpty)
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 28),
+                  onPressed: _clearHistory,
+                  child: Text(
+                    '清除',
+                    style: TextStyle(
+                      color: uiTokens.colors.accent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 10,
             runSpacing: 8,
@@ -1472,7 +1466,8 @@ class _SearchViewState extends State<SearchView> {
                 .map((keyword) => _buildHistoryChip(keyword))
                 .toList(growable: false),
           ),
-      ],
+        ],
+      ),
     );
   }
 

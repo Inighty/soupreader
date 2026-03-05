@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../../core/services/keyboard_assist_store.dart';
@@ -168,14 +169,10 @@ class _KeyboardAssistsConfigDialogState
                 child: _loading
                     ? const Center(child: CupertinoActivityIndicator())
                     : _items.isEmpty
-                        ? Center(
-                            child: Text(
-                              '暂无辅助按键',
-                              style: TextStyle(
-                                color: CupertinoColors.secondaryLabel
-                                    .resolveFrom(context),
-                              ),
-                            ),
+                        ? const AppEmptyState(
+                            illustration: AppEmptyPlanetIllustration(size: 80),
+                            title: '暂无辅助按键',
+                            message: '点击右上角加号添加辅助按键',
                           )
                         : ListView.separated(
                             itemCount: _items.length,

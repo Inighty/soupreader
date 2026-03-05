@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/bookmark_repository.dart';
@@ -46,10 +47,6 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
 
   Color get _textStrong =>
       _isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
-
-  Color get _textNormal => _isDark
-      ? CupertinoColors.systemGrey.resolveFrom(context)
-      : AppDesignTokens.textNormal;
 
   Color get _textSubtle => _isDark
       ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.75)
@@ -272,33 +269,10 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            CupertinoIcons.bookmark,
-            size: 64,
-            color: _textSubtle.withValues(alpha: 0.6),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '暂无书签',
-            style: TextStyle(
-              color: _textNormal,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '点击上方“添加”按钮添加当前位置',
-            style: TextStyle(
-              color: _textSubtle,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
+    return const AppEmptyState(
+      illustration: AppEmptyPlanetIllustration(size: 84),
+      title: '暂无书签',
+      message: '点击上方“添加”按钮添加当前位置',
     );
   }
 

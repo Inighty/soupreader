@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
@@ -1120,7 +1121,11 @@ class _CacheExportViewState extends State<CacheExportView> {
                 _buildProgressCard(),
                 Expanded(
                   child: _books.isEmpty
-                      ? const Center(child: Text('暂无书籍'))
+                      ? const AppEmptyState(
+                          illustration: AppEmptyPlanetIllustration(size: 86),
+                          title: '暂无书籍',
+                          message: '请先在书架添加书籍，或切换分组后重试。',
+                        )
                       : ListView.builder(
                           padding: const EdgeInsets.only(top: 12, bottom: 16),
                           itemCount: _books.length,

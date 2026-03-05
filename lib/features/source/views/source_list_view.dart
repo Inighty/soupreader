@@ -8,6 +8,8 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../app/theme/typography.dart';
 import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
+import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
@@ -241,10 +243,9 @@ class _SourceListViewState extends State<SourceListView> {
       child: AppCupertinoPageScaffold(
         title: '书源管理',
         transitionBetweenRoutes: false,
-        trailing: CupertinoButton(
+        trailing: AppNavBarButton(
           key: _moreMenuKey,
           onPressed: _showMainOptions,
-          padding: EdgeInsets.zero,
           minimumSize: const Size(
             SourceUiTokens.minTapSize,
             SourceUiTokens.minTapSize,
@@ -1189,38 +1190,10 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   Widget _buildEmptyState() {
-    final textTheme = CupertinoTheme.of(context).textTheme;
-    final labelColor = CupertinoColors.label.resolveFrom(context);
-    final secondaryColor = SourceUiTokens.resolveSecondaryTextColor(context);
-    final tertiaryColor = SourceUiTokens.resolveMutedTextColor(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            CupertinoIcons.cloud_download,
-            size: 52,
-            color: tertiaryColor,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '暂无书源',
-            style: textTheme.textStyle.copyWith(
-              fontSize: SourceUiTokens.emptyTitleSize,
-              fontWeight: FontWeight.w600,
-              color: labelColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '点击右上角更多导入书源',
-            style: textTheme.textStyle.copyWith(
-              fontSize: SourceUiTokens.emptyMessageSize,
-              color: secondaryColor,
-            ),
-          ),
-        ],
-      ),
+    return const AppEmptyState(
+      illustration: AppEmptyPlanetIllustration(size: 86),
+      title: '暂无书源',
+      message: '点击右上角更多导入书源',
     );
   }
 
@@ -2775,14 +2748,11 @@ class _SourceListViewState extends State<SourceListView> {
                     const SizedBox(height: 6),
                     Expanded(
                       child: history.isEmpty
-                          ? Center(
-                              child: Text(
-                                '暂无历史记录',
-                                style: TextStyle(
-                                  color: CupertinoColors.secondaryLabel
-                                      .resolveFrom(context),
-                                ),
-                              ),
+                          ? const AppEmptyState(
+                              illustration:
+                                  AppEmptyPlanetIllustration(size: 76),
+                              title: '暂无历史记录',
+                              message: '输入 URL 并导入后会自动保存',
                             )
                           : ListView.separated(
                               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),

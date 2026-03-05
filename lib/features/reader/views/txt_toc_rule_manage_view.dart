@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/qr_scan_service.dart';
@@ -904,14 +906,11 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                       const SizedBox(height: 6),
                       Expanded(
                         child: history.isEmpty
-                            ? Center(
-                                child: Text(
-                                  '暂无历史记录',
-                                  style: TextStyle(
-                                    color: CupertinoColors.secondaryLabel
-                                        .resolveFrom(context),
-                                  ),
-                                ),
+                            ? const AppEmptyState(
+                                illustration:
+                                    AppEmptyPlanetIllustration(size: 76),
+                                title: '暂无历史记录',
+                                message: '输入 URL 并导入后会自动保存',
                               )
                             : ListView.separated(
                                 padding:
@@ -1123,7 +1122,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
+          AppNavBarButton(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             minimumSize: const Size(30, 30),
             onPressed: _menuBusy || _selectionMode ? null : _startAddRule,
@@ -1132,7 +1131,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
               style: TextStyle(fontSize: 13),
             ),
           ),
-          CupertinoButton(
+          AppNavBarButton(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             minimumSize: const Size(30, 30),
             onPressed: _menuBusy || (!_selectionMode && _rules.isEmpty)
@@ -1143,7 +1142,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
               style: const TextStyle(fontSize: 13),
             ),
           ),
-          CupertinoButton(
+          AppNavBarButton(
             key: _moreMenuKey,
             padding: EdgeInsets.zero,
             minimumSize: const Size(30, 30),
@@ -1302,16 +1301,10 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
   }
 
   Widget _empty() {
-    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Text(
-          '暂无目录规则，可点击右上角添加，或从本地导入、网络导入、二维码导入。',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: secondary),
-        ),
-      ),
+    return const AppEmptyState(
+      illustration: AppEmptyPlanetIllustration(size: 86),
+      title: '暂无目录规则',
+      message: '可点击右上角添加，或从本地导入、网络导入、二维码导入。',
     );
   }
 }

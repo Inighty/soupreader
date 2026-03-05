@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../core/database/database_service.dart';
@@ -92,13 +93,10 @@ class _RssGroupManageViewState extends State<RssGroupManageView> {
       builder: (context, snapshot) {
         final groups = snapshot.data ?? _repo.allGroups();
         if (groups.isEmpty) {
-          return Center(
-            child: Text(
-              '暂无分组',
-              style: TextStyle(
-                color: CupertinoColors.secondaryLabel.resolveFrom(context),
-              ),
-            ),
+          return const AppEmptyState(
+            illustration: AppEmptyPlanetIllustration(size: 84),
+            title: '暂无分组',
+            message: '点击右上角加号添加分组',
           );
         }
         return AppListView(

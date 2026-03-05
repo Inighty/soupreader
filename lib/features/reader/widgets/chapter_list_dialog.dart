@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../bookshelf/models/book.dart';
 
@@ -290,33 +291,10 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
 
   Widget _buildBookmarkList() {
     if (widget.bookmarks.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              CupertinoIcons.bookmark,
-              color: _textSubtle.withValues(alpha: 0.8),
-              size: 48,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '暂无书签',
-              style: TextStyle(
-                color: _textNormal,
-                fontSize: 15,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '阅读时点击书签图标可添加书签',
-              style: TextStyle(
-                color: _textSubtle,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
+      return const AppEmptyState(
+        illustration: AppEmptyPlanetIllustration(size: 82),
+        title: '暂无书签',
+        message: '阅读时点击书签图标可添加书签',
       );
     }
 

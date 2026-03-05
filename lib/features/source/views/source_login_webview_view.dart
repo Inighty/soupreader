@@ -11,6 +11,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_webview_toolbar.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/webview_cookie_bridge.dart';
@@ -554,14 +555,12 @@ class _SourceLoginWebViewViewState extends State<SourceLoginWebViewView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             minimumSize: const Size(30, 30),
             onPressed: _showMoreMenu,
             child: const Icon(CupertinoIcons.ellipsis),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed: _confirmAndCheck,
             child: const Text('确认'),
             minimumSize: const Size(30, 30),

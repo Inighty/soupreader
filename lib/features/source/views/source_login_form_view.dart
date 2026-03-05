@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../core/services/cookie_store.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/source_login_store.dart';
@@ -309,17 +310,15 @@ class _SourceLoginFormViewState extends State<SourceLoginFormView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed: _loading ? null : _submit,
             child: const Text('完成'),
-            minimumSize: Size(30, 30),
+            minimumSize: const Size(30, 30),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             onPressed: _loading ? null : _showMoreMenu,
             child: const Icon(CupertinoIcons.ellipsis),
-            minimumSize: Size(30, 30),
+            minimumSize: const Size(30, 30),
           ),
         ],
       ),

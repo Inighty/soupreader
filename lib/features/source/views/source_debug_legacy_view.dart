@@ -1,10 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
-
-import '../../../app/widgets/app_manage_search_field.dart';
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/widgets/app_empty_state.dart';
+import '../../../app/widgets/app_manage_search_field.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../settings/views/app_help_dialog.dart';
@@ -638,13 +639,10 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
 
   Widget _buildLogList() {
     if (_events.isEmpty) {
-      return Center(
-        child: Text(
-          '提交 key 后开始调试',
-          style: TextStyle(
-            color: CupertinoColors.secondaryLabel.resolveFrom(context),
-          ),
-        ),
+      return const AppEmptyState(
+        illustration: AppEmptyPlanetIllustration(size: 82),
+        title: '暂无调试日志',
+        message: '提交 key 后开始调试',
       );
     }
     return ListView.separated(
@@ -675,20 +673,17 @@ class _SourceDebugLegacyViewState extends State<SourceDebugLegacyView> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             minimumSize: const Size(30, 30),
             onPressed: _running ? null : _runCurrentKeyIfNotEmpty,
             child: const Icon(CupertinoIcons.check_mark),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             minimumSize: const Size(30, 30),
             onPressed: _running ? null : _scanAndDebug,
             child: const Icon(CupertinoIcons.qrcode_viewfinder),
           ),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
+          AppNavBarButton(
             minimumSize: const Size(30, 30),
             onPressed: _showMoreMenu,
             child: const Icon(CupertinoIcons.ellipsis),

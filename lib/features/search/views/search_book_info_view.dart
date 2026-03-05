@@ -16,6 +16,7 @@ import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
+import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
@@ -3170,20 +3171,17 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (showInlineEditAction)
-            CupertinoButton(
-              padding: EdgeInsets.zero,
+            AppNavBarButton(
               onPressed: _openBookEdit,
               child: const Icon(CupertinoIcons.pencil),
             ),
           if (showInlineShareAction)
-            CupertinoButton(
-              padding: EdgeInsets.zero,
+            AppNavBarButton(
               onPressed: _shareBook,
               child: const Icon(CupertinoIcons.share),
             ),
-          CupertinoButton(
+          AppNavBarButton(
             key: _moreMenuKey,
-            padding: EdgeInsets.zero,
             onPressed: _showMoreActions,
             child: _switchingSource
                 ? const CupertinoActivityIndicator(radius: 9)
@@ -4237,9 +4235,8 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
         SourceUiTokens.resolveSecondaryTextColor(context);
     final filtered = _filtered;
     final searchAction = _searchExpanded
-        ? CupertinoButton(
+        ? AppNavBarButton(
             key: _menuSearchCloseKey,
-            padding: EdgeInsets.zero,
             minimumSize: const Size(
               SourceUiTokens.minTapSize,
               SourceUiTokens.minTapSize,
@@ -4247,9 +4244,8 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
             onPressed: () => _closeSearch(clearQuery: true),
             child: const Icon(CupertinoIcons.xmark, size: 18),
           )
-        : CupertinoButton(
+        : AppNavBarButton(
             key: _menuSearchActionKey,
-            padding: EdgeInsets.zero,
             minimumSize: const Size(
               SourceUiTokens.minTapSize,
               SourceUiTokens.minTapSize,
@@ -4271,9 +4267,8 @@ class _SearchBookTocViewState extends State<_SearchBookTocView> {
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: CupertinoActivityIndicator(radius: 8),
           ),
-        CupertinoButton(
+        AppNavBarButton(
           key: _menuMoreActionKey,
-          padding: EdgeInsets.zero,
           minimumSize: const Size(
             SourceUiTokens.minTapSize,
             SourceUiTokens.minTapSize,

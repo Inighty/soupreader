@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cover_image.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/book_repository.dart';
@@ -1005,22 +1006,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   }
 
   Widget _buildEmptyTab(String message) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            CupertinoIcons.doc_text,
-            size: 48,
-            color: _textSubtle.withValues(alpha: 0.65),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            style: TextStyle(color: _textSubtle, fontSize: 14),
-          ),
-        ],
-      ),
+    return AppEmptyState(
+      illustration: const AppEmptyPlanetIllustration(size: 82),
+      title: message,
     );
   }
 
