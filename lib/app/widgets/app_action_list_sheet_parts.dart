@@ -148,7 +148,7 @@ class _ActionRow<T> extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: textColor,
-                                            fontWeight: FontWeight.w600,
+                      fontSize: 17,
                     ),
                   ),
                 ),
@@ -189,7 +189,8 @@ class _CancelRow extends StatelessWidget {
             label,
             style: TextStyle(
               color: labelColor,
-                            fontWeight: FontWeight.w600,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),

@@ -118,9 +118,9 @@ class _AppNavBarButtonState extends State<AppNavBarButton> {
   }
 
   bool _shouldUseGlassBackground() {
-    final explicit = widget.useGlassBackground;
-    if (explicit != null) return explicit;
-    return widget.child is Icon;
+    // 原生 iOS 导航栏图标无背景气泡，默认关闭 glass。
+    // 仅在明确传入 useGlassBackground: true 时启用。
+    return widget.useGlassBackground ?? false;
   }
 
   void _setPressed(bool value) {
