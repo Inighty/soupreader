@@ -8136,29 +8136,35 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
         position: _railSlideAnim,
         child: FadeTransition(
           opacity: _menuFadeAnim,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-            decoration: BoxDecoration(
-              color: _uiPanelBg.withValues(alpha: _isUiDark ? 0.88 : 0.94),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: CupertinoColors.black
-                      .withValues(alpha: _isUiDark ? 0.25 : 0.12),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _uiPanelBg.withValues(alpha: _isUiDark ? 0.75 : 0.82),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: CupertinoColors.black
+                          .withValues(alpha: _isUiDark ? 0.25 : 0.12),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Column(
-              children:
-                  List<Widget>.generate(actionOrder.length * 2 - 1, (index) {
-                if (index.isOdd) {
-                  return const SizedBox(height: 6);
-                }
-                final action = actionOrder[index ~/ 2];
-                return _buildLegacyQuickActionButton(action);
-              }),
+                child: Column(
+                  children:
+                      List<Widget>.generate(actionOrder.length * 2 - 1, (index) {
+                    if (index.isOdd) {
+                      return const SizedBox(height: 6);
+                    }
+                    final action = actionOrder[index ~/ 2];
+                    return _buildLegacyQuickActionButton(action);
+                  }),
+                ),
+              ),
             ),
           ),
         ),
