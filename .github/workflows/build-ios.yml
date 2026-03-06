@@ -6,9 +6,6 @@
 name: Build iOS
 
 on:
-  push:
-    branches:
-      - '**'
   workflow_dispatch:
 
 permissions:
