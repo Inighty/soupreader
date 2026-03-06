@@ -1028,25 +1028,13 @@ class _PageTab extends StatelessWidget {
         if (_supportsVolumeKeyPaging)
           _Section(
             title: '按键',
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '音量键翻页',
-                      style: TextStyle(
-                        color: labelColor,
-                        fontSize: ReaderSettingsTokens.rowTitleSize,
-                      ),
-                    ),
-                    CupertinoSwitch(
-                      value: settings.volumeKeyPage,
-                      onChanged: (v) => onSettingsChanged(
-                          settings.copyWith(volumeKeyPage: v)),
-                      activeTrackColor: activeTrackColor,
-                    ),
-                  ],
+            child: _SwitchGroup(
+              rows: [
+                _SwitchRowData(
+                  label: '音量键翻页',
+                  value: settings.volumeKeyPage,
+                  onChanged: (v) => onSettingsChanged(
+                      settings.copyWith(volumeKeyPage: v)),
                 ),
               ],
             ),

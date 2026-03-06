@@ -117,14 +117,12 @@ class ReaderTopMenu extends StatelessWidget {
           children: [
             Row(
               children: [
-                _buildRoundIcon(
+                _buildNavButton(
                   icon: CupertinoIcons.back,
                   onTap: () => Navigator.pop(context),
-                  iconColor: style.primaryText,
-                  backgroundColor: style.controlBackground,
-                  borderColor: style.controlBorder,
+                  color: style.primaryText,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 Expanded(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
@@ -135,76 +133,60 @@ class ReaderTopMenu extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: style.primaryText,
-                        fontSize: 16,
+                        fontSize: 17,
                         fontWeight: FontWeight.w600,
+                        letterSpacing: -0.3,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 if (showChangeSourceAction && onChangeSource != null) ...[
-                  _buildRoundIcon(
+                  _buildNavButton(
                     key: _readerTopMenuChangeSourceKey,
                     icon: CupertinoIcons.arrow_right_arrow_left,
                     onTap: onChangeSource,
                     onLongPress: onChangeSourceLongPress,
-                    iconColor: style.primaryText,
-                    backgroundColor: style.controlBackground,
-                    borderColor: style.controlBorder,
+                    color: style.primaryText,
                   ),
-                  const SizedBox(width: 8),
                 ],
                 if (showRefreshAction && onRefresh != null) ...[
-                  _buildRoundIcon(
+                  _buildNavButton(
                     key: _readerTopMenuRefreshKey,
                     icon: CupertinoIcons.refresh,
                     onTap: onRefresh,
                     onLongPress: onRefreshLongPress,
-                    iconColor: style.primaryText,
-                    backgroundColor: style.controlBackground,
-                    borderColor: style.controlBorder,
+                    color: style.primaryText,
                   ),
-                  const SizedBox(width: 8),
                 ],
                 if (showDownloadAction && onOfflineCache != null) ...[
-                  _buildRoundIcon(
+                  _buildNavButton(
                     key: _readerTopMenuOfflineCacheKey,
                     icon: CupertinoIcons.cloud_download,
                     onTap: onOfflineCache,
-                    iconColor: style.primaryText,
-                    backgroundColor: style.controlBackground,
-                    borderColor: style.controlBorder,
+                    color: style.primaryText,
                   ),
-                  const SizedBox(width: 8),
                 ],
                 if (showTocRuleAction && onTocRule != null) ...[
-                  _buildRoundIcon(
+                  _buildNavButton(
                     key: _readerTopMenuTocRuleKey,
                     icon: CupertinoIcons.list_bullet,
                     onTap: onTocRule,
-                    iconColor: style.primaryText,
-                    backgroundColor: style.controlBackground,
-                    borderColor: style.controlBorder,
+                    color: style.primaryText,
                   ),
-                  const SizedBox(width: 8),
                 ],
                 if (showSetCharsetAction && onSetCharset != null) ...[
-                  _buildRoundIcon(
+                  _buildNavButton(
                     key: _readerTopMenuSetCharsetKey,
                     icon: CupertinoIcons.textformat,
                     onTap: onSetCharset,
-                    iconColor: style.primaryText,
-                    backgroundColor: style.controlBackground,
-                    borderColor: style.controlBorder,
+                    color: style.primaryText,
                   ),
-                  const SizedBox(width: 8),
                 ],
-                _buildRoundIcon(
-                  icon: CupertinoIcons.ellipsis,
+                _buildNavButton(
+                  icon: CupertinoIcons.ellipsis_circle,
                   onTap: onShowMoreMenu,
-                  iconColor: style.primaryText,
-                  backgroundColor: style.controlBackground,
-                  borderColor: style.controlBorder,
+                  color: style.primaryText,
                 ),
               ],
             ),
@@ -305,6 +287,34 @@ class ReaderTopMenu extends StatelessWidget {
       left: 0,
       right: 0,
       child: panel,
+    );
+  }
+
+  Widget _buildNavButton({
+    Key? key,
+    required IconData icon,
+    required VoidCallback? onTap,
+    VoidCallback? onLongPress,
+    required Color color,
+  }) {
+    return CupertinoButton(
+      key: key,
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPress: onLongPress,
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Icon(
+            icon,
+            color: color,
+            size: 22,
+          ),
+        ),
+      ),
     );
   }
 
