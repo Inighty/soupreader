@@ -3476,7 +3476,6 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                         color: backgroundColor,
                         borderRadius:
                             BorderRadius.circular(SourceUiTokens.radiusControl),
-                        border: Border.all(color: borderColor),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(

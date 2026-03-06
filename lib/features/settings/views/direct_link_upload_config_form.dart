@@ -44,10 +44,8 @@ class DirectLinkUploadConfigForm extends StatelessWidget {
   }
 
   Widget _buildRuleCard(AppUiTokens tokens) {
-    final borderColor = tokens.colors.separator.withValues(alpha: 0.72);
     return AppCard(
       padding: EdgeInsets.zero,
-      borderColor: borderColor,
       child: Column(
         children: [
           _buildTextFieldBlock(
@@ -127,10 +125,8 @@ class DirectLinkUploadConfigForm extends StatelessWidget {
   }
 
   Widget _buildCompressCard(AppUiTokens tokens) {
-    final borderColor = tokens.colors.separator.withValues(alpha: 0.72);
     return AppCard(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      borderColor: borderColor,
       child: Row(
         children: [
           Expanded(
@@ -165,13 +161,11 @@ class DirectLinkUploadConfigForm extends StatelessWidget {
   }
 
   Widget _buildFooterActions(AppUiTokens tokens) {
-    final borderColor = tokens.colors.separator.withValues(alpha: 0.68);
     return SafeArea(
       top: false,
       minimum: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       child: AppCard(
         padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-        borderColor: borderColor,
         child: Row(
           children: [
             CupertinoButton(

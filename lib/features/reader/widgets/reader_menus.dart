@@ -315,9 +315,6 @@ class ReaderTopMenu extends StatelessWidget {
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: borderColor,
-          ),
         ),
         child: Icon(
           icon,
@@ -345,9 +342,6 @@ class ReaderTopMenu extends StatelessWidget {
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(
-            color: borderColor,
-          ),
         ),
         child: Text(
           label,

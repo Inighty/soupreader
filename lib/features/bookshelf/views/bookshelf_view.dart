@@ -2070,9 +2070,6 @@ class _BookshelfViewState extends State<BookshelfView> {
                     .resolveFrom(context)
                     .withValues(alpha: 0.96),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: CupertinoColors.separator.resolveFrom(context),
-                ),
               ),
               child: Text(
                 message,
@@ -2569,10 +2566,6 @@ class _BookshelfViewState extends State<BookshelfView> {
     return BoxDecoration(
       color: uiTokens.colors.card,
       borderRadius: BorderRadius.circular(uiTokens.radii.card),
-      border: Border.all(
-        color: uiTokens.colors.separator,
-        width: AppDesignTokens.hairlineBorderWidth,
-      ),
     );
   }
 

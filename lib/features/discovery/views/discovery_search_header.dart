@@ -74,10 +74,6 @@ class DiscoverySearchHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: shell.background,
         borderRadius: BorderRadius.circular(_shellRadius),
-        border: Border.all(
-          color: shell.border,
-          width: AppDesignTokens.hairlineBorderWidth,
-        ),
         boxShadow: [
           BoxShadow(
             color: shell.shadow,

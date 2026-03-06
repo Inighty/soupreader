@@ -1198,8 +1198,6 @@ class _DictRuleImportCandidateTile extends StatelessWidget {
       onPressed: onTap,
       child: AppCard(
         backgroundColor: backgroundColor,
-        borderColor: CupertinoColors.separator.resolveFrom(context),
-        borderWidth: 0.5,
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Row(
           children: [

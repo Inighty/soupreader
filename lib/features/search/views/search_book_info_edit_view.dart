@@ -102,15 +102,10 @@ class _SearchBookInfoEditViewState extends State<SearchBookInfoEditView> {
   Widget _buildFormContainer({required Widget child}) {
     final cardColor =
         CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
-    final borderColor = CupertinoColors.separator.resolveFrom(context);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: borderColor,
-          width: 0.6,
-        ),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),

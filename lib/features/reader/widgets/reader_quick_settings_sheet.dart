@@ -286,7 +286,6 @@ class _Section extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final cardColor = ReaderSettingsTokens.sectionBackground(isDark: isDark);
-    final borderColor = ReaderSettingsTokens.sectionBorder(isDark: isDark);
     final titleColor = ReaderSettingsTokens.titleColor(isDark: isDark);
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
@@ -294,7 +293,6 @@ class _Section extends StatelessWidget {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(ReaderSettingsTokens.sectionRadius),
-        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -524,9 +522,6 @@ class _MarginPresetRow extends StatelessWidget {
     final chipBg = isDark
         ? CupertinoColors.white.withValues(alpha: 0.1)
         : AppDesignTokens.surfaceLight.withValues(alpha: 0.92);
-    final chipBorder = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.12)
-        : AppDesignTokens.borderLight;
     final textNormal = isDark
         ? CupertinoColors.white.withValues(alpha: 0.7)
         : AppDesignTokens.textNormal;
@@ -541,9 +536,6 @@ class _MarginPresetRow extends StatelessWidget {
                 ? accent.withValues(alpha: isDark ? 0.18 : 0.12)
                 : chipBg,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: selected ? accent : chipBorder,
-            ),
           ),
           child: Text(
             label,
@@ -1069,13 +1061,9 @@ class _ModeChip extends StatelessWidget {
     final bgNormal = isDark
         ? CupertinoColors.white.withValues(alpha: 0.1)
         : AppDesignTokens.surfaceLight.withValues(alpha: 0.92);
-    final borderNormal = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.12)
-        : AppDesignTokens.borderLight;
     final textNormal = ReaderSettingsTokens.rowMetaColor(isDark: isDark);
     final baseColor =
         selected ? accent.withValues(alpha: isDark ? 0.18 : 0.12) : bgNormal;
-    final borderColor = selected ? accent : borderNormal;
     final textColor = selected ? accent : textNormal;
     final opacity = disabled ? 0.45 : 1.0;
     return Opacity(
@@ -1087,7 +1075,6 @@ class _ModeChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: baseColor,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: borderColor),
           ),
           child: Text(
             label,

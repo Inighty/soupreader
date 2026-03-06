@@ -309,7 +309,6 @@ class _SearchBookCoverChangeViewState extends State<SearchBookCoverChangeView> {
     final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
     final cardColor =
         CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
-    final cardBorderColor = CupertinoColors.separator.resolveFrom(context);
     final cardTextColor = CupertinoColors.label.resolveFrom(context);
     final loadingColor = CupertinoColors.activeBlue.resolveFrom(context);
     final candidates = _displayCandidates;
@@ -353,9 +352,6 @@ class _SearchBookCoverChangeViewState extends State<SearchBookCoverChangeView> {
                     decoration: BoxDecoration(
                       color: cardColor,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: cardBorderColor,
-                      ),
                     ),
                     padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
                     child: Column(

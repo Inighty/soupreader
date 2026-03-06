@@ -90,7 +90,6 @@ class ExceptionLogDetailView extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: AppCard(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        borderColor: tokens.colors.separator.withValues(alpha: 0.72),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

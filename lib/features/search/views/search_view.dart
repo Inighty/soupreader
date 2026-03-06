@@ -1154,8 +1154,6 @@ class _SearchViewState extends State<SearchView> {
   Widget _buildFloatingSettingsButton() {
     const buttonSize = 40.0;
     const iconSize = 18.0;
-    const borderWidth = 1.0;
-    const borderAlpha = 0.45;
     const shadowAlpha = 0.10;
     const shadowBlur = 14.0;
     const shadowOffset = Offset(0, 8);
@@ -1174,10 +1172,6 @@ class _SearchViewState extends State<SearchView> {
         decoration: BoxDecoration(
           color: bg,
           shape: BoxShape.circle,
-          border: Border.all(
-            color: uiTokens.colors.accent.withValues(alpha: borderAlpha),
-            width: borderWidth,
-          ),
           boxShadow: [
             BoxShadow(
               color: shadow,
@@ -1315,8 +1309,6 @@ class _SearchViewState extends State<SearchView> {
     final uiTokens = AppUiTokens.resolve(context);
     return AppCard(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-      borderColor: uiTokens.colors.separator.withValues(alpha: 0.72),
-      borderWidth: 0.8,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1385,8 +1377,6 @@ class _SearchViewState extends State<SearchView> {
 
     return AppCard(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-      borderColor: uiTokens.colors.separator.withValues(alpha: 0.72),
-      borderWidth: 0.8,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1484,10 +1474,6 @@ class _SearchViewState extends State<SearchView> {
           decoration: BoxDecoration(
             color: uiTokens.colors.card,
             borderRadius: BorderRadius.circular(uiTokens.radii.control),
-            border: Border.all(
-              color: uiTokens.colors.separator.withValues(alpha: 0.72),
-              width: 0.8,
-            ),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,

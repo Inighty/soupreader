@@ -12,7 +12,6 @@ extension _SpeakEngineManageUi on _SpeakEngineManageViewState {
         _buildSectionHeader(tokens, '系统引擎'),
         AppCard(
           padding: EdgeInsets.zero,
-          borderColor: tokens.colors.separator.withValues(alpha: 0.72),
           child: const AppListTile(
             title: Text('系统默认'),
             subtitle: Text('跟随设备 TTS 设置'),
@@ -42,7 +41,6 @@ extension _SpeakEngineManageUi on _SpeakEngineManageViewState {
         _buildSectionHeader(tokens, 'HTTP 朗读引擎'),
         AppCard(
           padding: EdgeInsets.zero,
-          borderColor: tokens.colors.separator.withValues(alpha: 0.72),
           child: Column(
             children: [
               for (var i = 0; i < _rules.length; i++) ...[
@@ -119,8 +117,6 @@ class _ImportCandidateTile extends StatelessWidget {
         backgroundColor: selected
             ? CupertinoColors.systemGrey5.resolveFrom(context)
             : CupertinoColors.systemBackground.resolveFrom(context),
-        borderColor: CupertinoColors.separator.resolveFrom(context),
-        borderWidth: 0.5,
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Row(
           children: [

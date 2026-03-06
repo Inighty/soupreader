@@ -1329,7 +1329,6 @@ class _TxtTocRuleListTile extends StatelessWidget {
     final cardColor = selected
         ? CupertinoColors.systemGrey6.resolveFrom(context)
         : CupertinoColors.systemBackground.resolveFrom(context);
-    final borderColor = CupertinoColors.systemGrey4.resolveFrom(context);
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
     return GestureDetector(
       onTap: onTap,
@@ -1338,7 +1337,6 @@ class _TxtTocRuleListTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderColor, width: 0.5),
         ),
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Column(
@@ -1430,9 +1428,6 @@ class _TxtTocRuleImportCandidateTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final backgroundColor = CupertinoColors.systemGrey6.resolveFrom(context);
-    final borderColor = selected
-        ? CupertinoTheme.of(context).primaryColor.withValues(alpha: 0.45)
-        : CupertinoColors.systemGrey4.resolveFrom(context);
     final state = _buildStateText(candidate.state);
     return GestureDetector(
       onTap: onTap,
@@ -1440,7 +1435,6 @@ class _TxtTocRuleImportCandidateTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: borderColor, width: 0.8),
         ),
         padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
         child: Row(

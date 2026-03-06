@@ -1514,7 +1514,6 @@ class _SelectionSummaryBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = CupertinoColors.separator.resolveFrom(context);
     final bgColor =
         CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
     final textColor = CupertinoColors.secondaryLabel.resolveFrom(context);
@@ -1525,7 +1524,6 @@ class _SelectionSummaryBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1843,10 +1841,6 @@ class _BookshelfManageSourcePickerViewState
                                 .secondarySystemGroupedBackground
                                 .resolveFrom(context),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: CupertinoColors.separator
-                                  .resolveFrom(context),
-                            ),
                           ),
                           child: Row(
                             children: [

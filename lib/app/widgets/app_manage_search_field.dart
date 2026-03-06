@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 
-import '../theme/design_tokens.dart';
 import '../theme/ui_tokens.dart';
 
 class AppManageSearchField extends StatelessWidget {
@@ -66,10 +65,6 @@ class AppManageSearchField extends StatelessWidget {
         decoration: BoxDecoration(
           color: style.background,
           borderRadius: BorderRadius.circular(ui.radii.control),
-          border: Border.all(
-            color: style.border,
-            width: AppDesignTokens.hairlineBorderWidth,
-          ),
         ),
         child: _buildInputField(baseStyle, ui, iconColor),
       ),

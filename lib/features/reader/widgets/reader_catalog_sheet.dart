@@ -805,17 +805,12 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                 const BoxConstraints(minHeight: _chapterListItemExtent),
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
             margin: const EdgeInsets.only(bottom: 4),
-            decoration: BoxDecoration(
-              color: isCurrent
-                  ? _accent.withValues(alpha: _isDark ? 0.12 : 0.1)
-                  : const Color(0x00000000),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isCurrent
-                    ? _accent.withValues(alpha: _isDark ? 0.35 : 0.24)
-                    : const Color(0x00000000),
-              ),
-            ),
+            decoration: isCurrent
+                ? BoxDecoration(
+                    color: _accent.withValues(alpha: _isDark ? 0.12 : 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  )
+                : null,
             child: Row(
               children: [
                 SizedBox(

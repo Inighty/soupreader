@@ -618,10 +618,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
                     .resolveFrom(context)
                     .withValues(alpha: 0.96),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: CupertinoColors.separator.resolveFrom(context),
                 ),
-              ),
               child: Text(
                 message,
                 style: TextStyle(

@@ -308,10 +308,6 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
               decoration: BoxDecoration(
                 color: CupertinoColors.systemBackground.resolveFrom(context),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: CupertinoColors.separator.resolveFrom(context),
-                  width: 0.6,
-                ),
               ),
               child: Text(
                 message,
