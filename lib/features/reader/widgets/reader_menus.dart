@@ -96,24 +96,18 @@ class ReaderTopMenu extends StatelessWidget {
     Widget panel = Container(
         key: _readerTopMenuPanelKey,
         padding: EdgeInsets.only(
-          top: mediaQuery.padding.top + 7,
+          top: mediaQuery.padding.top + 10,
           left: horizontalPadding,
           right: horizontalPadding,
-          bottom: 9,
+          bottom: 12,
         ),
         decoration: BoxDecoration(
           color: style.panelBackground,
-          border: Border(
-            bottom: BorderSide(
-              color: style.borderColor,
-              width: 0.9,
-            ),
-          ),
           boxShadow: [
             BoxShadow(
               color: style.shadowColor,
-              blurRadius: 14,
-              offset: const Offset(0, 4),
+              blurRadius: 20,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -332,16 +326,16 @@ class ReaderTopMenu extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onLongPress: onLongPress,
         child: Container(
-          width: 34,
-          height: 34,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             color: backgroundColor,
-            borderRadius: BorderRadius.circular(17),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(
             icon,
             color: iconColor,
-            size: 17,
+            size: 18,
           ),
         ),
       ),

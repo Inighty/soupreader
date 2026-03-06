@@ -113,14 +113,11 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
       key: _bottomMenuPanelKey,
       decoration: BoxDecoration(
         color: style.panelBackground,
-        border: Border(
-          top: BorderSide(color: style.borderColor),
-        ),
         boxShadow: [
           BoxShadow(
             color: style.shadowColor,
-            blurRadius: 14,
-            offset: const Offset(0, -4),
+            blurRadius: 24,
+            offset: const Offset(0, -2),
           ),
         ],
       ),
@@ -135,13 +132,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             foreground: style.primaryText,
             mutedForeground: style.secondaryText,
           ),
-          const SizedBox(height: 3),
-          Container(
-            height: 0.9,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            color: style.dividerColor,
-          ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           _buildBottomTabs(foreground: style.primaryText),
         ],
       ),
@@ -204,11 +195,11 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     final canNext = widget.currentChapterIndex < widget.totalChapters - 1;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 5, 18, 6),
+      padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
       child: Row(
         children: [
-          _buildChapterTextButton(
-            label: '上一章',
+          _buildChapterNavButton(
+            icon: CupertinoIcons.chevron_left,
             enabled: canPrev,
             color: canPrev ? foreground : mutedForeground,
             onTap: canPrev
@@ -217,7 +208,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
           ),
           Expanded(
             child: SizedBox(
-              height: 25,
+              height: 28,
               child: CupertinoSlider(
                 value: sliderValue,
                 min: 0,
@@ -249,8 +240,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
               ),
             ),
           ),
-          _buildChapterTextButton(
-            label: '下一章',
+          _buildChapterNavButton(
+            icon: CupertinoIcons.chevron_right,
             enabled: canNext,
             color: canNext ? foreground : mutedForeground,
             onTap: canNext
@@ -262,23 +253,20 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     );
   }
 
-  Widget _buildChapterTextButton({
-    required String label,
+  Widget _buildChapterNavButton({
+    required IconData icon,
     required bool enabled,
     required Color color,
     required VoidCallback? onTap,
   }) {
     return CupertinoButton(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       minimumSize: Size.zero,
       onPressed: onTap,
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 13.5,
-          color: color,
-          fontWeight: enabled ? FontWeight.w600 : FontWeight.w400,
-        ),
+      child: Icon(
+        icon,
+        size: 20,
+        color: color,
       ),
     );
   }
@@ -447,7 +435,7 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         : AppDesignTokens.brandPrimary;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 0, top: 0),
+      padding: const EdgeInsets.only(bottom: 2, top: 2),
       child: Row(
         children: [
           const Spacer(),

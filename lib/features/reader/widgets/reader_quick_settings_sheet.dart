@@ -287,27 +287,31 @@ class _Section extends StatelessWidget {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final cardColor = ReaderSettingsTokens.sectionBackground(isDark: isDark);
     final titleColor = ReaderSettingsTokens.titleColor(isDark: isDark);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(ReaderSettingsTokens.sectionRadius),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+          child: Text(
+            title.toUpperCase(),
             style: TextStyle(
               color: titleColor,
-              fontSize: ReaderSettingsTokens.sectionTitleSize,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
             ),
           ),
-          const SizedBox(height: 10),
-          child,
-        ],
-      ),
+        ),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(ReaderSettingsTokens.sectionRadius),
+          ),
+          child: child,
+        ),
+      ],
     );
   }
 }
