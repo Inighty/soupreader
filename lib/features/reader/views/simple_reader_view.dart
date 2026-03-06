@@ -8276,23 +8276,27 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
           top: false,
           child: Align(
             alignment: Alignment.bottomCenter,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 28),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemBackground
-                    .resolveFrom(context)
-                    .withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: CupertinoColors.separator.resolveFrom(context),
-                ),
-              ),
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: CupertinoColors.label.resolveFrom(context),
-                  fontSize: 13,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 28),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.systemBackground
+                        .resolveFrom(context)
+                        .withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    message,
+                    style: TextStyle(
+                      color: CupertinoColors.label.resolveFrom(context),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -16815,23 +16819,27 @@ class _ReaderContentEditorPageState extends State<_ReaderContentEditorPage> {
           top: false,
           child: Align(
             alignment: Alignment.bottomCenter,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 28),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: CupertinoColors.systemBackground
-                    .resolveFrom(context)
-                    .withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: CupertinoColors.separator.resolveFrom(context),
-                ),
-              ),
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: CupertinoColors.label.resolveFrom(context),
-                  fontSize: 13,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 28),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.systemBackground
+                        .resolveFrom(context)
+                        .withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    message,
+                    style: TextStyle(
+                      color: CupertinoColors.label.resolveFrom(context),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ),
             ),
