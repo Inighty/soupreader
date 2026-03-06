@@ -218,21 +218,21 @@ class ReaderThemeTokens {
 class ReaderSettingsTokens {
   ReaderSettingsTokens._();
 
-  static const double sectionRadius = 14;
-  static const double sectionTitleSize = 13;
-  static const double rowTitleSize = 14;
+  static const double sectionRadius = 10;
+  static const double sectionTitleSize = 12;
+  static const double rowTitleSize = 15;
   static const double rowMetaSize = 12;
 
   static Color sheetBackground({required bool isDark}) {
     return isDark
-        ? const Color(0xFF1B1D21)
-        : AppDesignTokens.surfaceLight.withValues(alpha: 0.98);
+        ? const Color(0xFF1C1C1E) // iOS systemBackground dark
+        : const Color(0xFFF2F2F7); // iOS systemGroupedBackground light
   }
 
   static Color sectionBackground({required bool isDark}) {
     return isDark
-        ? CupertinoColors.white.withValues(alpha: 0.1)
-        : AppDesignTokens.surfaceLight.withValues(alpha: 0.9);
+        ? const Color(0xFF2C2C2E) // iOS secondarySystemBackground dark
+        : CupertinoColors.white;
   }
 
   static Color sectionBorder({required bool isDark}) {
