@@ -63,7 +63,7 @@ class RemoteBooksSelectActionBar extends StatelessWidget {
           color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
           border: Border(
             top: BorderSide(
-              color: CupertinoColors.systemGrey4.resolveFrom(context),
+              color: CupertinoColors.separator.resolveFrom(context),
               width: 0.5,
             ),
           ),

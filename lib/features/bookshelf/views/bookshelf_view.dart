@@ -2115,10 +2115,6 @@ class _BookshelfViewState extends State<BookshelfView> {
           decoration: BoxDecoration(
             color: CupertinoColors.systemRed.resolveFrom(context),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: CupertinoColors.white.withValues(alpha: 0.28),
-              width: AppDesignTokens.hairlineBorderWidth,
-            ),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -2424,13 +2420,6 @@ class _BookshelfViewState extends State<BookshelfView> {
                 decoration: BoxDecoration(
                   color: AppUiTokens.resolve(context).colors.card,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: AppUiTokens.resolve(context)
-                        .colors
-                        .separator
-                        .withValues(alpha: 0.72),
-                    width: 0.8,
-                  ),
                 ),
                 child: AppCoverImage(
                   urlOrPath: group.cover,
@@ -2483,13 +2472,6 @@ class _BookshelfViewState extends State<BookshelfView> {
                       decoration: BoxDecoration(
                         color: AppUiTokens.resolve(context).colors.card,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: AppUiTokens.resolve(context)
-                              .colors
-                              .separator
-                              .withValues(alpha: 0.72),
-                          width: 0.8,
-                        ),
                       ),
                       child: AppCoverImage(
                         urlOrPath: book.coverUrl,
