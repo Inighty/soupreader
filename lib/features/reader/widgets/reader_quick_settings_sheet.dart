@@ -688,30 +688,27 @@ class _InterfaceTab extends StatelessWidget {
         ),
         _Section(
           title: '页眉页脚',
-          child: Column(
-            children: [
-              _SwitchRow(
+          child: _SwitchGroup(
+            rows: [
+              _SwitchRowData(
                 label: '隐藏页眉',
                 value: settings.hideHeader,
                 onChanged: (v) =>
                     onSettingsChanged(settings.copyWith(hideHeader: v)),
               ),
-              const SizedBox(height: 8),
-              _SwitchRow(
+              _SwitchRowData(
                 label: '隐藏页脚',
                 value: settings.hideFooter,
                 onChanged: (v) =>
                     onSettingsChanged(settings.copyWith(hideFooter: v)),
               ),
-              const SizedBox(height: 8),
-              _SwitchRow(
+              _SwitchRowData(
                 label: '页眉分割线',
                 value: settings.showHeaderLine,
                 onChanged: (v) =>
                     onSettingsChanged(settings.copyWith(showHeaderLine: v)),
               ),
-              const SizedBox(height: 8),
-              _SwitchRow(
+              _SwitchRowData(
                 label: '页脚分割线',
                 value: settings.showFooterLine,
                 onChanged: (v) =>
@@ -742,22 +739,28 @@ class _SwitchRow extends StatelessWidget {
     final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
     final labelColor = ReaderSettingsTokens.rowTitleColor(isDark: isDark);
     final activeTrackColor = ReaderSettingsTokens.accent(isDark: isDark);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: labelColor,
-            fontSize: ReaderSettingsTokens.rowTitleSize,
+    return SizedBox(
+      height: 44,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: labelColor,
+              fontSize: ReaderSettingsTokens.rowTitleSize,
+            ),
           ),
-        ),
-        CupertinoSwitch(
-          value: value,
-          onChanged: onChanged,
-          activeTrackColor: activeTrackColor,
-        ),
-      ],
+          Transform.scale(
+            scale: 0.85,
+            child: CupertinoSwitch(
+              value: value,
+              onChanged: onChanged,
+              activeTrackColor: activeTrackColor,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -841,31 +844,32 @@ class _MoreTab extends StatelessWidget {
           title: '其他',
           child: Column(
             children: [
-              _SwitchRow(
-                label: '屏幕常亮',
-                value: settings.keepScreenOn,
-                onChanged: (v) => onSettingsChanged(
-                  settings.copyWith(keepScreenOn: v),
-                ),
+              _SwitchGroup(
+                rows: [
+                  _SwitchRowData(
+                    label: '屏幕常亮',
+                    value: settings.keepScreenOn,
+                    onChanged: (v) => onSettingsChanged(
+                      settings.copyWith(keepScreenOn: v),
+                    ),
+                  ),
+                  _SwitchRowData(
+                    label: '净化章节标题',
+                    value: settings.cleanChapterTitle,
+                    onChanged: (v) => onSettingsChanged(
+                      settings.copyWith(cleanChapterTitle: v),
+                    ),
+                  ),
+                  if (_supportsVolumeKeyPaging)
+                    _SwitchRowData(
+                      label: '音量键翻页',
+                      value: settings.volumeKeyPage,
+                      onChanged: (v) =>
+                          onSettingsChanged(settings.copyWith(volumeKeyPage: v)),
+                    ),
+                ],
               ),
-              const SizedBox(height: 8),
-              _SwitchRow(
-                label: '净化章节标题',
-                value: settings.cleanChapterTitle,
-                onChanged: (v) => onSettingsChanged(
-                  settings.copyWith(cleanChapterTitle: v),
-                ),
-              ),
-              if (_supportsVolumeKeyPaging) ...[
-                const SizedBox(height: 8),
-                _SwitchRow(
-                  label: '音量键翻页',
-                  value: settings.volumeKeyPage,
-                  onChanged: (v) =>
-                      onSettingsChanged(settings.copyWith(volumeKeyPage: v)),
-                ),
-              ],
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               _ChineseConverterTypeRow(
                 currentType: settings.chineseConverterType,
                 onChanged: (value) => onSettingsChanged(
@@ -1136,6 +1140,69 @@ class _ModeChip extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SwitchRowData {
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SwitchRowData({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+}
+
+class _SwitchGroup extends StatelessWidget {
+  final List<_SwitchRowData> rows;
+
+  const _SwitchGroup({required this.rows});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
+    final dividerColor = isDark
+        ? CupertinoColors.separator.darkColor
+        : CupertinoColors.separator.color;
+    final activeTrackColor = ReaderSettingsTokens.accent(isDark: isDark);
+    final labelColor = ReaderSettingsTokens.rowTitleColor(isDark: isDark);
+
+    return Column(
+      children: [
+        for (int i = 0; i < rows.length; i++) ...[
+          SizedBox(
+            height: 44,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  rows[i].label,
+                  style: TextStyle(
+                    color: labelColor,
+                    fontSize: ReaderSettingsTokens.rowTitleSize,
+                  ),
+                ),
+                Transform.scale(
+                  scale: 0.85,
+                  child: CupertinoSwitch(
+                    value: rows[i].value,
+                    onChanged: rows[i].onChanged,
+                    activeTrackColor: activeTrackColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (i < rows.length - 1)
+            Container(
+              height: 0.5,
+              color: dividerColor,
+            ),
+        ],
+      ],
     );
   }
 }
