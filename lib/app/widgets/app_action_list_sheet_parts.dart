@@ -23,26 +23,22 @@ class _SheetHandle extends StatelessWidget {
 class _SheetCard extends StatelessWidget {
   final Widget child;
   final Color backgroundColor;
-  final Color borderColor;
   final double radius;
 
   const _SheetCard({
     required this.child,
     required this.backgroundColor,
-    required this.borderColor,
     required this.radius,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AppSquircleSurface(
-      padding: EdgeInsets.zero,
-      backgroundColor: backgroundColor,
-      borderColor: borderColor,
-      borderWidth: AppDesignTokens.hairlineBorderWidth,
-      radius: radius,
-      blurBackground: true,
-      child: child,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: ColoredBox(
+        color: backgroundColor,
+        child: child,
+      ),
     );
   }
 }

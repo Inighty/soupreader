@@ -38,14 +38,10 @@ class SourceConsistentCard extends StatelessWidget {
     final background = backgroundColor ??
         SourceUiTokens.resolveCardBackgroundColor(context).withValues(
             alpha: isDark ? _kDarkSurfaceAlpha : _kLightSurfaceAlpha);
-    final border =
-        (borderColor ?? SourceUiTokens.resolveSeparatorColor(context))
-            .withValues(alpha: SourceUiTokens.discoveryExpandedCardBorderAlpha);
     final shadow = (isDark ? CupertinoColors.black : const Color(0xFF0A2A5E))
         .withValues(alpha: isDark ? _kShadowDarkAlpha : _kShadowLightAlpha);
     return _SourceCardStyle(
       background: background,
-      border: border,
       shadow: shadow,
     );
   }
@@ -54,16 +50,16 @@ class SourceConsistentCard extends StatelessWidget {
     return AppSquircleSurface(
       padding: EdgeInsets.zero,
       backgroundColor: style.background,
-      borderColor: style.border,
-      borderWidth: SourceUiTokens.borderWidth,
+      borderColor: CupertinoColors.transparent,
+      borderWidth: 0,
       radius: SourceUiTokens.radiusCard,
-      blurBackground: true,
+      blurBackground: false,
       shadows: <BoxShadow>[
         BoxShadow(
           color: style.shadow,
-          offset: const Offset(0, 7),
-          blurRadius: 20,
-          spreadRadius: -11,
+          offset: const Offset(0, 2),
+          blurRadius: 8,
+          spreadRadius: -2,
         ),
       ],
       child: Padding(
@@ -79,11 +75,9 @@ class SourceConsistentCard extends StatelessWidget {
 class _SourceCardStyle {
   const _SourceCardStyle({
     required this.background,
-    required this.border,
     required this.shadow,
   });
 
   final Color background;
-  final Color border;
   final Color shadow;
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 
-import '../theme/design_tokens.dart';
 import '../theme/ui_tokens.dart';
 import 'app_squircle_surface.dart';
 
@@ -24,14 +23,14 @@ class AppGlassSheetPanel extends StatelessWidget {
     final ui = AppUiTokens.resolve(context);
     // 使用系统 secondarySystemBackground（浅色白色，深色深灰），与原生 sheet 一致。
     final background = ui.colors.surfaceBackground.withValues(alpha: _kBackgroundAlpha);
-    final border = ui.colors.separator;
     return AppSquircleSurface(
       padding: EdgeInsets.zero,
       backgroundColor: background,
-      borderColor: border,
-      borderWidth: AppDesignTokens.hairlineBorderWidth,
+      borderColor: CupertinoColors.transparent,
+      borderWidth: 0,
       radius: radius ?? ui.radii.sheet,
       blurBackground: true,
+      blurSigma: 40,
       child: Padding(
         padding: contentPadding,
         child: child,

@@ -31,9 +31,12 @@ class AppSquircleSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final side = borderWidth > 0
+        ? BorderSide(color: borderColor, width: borderWidth)
+        : BorderSide.none;
     final shape = ContinuousRectangleBorder(
       borderRadius: BorderRadius.all(Radius.circular(radius)),
-      side: BorderSide(color: borderColor, width: borderWidth),
+      side: side,
     );
     final decorated = DecoratedBox(
       decoration: ShapeDecoration(

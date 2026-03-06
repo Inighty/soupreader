@@ -90,8 +90,7 @@ class _OptionPickerBody<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ui = AppUiTokens.resolve(context);
-    final borderColor = ui.colors.separator.withValues(alpha: 0.78);
-    final cardColor = ui.colors.surfaceBackground.withValues(alpha: 0.9);
+    final cardColor = ui.colors.surfaceBackground;
 
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight),
@@ -102,7 +101,6 @@ class _OptionPickerBody<T> extends StatelessWidget {
           header,
           _OptionPickerCard(
             color: cardColor,
-            borderColor: borderColor,
             radius: ui.radii.card,
             child: AppListSection(
               margin: EdgeInsets.zero,
@@ -122,7 +120,6 @@ class _OptionPickerBody<T> extends StatelessWidget {
             const SizedBox(height: 10),
             _OptionPickerCard(
               color: cardColor,
-              borderColor: borderColor,
               radius: ui.radii.card,
               child: AppListSection(
                 margin: EdgeInsets.zero,
@@ -151,26 +148,22 @@ class _OptionPickerBody<T> extends StatelessWidget {
 class _OptionPickerCard extends StatelessWidget {
   final Widget child;
   final Color color;
-  final Color borderColor;
   final double radius;
 
   const _OptionPickerCard({
     required this.child,
     required this.color,
-    required this.borderColor,
     required this.radius,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AppSquircleSurface(
-      padding: EdgeInsets.zero,
-      backgroundColor: color,
-      borderColor: borderColor,
-      borderWidth: AppDesignTokens.hairlineBorderWidth,
-      radius: radius,
-      blurBackground: true,
-      child: child,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: ColoredBox(
+        color: color,
+        child: child,
+      ),
     );
   }
 }

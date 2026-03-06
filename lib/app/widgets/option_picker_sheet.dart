@@ -7,7 +7,6 @@ import '../theme/design_tokens.dart';
 import '../theme/ui_tokens.dart';
 import 'app_glass_sheet_panel.dart';
 import 'app_ui_kit.dart';
-import 'app_squircle_surface.dart';
 import 'cupertino_bottom_dialog.dart';
 
 part 'option_picker_sheet_parts.dart';

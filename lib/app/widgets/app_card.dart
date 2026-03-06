@@ -7,7 +7,6 @@ import 'app_squircle_surface.dart';
 class AppCard extends StatelessWidget {
   static const double _kDarkSurfaceAlpha = 0.86;
   static const double _kLightSurfaceAlpha = 0.88;
-  static const double _kBorderAlpha = 0.74;
   static const double _kShadowDarkAlpha = 0.22;
   static const double _kShadowLightAlpha = 0.08;
 
@@ -41,34 +40,33 @@ class AppCard extends StatelessWidget {
         tokens.colors.sectionBackground.withValues(
           alpha: isDark ? _kDarkSurfaceAlpha : _kLightSurfaceAlpha,
         );
-    final border = (borderColor ?? tokens.colors.separator)
-        .withValues(alpha: _kBorderAlpha);
     final shadow = (isDark ? CupertinoColors.black : const Color(0xFF042852))
         .withValues(alpha: isDark ? _kShadowDarkAlpha : _kShadowLightAlpha);
     return _AppCardStyle(
       background: background,
-      border: border,
       shadow: shadow,
     );
   }
 
   Widget _buildCard(AppUiTokens tokens, _AppCardStyle style) {
     final radius = borderRadius ?? tokens.radii.card;
-    final resolvedBorderWidth =
-        borderWidth <= 0 ? AppDesignTokens.hairlineBorderWidth : borderWidth;
+    final resolvedBorderColor = borderColor ?? CupertinoColors.transparent;
+    final resolvedBorderWidth = borderColor != null && borderWidth <= 0
+        ? AppDesignTokens.hairlineBorderWidth
+        : borderWidth;
     return AppSquircleSurface(
       padding: EdgeInsets.zero,
       backgroundColor: style.background,
-      borderColor: style.border,
+      borderColor: resolvedBorderColor,
       borderWidth: resolvedBorderWidth,
       radius: radius,
-      blurBackground: true,
+      blurBackground: false,
       shadows: <BoxShadow>[
         BoxShadow(
           color: style.shadow,
-          offset: const Offset(0, 8),
-          blurRadius: 24,
-          spreadRadius: -12,
+          offset: const Offset(0, 2),
+          blurRadius: 8,
+          spreadRadius: -2,
         ),
       ],
       child: Padding(
@@ -84,11 +82,9 @@ class AppCard extends StatelessWidget {
 class _AppCardStyle {
   const _AppCardStyle({
     required this.background,
-    required this.border,
     required this.shadow,
   });
 
   final Color background;
-  final Color border;
   final Color shadow;
 }

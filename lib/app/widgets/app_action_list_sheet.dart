@@ -3,10 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
-import '../theme/design_tokens.dart';
 import '../theme/ui_tokens.dart';
 import 'app_glass_sheet_panel.dart';
-import 'app_squircle_surface.dart';
 import 'cupertino_bottom_dialog.dart';
 
 part 'app_action_list_sheet_parts.dart';
@@ -163,11 +161,10 @@ class _AppActionListSheet<T> extends StatelessWidget {
   }) {
     final dividerColor = ui.colors.separator.withValues(alpha: 0.78);
     final cardRadius = ui.radii.card;
-    final cardBg = ui.colors.surfaceBackground.withValues(alpha: 0.9);
+    final cardBg = ui.colors.surfaceBackground;
     final children = <Widget>[
       _SheetCard(
         backgroundColor: cardBg,
-        borderColor: dividerColor,
         radius: cardRadius,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -188,7 +185,6 @@ class _AppActionListSheet<T> extends StatelessWidget {
           const SizedBox(height: 10),
           _SheetCard(
             backgroundColor: cardBg,
-            borderColor: dividerColor,
             radius: cardRadius,
             child: _CancelRow(
               height: _rowHeight,
