@@ -769,10 +769,15 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       return _buildEmptyTab(_searchQuery.trim().isNotEmpty ? '无匹配章节' : '暂无章节');
     }
 
-    return ListView.builder(
+    return ListView.separated(
       controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       itemCount: chapters.length,
+      separatorBuilder: (context, index) => Container(
+        height: 0.5,
+        margin: const EdgeInsets.only(left: 42),
+        color: _lineColor.withValues(alpha: 0.6),
+      ),
       itemBuilder: (context, index) {
         final chapter = chapters[index];
         final originalIndex = chapter.index;
@@ -790,7 +795,6 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
             constraints:
                 const BoxConstraints(minHeight: _chapterListItemExtent),
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-            margin: const EdgeInsets.only(bottom: 4),
             decoration: isCurrent
                 ? BoxDecoration(
                     color: _accent.withValues(alpha: _isDark ? 0.12 : 0.1),
