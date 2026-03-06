@@ -242,19 +242,22 @@ class ReaderSettingsTokens {
   }
 
   static Color titleColor({required bool isDark}) {
+    // iOS secondaryLabel
     return isDark
-        ? CupertinoColors.white.withValues(alpha: 0.64)
-        : AppDesignTokens.textMuted;
+        ? const Color(0xFF8E8E93)
+        : const Color(0xFF6C6C70);
   }
 
   static Color rowTitleColor({required bool isDark}) {
-    return isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+    // iOS label
+    return isDark ? CupertinoColors.white : const Color(0xFF1C1C1E);
   }
 
   static Color rowMetaColor({required bool isDark}) {
+    // iOS secondaryLabel
     return isDark
-        ? CupertinoColors.white.withValues(alpha: 0.72)
-        : AppDesignTokens.textNormal;
+        ? const Color(0xFF8E8E93)
+        : const Color(0xFF6C6C70);
   }
 
   static Color accent({required bool isDark}) {
