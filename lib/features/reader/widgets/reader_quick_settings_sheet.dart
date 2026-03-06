@@ -737,48 +737,6 @@ class _InterfaceTab extends StatelessWidget {
   }
 }
 
-class _SwitchRow extends StatelessWidget {
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  const _SwitchRow({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final labelColor = ReaderSettingsTokens.rowTitleColor(isDark: isDark);
-    final activeTrackColor = ReaderSettingsTokens.accent(isDark: isDark);
-    return SizedBox(
-      height: 44,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: labelColor,
-              fontSize: ReaderSettingsTokens.rowTitleSize,
-            ),
-          ),
-          Transform.scale(
-            scale: 0.85,
-            child: CupertinoSwitch(
-              value: value,
-              onChanged: onChanged,
-              activeTrackColor: activeTrackColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ChineseConverterTypeRow extends StatelessWidget {
   final int currentType;
   final ValueChanged<int> onChanged;
