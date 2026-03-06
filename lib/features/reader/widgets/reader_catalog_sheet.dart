@@ -397,10 +397,10 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
+      height: MediaQuery.of(context).size.height * 0.88,
       decoration: BoxDecoration(
         color: _panelBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         top: false,
@@ -423,12 +423,12 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         : const Color(0x1F000000);
     return Center(
       child: Container(
-        margin: const EdgeInsets.only(top: 8),
+        margin: const EdgeInsets.only(top: 10, bottom: 2),
         width: 36,
-        height: 4,
+        height: 5,
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(2),
+          borderRadius: BorderRadius.circular(2.5),
         ),
       ),
     );
@@ -488,13 +488,10 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     final chapterCount = _chapters.length;
     final bookmarkCount = _bookmarks.length;
 
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: _lineColor),
-        ),
-      ),
-      child: Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
         children: [
           _buildTab(0, '目录', count: chapterCount),
           _buildTab(1, '书签', count: bookmarkCount),
@@ -534,6 +531,8 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
           ),
         ],
       ),
+        Container(height: 0.5, color: _lineColor),
+      ],
     );
   }
 
@@ -580,42 +579,25 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     final placeholder = _selectedTab == 0 ? '输入关键字搜索目录' : '搜索书签';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Column(
         children: [
           Row(
             children: [
               Expanded(
-                child: Container(
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: _cardMutedBg,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: CupertinoTextField(
-                    controller: _searchController,
-                    placeholder: placeholder,
-                    placeholderStyle:
-                        TextStyle(color: _textSubtle, fontSize: 13),
-                    style: TextStyle(color: _textStrong, fontSize: 13),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: null,
-                    prefix: Padding(
-                      padding: EdgeInsets.only(left: 8),
-                      child: Icon(
-                        CupertinoIcons.search,
-                        size: 16,
-                        color: _textSubtle,
-                      ),
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                        _resetAutoScrollState();
-                      });
-                      _scheduleScrollToCurrentChapter();
-                    },
-                  ),
+                child: CupertinoSearchTextField(
+                  controller: _searchController,
+                  placeholder: placeholder,
+                  style: TextStyle(color: _textStrong, fontSize: 14),
+                  backgroundColor: _cardMutedBg,
+                  borderRadius: BorderRadius.circular(10),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                      _resetAutoScrollState();
+                    });
+                    _scheduleScrollToCurrentChapter();
+                  },
                 ),
               ),
               if (showSort) ...[
