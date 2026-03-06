@@ -527,15 +527,21 @@ class _MarginPresetRow extends StatelessWidget {
         : AppDesignTokens.textNormal;
     Widget chip(String label, _MarginPreset v) {
       final selected = preset == v;
-      return GestureDetector(
-        onTap: () => onSettingsChanged(_apply(v)),
-        child: Container(
+      return CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        onPressed: () => onSettingsChanged(_apply(v)),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: selected
                 ? accent.withValues(alpha: isDark ? 0.18 : 0.12)
                 : chipBg,
             borderRadius: BorderRadius.circular(10),
+            border: selected
+                ? Border.all(color: accent.withValues(alpha: 0.5), width: 1.5)
+                : null,
           ),
           child: Text(
             label,
@@ -944,27 +950,61 @@ class _ThemeCell extends StatelessWidget {
     final accent = ReaderSettingsTokens.accent(isDark: isDark);
     final borderColor =
         selected ? accent : ReaderSettingsTokens.sectionBorder(isDark: isDark);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
           color: theme.background,
           borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-          border: Border.all(color: borderColor, width: selected ? 1.4 : 1),
+          border: Border.all(color: borderColor, width: selected ? 2.0 : 0.5),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.25),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         padding: const EdgeInsets.all(8),
-        child: Align(
-          alignment: Alignment.bottomLeft,
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: theme.text.withValues(alpha: 0.9),
-              fontSize: 11,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        child: Stack(
+          children: [
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: theme.text.withValues(alpha: 0.9),
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
             ),
-          ),
+            if (selected)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    CupertinoIcons.checkmark,
+                    color: CupertinoColors.white,
+                    size: 10,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -1068,13 +1108,20 @@ class _ModeChip extends StatelessWidget {
     final opacity = disabled ? 0.45 : 1.0;
     return Opacity(
       opacity: opacity,
-      child: GestureDetector(
-        onTap: disabled ? null : onTap,
-        child: Container(
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        onPressed: disabled ? null : onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: baseColor,
             borderRadius: BorderRadius.circular(10),
+            border: selected
+                ? Border.all(
+                    color: accent.withValues(alpha: 0.5), width: 1.5)
+                : null,
           ),
           child: Text(
             label,

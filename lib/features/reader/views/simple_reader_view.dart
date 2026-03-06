@@ -149,7 +149,8 @@ class SimpleReaderView extends StatefulWidget {
   State<SimpleReaderView> createState() => _SimpleReaderViewState();
 }
 
-class _SimpleReaderViewState extends State<SimpleReaderView> {
+class _SimpleReaderViewState extends State<SimpleReaderView>
+    with TickerProviderStateMixin {
   late final ChapterRepository _chapterRepo;
   late final BookRepository _bookRepo;
   late final SourceRepository _sourceRepo;
@@ -185,6 +186,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   // UI 状态
   bool _showMenu = false;
   bool _showSearchMenu = false;
+
+  // 菜单动画
+  late final AnimationController _menuAnimController;
+  late final Animation<double> _menuFadeAnim;
+  late final Animation<Offset> _topMenuSlideAnim;
+  late final Animation<Offset> _bottomMenuSlideAnim;
+  late final Animation<Offset> _railSlideAnim;
+
+  // 搜索菜单动画
+  late final AnimationController _searchMenuAnimController;
+  late final Animation<double> _searchMenuFadeAnim;
+  late final Animation<Offset> _searchMenuSlideAnim;
   ReaderSystemUiConfig? _appliedSystemUiConfig;
   List<DeviceOrientation>? _appliedPreferredOrientations;
   final ScrollController _scrollController = ScrollController();
@@ -502,6 +515,56 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
   @override
   void initState() {
     super.initState();
+    _menuAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _menuFadeAnim = CurvedAnimation(
+      parent: _menuAnimController,
+      curve: Curves.easeOut,
+      reverseCurve: Curves.easeIn,
+    );
+    _topMenuSlideAnim = Tween<Offset>(
+      begin: const Offset(0, -1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _menuAnimController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    ));
+    _bottomMenuSlideAnim = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _menuAnimController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    ));
+    _railSlideAnim = Tween<Offset>(
+      begin: const Offset(1, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _menuAnimController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    ));
+    _searchMenuAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+    _searchMenuFadeAnim = CurvedAnimation(
+      parent: _searchMenuAnimController,
+      curve: Curves.easeOut,
+      reverseCurve: Curves.easeIn,
+    );
+    _searchMenuSlideAnim = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _searchMenuAnimController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    ));
     final db = DatabaseService();
     _chapterRepo = ChapterRepository(db);
     _bookRepo = BookRepository(db);
@@ -739,6 +802,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
 
   @override
   void dispose() {
+    _menuAnimController.dispose();
+    _searchMenuAnimController.dispose();
     _stopSourceSwitchCandidateSearch();
     _settingsService.readingSettingsListenable
         .removeListener(_handleReadingSettingsChanged);
@@ -815,13 +880,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       }
       return;
     }
-    setState(() {
-      _showMenu = visible;
-      if (visible) {
+    if (visible) {
+      setState(() {
+        _showMenu = true;
         _showSearchMenu = false;
         _showAutoReadPanel = false;
-      }
-    });
+      });
+      _menuAnimController.forward();
+    } else {
+      _menuAnimController.reverse().then((_) {
+        if (mounted) setState(() => _showMenu = false);
+      });
+    }
     _syncSystemUiForOverlay();
     if (!visible) {
       _requestReaderKeyboardFocus();
@@ -836,13 +906,18 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
       }
       return;
     }
-    setState(() {
-      _showSearchMenu = visible;
-      if (visible) {
+    if (visible) {
+      setState(() {
+        _showSearchMenu = true;
         _showMenu = false;
         _showAutoReadPanel = false;
-      }
-    });
+      });
+      _searchMenuAnimController.forward();
+    } else {
+      _searchMenuAnimController.reverse().then((_) {
+        if (mounted) setState(() => _showSearchMenu = false);
+      });
+    }
     _syncSystemUiForOverlay();
     if (!visible) {
       _requestReaderKeyboardFocus();
@@ -4764,14 +4839,19 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                     // 菜单打开时添加轻遮罩，提升层级感并支持点击空白关闭。
                     if (_showMenu || _showSearchMenu)
                       Positioned.fill(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: _showSearchMenu
-                              ? () => _setSearchMenuVisible(false)
-                              : _closeReaderMenuOverlay,
-                          child: Container(
-                            color:
-                                const Color(0xFF000000).withValues(alpha: 0.14),
+                        child: FadeTransition(
+                          opacity: _showMenu
+                              ? _menuFadeAnim
+                              : const AlwaysStoppedAnimation(1.0),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: _showSearchMenu
+                                ? () => _setSearchMenuVisible(false)
+                                : _closeReaderMenuOverlay,
+                            child: Container(
+                              color: const Color(0xFF000000)
+                                  .withValues(alpha: 0.14),
+                            ),
                           ),
                         ),
                       ),
@@ -4851,6 +4931,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         showChapterLink: !_isCurrentBookLocal(),
                         showTitleAddition: _settings.showReadTitleAddition,
                         readBarStyleFollowPage: _menuFollowPageTone,
+                        menuFadeAnimation: _menuFadeAnim,
+                        menuSlideAnimation: _topMenuSlideAnim,
                       ),
 
                     // 右侧悬浮快捷栏（对标 legado 快捷动作区）
@@ -4888,6 +4970,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
                         readBarStyleFollowPage: _menuFollowPageTone,
                         readAloudRunning: _readAloudSnapshot.isRunning,
                         readAloudPaused: _readAloudSnapshot.isPaused,
+                        menuFadeAnimation: _menuFadeAnim,
+                        menuSlideAnimation: _bottomMenuSlideAnim,
                       ),
 
                     if (_showSearchMenu) _buildSearchMenuOverlay(),
@@ -7744,30 +7828,40 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
         Positioned(
           left: 12,
           top: sideButtonTop,
-          child: _buildSearchSideNavButton(
-            icon: CupertinoIcons.chevron_left,
-            onTap: canNavigate ? () => _navigateSearchHit(-1) : null,
-            color: navBtnBg,
-            shadowColor: navBtnShadow,
-            semanticsLabel: '上一个',
+          child: FadeTransition(
+            opacity: _searchMenuFadeAnim,
+            child: _buildSearchSideNavButton(
+              icon: CupertinoIcons.chevron_left,
+              onTap: canNavigate ? () => _navigateSearchHit(-1) : null,
+              color: navBtnBg,
+              shadowColor: navBtnShadow,
+              semanticsLabel: '上一个',
+            ),
           ),
         ),
         Positioned(
           right: 12,
           top: sideButtonTop,
-          child: _buildSearchSideNavButton(
-            icon: CupertinoIcons.chevron_right,
-            onTap: canNavigate ? () => _navigateSearchHit(1) : null,
-            color: navBtnBg,
-            shadowColor: navBtnShadow,
-            semanticsLabel: '下一个',
+          child: FadeTransition(
+            opacity: _searchMenuFadeAnim,
+            child: _buildSearchSideNavButton(
+              icon: CupertinoIcons.chevron_right,
+              onTap: canNavigate ? () => _navigateSearchHit(1) : null,
+              color: navBtnBg,
+              shadowColor: navBtnShadow,
+              semanticsLabel: '下一个',
+            ),
           ),
         ),
         Positioned(
           left: 0,
           right: 0,
           bottom: 0,
-          child: SafeArea(
+          child: SlideTransition(
+            position: _searchMenuSlideAnim,
+            child: FadeTransition(
+              opacity: _searchMenuFadeAnim,
+              child: SafeArea(
             top: false,
             child: Container(
               margin: const EdgeInsets.fromLTRB(6, 0, 6, 0),
@@ -7905,6 +7999,8 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
               ),
             ),
           ),
+            ),
+          ),
         ),
       ],
     );
@@ -8029,29 +8125,36 @@ class _SimpleReaderViewState extends State<SimpleReaderView> {
     return Positioned(
       right: 8,
       top: topOffset,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
-        decoration: BoxDecoration(
-          color: _uiPanelBg.withValues(alpha: _isUiDark ? 0.78 : 0.9),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: _uiBorder),
-          boxShadow: [
-            BoxShadow(
-              color: CupertinoColors.black
-                  .withValues(alpha: _isUiDark ? 0.2 : 0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 5),
+      child: SlideTransition(
+        position: _railSlideAnim,
+        child: FadeTransition(
+          opacity: _menuFadeAnim,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+            decoration: BoxDecoration(
+              color: _uiPanelBg.withValues(alpha: _isUiDark ? 0.78 : 0.9),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: _uiBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: CupertinoColors.black
+                      .withValues(alpha: _isUiDark ? 0.2 : 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 5),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Column(
-          children: List<Widget>.generate(actionOrder.length * 2 - 1, (index) {
-            if (index.isOdd) {
-              return const SizedBox(height: 6);
-            }
-            final action = actionOrder[index ~/ 2];
-            return _buildLegacyQuickActionButton(action);
-          }),
+            child: Column(
+              children:
+                  List<Widget>.generate(actionOrder.length * 2 - 1, (index) {
+                if (index.isOdd) {
+                  return const SizedBox(height: 6);
+                }
+                final action = actionOrder[index ~/ 2];
+                return _buildLegacyQuickActionButton(action);
+              }),
+            ),
+          ),
         ),
       ),
     );

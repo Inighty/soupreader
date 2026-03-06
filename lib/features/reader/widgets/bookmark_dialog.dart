@@ -315,9 +315,10 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: _lineColor.withValues(alpha: 0.85)),
         ),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => _jumpToBookmark(bookmark),
+        child: CupertinoButton(
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          onPressed: () => _jumpToBookmark(bookmark),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
             child: Row(
@@ -401,15 +402,14 @@ class BookmarkIndicator extends StatelessWidget {
         ? CupertinoColors.systemGrey.resolveFrom(context)
         : AppDesignTokens.textMuted;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Icon(
-          hasBookmark ? CupertinoIcons.bookmark_fill : CupertinoIcons.bookmark,
-          color: hasBookmark ? activeColor : inactiveColor,
-          size: 24,
-        ),
+    return CupertinoButton(
+      padding: const EdgeInsets.all(8),
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: Icon(
+        hasBookmark ? CupertinoIcons.bookmark_fill : CupertinoIcons.bookmark,
+        color: hasBookmark ? activeColor : inactiveColor,
+        size: 24,
       ),
     );
   }

@@ -540,9 +540,10 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   Widget _buildTab(int index, String label, {int? count}) {
     final isSelected = _selectedTab == index;
     final title = count == null ? label : '$label ($count)';
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: () {
         setState(() {
           _selectedTab = index;
           _searchQuery = '';
@@ -551,7 +552,8 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         });
         _scheduleScrollToCurrentChapter();
       },
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           border: Border(
@@ -797,9 +799,11 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
             chapter.isDownloaded && (chapter.content?.isNotEmpty ?? false);
         final wordCount = _resolveChapterWordCountLabel(chapter);
 
-        return GestureDetector(
+        return CupertinoButton(
           key: _chapterKeyFor(originalIndex),
-          onTap: () => widget.onChapterSelected(originalIndex),
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          onPressed: () => widget.onChapterSelected(originalIndex),
           child: Container(
             constraints:
                 const BoxConstraints(minHeight: _chapterListItemExtent),
@@ -940,9 +944,10 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
               _bookmarks.removeWhere((b) => b.id == bookmark.id);
             });
           },
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => widget.onBookmarkSelected(bookmark),
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: Size.zero,
+            onPressed: () => widget.onBookmarkSelected(bookmark),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(

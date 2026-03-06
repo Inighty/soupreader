@@ -304,21 +304,22 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
   }) {
     final color = highlighted ? _accent : _textStrong;
     return SizedBox(
-      width: 58,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
+      width: 64,
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        onPressed: onTap,
         child: Padding(
-          padding: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.only(bottom: 6, top: 4),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
-                height: 20,
+                height: 22,
                 child: Center(
                   child: Icon(
                     icon,
-                    size: 20,
+                    size: 22,
                     color: color,
                   ),
                 ),
@@ -329,7 +330,7 @@ class _AutoReadPanelState extends State<AutoReadPanel> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   color: color,
                   fontWeight: highlighted ? FontWeight.w600 : FontWeight.w500,
                 ),

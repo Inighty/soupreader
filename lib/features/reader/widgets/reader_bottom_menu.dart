@@ -26,6 +26,8 @@ class ReaderBottomMenuNew extends StatefulWidget {
   final bool readBarStyleFollowPage;
   final bool readAloudRunning;
   final bool readAloudPaused;
+  final Animation<double>? menuFadeAnimation;
+  final Animation<Offset>? menuSlideAnimation;
 
   const ReaderBottomMenuNew({
     super.key,
@@ -48,6 +50,8 @@ class ReaderBottomMenuNew extends StatefulWidget {
     this.readBarStyleFollowPage = false,
     this.readAloudRunning = false,
     this.readAloudPaused = false,
+    this.menuFadeAnimation,
+    this.menuSlideAnimation,
   });
 
   @override
@@ -89,6 +93,69 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
         ? _brightnessPanelTopOffsetWithTitleAddition
         : _brightnessPanelTopOffset;
 
+    final fadeAnim = widget.menuFadeAnimation;
+    final slideAnim = widget.menuSlideAnimation;
+
+    Widget brightnessPanelChild = _buildBrightnessPanel(
+      style.panelBackground,
+      foreground: style.primaryText,
+      mutedForeground: style.secondaryText,
+      borderColor: style.borderColor,
+    );
+    if (fadeAnim != null) {
+      brightnessPanelChild = FadeTransition(
+        opacity: fadeAnim,
+        child: brightnessPanelChild,
+      );
+    }
+
+    Widget bottomPanel = Container(
+      key: _bottomMenuPanelKey,
+      decoration: BoxDecoration(
+        color: style.panelBackground,
+        border: Border(
+          top: BorderSide(color: style.borderColor),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: style.shadowColor,
+            blurRadius: 14,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      // 让菜单面板本体直接覆盖到底部安全区，避免系统手势区露出正文底色。
+      padding: EdgeInsets.only(
+        bottom: bottomPadding + (bottomPadding > 0 ? 4 : 8),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildChapterSlider(
+            foreground: style.primaryText,
+            mutedForeground: style.secondaryText,
+          ),
+          const SizedBox(height: 3),
+          Container(
+            height: 0.9,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            color: style.dividerColor,
+          ),
+          const SizedBox(height: 4),
+          _buildBottomTabs(foreground: style.primaryText),
+        ],
+      ),
+    );
+    if (slideAnim != null && fadeAnim != null) {
+      bottomPanel = SlideTransition(
+        position: slideAnim,
+        child: FadeTransition(
+          opacity: fadeAnim,
+          child: bottomPanel,
+        ),
+      );
+    }
+
     return Positioned.fill(
       child: Stack(
         children: [
@@ -98,54 +165,13 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
               bottom: bottomPadding + _brightnessPanelBottomOffset,
               left: widget.settings.brightnessViewOnRight ? null : 16,
               right: widget.settings.brightnessViewOnRight ? 16 : null,
-              child: _buildBrightnessPanel(
-                style.panelBackground,
-                foreground: style.primaryText,
-                mutedForeground: style.secondaryText,
-                borderColor: style.borderColor,
-              ),
+              child: brightnessPanelChild,
             ),
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: Container(
-              key: _bottomMenuPanelKey,
-              decoration: BoxDecoration(
-                color: style.panelBackground,
-                border: Border(
-                  top: BorderSide(color: style.borderColor),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: style.shadowColor,
-                    blurRadius: 14,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
-              ),
-              // 让菜单面板本体直接覆盖到底部安全区，避免系统手势区露出正文底色。
-              padding: EdgeInsets.only(
-                bottom: bottomPadding + (bottomPadding > 0 ? 4 : 8),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildChapterSlider(
-                    foreground: style.primaryText,
-                    mutedForeground: style.secondaryText,
-                  ),
-                  const SizedBox(height: 3),
-                  Container(
-                    height: 0.9,
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    color: style.dividerColor,
-                  ),
-                  const SizedBox(height: 4),
-                  _buildBottomTabs(foreground: style.primaryText),
-                ],
-              ),
-            ),
+            child: bottomPanel,
           ),
         ],
       ),
@@ -242,18 +268,16 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     required Color color,
     required VoidCallback? onTap,
   }) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13.5,
-            color: color,
-            fontWeight: enabled ? FontWeight.w600 : FontWeight.w400,
-          ),
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13.5,
+          color: color,
+          fontWeight: enabled ? FontWeight.w600 : FontWeight.w400,
         ),
       ),
     );
@@ -318,10 +342,11 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
               ),
               child: Column(
                 children: [
-                  GestureDetector(
+                  CupertinoButton(
                     key: _brightnessAutoToggleKey,
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    onPressed: () {
                       widget.onSettingsChanged(
                         widget.settings.copyWith(
                           useSystemBrightness:
@@ -381,10 +406,11 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                       ),
                     ),
                   ),
-                  GestureDetector(
+                  CupertinoButton(
                     key: _brightnessPositionToggleKey,
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    onPressed: () {
                       widget.onSettingsChanged(
                         widget.settings.copyWith(
                           brightnessViewOnRight:
@@ -474,38 +500,42 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   }) {
     final contentColor = active ? (activeColor ?? foreground) : foreground;
     return SizedBox(
-      width: 60,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 7),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                height: 20,
-                child: Center(
-                  child: Icon(
-                    icon,
-                    size: 20,
-                    color: contentColor,
+      width: 64,
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        onPressed: onTap,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onLongPress: onLongPress,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 7, top: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 22,
+                  child: Center(
+                    child: Icon(
+                      icon,
+                      size: 22,
+                      color: contentColor,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: contentColor,
-                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: contentColor,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

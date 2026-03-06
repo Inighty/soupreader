@@ -358,11 +358,13 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
   }
 
   Widget _buildCircleButton(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onTap,
       child: Container(
-        width: 28,
-        height: 28,
+        width: 32,
+        height: 32,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: _chipBg,
@@ -400,9 +402,12 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
             children: List.generate(options.length, (index) {
               final isSelected = selectedIndex == index;
               return Expanded(
-                child: GestureDetector(
-                  onTap: () => onChanged(index),
-                  child: Container(
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  onPressed: () => onChanged(index),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
                     margin: EdgeInsets.only(
                       right: index < options.length - 1 ? 8 : 0,
                     ),
@@ -413,6 +418,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: isSelected ? _accent : _lineColor,
+                        width: isSelected ? 1.5 : 1.0,
                       ),
                     ),
                     child: Center(

@@ -216,8 +216,10 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
         final chapter = chapters[index];
         final isCurrentChapter = actualIndex == widget.currentChapterIndex;
 
-        return GestureDetector(
-          onTap: () {
+        return CupertinoButton(
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          onPressed: () {
             Navigator.pop(context);
             widget.onChapterSelected(actualIndex);
           },
@@ -307,8 +309,10 @@ class _ChapterListDialogState extends State<ChapterListDialog> {
       itemBuilder: (context, index) {
         final bookmark = bookmarks[index];
 
-        return GestureDetector(
-          onTap: () {
+        return CupertinoButton(
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          onPressed: () {
             Navigator.pop(context);
             widget.onBookmarkSelected(bookmark);
           },

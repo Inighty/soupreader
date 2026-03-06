@@ -40,6 +40,8 @@ class ReaderTopMenu extends StatelessWidget {
   final bool showChapterLink;
   final bool showTitleAddition;
   final bool readBarStyleFollowPage;
+  final Animation<double>? menuFadeAnimation;
+  final Animation<Offset>? menuSlideAnimation;
 
   const ReaderTopMenu({
     super.key,
@@ -69,6 +71,8 @@ class ReaderTopMenu extends StatelessWidget {
     this.showChapterLink = true,
     this.showTitleAddition = true,
     this.readBarStyleFollowPage = false,
+    this.menuFadeAnimation,
+    this.menuSlideAnimation,
   });
 
   @override
@@ -86,11 +90,10 @@ class ReaderTopMenu extends StatelessWidget {
       readBarStyleFollowPage: readBarStyleFollowPage,
     );
 
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
+    final fadeAnim = menuFadeAnimation;
+    final slideAnim = menuSlideAnimation;
+
+    Widget panel = Container(
         key: _readerTopMenuPanelKey,
         padding: EdgeInsets.only(
           top: mediaQuery.padding.top + 7,
@@ -291,7 +294,23 @@ class ReaderTopMenu extends StatelessWidget {
             ],
           ],
         ),
-      ),
+      );
+
+    if (slideAnim != null && fadeAnim != null) {
+      panel = SlideTransition(
+        position: slideAnim,
+        child: FadeTransition(
+          opacity: fadeAnim,
+          child: panel,
+        ),
+      );
+    }
+
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: panel,
     );
   }
 
@@ -304,22 +323,26 @@ class ReaderTopMenu extends StatelessWidget {
     required Color backgroundColor,
     required Color borderColor,
   }) {
-    return GestureDetector(
+    return CupertinoButton(
       key: key,
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Icon(
-          icon,
-          color: iconColor,
-          size: 17,
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPress: onLongPress,
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(17),
+          ),
+          child: Icon(
+            icon,
+            color: iconColor,
+            size: 17,
+          ),
         ),
       ),
     );
@@ -333,15 +356,16 @@ class ReaderTopMenu extends StatelessWidget {
     required Color borderColor,
     required double maxWidth,
   }) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onTap,
       child: Container(
         constraints: BoxConstraints(maxWidth: maxWidth),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
           color: backgroundColor,
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
           label,
@@ -488,12 +512,15 @@ class ReaderBottomMenu extends StatelessWidget {
                   size: 20,
                 ),
                 const SizedBox(width: 16),
-                GestureDetector(
-                  onTap: () {
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  onPressed: () {
                     onSettingsChanged(settings.copyWith(
                         useSystemBrightness: !settings.useSystemBrightness));
                   },
-                  child: Container(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
