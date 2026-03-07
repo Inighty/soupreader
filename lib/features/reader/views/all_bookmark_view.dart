@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
@@ -307,7 +308,7 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: CupertinoColors.systemBackground.resolveFrom(context),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppDesignTokens.radiusToast),
               ),
               child: Text(
                 message,

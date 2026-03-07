@@ -49,6 +49,7 @@ class AppDesignTokens {
   static const double radiusCard = 13; // iOS insetGrouped section radius
   static const double radiusPopup = 14;
   static const double radiusSheet = 13; // iOS action sheet radius
+  static const double radiusToast = 12; // 悬浮 toast 提示
   static const double hairlineBorderWidth = 0.5;
   static const double glassBlurSigma = 20;
 

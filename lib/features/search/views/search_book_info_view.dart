@@ -12,6 +12,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cover_image.dart';
@@ -3256,7 +3257,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
                             padding: const EdgeInsets.all(3),
                             decoration: BoxDecoration(
                               color: backgroundColor,
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                               boxShadow: [
                                 BoxShadow(
                                   color: CupertinoColors.black.withValues(

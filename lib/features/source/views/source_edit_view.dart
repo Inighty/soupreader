@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
@@ -1059,7 +1060,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       decoration: BoxDecoration(
         color: CupertinoColors.secondarySystemGroupedBackground
             .resolveFrom(context),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
       child: child,
     );
@@ -1187,7 +1188,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                       color: CupertinoColors.systemRed
                           .resolveFrom(context)
                           .withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                       border: Border.all(
                         color: CupertinoColors.systemRed
                             .resolveFrom(context)
@@ -2641,7 +2642,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                         ),
                         decoration: BoxDecoration(
                           color: _labelColor(label).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                           border: Border.all(
                             color: _labelColor(label).withValues(alpha: 0.35),
                           ),

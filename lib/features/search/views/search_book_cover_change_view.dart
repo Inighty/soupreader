@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
@@ -351,7 +352,7 @@ class _SearchBookCoverChangeViewState extends State<SearchBookCoverChangeView> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: cardColor,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
                     ),
                     padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
                     child: Column(

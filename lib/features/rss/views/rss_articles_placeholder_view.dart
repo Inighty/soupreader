@@ -6,6 +6,7 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_popover_menu.dart';
@@ -884,7 +885,7 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
                 color: CupertinoColors.systemBackground
                     .resolveFrom(context)
                     .withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppDesignTokens.radiusToast),
               ),
               child: Text(
                 message,
@@ -1864,7 +1865,7 @@ class _RssFavoriteItemCard extends StatelessWidget {
         color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
           context,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1945,7 +1946,7 @@ class _PlaceholderCard extends StatelessWidget {
         color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
           context,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1986,7 +1987,7 @@ class _InfoCard extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2030,7 +2031,7 @@ class _SortPreviewCard extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: CupertinoColors.systemGroupedBackground.resolveFrom(context),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

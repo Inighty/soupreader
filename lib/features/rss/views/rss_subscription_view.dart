@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
@@ -257,7 +258,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
       decoration: BoxDecoration(
         color: CupertinoColors.secondarySystemGroupedBackground
             .resolveFrom(context),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
       child: CupertinoListTile.notched(
         leading: const Icon(CupertinoIcons.square_list),
@@ -283,7 +284,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
         decoration: BoxDecoration(
           color: CupertinoColors.secondarySystemGroupedBackground
               .resolveFrom(context),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
         ),
         child: CupertinoListTile.notched(
           leading: _buildSourceIcon(source),
@@ -617,7 +618,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
                 color: CupertinoColors.systemBackground
                     .resolveFrom(context)
                     .withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppDesignTokens.radiusToast),
                 ),
               child: Text(
                 message,

@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/theme/typography.dart';
 import '../../../app/theme/source_ui_tokens.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
@@ -3816,7 +3817,7 @@ class _SourceListViewState extends State<SourceListView> {
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: background,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppDesignTokens.radiusToast),
                   border: Border.all(color: border),
                 ),
                 child: Text(
