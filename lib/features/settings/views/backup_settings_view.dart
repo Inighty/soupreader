@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_popover_menu.dart';
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
@@ -614,7 +617,7 @@ class _BackupSettingsViewState extends State<BackupSettingsView> {
     if (result.cancelled) return;
     if (result.success) {
       await _syncBackupCompareBaselineNow(reason: 'export_to_file');
-      _showMessage('导出成功');
+      unawaited(showAppToast(context, message: '导出成功'));
       return;
     }
     _exceptionLogService.record(

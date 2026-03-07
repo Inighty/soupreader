@@ -3673,7 +3673,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       _validateJson(silent: true);
       await _saveLoginState(showMessage: false);
       if (!mounted) return;
-      _showMessage('保存成功');
+      unawaited(showAppToast(context, message: '保存成功'));
     } catch (e) {
       if (!mounted) return;
       _showMessage('保存失败：$e');
