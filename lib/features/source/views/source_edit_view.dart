@@ -3537,7 +3537,7 @@ class _SourceEditViewState extends State<SourceEditView> {
       }
 
       if (showMessage) {
-        _showMessage('登录态缓存已保存');
+        unawaited(showAppToast(context, message: '登录态缓存已保存'));
       }
     } catch (e) {
       if (showMessage) {
