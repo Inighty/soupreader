@@ -2069,7 +2069,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                 color: CupertinoColors.systemBackground
                     .resolveFrom(context)
                     .withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
+                borderRadius: BorderRadius.circular(AppDesignTokens.radiusToast),
               ),
               child: Text(
                 message,
