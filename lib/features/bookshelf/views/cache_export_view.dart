@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
@@ -1019,7 +1020,7 @@ class _CacheExportViewState extends State<CacheExportView> {
       decoration: BoxDecoration(
         color: CupertinoColors.secondarySystemGroupedBackground
             .resolveFrom(context),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1055,7 +1056,7 @@ class _CacheExportViewState extends State<CacheExportView> {
       decoration: BoxDecoration(
         color: CupertinoColors.tertiarySystemGroupedBackground
             .resolveFrom(context),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
       ),
       child: Text(
         '缓存/导出（迁移中）',
@@ -1078,7 +1079,7 @@ class _CacheExportViewState extends State<CacheExportView> {
       decoration: BoxDecoration(
         color: CupertinoColors.secondarySystemGroupedBackground
             .resolveFrom(context),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
