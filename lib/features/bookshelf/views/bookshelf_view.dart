@@ -2475,46 +2475,10 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
   }
 
-  Widget _buildGridLoadingBadge() {
-    return Container(
-      width: 22,
-      height: 22,
-      decoration: BoxDecoration(
-        color: CupertinoColors.black.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(11),
-      ),
-      alignment: Alignment.center,
-      child: const CupertinoActivityIndicator(radius: 6),
-    );
-  }
+  Widget _buildGridLoadingBadge() => const _BookshelfGridLoadingBadge();
 
-  Widget _buildGridUnreadBadge(int unreadCount) {
-    if (unreadCount <= 0) return const SizedBox.shrink();
-
-    return Container(
-      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemRed.resolveFrom(context),
-        borderRadius: BorderRadius.circular(9),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        _formatUnreadCount(unreadCount),
-        style: const TextStyle(
-          color: CupertinoColors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          height: 1.1,
-        ),
-      ),
-    );
-  }
-
-  String _formatUnreadCount(int unreadCount) {
-    if (unreadCount > 99) return '99+';
-    return '$unreadCount';
-  }
+  Widget _buildGridUnreadBadge(int unreadCount) =>
+      _BookshelfGridUnreadBadge(unreadCount: unreadCount);
 
   int _unreadCountLikeLegado(Book book) {
     final total = book.totalChapters;
@@ -2917,5 +2881,54 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
     if (!mounted) return;
     _loadBooks();
+  }
+}
+
+
+class _BookshelfGridLoadingBadge extends StatelessWidget {
+  const _BookshelfGridLoadingBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        color: CupertinoColors.black.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      alignment: Alignment.center,
+      child: const CupertinoActivityIndicator(radius: 6),
+    );
+  }
+}
+
+class _BookshelfGridUnreadBadge extends StatelessWidget {
+  final int unreadCount;
+
+  const _BookshelfGridUnreadBadge({required this.unreadCount});
+
+  @override
+  Widget build(BuildContext context) {
+    if (unreadCount <= 0) return const SizedBox.shrink();
+    final label = unreadCount > 99 ? '99+' : '$unreadCount';
+    return Container(
+      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: CupertinoColors.systemRed.resolveFrom(context),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: CupertinoColors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          height: 1.1,
+        ),
+      ),
+    );
   }
 }
