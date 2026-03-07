@@ -104,12 +104,6 @@ import '../widgets/source_switch_candidate_sheet.dart';
 import 'reader_dict_lookup_sheet.dart';
 
 /// 简洁阅读器 - Cupertino 风格 (增强版)
-part 'simple_reader_view_scroll.dart';
-part 'simple_reader_view_menu_actions.dart';
-part 'simple_reader_view_source_switch.dart';
-part 'simple_reader_view_bookmark_catalog.dart';
-part 'simple_reader_view_private_classes.dart';
-
 class SimpleReaderView extends StatefulWidget {
   final String bookId;
   final String bookTitle;
@@ -1229,6 +1223,1325 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       chapterIndex: safeChapterIndex,
       progress: chapterProgress,
     );
+  }
+
+  GlobalKey _scrollSegmentKeyFor(int chapterIndex) {
+    return _scrollSegmentKeys.putIfAbsent(
+      chapterIndex,
+      () => GlobalKey(debugLabel: 'scroll_segment_$chapterIndex'),
+    );
+  }
+
+  double _resolveScrollTopSystemInset(MediaQueryData mediaQuery) {
+    if (_settings.showStatusBar) {
+      return mediaQuery.padding.top;
+    }
+    if (_settings.paddingDisplayCutouts) {
+      return mediaQuery.viewPadding.top;
+    }
+    return 0.0;
+  }
+
+  double _resolveScrollBottomSystemInset(MediaQueryData mediaQuery) {
+    if (_settings.hideNavigationBar) {
+      if (_settings.paddingDisplayCutouts) {
+        return mediaQuery.viewPadding.bottom;
+      }
+      return 0.0;
+    }
+    return mediaQuery.padding.bottom;
+  }
+
+  double _resolveScrollHeaderSlotHeight() {
+    if (!_settings.shouldShowHeader(showStatusBar: _settings.showStatusBar)) {
+      return 0.0;
+    }
+    return PagedReaderWidget.resolveHeaderSlotHeight(
+      settings: _settings,
+      showStatusBar: _settings.showStatusBar,
+    );
+  }
+
+  double _resolveScrollFooterSlotHeight() {
+    if (!_settings.shouldShowFooter()) {
+      return 0.0;
+    }
+    return PagedReaderWidget.resolveFooterSlotHeight(
+      settings: _settings,
+    );
+  }
+
+  EdgeInsets _resolveScrollContentInsets(MediaQueryData mediaQuery) {
+    final leftInset =
+        _settings.paddingDisplayCutouts ? mediaQuery.padding.left : 0.0;
+    final rightInset =
+        _settings.paddingDisplayCutouts ? mediaQuery.padding.right : 0.0;
+    return EdgeInsets.fromLTRB(
+      leftInset,
+      _resolveScrollTopSystemInset(mediaQuery) +
+          _resolveScrollHeaderSlotHeight(),
+      rightInset,
+      _resolveScrollBottomSystemInset(mediaQuery) +
+          _resolveScrollFooterSlotHeight(),
+    );
+  }
+
+  double _scrollBodyWidth() {
+    if (!mounted) return 320.0;
+    final mediaQuery = MediaQuery.maybeOf(context);
+    if (mediaQuery == null) return 320.0;
+    final screenSize = mediaQuery.size;
+    final safePadding = mediaQuery.padding;
+    final horizontalSafeInset = _settings.paddingDisplayCutouts
+        ? safePadding.left + safePadding.right
+        : 0.0;
+    return (screenSize.width -
+            horizontalSafeInset -
+            _settings.paddingLeft -
+            _settings.paddingRight)
+        .clamp(1.0, double.infinity)
+        .toDouble();
+  }
+
+  TextStyle _scrollParagraphStyle() {
+    return TextStyle(
+      fontSize: _settings.fontSize,
+      height: _settings.lineHeight,
+      color: _currentTheme.text,
+      letterSpacing: _settings.letterSpacing,
+      fontFamily: _currentFontFamily,
+      fontFamilyFallback: _currentFontFamilyFallback,
+      fontWeight: _currentFontWeight,
+      decoration: _currentTextDecoration,
+    );
+  }
+
+  ScrollTextLayoutKey _scrollLayoutKeyFor({
+    required _ScrollSegmentSeed seed,
+    required double maxWidth,
+    required TextStyle style,
+  }) {
+    return ScrollTextLayoutKey(
+      chapterId: seed.chapterId,
+      contentHash: seed.content.hashCode,
+      widthPx: maxWidth.round(),
+      fontSizeX100: ((style.fontSize ?? 16.0) * 100).round(),
+      lineHeightX100: ((style.height ?? 1.2) * 100).round(),
+      letterSpacingX100: ((style.letterSpacing ?? 0.0) * 100).round(),
+      fontFamily: style.fontFamily,
+      fontWeight: style.fontWeight,
+      fontStyle: style.fontStyle,
+      justify: _settings.textFullJustify,
+      paragraphIndent: _settings.paragraphIndent,
+      paragraphSpacingX100: (_settings.paragraphSpacing * 100).round(),
+    );
+  }
+
+  ScrollTextLayout _resolveScrollTextLayout({
+    required _ScrollSegmentSeed seed,
+    required double maxWidth,
+    required TextStyle style,
+  }) {
+    return _scrollTextLayoutEngine.compose(
+      key: _scrollLayoutKeyFor(
+        seed: seed,
+        maxWidth: maxWidth,
+        style: style,
+      ),
+      content: seed.content,
+      style: style,
+      maxWidth: maxWidth,
+      justify: _settings.textFullJustify,
+      paragraphIndent: _settings.paragraphIndent,
+      paragraphSpacing: _settings.paragraphSpacing,
+    );
+  }
+
+  double _estimateScrollSegmentHeight({
+    required ScrollTextLayout layout,
+    required bool hasTitle,
+  }) {
+    final titleLineHeight = (_settings.fontSize + _settings.titleSize) *
+        ((_scrollParagraphStyle().height ?? 1.2).clamp(1.0, 2.5));
+    final titleExtra = hasTitle
+        ? (_settings.titleTopSpacing > 0 ? _settings.titleTopSpacing : 20) +
+            titleLineHeight +
+            (_settings.titleBottomSpacing > 0
+                ? _settings.titleBottomSpacing
+                : _settings.paragraphSpacing * 1.5)
+        : 0.0;
+    return _settings.paddingTop +
+        _settings.paddingBottom +
+        titleExtra +
+        layout.bodyHeight +
+        24.0;
+  }
+
+  Future<_ScrollSegment> _loadScrollSegment(
+    int chapterIndex, {
+    bool showLoading = false,
+  }) async {
+    final chapter = _chapters[chapterIndex];
+    final book = _bookRepo.getBookById(widget.bookId);
+    String content = chapter.content ?? '';
+
+    final chapterUrl = (chapter.url ?? '').trim();
+    final canFetchFromSource = chapterUrl.isNotEmpty &&
+        (book == null || !book.isLocal) &&
+        _resolveActiveSourceUrl(book).isNotEmpty;
+    if (content.isEmpty && canFetchFromSource) {
+      content = await _fetchChapterContent(
+        chapter: chapter,
+        index: chapterIndex,
+        book: book,
+        showLoading: showLoading,
+      );
+    }
+
+    final stage = await _computeReplaceStage(
+      chapterId: chapter.id,
+      rawTitle: chapter.title,
+      rawContent: content,
+    );
+    final resolved = _resolveChapterSnapshotFromBase(
+      chapter: chapter,
+      baseTitle: stage.title,
+      baseContent: stage.content,
+    );
+    final seed = _ScrollSegmentSeed(
+      chapterId: chapter.id,
+      title: resolved.title,
+      content: resolved.content,
+    );
+    final paragraphStyle = _scrollParagraphStyle();
+    final bodyWidth = _scrollBodyWidth();
+    final layout = _resolveScrollTextLayout(
+      seed: seed,
+      maxWidth: bodyWidth,
+      style: paragraphStyle,
+    );
+
+    return _ScrollSegment(
+      chapterIndex: chapterIndex,
+      chapterId: seed.chapterId,
+      title: seed.title,
+      content: seed.content,
+      estimatedHeight: _estimateScrollSegmentHeight(
+        layout: layout,
+        hasTitle: _settings.titleMode != 2,
+      ),
+    );
+  }
+
+  Future<void> _initializeScrollSegments({
+    required int centerIndex,
+    required bool restoreOffset,
+    required bool goToLastPage,
+    double? targetChapterProgress,
+  }) async {
+    final readableChapterCount = _effectiveReadableChapterCount();
+    if (readableChapterCount <= 0) return;
+    final maxReadableIndex = readableChapterCount - 1;
+    final safeCenterIndex = centerIndex.clamp(0, maxReadableIndex).toInt();
+    final start = (safeCenterIndex - 1).clamp(0, maxReadableIndex);
+    final end = (safeCenterIndex + 1).clamp(0, maxReadableIndex);
+    final segments = <_ScrollSegment>[];
+    for (var i = start; i <= end; i++) {
+      segments.add(
+        await _loadScrollSegment(
+          i,
+          showLoading: i == safeCenterIndex,
+        ),
+      );
+    }
+    if (!mounted) return;
+    final centerSegment = segments.firstWhere(
+      (segment) => segment.chapterIndex == safeCenterIndex,
+      orElse: () => segments.first,
+    );
+
+    setState(() {
+      _scrollSegments
+        ..clear()
+        ..addAll(segments);
+      _currentChapterIndex = centerSegment.chapterIndex;
+      _currentTitle = centerSegment.title;
+      _currentContent = centerSegment.content;
+      _currentScrollChapterProgress = 0.0;
+      _invalidateScrollLayoutSnapshot();
+    });
+
+    final savedProgress = _settingsService.getChapterPageProgress(
+      widget.bookId,
+      chapterIndex: safeCenterIndex,
+    );
+    final preferredProgress = targetChapterProgress ??
+        (restoreOffset ? savedProgress : (goToLastPage ? null : 0.0));
+
+    _pendingScrollTargetChapterIndex = safeCenterIndex;
+    _pendingScrollTargetChapterProgress =
+        preferredProgress?.clamp(0.0, 1.0).toDouble();
+    _pendingScrollJumpToEnd = goToLastPage;
+    _pendingScrollJumpRetry = 0;
+    _scheduleApplyPendingScrollTarget();
+  }
+
+  void _scheduleApplyPendingScrollTarget() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _applyPendingScrollTarget();
+    });
+  }
+
+  void _applyPendingScrollTarget() {
+    final targetChapterIndex = _pendingScrollTargetChapterIndex;
+    if (targetChapterIndex == null) return;
+    if (!_scrollController.hasClients) {
+      if (_pendingScrollJumpRetry++ < 8) {
+        _scheduleApplyPendingScrollTarget();
+      }
+      return;
+    }
+
+    final targetContext =
+        _scrollSegmentKeyFor(targetChapterIndex).currentContext;
+    if (targetContext == null) {
+      if (_pendingScrollJumpRetry++ < 8) {
+        _scheduleApplyPendingScrollTarget();
+      }
+      return;
+    }
+
+    final progress =
+        (_pendingScrollTargetChapterProgress ?? 0.0).clamp(0.0, 1.0).toDouble();
+    final jumpToEnd = _pendingScrollJumpToEnd;
+
+    if (jumpToEnd) {
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: Duration.zero,
+        alignment: 1.0,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+      );
+    } else {
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: Duration.zero,
+        alignment: 0.0,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+      );
+      if (progress > 0) {
+        final renderObject = targetContext.findRenderObject();
+        if (renderObject is RenderBox) {
+          final viewport = _scrollController.position.viewportDimension;
+          final movable =
+              (renderObject.size.height - viewport).clamp(0.0, double.infinity);
+          if (movable > 0) {
+            final target = (_scrollController.offset + movable * progress)
+                .clamp(
+                  _scrollController.position.minScrollExtent,
+                  _scrollController.position.maxScrollExtent,
+                )
+                .toDouble();
+            _scrollController.jumpTo(target);
+          }
+        }
+      }
+    }
+
+    _pendingScrollTargetChapterIndex = null;
+    _pendingScrollTargetChapterProgress = null;
+    _pendingScrollJumpToEnd = false;
+    _pendingScrollJumpRetry = 0;
+    _refreshScrollSegmentHeights();
+    _syncCurrentChapterFromScroll(saveProgress: true);
+  }
+
+  void _refreshScrollSegmentHeights() {
+    for (final segment in _scrollSegments) {
+      final context = _scrollSegmentKeyFor(segment.chapterIndex).currentContext;
+      final renderObject = context?.findRenderObject();
+      if (renderObject is RenderBox && renderObject.hasSize) {
+        _scrollSegmentHeights[segment.chapterIndex] = renderObject.size.height;
+      }
+    }
+    _rebuildScrollSegmentOffsetRanges();
+    _refreshScrollAnchorWithinViewport();
+  }
+
+  void _rebuildScrollSegmentOffsetRanges() {
+    _scrollSegmentOffsetRanges.clear();
+    if (_scrollSegments.isEmpty) return;
+    var cursor = 0.0;
+    for (final segment in _scrollSegments) {
+      final measuredHeight = _scrollSegmentHeights[segment.chapterIndex];
+      final fallbackHeight = segment.estimatedHeight > 1.0
+          ? segment.estimatedHeight
+          : (_scrollController.hasClients
+              ? _scrollController.position.viewportDimension
+                  .clamp(1.0, double.infinity)
+                  .toDouble()
+              : 600.0);
+      final height = (measuredHeight != null && measuredHeight > 1.0)
+          ? measuredHeight
+          : fallbackHeight;
+      final end = cursor + height;
+      _scrollSegmentOffsetRanges.add(
+        _ScrollSegmentOffsetRange(
+          segment: segment,
+          start: cursor,
+          end: end,
+          height: height,
+        ),
+      );
+      cursor = end;
+    }
+  }
+
+  void _refreshScrollAnchorWithinViewport() {
+    if (!mounted) return;
+    final viewportContext = _scrollViewportKey.currentContext;
+    final viewportRenderObject = viewportContext?.findRenderObject();
+    if (viewportRenderObject is! RenderBox || !viewportRenderObject.hasSize) {
+      return;
+    }
+    final mediaQuery = MediaQuery.of(context);
+    final targetGlobalAnchor = _resolveScrollTopSystemInset(mediaQuery) +
+        _resolveScrollHeaderSlotHeight() +
+        110.0;
+    final viewportTop = viewportRenderObject.localToGlobal(Offset.zero).dy;
+    final withinViewport = (targetGlobalAnchor - viewportTop)
+        .clamp(0.0, viewportRenderObject.size.height)
+        .toDouble();
+    _scrollAnchorWithinViewport = withinViewport;
+  }
+
+  void _handleScrollControllerTick() {
+    if (!mounted) return;
+    if (_settings.pageTurnMode != PageTurnMode.scroll) return;
+    if (!_scrollController.hasClients) return;
+
+    _scheduleScrollPreload();
+    if (!_programmaticScrollInFlight && _shouldSyncScrollUiNow()) {
+      _syncCurrentChapterFromScroll();
+    }
+  }
+
+  bool _shouldSyncScrollUiNow() {
+    final now = DateTime.now();
+    final shouldRun = ScrollRuntimeHelper.shouldRun(
+      now: now,
+      lastRunAt: _lastScrollUiSyncAt,
+      minIntervalMs: _scrollUiSyncIntervalMs,
+    );
+    if (!shouldRun) return false;
+    _lastScrollUiSyncAt = now;
+    return true;
+  }
+
+  bool _shouldCheckScrollPreloadNow() {
+    final now = DateTime.now();
+    final shouldRun = ScrollRuntimeHelper.shouldRun(
+      now: now,
+      lastRunAt: _lastScrollPreloadCheckAt,
+      minIntervalMs: _scrollPreloadIntervalMs,
+    );
+    if (!shouldRun) return false;
+    _lastScrollPreloadCheckAt = now;
+    return true;
+  }
+
+  void _scheduleScrollPreload() {
+    if (!_scrollController.hasClients || !_shouldCheckScrollPreloadNow()) {
+      return;
+    }
+    final metrics = _scrollController.position;
+    if (metrics.maxScrollExtent - metrics.pixels <= _scrollPreloadExtent) {
+      unawaited(_appendNextScrollSegmentIfNeeded());
+    }
+    if (metrics.pixels - metrics.minScrollExtent <= _scrollPreloadExtent) {
+      unawaited(_prependPrevScrollSegmentIfNeeded());
+    }
+  }
+
+  void _syncCurrentChapterFromScroll({bool saveProgress = false}) {
+    if (!mounted ||
+        !_scrollController.hasClients ||
+        _scrollSegments.isEmpty ||
+        _syncingScrollVisibleChapter) {
+      return;
+    }
+    _syncingScrollVisibleChapter = true;
+    try {
+      if (_scrollSegmentOffsetRanges.length != _scrollSegments.length) {
+        _rebuildScrollSegmentOffsetRanges();
+      }
+      if (_scrollSegmentOffsetRanges.isEmpty) return;
+
+      final position = _scrollController.position;
+      final anchorOffset =
+          (_scrollController.offset + _scrollAnchorWithinViewport)
+              .clamp(
+                position.minScrollExtent,
+                position.maxScrollExtent + position.viewportDimension,
+              )
+              .toDouble();
+
+      _ScrollSegmentOffsetRange? chosenRange;
+      double chosenProgress = _currentScrollChapterProgress;
+      double bestDistance = double.infinity;
+
+      for (final range in _scrollSegmentOffsetRanges) {
+        if (anchorOffset >= range.start && anchorOffset <= range.end) {
+          chosenRange = range;
+          chosenProgress = ((anchorOffset - range.start) / range.height)
+              .clamp(0.0, 1.0)
+              .toDouble();
+          break;
+        }
+
+        final distance = anchorOffset < range.start
+            ? (range.start - anchorOffset)
+            : (anchorOffset - range.end);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          chosenRange = range;
+          chosenProgress = ((anchorOffset - range.start) / range.height)
+              .clamp(0.0, 1.0)
+              .toDouble();
+        }
+      }
+
+      final chosen = chosenRange?.segment;
+      if (chosen == null) return;
+
+      final chapterChanged = chosen.chapterIndex != _currentChapterIndex;
+      final progressChanged =
+          (chosenProgress - _currentScrollChapterProgress).abs() > 0.02;
+      if (!chapterChanged && !progressChanged) return;
+
+      if (chapterChanged || saveProgress) {
+        setState(() {
+          _currentChapterIndex = chosen.chapterIndex;
+          _currentTitle = chosen.title;
+          _currentContent = chosen.content;
+          _currentScrollChapterProgress = chosenProgress;
+        });
+      } else {
+        _currentScrollChapterProgress = chosenProgress;
+      }
+      if (chapterChanged) {
+        _updateBookmarkStatus();
+      }
+
+      if (saveProgress) {
+        final now = DateTime.now();
+        if (now.difference(_lastScrollProgressSyncAt).inMilliseconds >=
+            _scrollSaveProgressIntervalMs) {
+          _lastScrollProgressSyncAt = now;
+          unawaited(_saveProgress());
+        }
+      }
+    } finally {
+      _syncingScrollVisibleChapter = false;
+    }
+  }
+
+  Future<void> _appendNextScrollSegmentIfNeeded() async {
+    if (_scrollAppending || _scrollSegments.isEmpty) return;
+    final maxReadableIndex = _effectiveReadableMaxChapterIndex();
+    if (maxReadableIndex < 0) return;
+    final lastIndex = _scrollSegments.last.chapterIndex;
+    if (lastIndex >= maxReadableIndex) return;
+    _scrollAppending = true;
+    try {
+      final nextIndex = lastIndex + 1;
+      final exists =
+          _scrollSegments.any((segment) => segment.chapterIndex == nextIndex);
+      if (exists) return;
+
+      final segment = await _loadScrollSegment(nextIndex);
+      if (!mounted) return;
+
+      setState(() {
+        _scrollSegments.add(segment);
+      });
+      _schedulePostScrollFlowAdjustments();
+    } finally {
+      _scrollAppending = false;
+    }
+  }
+
+  Future<void> _prependPrevScrollSegmentIfNeeded() async {
+    if (_scrollPrepending || _scrollSegments.isEmpty) return;
+    final firstIndex = _scrollSegments.first.chapterIndex;
+    if (firstIndex <= 0) return;
+    final hasClients = _scrollController.hasClients;
+    final oldOffset = hasClients ? _scrollController.offset : 0.0;
+    final oldMax =
+        hasClients ? _scrollController.position.maxScrollExtent : 0.0;
+
+    _scrollPrepending = true;
+    try {
+      final prevIndex = firstIndex - 1;
+      final exists =
+          _scrollSegments.any((segment) => segment.chapterIndex == prevIndex);
+      if (exists) return;
+
+      final segment = await _loadScrollSegment(prevIndex);
+      if (!mounted) return;
+
+      setState(() {
+        _scrollSegments.insert(0, segment);
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        final newMax = _scrollController.position.maxScrollExtent;
+        final delta = (newMax - oldMax).clamp(0.0, double.infinity).toDouble();
+        final target = (oldOffset + delta)
+            .clamp(
+              _scrollController.position.minScrollExtent,
+              _scrollController.position.maxScrollExtent,
+            )
+            .toDouble();
+        _scrollController.jumpTo(target);
+        _schedulePostScrollFlowAdjustments();
+      });
+    } finally {
+      _scrollPrepending = false;
+    }
+  }
+
+  void _schedulePostScrollFlowAdjustments() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _refreshScrollSegmentHeights();
+      _trimScrollSegmentsWindow();
+      _syncCurrentChapterFromScroll(saveProgress: true);
+    });
+  }
+
+  void _trimScrollSegmentsWindow() {
+    if (_scrollSegments.length <= 9) return;
+    if (!_scrollController.hasClients) return;
+    var changed = false;
+    while (_scrollSegments.length > 9) {
+      final first = _scrollSegments.first.chapterIndex;
+      final last = _scrollSegments.last.chapterIndex;
+      final removeFromStart =
+          (_currentChapterIndex - first) > (last - _currentChapterIndex);
+      if (removeFromStart) {
+        final removed = _scrollSegments.removeAt(0);
+        final removedHeight =
+            _scrollSegmentHeights.remove(removed.chapterIndex) ?? 0.0;
+        _scrollSegmentKeys.remove(removed.chapterIndex);
+        if (removedHeight > 0 && _scrollController.hasClients) {
+          final target = (_scrollController.offset - removedHeight)
+              .clamp(
+                _scrollController.position.minScrollExtent,
+                _scrollController.position.maxScrollExtent,
+              )
+              .toDouble();
+          _scrollController.jumpTo(target);
+        }
+      } else {
+        final removed = _scrollSegments.removeLast();
+        _scrollSegmentHeights.remove(removed.chapterIndex);
+        _scrollSegmentKeys.remove(removed.chapterIndex);
+      }
+      changed = true;
+    }
+    if (changed && mounted) {
+      _rebuildScrollSegmentOffsetRanges();
+      setState(() {});
+    }
+  }
+
+  Future<void> _loadChapter(int index,
+      {bool restoreOffset = false,
+      bool goToLastPage = false,
+      double? targetChapterProgress}) async {
+    final readableChapterCount = _effectiveReadableChapterCount();
+    if (index < 0 || index >= readableChapterCount) return;
+    final deferFarChapterTransforms = _shouldDeferFarChapterTransforms();
+
+    if (_settings.pageTurnMode == PageTurnMode.scroll) {
+      _isRestoringProgress = restoreOffset;
+      try {
+        await _initializeScrollSegments(
+          centerIndex: index,
+          restoreOffset: restoreOffset,
+          goToLastPage: goToLastPage,
+          targetChapterProgress: targetChapterProgress,
+        );
+        if (!mounted) return;
+        _updateBookmarkStatus();
+        _syncPageFactoryChapters(
+          centerIndex: index,
+          preferCachedForFarChapters: deferFarChapterTransforms,
+        );
+        _syncReadAloudChapterContext();
+        unawaited(_prefetchNeighborChapters(centerIndex: index));
+      } finally {
+        _isRestoringProgress = false;
+      }
+      if (!restoreOffset) {
+        await _saveProgress();
+      }
+      return;
+    }
+
+    final book = _bookRepo.getBookById(widget.bookId);
+    final chapter = _chapters[index];
+    String content = chapter.content ?? '';
+
+    final chapterUrl = (chapter.url ?? '').trim();
+    final canFetchFromSource = chapterUrl.isNotEmpty &&
+        (book == null || !book.isLocal) &&
+        _resolveActiveSourceUrl(book).isNotEmpty;
+
+    if (content.isEmpty && canFetchFromSource) {
+      content = await _fetchChapterContent(
+        chapter: chapter,
+        index: index,
+        book: book,
+      );
+    }
+
+    final stage = await _computeReplaceStage(
+      chapterId: chapter.id,
+      rawTitle: chapter.title,
+      rawContent: content,
+    );
+    final resolved = _resolveChapterSnapshotFromBase(
+      chapter: chapter,
+      baseTitle: stage.title,
+      baseContent: stage.content,
+    );
+    final warmupFuture = _settings.pageTurnMode == PageTurnMode.scroll
+        ? Future<bool>.value(false)
+        : _warmupPagedImageSizeCache(
+            resolved.content,
+            maxProbeCount: _chapterLoadImageWarmupMaxProbeCount,
+            maxDuration: _chapterLoadImageWarmupMaxDuration,
+          );
+    setState(() {
+      _currentChapterIndex = index;
+      _currentTitle = resolved.title;
+      _currentContent = resolved.content;
+      _invalidateScrollLayoutSnapshot();
+    });
+    _cacheCurrentChapterImageMetasFromSnapshot(resolved);
+    _updateBookmarkStatus();
+    _syncReadAloudChapterContext();
+
+    _syncPageFactoryChapters(
+      centerIndex: index,
+      preferCachedForFarChapters: deferFarChapterTransforms,
+    );
+    unawaited(_prefetchNeighborChapters(centerIndex: index));
+
+    // 如果是非滚动模式，需要在build后进行分页
+    _isRestoringProgress = restoreOffset;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      var shouldPaginate = _settings.pageTurnMode != PageTurnMode.scroll;
+      if (shouldPaginate) {
+        await warmupFuture;
+        if (!mounted) {
+          return;
+        }
+        shouldPaginate = _settings.pageTurnMode != PageTurnMode.scroll;
+      }
+
+      if (shouldPaginate) {
+        _paginateContent();
+
+        // 使用PageFactory跳转章节（自动处理goToLastPage）
+        _pageFactory.jumpToChapter(index, goToLastPage: goToLastPage);
+
+        if ((restoreOffset || targetChapterProgress != null) && !goToLastPage) {
+          final desiredChapterProgress = targetChapterProgress ??
+              _settingsService.getChapterPageProgress(
+                widget.bookId,
+                chapterIndex: index,
+              );
+          final totalPages = _pageFactory.totalPages;
+          if (totalPages > 0) {
+            final targetPage = ChapterProgressUtils.pageIndexFromProgress(
+              progress: desiredChapterProgress,
+              totalPages: totalPages,
+            );
+            if (targetPage != _pageFactory.currentPageIndex) {
+              _pageFactory.jumpToPage(targetPage);
+            }
+          }
+        }
+      }
+
+      _isRestoringProgress = false;
+
+      if (_scrollController.hasClients) {
+        if (restoreOffset && _settings.pageTurnMode == PageTurnMode.scroll) {
+          final savedOffset = _settingsService.getScrollOffset(
+            widget.bookId,
+            chapterIndex: index,
+          );
+          if (savedOffset > 0) {
+            final max = _scrollController.position.maxScrollExtent;
+            final offset = savedOffset.clamp(0.0, max).toDouble();
+            _scrollController.jumpTo(offset);
+            return;
+          }
+        }
+        // 跳转到最后（从上一章滑动过来时）
+        if (goToLastPage && _settings.pageTurnMode == PageTurnMode.scroll) {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        } else {
+          _scrollController.jumpTo(0);
+        }
+      }
+    });
+
+    if (!restoreOffset) {
+      await _saveProgress();
+    }
+  }
+
+  void _syncPageFactoryChapters({
+    bool keepPosition = false,
+    bool preferCachedForFarChapters = false,
+    int? centerIndex,
+  }) {
+    _pruneResolvedChapterCachesIfNeeded();
+    final readableChapters = _effectiveReadableChapters();
+    if (readableChapters.isEmpty) {
+      if (keepPosition) {
+        _pageFactory.replaceChaptersKeepingPosition(const <ChapterData>[]);
+      } else {
+        _pageFactory.setChapters(const <ChapterData>[], 0);
+      }
+      _hasDeferredChapterTransformRefresh = false;
+      return;
+    }
+    final maxReadableIndex = readableChapters.length - 1;
+    final safeCurrentIndex =
+        _currentChapterIndex.clamp(0, maxReadableIndex).toInt();
+    final center =
+        (centerIndex ?? safeCurrentIndex).clamp(0, maxReadableIndex).toInt();
+    var deferredFarSnapshotUsed = false;
+    final chapterDataList = List<ChapterData>.generate(
+      readableChapters.length,
+      (index) {
+        final chapter = readableChapters[index];
+        final isNearChapter = (index - center).abs() <= 1;
+        final snapshot = preferCachedForFarChapters && !isNearChapter
+            ? () {
+                final chapterId = chapter.id;
+                final cached = _resolvedChapterSnapshotByChapterId[chapterId];
+                if (cached != null) {
+                  return cached;
+                }
+                deferredFarSnapshotUsed = true;
+                return _resolveDeferredChapterSnapshot(index);
+              }()
+            : _resolveChapterSnapshot(index);
+        return ChapterData(
+          title: snapshot.title,
+          content: snapshot.content,
+        );
+      },
+      growable: false,
+    );
+    if (keepPosition) {
+      _pageFactory.replaceChaptersKeepingPosition(chapterDataList);
+    } else {
+      _pageFactory.setChapters(chapterDataList, safeCurrentIndex);
+    }
+    if (deferredFarSnapshotUsed) {
+      _hasDeferredChapterTransformRefresh = true;
+    } else if (!preferCachedForFarChapters) {
+      _hasDeferredChapterTransformRefresh = false;
+    }
+  }
+
+  bool _shouldDeferFarChapterTransforms() {
+    if (_effectiveReadableChapterCount() <= 2) return false;
+    if (_settings.pageTurnMode == PageTurnMode.scroll) return true;
+    return _isCurrentBookLocal();
+  }
+
+  _ResolvedChapterSnapshot _resolveDeferredChapterSnapshot(int chapterIndex) {
+    final chapter = _chapters[chapterIndex];
+    final stage = _replaceStageCache[chapter.id];
+    final baseTitle = stage?.title ?? chapter.title;
+    final baseContent = stage?.content ?? (chapter.content ?? '');
+    return _ResolvedChapterSnapshot(
+      chapterId: chapter.id,
+      postProcessSignature: _chapterPostProcessSignature(chapter.id),
+      baseTitleHash: baseTitle.hashCode,
+      baseContentHash: baseContent.hashCode,
+      title: _postProcessTitle(baseTitle),
+      // 远端章节先复用基础内容，命中章节时再走完整正文后处理。
+      content: baseContent,
+      isDeferredPlaceholder: true,
+    );
+  }
+
+  int _chapterPostProcessSignature(String chapterId) {
+    final removeSameTitle = _settings.cleanChapterTitle ||
+        _isChapterSameTitleRemovalEnabled(chapterId);
+    return Object.hashAll(<Object?>[
+      removeSameTitle,
+      _settings.chineseConverterType,
+      _reSegment,
+      _delRubyTag,
+      _delHTag,
+      _settings.pageTurnMode,
+      _normalizeLegacyImageStyle(_imageStyle),
+    ]);
+  }
+
+  _ResolvedChapterSnapshot _resolveChapterSnapshotFromBase({
+    required Chapter chapter,
+    required String baseTitle,
+    required String baseContent,
+  }) {
+    final signature = _chapterPostProcessSignature(chapter.id);
+    final baseTitleHash = baseTitle.hashCode;
+    final baseContentHash = baseContent.hashCode;
+    final cached = _resolvedChapterSnapshotByChapterId[chapter.id];
+    if (cached != null &&
+        !cached.isDeferredPlaceholder &&
+        cached.postProcessSignature == signature &&
+        cached.baseTitleHash == baseTitleHash &&
+        cached.baseContentHash == baseContentHash) {
+      return cached;
+    }
+
+    final snapshot = _ResolvedChapterSnapshot(
+      chapterId: chapter.id,
+      postProcessSignature: signature,
+      baseTitleHash: baseTitleHash,
+      baseContentHash: baseContentHash,
+      title: _postProcessTitle(baseTitle),
+      content: _postProcessContent(
+        baseContent,
+        baseTitle,
+        chapterId: chapter.id,
+      ),
+    );
+    _resolvedChapterSnapshotByChapterId[chapter.id] = snapshot;
+    return snapshot;
+  }
+
+  void _pruneResolvedChapterCachesIfNeeded() {
+    final readableChapters = _effectiveReadableChapters();
+    final activeChapterCount = readableChapters.length;
+    final shouldPruneResolved =
+        _resolvedChapterSnapshotByChapterId.length > activeChapterCount + 8;
+    final shouldPruneImageMeta =
+        _chapterImageMetaSnapshotByChapterId.length > activeChapterCount + 8;
+    if (!shouldPruneResolved && !shouldPruneImageMeta) {
+      return;
+    }
+    final activeChapterIds =
+        readableChapters.map((chapter) => chapter.id).toSet();
+    if (shouldPruneResolved) {
+      _resolvedChapterSnapshotByChapterId.removeWhere(
+        (chapterId, _) => !activeChapterIds.contains(chapterId),
+      );
+    }
+    if (shouldPruneImageMeta) {
+      _chapterImageMetaSnapshotByChapterId.removeWhere(
+        (chapterId, _) => !activeChapterIds.contains(chapterId),
+      );
+    }
+  }
+
+  _ResolvedChapterSnapshot _resolveChapterSnapshot(
+    int chapterIndex, {
+    bool allowStale = false,
+  }) {
+    final chapter = _chapters[chapterIndex];
+    if (allowStale) {
+      final cached = _resolvedChapterSnapshotByChapterId[chapter.id];
+      if (cached != null) {
+        return cached;
+      }
+    }
+    final stage = _replaceStageCache[chapter.id];
+    return _resolveChapterSnapshotFromBase(
+      chapter: chapter,
+      baseTitle: stage?.title ?? chapter.title,
+      baseContent: stage?.content ?? (chapter.content ?? ''),
+    );
+  }
+
+  bool _isChapterSnapshotFresh(int chapterIndex) {
+    final chapter = _chapters[chapterIndex];
+    final stage = _replaceStageCache[chapter.id];
+    final baseTitle = stage?.title ?? chapter.title;
+    final baseContent = stage?.content ?? (chapter.content ?? '');
+    final cached = _resolvedChapterSnapshotByChapterId[chapter.id];
+    if (cached == null) {
+      return false;
+    }
+    return cached.postProcessSignature ==
+            _chapterPostProcessSignature(chapter.id) &&
+        cached.baseTitleHash == baseTitle.hashCode &&
+        cached.baseContentHash == baseContent.hashCode;
+  }
+
+  _ChapterImageMetaSnapshot _resolveChapterImageMetaSnapshot(
+    _ResolvedChapterSnapshot snapshot,
+  ) {
+    final contentHash = snapshot.content.hashCode;
+    final cached = _chapterImageMetaSnapshotByChapterId[snapshot.chapterId];
+    if (cached != null &&
+        cached.postProcessSignature == snapshot.postProcessSignature &&
+        cached.contentHash == contentHash) {
+      return cached;
+    }
+
+    final next = _ChapterImageMetaSnapshot(
+      chapterId: snapshot.chapterId,
+      postProcessSignature: snapshot.postProcessSignature,
+      contentHash: contentHash,
+      metas: _collectUniqueImageMarkerMetas(
+        snapshot.content,
+        maxCount: _persistedImageSizeSnapshotMaxEntries,
+      ),
+    );
+
+    _chapterImageMetaSnapshotByChapterId.remove(snapshot.chapterId);
+    _chapterImageMetaSnapshotByChapterId[snapshot.chapterId] = next;
+    while (_chapterImageMetaSnapshotByChapterId.length >
+        _chapterImageMetaSnapshotMaxEntries) {
+      _chapterImageMetaSnapshotByChapterId.remove(
+        _chapterImageMetaSnapshotByChapterId.keys.first,
+      );
+    }
+    return next;
+  }
+
+  void _cacheCurrentChapterImageMetasFromSnapshot(
+    _ResolvedChapterSnapshot snapshot,
+  ) {
+    _chapterImageMetaByCacheKey.clear();
+    final metas = _resolveChapterImageMetaSnapshot(snapshot).metas;
+    for (final meta in metas) {
+      final key = ReaderImageMarkerCodec.normalizeResolvedSizeKey(meta.src);
+      if (key.isEmpty) continue;
+      _chapterImageMetaByCacheKey[key] = meta;
+    }
+  }
+
+  void _handlePageFactoryContentChanged() {
+    if (!mounted || _chapters.isEmpty) return;
+    _screenOffTimerStart();
+
+    final factoryChapterIndex = _pageFactory.currentChapterIndex;
+    if (factoryChapterIndex < 0 || factoryChapterIndex >= _chapters.length) {
+      return;
+    }
+
+    final chapterSnapshotFreshBeforeResolve =
+        _isChapterSnapshotFresh(factoryChapterIndex);
+    final chapterChanged = factoryChapterIndex != _currentChapterIndex;
+    final snapshot = _resolveChapterSnapshot(factoryChapterIndex);
+    final chapterPayloadChanged = chapterChanged ||
+        _currentTitle != snapshot.title ||
+        _currentContent != snapshot.content;
+    setState(() {
+      _currentChapterIndex = factoryChapterIndex;
+      if (chapterPayloadChanged) {
+        _currentTitle = snapshot.title;
+        _currentContent = snapshot.content;
+      }
+    });
+    if (chapterPayloadChanged) {
+      _cacheCurrentChapterImageMetasFromSnapshot(snapshot);
+    }
+    unawaited(_saveProgress());
+    if (chapterChanged) {
+      _syncReadAloudChapterContext();
+      unawaited(_prefetchNeighborChapters(centerIndex: factoryChapterIndex));
+    }
+
+    final shouldRefreshFactoryAroundCurrent =
+        _hasDeferredChapterTransformRefresh &&
+            !chapterSnapshotFreshBeforeResolve &&
+            _settings.pageTurnMode != PageTurnMode.scroll;
+    if (shouldRefreshFactoryAroundCurrent) {
+      _syncPageFactoryChapters(
+        keepPosition: true,
+        preferCachedForFarChapters: true,
+        centerIndex: factoryChapterIndex,
+      );
+      _paginateContentLogicOnly();
+    }
+
+    if (!chapterChanged) {
+      _syncCurrentFactoryChapterLoadingState();
+      return;
+    }
+
+    final chapter = _chapters[factoryChapterIndex];
+    final hasContent = (chapter.content ?? '').trim().isNotEmpty;
+    if (hasContent) {
+      _syncCurrentFactoryChapterLoadingState();
+      return;
+    }
+    if (_isHydratingChapterFromPageFactory) {
+      _pendingHydratingChapterFromPageFactoryIndex = factoryChapterIndex;
+      _syncCurrentFactoryChapterLoadingState();
+      return;
+    }
+
+    unawaited(_hydrateCurrentFactoryChapter(factoryChapterIndex));
+  }
+
+  Future<void> _hydrateCurrentFactoryChapter(int index) async {
+    if (index < 0 || index >= _chapters.length) return;
+    if (_isHydratingChapterFromPageFactory) {
+      _pendingHydratingChapterFromPageFactoryIndex = index;
+      _syncCurrentFactoryChapterLoadingState();
+      return;
+    }
+
+    _isHydratingChapterFromPageFactory = true;
+    _activeHydratingChapterFromPageFactoryIndex = index;
+    _syncCurrentFactoryChapterLoadingState();
+    try {
+      await _prefetchChapterIfNeeded(index, showLoading: true);
+    } finally {
+      _isHydratingChapterFromPageFactory = false;
+      _activeHydratingChapterFromPageFactoryIndex = null;
+      final pendingIndex = _pendingHydratingChapterFromPageFactoryIndex;
+      _pendingHydratingChapterFromPageFactoryIndex = null;
+      _syncCurrentFactoryChapterLoadingState();
+      if (pendingIndex != null &&
+          pendingIndex >= 0 &&
+          pendingIndex < _chapters.length &&
+          pendingIndex != index) {
+        unawaited(_hydrateCurrentFactoryChapter(pendingIndex));
+      }
+    }
+  }
+
+  void _syncCurrentFactoryChapterLoadingState() {
+    if (!mounted) return;
+    if (_settings.pageTurnMode == PageTurnMode.scroll || _chapters.isEmpty) {
+      if (_isCurrentFactoryChapterLoading) {
+        setState(() {
+          _isCurrentFactoryChapterLoading = false;
+        });
+      }
+      return;
+    }
+
+    final factoryChapterIndex = _pageFactory.currentChapterIndex;
+    if (factoryChapterIndex < 0 || factoryChapterIndex >= _chapters.length) {
+      if (_isCurrentFactoryChapterLoading) {
+        setState(() {
+          _isCurrentFactoryChapterLoading = false;
+        });
+      }
+      return;
+    }
+
+    final chapter = _chapters[factoryChapterIndex];
+    final chapterContentEmpty = (chapter.content ?? '').trim().isEmpty;
+    final nextLoading = chapterContentEmpty &&
+        (_chapterContentInFlight.containsKey(chapter.id) ||
+            (_isHydratingChapterFromPageFactory &&
+                _activeHydratingChapterFromPageFactoryIndex ==
+                    factoryChapterIndex) ||
+            _pendingHydratingChapterFromPageFactoryIndex ==
+                factoryChapterIndex);
+    if (_isCurrentFactoryChapterLoading == nextLoading) return;
+    setState(() {
+      _isCurrentFactoryChapterLoading = nextLoading;
+    });
+  }
+
+  Future<void> _prefetchNeighborChapters({required int centerIndex}) async {
+    final readableChapterCount = _effectiveReadableChapterCount();
+    if (centerIndex < 0 || centerIndex >= readableChapterCount) return;
+
+    final tasks = <Future<void>>[];
+    final prevIndex = centerIndex - 1;
+    if (prevIndex >= 0) {
+      tasks.add(_prefetchChapterIfNeeded(prevIndex));
+    }
+    final nextIndex = centerIndex + 1;
+    if (nextIndex < readableChapterCount) {
+      tasks.add(_prefetchChapterIfNeeded(nextIndex));
+    }
+    if (tasks.isEmpty) return;
+
+    await Future.wait(tasks);
+  }
+
+  Future<void> _prefetchChapterIfNeeded(
+    int index, {
+    bool showLoading = false,
+  }) async {
+    final readableChapterCount = _effectiveReadableChapterCount();
+    if (index < 0 || index >= readableChapterCount) return;
+
+    final chapter = _chapters[index];
+    var content = chapter.content ?? '';
+    var fetchedFromSource = false;
+
+    try {
+      if (content.trim().isEmpty) {
+        final inFlight = _chapterContentInFlight[chapter.id];
+        if (inFlight != null) {
+          _syncCurrentFactoryChapterLoadingState();
+          if (showLoading) {
+            await inFlight;
+            _syncCurrentFactoryChapterLoadingState();
+          }
+          return;
+        }
+
+        final book = _bookRepo.getBookById(widget.bookId);
+        final chapterUrl = (chapter.url ?? '').trim();
+        final canFetchFromSource = chapterUrl.isNotEmpty &&
+            (book == null || !book.isLocal) &&
+            _resolveActiveSourceUrl(book).isNotEmpty;
+        if (!canFetchFromSource) return;
+
+        content = await _fetchChapterContent(
+          chapter: chapter,
+          index: index,
+          book: book,
+          showLoading: showLoading,
+        );
+        fetchedFromSource = true;
+      }
+      if (content.trim().isEmpty) return;
+
+      final previousStage = _replaceStageCache[chapter.id];
+      final stage = await _computeReplaceStage(
+        chapterId: chapter.id,
+        rawTitle: chapter.title,
+        rawContent: content,
+      );
+      final stageChanged = !identical(previousStage, stage);
+      final resolved = _resolveChapterSnapshotFromBase(
+        chapter: chapter,
+        baseTitle: stage.title,
+        baseContent: stage.content,
+      );
+
+      await _warmupPagedImageSizeCache(
+        resolved.content,
+        maxProbeCount: _prefetchImageWarmupMaxProbeCount,
+        maxDuration: _prefetchImageWarmupMaxDuration,
+      );
+
+      if (!mounted) return;
+      if (fetchedFromSource || stageChanged) {
+        _syncPageFactoryChapters(keepPosition: true);
+        if (_settings.pageTurnMode != PageTurnMode.scroll) {
+          _paginateContentLogicOnly();
+        }
+      }
+    } catch (_) {
+      // 预加载失败不影响当前阅读流程。
+    }
+  }
+
+  Future<String> _fetchChapterContent({
+    required Chapter chapter,
+    required int index,
+    Book? book,
+    bool showLoading = true,
+  }) async {
+    final inFlight = _chapterContentInFlight[chapter.id];
+    if (inFlight != null) {
+      return inFlight;
+    }
+    final task = _fetchChapterContentInternal(
+      chapter: chapter,
+      index: index,
+      book: book,
+      showLoading: showLoading,
+    );
+    _chapterContentInFlight[chapter.id] = task;
+    _syncCurrentFactoryChapterLoadingState();
+    try {
+      return await task;
+    } finally {
+      if (identical(_chapterContentInFlight[chapter.id], task)) {
+        _chapterContentInFlight.remove(chapter.id);
+      }
+      _syncCurrentFactoryChapterLoadingState();
+    }
+  }
+
+  Future<String> _fetchChapterContentInternal({
+    required Chapter chapter,
+    required int index,
+    Book? book,
+    bool showLoading = true,
+  }) async {
+    final sourceUrl = _resolveActiveSourceUrl(book);
+    if (sourceUrl.isEmpty) {
+      return chapter.content ?? '';
+    }
+    final source = _sourceRepo.getSourceByUrl(sourceUrl);
+    if (source == null) return chapter.content ?? '';
+
+    if (_currentSourceUrl != source.bookSourceUrl) {
+      _readerImageCookieHeaderByHost.clear();
+      _readerImageCookieLoadInFlight.clear();
+    }
+    _currentSourceUrl = source.bookSourceUrl;
+    _currentSourceName = source.bookSourceName;
+
+    if (showLoading && mounted) {
+      setState(() => _isLoadingChapter = true);
+    }
+
+    String content = chapter.content ?? '';
+    final stopwatch = Stopwatch()..start();
+    try {
+      final nextChapterUrl = (index + 1 < _chapters.length)
+          ? (_chapters[index + 1].url ?? '')
+          : null;
+      content = await _ruleEngine.getContent(
+        source,
+        chapter.url ?? '',
+        nextChapterUrl: nextChapterUrl,
+      );
+      if (content.isNotEmpty) {
+        await _chapterRepo.cacheChapterContent(chapter.id, content);
+        _chapters[index] =
+            chapter.copyWith(content: content, isDownloaded: true);
+      }
+    } finally {
+      stopwatch.stop();
+      if (stopwatch.elapsedMilliseconds > 0) {
+        _recentChapterFetchDuration = stopwatch.elapsed;
+      }
+      if (showLoading && mounted) {
+        setState(() => _isLoadingChapter = false);
+      }
+    }
+
+    return content;
+  }
+
+  String _resolveActiveSourceUrl(Book? book) {
+    final fromBook = (book?.sourceUrl ?? book?.sourceId ?? '').trim();
+    if (fromBook.isNotEmpty) return fromBook;
+    final fromSession = (widget.effectiveSourceUrl ?? '').trim();
+    if (fromSession.isNotEmpty) return fromSession;
+    return (_currentSourceUrl ?? '').trim();
   }
 
   Future<void> _restoreReaderImageSizeSnapshot() async {
@@ -8215,6 +9528,2607 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     _showToast(result.message ?? '导出失败');
   }
 
+  Future<void> _showChangeSourceEntryActions() async {
+    final selected =
+        await showCupertinoBottomDialog<ReaderLegacyChangeSourceMenuAction>(
+      context: context,
+      barrierDismissible: true,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('换源'),
+        actions: ReaderLegacyMenuHelper.buildChangeSourceMenuActions()
+            .map(
+              (action) => CupertinoActionSheetAction(
+                onPressed: () => Navigator.pop(sheetContext, action),
+                child:
+                    Text(ReaderLegacyMenuHelper.changeSourceMenuLabel(action)),
+              ),
+            )
+            .toList(growable: false),
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (selected == null) return;
+    switch (selected) {
+      case ReaderLegacyChangeSourceMenuAction.chapter:
+        await _showSwitchSourceChapterMenu();
+        return;
+      case ReaderLegacyChangeSourceMenuAction.book:
+        await _showSwitchSourceBookMenu();
+        return;
+    }
+  }
+
+  Future<void> _handleTopMenuChangeSourceTap() async {
+    _closeReaderMenuOverlay();
+    await _showSwitchSourceBookMenu();
+  }
+
+  Future<void> _handleTopMenuChangeSourceLongPress() async {
+    _closeReaderMenuOverlay();
+    await _showChangeSourceEntryActions();
+  }
+
+  Future<void> _handleTopMenuRefreshTap() async {
+    _closeReaderMenuOverlay();
+    await _runLegacyDefaultRefreshAction();
+  }
+
+  Future<void> _handleTopMenuRefreshLongPress() async {
+    _closeReaderMenuOverlay();
+    await _showRefreshEntryActions();
+  }
+
+  Future<void> _handleTopMenuOfflineCacheTap() async {
+    _closeReaderMenuOverlay();
+    await _showOfflineCacheDialogFromMenu();
+  }
+
+  Future<void> _handleTopMenuTocRuleTap() async {
+    _closeReaderMenuOverlay();
+    await _showTxtTocRuleDialogFromMenu();
+  }
+
+  Future<void> _handleTopMenuSetCharsetTap() async {
+    _closeReaderMenuOverlay();
+    await _showCharsetConfigFromMenu();
+  }
+
+  Future<void> _showOfflineCacheDialogFromMenu() async {
+    if (_offlineCacheRunning) {
+      _showToast('离线缓存进行中，请稍候');
+      return;
+    }
+    if (_isCurrentBookLocal()) {
+      return;
+    }
+    if (_chapters.isEmpty) {
+      _showToast('当前目录为空，无法离线缓存');
+      return;
+    }
+
+    final input = await _showOfflineCacheRangeInputDialog();
+    if (input == null) return;
+
+    final range = _resolveOfflineCacheRange(
+      startText: input.startChapter,
+      endText: input.endChapter,
+      totalChapters: _chapters.length,
+    );
+    if (range == null) {
+      _showToast('章节范围输入无效');
+      return;
+    }
+    if (range.endIndex < range.startIndex) {
+      _showToast('离线缓存范围为空');
+      return;
+    }
+
+    await _cacheChapterRangeFromMenu(range: range);
+  }
+
+  Future<_ReaderOfflineCacheInput?> _showOfflineCacheRangeInputDialog() async {
+    final totalChapters = _chapters.length;
+    if (totalChapters <= 0) return null;
+    final defaultStartChapter =
+        (_currentChapterIndex + 1).clamp(1, totalChapters).toInt();
+    final startController = TextEditingController(
+      text: defaultStartChapter.toString(),
+    );
+    final endController = TextEditingController(
+      text: totalChapters.toString(),
+    );
+    try {
+      return await showCupertinoBottomDialog<_ReaderOfflineCacheInput>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('离线缓存'),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '缓存章节范围（1-$totalChapters）',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                CupertinoTextField(
+                  controller: startController,
+                  placeholder: '开始章节',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    signed: false,
+                    decimal: false,
+                  ),
+                  clearButtonMode: OverlayVisibilityMode.editing,
+                ),
+                const SizedBox(height: 8),
+                CupertinoTextField(
+                  controller: endController,
+                  placeholder: '结束章节',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    signed: false,
+                    decimal: false,
+                  ),
+                  clearButtonMode: OverlayVisibilityMode.editing,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('取消'),
+            ),
+            CupertinoDialogAction(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  _ReaderOfflineCacheInput(
+                    startChapter: startController.text,
+                    endChapter: endController.text,
+                  ),
+                );
+              },
+              child: const Text('确定'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      startController.dispose();
+      endController.dispose();
+    }
+  }
+
+  _ReaderOfflineCacheRange? _resolveOfflineCacheRange({
+    required String startText,
+    required String endText,
+    required int totalChapters,
+  }) {
+    if (totalChapters <= 0) return null;
+    final startRaw = startText.trim();
+    final endRaw = endText.trim();
+    final startInput = startRaw.isEmpty ? 0 : int.tryParse(startRaw);
+    if (startInput == null) return null;
+    final endInput = endRaw.isEmpty ? totalChapters : int.tryParse(endRaw);
+    if (endInput == null) return null;
+    final maxIndex = totalChapters - 1;
+    final startIndex = (startInput - 1).clamp(0, maxIndex).toInt();
+    final endIndex = (endInput - 1).clamp(0, maxIndex).toInt();
+    return _ReaderOfflineCacheRange(
+      startIndex: startIndex,
+      endIndex: endIndex,
+    );
+  }
+
+  Future<void> _cacheChapterRangeFromMenu({
+    required _ReaderOfflineCacheRange range,
+  }) async {
+    if (_chapters.isEmpty) return;
+    final maxIndex = _chapters.length - 1;
+    final startIndex = range.startIndex.clamp(0, maxIndex).toInt();
+    final endIndex = range.endIndex.clamp(0, maxIndex).toInt();
+    final requestedCount =
+        endIndex >= startIndex ? endIndex - startIndex + 1 : 0;
+    if (requestedCount <= 0) {
+      _showToast('离线缓存范围为空');
+      return;
+    }
+
+    var successCount = 0;
+    var skippedCount = 0;
+    var failureCount = 0;
+    final book = _bookRepo.getBookById(widget.bookId);
+
+    if (mounted) {
+      setState(() {
+        _offlineCacheRunning = true;
+        _isLoadingChapter = true;
+      });
+    } else {
+      _offlineCacheRunning = true;
+    }
+
+    try {
+      for (var index = startIndex; index <= endIndex; index += 1) {
+        final chapter = _chapters[index];
+        final cachedContent = (chapter.content ?? '').trim();
+        if (chapter.isDownloaded && cachedContent.isNotEmpty) {
+          skippedCount += 1;
+          continue;
+        }
+        try {
+          final content = await _fetchChapterContent(
+            chapter: chapter,
+            index: index,
+            book: book,
+            showLoading: false,
+          );
+          if (content.trim().isNotEmpty) {
+            successCount += 1;
+            continue;
+          }
+          failureCount += 1;
+          ExceptionLogService().record(
+            node: 'reader.menu.offline_cache.empty_content',
+            message: '离线缓存章节正文为空',
+            error: 'empty_content',
+            context: <String, dynamic>{
+              'bookId': widget.bookId,
+              'bookTitle': widget.bookTitle,
+              'chapterIndex': index,
+              'chapterTitle': chapter.title,
+              'chapterUrl': chapter.url,
+            },
+          );
+        } catch (error, stackTrace) {
+          failureCount += 1;
+          ExceptionLogService().record(
+            node: 'reader.menu.offline_cache.fetch_failed',
+            message: '离线缓存章节失败',
+            error: error,
+            stackTrace: stackTrace,
+            context: <String, dynamic>{
+              'bookId': widget.bookId,
+              'bookTitle': widget.bookTitle,
+              'chapterIndex': index,
+              'chapterTitle': chapter.title,
+              'chapterUrl': chapter.url,
+            },
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _offlineCacheRunning = false;
+          _isLoadingChapter = false;
+        });
+      } else {
+        _offlineCacheRunning = false;
+      }
+    }
+
+    if (!mounted) return;
+    _showToast(
+      _buildOfflineCacheSummary(
+        requestedCount: requestedCount,
+        successCount: successCount,
+        skippedCount: skippedCount,
+        failureCount: failureCount,
+      ),
+    );
+  }
+
+  String _buildOfflineCacheSummary({
+    required int requestedCount,
+    required int successCount,
+    required int skippedCount,
+    required int failureCount,
+  }) {
+    final parts = <String>[
+      '新增$successCount章',
+      if (skippedCount > 0) '已缓存$skippedCount章',
+      if (failureCount > 0) '失败$failureCount章',
+    ];
+    return '离线缓存完成（共$requestedCount章）：${parts.join('，')}';
+  }
+
+  Future<void> _showRefreshEntryActions() async {
+    final selected =
+        await showCupertinoBottomDialog<ReaderLegacyRefreshMenuAction>(
+      context: context,
+      barrierDismissible: true,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('刷新'),
+        actions: ReaderLegacyMenuHelper.buildRefreshMenuActions()
+            .map(
+              (action) => CupertinoActionSheetAction(
+                onPressed: () => Navigator.pop(sheetContext, action),
+                child: Text(ReaderLegacyMenuHelper.refreshMenuLabel(action)),
+              ),
+            )
+            .toList(growable: false),
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+    if (selected == null) return;
+    await _executeLegacyRefreshMenuAction(selected);
+  }
+
+  Future<void> _executeLegacyRefreshMenuAction(
+    ReaderLegacyRefreshMenuAction action,
+  ) async {
+    if (!_canRefreshChapterContentFromSource()) {
+      _refreshChapter();
+      return;
+    }
+    final selection = ReaderRefreshScopeHelper.selectionFromLegacyAction(
+      action: action,
+      currentChapterIndex: _currentChapterIndex,
+    );
+    await _refreshChapterContentFromSource(
+      startIndex: selection.startIndex,
+      clearFollowing: selection.clearFollowing,
+    );
+  }
+
+  bool _canRefreshChapterContentFromSource() {
+    final book = _bookRepo.getBookById(widget.bookId);
+    if (book?.isLocal == true) {
+      return false;
+    }
+    final sourceUrl = _resolveActiveSourceUrl(book);
+    return sourceUrl.isNotEmpty;
+  }
+
+  Future<void> _refreshChapterContentFromSource({
+    required int startIndex,
+    required bool clearFollowing,
+  }) async {
+    final result = ReaderRefreshScopeHelper.clearCachedRange(
+      chapters: _chapters,
+      startIndex: startIndex,
+      clearFollowing: clearFollowing,
+    );
+    if (!result.hasRange) {
+      return;
+    }
+
+    if (!widget.isEphemeral && result.updates.isNotEmpty) {
+      await _chapterRepo.addChapters(result.updates);
+    }
+
+    if (!mounted) return;
+    setState(() {
+      for (var index = result.startIndex;
+          index <= result.endIndex;
+          index += 1) {
+        final oldId = _chapters[index].id;
+        _replaceStageCache.remove(oldId);
+        _catalogDisplayTitleCacheByChapterId.remove(oldId);
+        _chapterContentInFlight.remove(oldId);
+      }
+      _chapters = result.nextChapters;
+    });
+
+    await _loadChapter(
+      _clampChapterIndexToReadableRange(_currentChapterIndex),
+      restoreOffset: true,
+    );
+  }
+
+  Future<void> _executeLegacyReadMenuAction(
+    ReaderLegacyReadMenuAction action,
+  ) async {
+    switch (action) {
+      case ReaderLegacyReadMenuAction.changeSource:
+        await _showSwitchSourceBookMenu();
+        return;
+      case ReaderLegacyReadMenuAction.refresh:
+        await _runLegacyDefaultRefreshAction();
+        return;
+      case ReaderLegacyReadMenuAction.download:
+        await _showOfflineCacheDialogFromMenu();
+        return;
+      case ReaderLegacyReadMenuAction.tocRule:
+        await _showTxtTocRuleDialogFromMenu();
+        return;
+      case ReaderLegacyReadMenuAction.setCharset:
+        await _showCharsetConfigFromMenu();
+        return;
+      case ReaderLegacyReadMenuAction.addBookmark:
+        await _openAddBookmarkDialog();
+        return;
+      case ReaderLegacyReadMenuAction.editContent:
+        await _openContentEditFromMenu();
+        return;
+      case ReaderLegacyReadMenuAction.pageAnim:
+        await _showBookPageAnimConfigFromMenu();
+        return;
+      case ReaderLegacyReadMenuAction.getProgress:
+        await _pullBookProgressFromWebDav();
+        return;
+      case ReaderLegacyReadMenuAction.coverProgress:
+        await _pushBookProgressToWebDav();
+        return;
+      case ReaderLegacyReadMenuAction.reverseContent:
+        await _reverseCurrentChapterContentFromMenu();
+        return;
+      case ReaderLegacyReadMenuAction.simulatedReading:
+        await _openSimulatedReadingFromMenu();
+        return;
+      case ReaderLegacyReadMenuAction.enableReplace:
+        await _toggleReplaceRuleState();
+        return;
+      case ReaderLegacyReadMenuAction.sameTitleRemoved:
+        await _toggleSameTitleRemovedFromMenu();
+        return;
+      case ReaderLegacyReadMenuAction.reSegment:
+        await _toggleReSegmentFromMenu();
+        return;
+      case ReaderLegacyReadMenuAction.enableReview:
+        // legado 当前代码中该入口默认隐藏且事件分支已注释，保持 no-op。
+        return;
+      case ReaderLegacyReadMenuAction.delRubyTag:
+        await _toggleEpubTagCleanupFromMenu(ruby: true);
+        return;
+      case ReaderLegacyReadMenuAction.delHTag:
+        await _toggleEpubTagCleanupFromMenu(ruby: false);
+        return;
+      case ReaderLegacyReadMenuAction.imageStyle:
+        await _openImageStyleFromMenu();
+        return;
+      case ReaderLegacyReadMenuAction.updateToc:
+        final isLocalBook = _isCurrentBookLocal();
+        if (mounted) {
+          setState(() => _isLoadingChapter = true);
+        }
+        try {
+          await _refreshCatalogFromSource();
+        } catch (e, stackTrace) {
+          ExceptionLogService().record(
+            node: 'reader.menu.update_toc.failed',
+            message: '阅读页更新目录失败',
+            error: e,
+            stackTrace: stackTrace,
+            context: <String, dynamic>{
+              'bookId': widget.bookId,
+              'bookTitle': widget.bookTitle,
+              'isLocalBook': isLocalBook,
+              'currentSourceUrl': _currentSourceUrl,
+            },
+          );
+          if (!mounted) return;
+          _showToast(
+            _legacyUpdateTocErrorMessage(
+              isLocalBook: isLocalBook,
+              error: e,
+            ),
+          );
+        } finally {
+          if (mounted) {
+            setState(() => _isLoadingChapter = false);
+          }
+        }
+        return;
+      case ReaderLegacyReadMenuAction.effectiveReplaces:
+        await _openEffectiveReplacesFromMenu();
+        return;
+      case ReaderLegacyReadMenuAction.log:
+        await showAppLogDialog(context);
+        return;
+      case ReaderLegacyReadMenuAction.help:
+        await _openReadMenuHelpFromMenu();
+        return;
+    }
+  }
+
+  Future<void> _openReadMenuHelpFromMenu() async {
+    try {
+      final markdownText =
+          await rootBundle.loadString('assets/web/help/md/readMenuHelp.md');
+      if (!mounted) return;
+      await showAppHelpDialog(context, markdownText: markdownText);
+    } catch (error) {
+      if (!mounted) return;
+      await showCupertinoBottomDialog<void>(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('帮助'),
+          content: Text('帮助文档加载失败：$error'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _runLegacyDefaultRefreshAction() async {
+    await _executeLegacyRefreshMenuAction(
+      ReaderLegacyMenuHelper.defaultRefreshAction(),
+    );
+  }
+
+  BookSource? _resolveCurrentSource() {
+    final sourceUrl = (_currentSourceUrl ?? '').trim();
+    if (sourceUrl.isEmpty) return null;
+    return _sourceRepo.getSourceByUrl(sourceUrl);
+  }
+
+  String _resolvedCurrentChapterUrlForTopMenu() {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      return '';
+    }
+    final chapter = _chapters[_currentChapterIndex];
+    final source = _resolveCurrentSource();
+    final bookUrl = _bookRepo.getBookById(widget.bookId)?.bookUrl;
+    return ReaderTopBarActionHelper.resolveChapterUrl(
+      chapterUrl: chapter.url,
+      bookUrl: bookUrl,
+      sourceUrl: source?.bookSourceUrl ?? _currentSourceUrl,
+    );
+  }
+
+  Future<void> _openBookInfoFromTopMenu() async {
+    final book = _bookRepo.getBookById(widget.bookId);
+    if (book == null) {
+      _showToast('当前会话未关联书架书籍，无法打开书籍详情');
+      return;
+    }
+
+    await Navigator.of(context, rootNavigator: true).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SearchBookInfoView.fromBookshelf(book: book),
+      ),
+    );
+    if (!mounted) return;
+    _refreshCurrentSourceName();
+    setState(() {});
+  }
+
+  Future<void> _openChapterLinkFromTopMenu() async {
+    if (_isCurrentBookLocal()) {
+      _showToast('本地书籍不支持打开章节链接');
+      return;
+    }
+
+    final chapterUrl = _resolvedCurrentChapterUrlForTopMenu();
+    if (chapterUrl.isEmpty) {
+      _showToast('当前章节链接为空');
+      return;
+    }
+    if (!ReaderTopBarActionHelper.isHttpUrl(chapterUrl)) {
+      _showToast('当前章节链接不是有效网页地址');
+      return;
+    }
+    final uri = Uri.tryParse(chapterUrl);
+    if (uri == null) {
+      _showToast('当前章节链接不是有效网页地址');
+      return;
+    }
+
+    if (_settingsService.readerChapterUrlOpenInBrowser) {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        _showToast('打开浏览器失败');
+      }
+      return;
+    }
+
+    final source = _resolveCurrentSource();
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceWebVerifyView(
+          initialUrl: chapterUrl,
+          sourceOrigin: source?.bookSourceUrl ?? (_currentSourceUrl ?? ''),
+          sourceName: source?.bookSourceName ?? '',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleChapterLinkOpenModeFromTopMenu() async {
+    if (_isCurrentBookLocal()) {
+      _showToast('本地书籍不支持章节链接打开');
+      return;
+    }
+
+    final currentOpenInBrowser = _settingsService.readerChapterUrlOpenInBrowser;
+    final nextOpenInBrowser = await showCupertinoBottomDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('章节链接打开方式'),
+        content: Text(
+          '\n当前：${currentOpenInBrowser ? '浏览器打开' : '应用内网页打开'}',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('应用内网页打开'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('浏览器打开'),
+          ),
+        ],
+      ),
+    );
+    if (nextOpenInBrowser == null ||
+        nextOpenInBrowser == currentOpenInBrowser) {
+      return;
+    }
+
+    await _settingsService.saveReaderChapterUrlOpenInBrowser(
+      nextOpenInBrowser,
+    );
+    if (!mounted) return;
+    _showToast(
+      nextOpenInBrowser ? '已切换为浏览器打开章节链接' : '已切换为应用内网页打开章节链接',
+    );
+  }
+
+  bool? _resolveCurrentChapterIsVip() {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      return null;
+    }
+    final chapterUrl =
+        _normalizeChapterUrl(_chapters[_currentChapterIndex].url);
+    if (chapterUrl.isEmpty) return null;
+    return _chapterVipByUrl[chapterUrl];
+  }
+
+  bool? _resolveCurrentChapterIsPay() {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      return null;
+    }
+    final chapterUrl =
+        _normalizeChapterUrl(_chapters[_currentChapterIndex].url);
+    if (chapterUrl.isEmpty) return null;
+    return _chapterPayByUrl[chapterUrl];
+  }
+
+  void _cacheChapterPayFlags(List<TocItem> toc) {
+    _chapterVipByUrl.clear();
+    _chapterPayByUrl.clear();
+    for (final item in toc) {
+      final url = _normalizeChapterUrl(item.url);
+      if (url.isEmpty) continue;
+      _chapterVipByUrl[url] = item.isVip;
+      _chapterPayByUrl[url] = item.isPay;
+    }
+  }
+
+  Future<void> _ensureCurrentChapterPayFlags(BookSource source) async {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      return;
+    }
+    final chapterUrl =
+        _normalizeChapterUrl(_chapters[_currentChapterIndex].url);
+    if (chapterUrl.isEmpty) {
+      return;
+    }
+    if (_chapterVipByUrl.containsKey(chapterUrl) &&
+        _chapterPayByUrl.containsKey(chapterUrl)) {
+      return;
+    }
+
+    final book = _bookRepo.getBookById(widget.bookId);
+    if (book == null || book.isLocal) {
+      return;
+    }
+    final bookUrl = (book.bookUrl ?? '').trim();
+    if (bookUrl.isEmpty) {
+      return;
+    }
+
+    try {
+      final detail = await _ruleEngine.getBookInfo(
+        source,
+        bookUrl,
+        clearRuntimeVariables: true,
+      );
+      final primaryTocUrl =
+          detail?.tocUrl.isNotEmpty == true ? detail!.tocUrl : bookUrl;
+      final toc = await _ruleEngine.getToc(
+        source,
+        primaryTocUrl,
+        clearRuntimeVariables: false,
+      );
+      if (toc.isEmpty) {
+        return;
+      }
+      _cacheChapterPayFlags(toc);
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'reader.menu.chapter_pay.resolve_flag_failed',
+        message: '章节购买入口状态计算失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'bookId': widget.bookId,
+          'bookTitle': widget.bookTitle,
+          'sourceUrl': source.bookSourceUrl,
+          'chapterUrl': chapterUrl,
+        },
+      );
+    }
+  }
+
+  Future<void> _showSourceActionsMenu() async {
+    _closeReaderMenuOverlay();
+    if (_isCurrentBookLocal()) {
+      _showToast('本地书籍不支持书源操作');
+      return;
+    }
+
+    final source = _resolveCurrentSource();
+    if (source == null) {
+      _showToast('未找到当前书源');
+      return;
+    }
+
+    await _ensureCurrentChapterPayFlags(source);
+
+    final hasLogin = ReaderSourceActionHelper.hasLoginUrl(source.loginUrl);
+    final showChapterPay = ReaderSourceActionHelper.shouldShowChapterPay(
+      hasLoginUrl: hasLogin,
+      currentChapterIsVip: _resolveCurrentChapterIsVip(),
+      currentChapterIsPay: _resolveCurrentChapterIsPay(),
+    );
+
+    await showCupertinoBottomDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: Text(source.bookSourceName),
+        message: Text(source.bookSourceUrl),
+        actions: [
+          if (hasLogin)
+            CupertinoActionSheetAction(
+              onPressed: () async {
+                Navigator.pop(sheetContext);
+                await _openSourceLoginFromReader(source.bookSourceUrl);
+              },
+              child: const Text('登录'),
+            ),
+          if (showChapterPay)
+            CupertinoActionSheetAction(
+              onPressed: () async {
+                Navigator.pop(sheetContext);
+                await _triggerChapterPayAction(source.bookSourceUrl);
+              },
+              child: const Text('章节购买'),
+            ),
+          CupertinoActionSheetAction(
+            onPressed: () async {
+              Navigator.pop(sheetContext);
+              await _openSourceEditorFromReader(source.bookSourceUrl);
+            },
+            child: const Text('编辑书源'),
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () async {
+              Navigator.pop(sheetContext);
+              await _disableSourceFromReader(source.bookSourceUrl);
+            },
+            child: const Text('禁用书源'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(sheetContext),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSourceLoginFromReader(String sourceUrl) async {
+    final source = _sourceRepo.getSourceByUrl(sourceUrl);
+    if (source == null) {
+      _showToast('未找到书源');
+      return;
+    }
+
+    if (SourceLoginUiHelper.hasLoginUi(source.loginUi)) {
+      await Navigator.of(context).push(
+        CupertinoPageRoute<void>(
+          builder: (_) => SourceLoginFormView(source: source),
+        ),
+      );
+      return;
+    }
+
+    final resolvedUrl = SourceLoginUrlResolver.resolve(
+      baseUrl: source.bookSourceUrl,
+      loginUrl: source.loginUrl ?? '',
+    );
+    if (resolvedUrl.isEmpty) {
+      _showToast('当前书源未配置登录地址');
+      return;
+    }
+    final uri = Uri.tryParse(resolvedUrl);
+    final scheme = uri?.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') {
+      _showToast('登录地址不是有效网页地址');
+      return;
+    }
+
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => SourceLoginWebViewView(
+          source: source,
+          initialUrl: resolvedUrl,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _triggerChapterPayAction(String sourceUrl) async {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      _showToast('no chapter');
+      return;
+    }
+    final chapterIndex = _currentChapterIndex;
+    final chapter = _chapters[chapterIndex];
+    final chapterIsVip = _resolveCurrentChapterIsVip();
+    final chapterIsPay = _resolveCurrentChapterIsPay();
+
+    final confirmed = await showCupertinoBottomDialog<bool>(
+          context: context,
+          builder: (dialogContext) => CupertinoAlertDialog(
+            title: const Text('章节购买'),
+            content: Text(chapter.title),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('取消'),
+              ),
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('确定'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+
+    try {
+      final source = _sourceRepo.getSourceByUrl(sourceUrl);
+      if (source == null) {
+        throw StateError('no book source');
+      }
+      final payAction = (source.ruleContent?.payAction ?? '').trim();
+      if (payAction.isEmpty) {
+        throw StateError('no pay action');
+      }
+
+      final output = _evaluateChapterPayAction(
+        source: source,
+        chapter: chapter,
+        chapterIndex: chapterIndex,
+        chapterIsVip: chapterIsVip,
+        chapterIsPay: chapterIsPay,
+        payAction: payAction,
+      );
+      if (ReaderSourceActionHelper.isAbsoluteHttpUrl(output)) {
+        await Navigator.of(context).push(
+          CupertinoPageRoute<void>(
+            builder: (_) => SourceWebVerifyView(
+              initialUrl: output.trim(),
+              sourceOrigin: source.bookSourceUrl,
+              sourceName: source.bookSourceName,
+            ),
+          ),
+        );
+        return;
+      }
+      if (!ReaderSourceActionHelper.isLegadoTruthy(output)) {
+        return;
+      }
+
+      await _refreshCatalogAfterChapterPaySuccess(
+        chapterIndex: chapterIndex,
+      );
+    } catch (error, stackTrace) {
+      _recordChapterPayActionError(
+        error: error,
+        stackTrace: stackTrace,
+        sourceUrl: sourceUrl,
+        chapterIndex: chapterIndex,
+        chapterTitle: chapter.title,
+      );
+    }
+  }
+
+  String _evaluateChapterPayAction({
+    required BookSource source,
+    required Chapter chapter,
+    required int chapterIndex,
+    required bool? chapterIsVip,
+    required bool? chapterIsPay,
+    required String payAction,
+  }) {
+    final runtime = createJsRuntime();
+    final chapterUrl = (chapter.url ?? '').trim();
+    final book = _bookRepo.getBookById(widget.bookId);
+    final script = '''
+      (function() {
+        var source = {
+          bookSourceUrl: ${jsonEncode(source.bookSourceUrl)},
+          bookSourceName: ${jsonEncode(source.bookSourceName)},
+          loginUrl: ${jsonEncode(source.loginUrl ?? '')}
+        };
+        var book = {
+          id: ${jsonEncode(widget.bookId)},
+          name: ${jsonEncode(widget.bookTitle)},
+          author: ${jsonEncode(_bookAuthor)},
+          bookUrl: ${jsonEncode((book?.bookUrl ?? '').trim())}
+        };
+        var chapter = {
+          title: ${jsonEncode(chapter.title)},
+          url: ${jsonEncode(chapterUrl)},
+          index: $chapterIndex,
+          isVip: ${jsonEncode(chapterIsVip)},
+          isPay: ${jsonEncode(chapterIsPay)}
+        };
+        var baseUrl = chapter.url || book.bookUrl || source.bookSourceUrl || '';
+        var url = baseUrl;
+        var result = eval(${jsonEncode(payAction)});
+        if (result === undefined || result === null) return '';
+        if (typeof result === 'boolean') return result ? 'true' : 'false';
+        if (typeof result === 'string') return result;
+        try {
+          return JSON.stringify(result);
+        } catch (e) {
+          return String(result);
+        }
+      })()
+    ''';
+    return runtime.evaluate(script).trim();
+  }
+
+  Future<void> _refreshCatalogAfterChapterPaySuccess({
+    required int chapterIndex,
+  }) async {
+    if (_chapters.isEmpty ||
+        chapterIndex < 0 ||
+        chapterIndex >= _chapters.length) {
+      return;
+    }
+    final currentChapter = _chapters[chapterIndex];
+    final clearedChapter = currentChapter.copyWith(
+      content: null,
+      isDownloaded: false,
+    );
+    if (!widget.isEphemeral) {
+      await _chapterRepo.addChapters(<Chapter>[clearedChapter]);
+    }
+
+    if (mounted) {
+      setState(() {
+        _replaceStageCache.remove(currentChapter.id);
+        _catalogDisplayTitleCacheByChapterId.remove(currentChapter.id);
+        _chapterContentInFlight.remove(currentChapter.id);
+        _chapters[chapterIndex] = clearedChapter;
+      });
+    }
+
+    try {
+      await _refreshCatalogFromSource();
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'reader.menu.chapter_pay.refresh_toc_failed',
+        message: '章节购买后刷新目录失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'bookId': widget.bookId,
+          'bookTitle': widget.bookTitle,
+          'sourceUrl': _currentSourceUrl,
+          'chapterIndex': chapterIndex,
+          'chapterTitle': currentChapter.title,
+        },
+      );
+      if (mounted) {
+        _showToast(
+          _legacyUpdateTocErrorMessage(
+            isLocalBook: false,
+            error: error,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!mounted || _chapters.isEmpty) return;
+    final targetIndex = _clampChapterIndexToReadableRange(_currentChapterIndex);
+    await _loadChapter(
+      targetIndex,
+      restoreOffset: _settings.pageTurnMode == PageTurnMode.scroll,
+    );
+  }
+
+  void _recordChapterPayActionError({
+    required Object error,
+    required StackTrace stackTrace,
+    required String sourceUrl,
+    required int chapterIndex,
+    required String chapterTitle,
+  }) {
+    final reason = _normalizeReaderErrorMessage(error);
+    ExceptionLogService().record(
+      node: 'reader.menu.chapter_pay.failed',
+      message: '执行购买操作出错\n$reason',
+      error: error,
+      stackTrace: stackTrace,
+      context: <String, dynamic>{
+        'bookId': widget.bookId,
+        'bookTitle': widget.bookTitle,
+        'sourceUrl': sourceUrl,
+        'chapterIndex': chapterIndex,
+        'chapterTitle': chapterTitle,
+      },
+    );
+  }
+
+  Future<String?> _openSourceEditorFromReader(String sourceUrl) async {
+    final source = _sourceRepo.getSourceByUrl(sourceUrl);
+    if (source == null) {
+      _showToast('未找到书源');
+      return null;
+    }
+
+    final result = await Navigator.of(context).push<String?>(
+      CupertinoPageRoute<String?>(
+        builder: (_) => SourceEditView.fromSource(
+          source,
+          rawJson: _sourceRepo.getRawJsonByUrl(source.bookSourceUrl),
+        ),
+      ),
+    );
+    if (result == null) return null;
+    if (!mounted) return result;
+    _refreshCurrentSourceName();
+    setState(() {});
+    return result;
+  }
+
+  Future<void> _openSourceManageFromReader() async {
+    await Navigator.of(context, rootNavigator: true).push<void>(
+      CupertinoPageRoute<void>(
+        builder: (_) => const SourceListView(),
+      ),
+    );
+    if (!mounted) return;
+    _refreshCurrentSourceName();
+    setState(() {});
+  }
+
+  Future<void> _disableSourceFromReader(String sourceUrl) async {
+    final source = _sourceRepo.getSourceByUrl(sourceUrl);
+    if (source == null) {
+      _showToast('未找到书源');
+      return;
+    }
+    await _sourceRepo.updateSource(source.copyWith(enabled: false));
+    if (!mounted) return;
+    _refreshCurrentSourceName();
+    setState(() {});
+    _showToast('已禁用书源：${source.bookSourceName}');
+  }
+
+  Future<void> _deleteSourceByLegacyRule(String sourceUrl) async {
+    await _sourceRepo.deleteSource(sourceUrl);
+    await SourceVariableStore.removeVariable(sourceUrl);
+  }
+
+  Future<List<ReaderSourceSwitchCandidate>> _disableSourceSwitchCandidate({
+    required ReaderSourceSwitchCandidate candidate,
+    required List<ReaderSourceSwitchCandidate> currentCandidates,
+  }) async {
+    final source = _sourceRepo.getSourceByUrl(candidate.source.bookSourceUrl);
+    if (source != null) {
+      await _sourceRepo.updateSource(source.copyWith(enabled: false));
+    }
+    final targetSourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
+      candidate.source.bookSourceUrl,
+    );
+    final targetBookUrl = candidate.book.bookUrl.trim();
+    return currentCandidates.where((item) {
+      final sourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
+        item.source.bookSourceUrl,
+      );
+      if (sourceKey != targetSourceKey) {
+        return true;
+      }
+      if (targetBookUrl.isEmpty) {
+        return false;
+      }
+      return item.book.bookUrl.trim() != targetBookUrl;
+    }).toList(growable: false);
+  }
+
+  Future<List<ReaderSourceSwitchCandidate>> _deleteSourceSwitchCandidate({
+    required ReaderSourceSwitchCandidate candidate,
+    required List<ReaderSourceSwitchCandidate> currentCandidates,
+  }) async {
+    await _deleteSourceByLegacyRule(candidate.source.bookSourceUrl);
+    final targetSourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
+      candidate.source.bookSourceUrl,
+    );
+    final targetBookUrl = candidate.book.bookUrl.trim();
+    return currentCandidates.where((item) {
+      final sourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
+        item.source.bookSourceUrl,
+      );
+      if (sourceKey != targetSourceKey) {
+        return true;
+      }
+      if (targetBookUrl.isEmpty) {
+        return false;
+      }
+      return item.book.bookUrl.trim() != targetBookUrl;
+    }).toList(growable: false);
+  }
+
+  Future<List<ReaderSourceSwitchCandidate>> _topSourceSwitchCandidate({
+    required ReaderSourceSwitchCandidate candidate,
+    required List<ReaderSourceSwitchCandidate> currentCandidates,
+  }) async {
+    final source = _sourceRepo.getSourceByUrl(candidate.source.bookSourceUrl);
+    if (source == null) {
+      return List<ReaderSourceSwitchCandidate>.from(
+        currentCandidates,
+        growable: false,
+      );
+    }
+    final allSources = _sourceRepo.getAllSources();
+    if (allSources.isEmpty) {
+      return List<ReaderSourceSwitchCandidate>.from(
+        currentCandidates,
+        growable: false,
+      );
+    }
+    var minOrder = allSources.first.customOrder;
+    for (final item in allSources.skip(1)) {
+      if (item.customOrder < minOrder) {
+        minOrder = item.customOrder;
+      }
+    }
+    final updatedSource = source.copyWith(customOrder: minOrder - 1);
+    await _sourceRepo.updateSource(updatedSource);
+
+    final targetKey = ReaderSourceSwitchHelper.normalizeForCompare(
+      updatedSource.bookSourceUrl,
+    );
+    final updatedCandidates = currentCandidates.map((item) {
+      final itemKey = ReaderSourceSwitchHelper.normalizeForCompare(
+        item.source.bookSourceUrl,
+      );
+      if (itemKey != targetKey) {
+        return item;
+      }
+      return ReaderSourceSwitchCandidate(
+        source: updatedSource,
+        book: item.book,
+        chapterWordCountText: item.chapterWordCountText,
+        chapterWordCount: item.chapterWordCount,
+        respondTimeMs: item.respondTimeMs,
+      );
+    }).toList(growable: false);
+
+    return _reorderSourceSwitchCandidatesByCustomOrder(updatedCandidates);
+  }
+
+  Future<List<ReaderSourceSwitchCandidate>> _bottomSourceSwitchCandidate({
+    required ReaderSourceSwitchCandidate candidate,
+    required List<ReaderSourceSwitchCandidate> currentCandidates,
+  }) async {
+    final source = _sourceRepo.getSourceByUrl(candidate.source.bookSourceUrl);
+    if (source == null) {
+      return List<ReaderSourceSwitchCandidate>.from(
+        currentCandidates,
+        growable: false,
+      );
+    }
+    final allSources = _sourceRepo.getAllSources();
+    if (allSources.isEmpty) {
+      return List<ReaderSourceSwitchCandidate>.from(
+        currentCandidates,
+        growable: false,
+      );
+    }
+    var maxOrder = allSources.first.customOrder;
+    for (final item in allSources.skip(1)) {
+      if (item.customOrder > maxOrder) {
+        maxOrder = item.customOrder;
+      }
+    }
+    final updatedSource = source.copyWith(customOrder: maxOrder + 1);
+    await _sourceRepo.updateSource(updatedSource);
+
+    final targetKey = ReaderSourceSwitchHelper.normalizeForCompare(
+      updatedSource.bookSourceUrl,
+    );
+    final updatedCandidates = currentCandidates.map((item) {
+      final itemKey = ReaderSourceSwitchHelper.normalizeForCompare(
+        item.source.bookSourceUrl,
+      );
+      if (itemKey != targetKey) {
+        return item;
+      }
+      return ReaderSourceSwitchCandidate(
+        source: updatedSource,
+        book: item.book,
+        chapterWordCountText: item.chapterWordCountText,
+        chapterWordCount: item.chapterWordCount,
+        respondTimeMs: item.respondTimeMs,
+      );
+    }).toList(growable: false);
+
+    return _reorderSourceSwitchCandidatesByCustomOrder(updatedCandidates);
+  }
+
+  Future<List<ReaderSourceSwitchCandidate>>
+      _refreshEditedSourceSwitchCandidate({
+    required ReaderSourceSwitchCandidate editedCandidate,
+    required List<ReaderSourceSwitchCandidate> currentCandidates,
+    required Book currentBook,
+    required String savedSourceUrl,
+  }) async {
+    final oldSourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
+      editedCandidate.source.bookSourceUrl,
+    );
+    final nextSourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
+      savedSourceUrl,
+    );
+    final retained = <ReaderSourceSwitchCandidate>[];
+    var firstReplacedIndex = -1;
+    for (final item in currentCandidates) {
+      final key = ReaderSourceSwitchHelper.normalizeForCompare(
+        item.source.bookSourceUrl,
+      );
+      final shouldReplace = key == oldSourceKey || key == nextSourceKey;
+      if (shouldReplace) {
+        if (firstReplacedIndex < 0) {
+          firstReplacedIndex = retained.length;
+        }
+        continue;
+      }
+      retained.add(item);
+    }
+
+    final savedSource = _sourceRepo.getSourceByUrl(savedSourceUrl);
+    if (savedSource == null) {
+      return List<ReaderSourceSwitchCandidate>.from(
+        retained,
+        growable: false,
+      );
+    }
+
+    final refreshed = await _loadSourceSwitchCandidatesBySources(
+      currentBook: currentBook,
+      sourcesToSearch: <BookSource>[savedSource],
+      loadInfoEnabled: _changeSourceLoadInfo,
+      loadWordCountEnabled: _changeSourceLoadWordCount,
+      loadTocEnabled: _changeSourceLoadToc,
+      sourceDelaySeconds: _changeSourceDelaySeconds,
+    );
+    if (refreshed.isEmpty) {
+      return List<ReaderSourceSwitchCandidate>.from(
+        retained,
+        growable: false,
+      );
+    }
+
+    final merged = List<ReaderSourceSwitchCandidate>.from(
+      retained,
+      growable: true,
+    );
+    final insertIndex =
+        firstReplacedIndex < 0 || firstReplacedIndex > merged.length
+            ? merged.length
+            : firstReplacedIndex;
+    merged.insertAll(insertIndex, refreshed);
+    return List<ReaderSourceSwitchCandidate>.from(merged, growable: false);
+  }
+
+  Future<List<ReaderSourceSwitchCandidate>> _editSourceSwitchCandidate({
+    required ReaderSourceSwitchCandidate candidate,
+    required List<ReaderSourceSwitchCandidate> currentCandidates,
+    required Book currentBook,
+    required bool refreshAllAfterEdit,
+  }) async {
+    final savedSourceUrl =
+        await _openSourceEditorFromReader(candidate.source.bookSourceUrl);
+    if (savedSourceUrl == null) {
+      return List<ReaderSourceSwitchCandidate>.from(
+        currentCandidates,
+        growable: false,
+      );
+    }
+    if (refreshAllAfterEdit) {
+      return _startSourceSwitchCandidateSearch(
+        currentBook: currentBook,
+        currentCandidates: currentCandidates,
+        loadInfoEnabled: _changeSourceLoadInfo,
+        loadWordCountEnabled: _changeSourceLoadWordCount,
+        loadTocEnabled: _changeSourceLoadToc,
+        sourceDelaySeconds: _changeSourceDelaySeconds,
+      );
+    }
+    return _refreshEditedSourceSwitchCandidate(
+      editedCandidate: candidate,
+      currentCandidates: currentCandidates,
+      currentBook: currentBook,
+      savedSourceUrl: savedSourceUrl,
+    );
+  }
+
+  List<ReaderSourceSwitchCandidate> _reorderSourceSwitchCandidatesByCustomOrder(
+    List<ReaderSourceSwitchCandidate> candidates,
+  ) {
+    if (candidates.length <= 1) {
+      return List<ReaderSourceSwitchCandidate>.from(
+        candidates,
+        growable: false,
+      );
+    }
+    final sourceOrderByKey = <String, int>{
+      for (final source in _sourceRepo.getAllSources())
+        ReaderSourceSwitchHelper.normalizeForCompare(source.bookSourceUrl):
+            source.customOrder,
+    };
+    final indexed = candidates.asMap().entries.toList(growable: false);
+    indexed.sort((left, right) {
+      final leftKey = ReaderSourceSwitchHelper.normalizeForCompare(
+        left.value.source.bookSourceUrl,
+      );
+      final rightKey = ReaderSourceSwitchHelper.normalizeForCompare(
+        right.value.source.bookSourceUrl,
+      );
+      final leftOrder =
+          sourceOrderByKey[leftKey] ?? left.value.source.customOrder;
+      final rightOrder =
+          sourceOrderByKey[rightKey] ?? right.value.source.customOrder;
+      final orderCompare = leftOrder.compareTo(rightOrder);
+      if (orderCompare != 0) {
+        return orderCompare;
+      }
+      return left.key.compareTo(right.key);
+    });
+    return indexed.map((entry) => entry.value).toList(growable: false);
+  }
+
+  void _stopSourceSwitchCandidateSearch() {
+    final token = _sourceSwitchCandidateSearchCancelToken;
+    if (token == null || token.isCancelled) return;
+    token.cancel('source switch candidate search stopped by user');
+  }
+
+  Future<List<ReaderSourceSwitchCandidate>> _startSourceSwitchCandidateSearch({
+    required Book currentBook,
+    required List<ReaderSourceSwitchCandidate> currentCandidates,
+    bool? loadInfoEnabled,
+    bool? loadWordCountEnabled,
+    bool? loadTocEnabled,
+    int? sourceDelaySeconds,
+  }) async {
+    _stopSourceSwitchCandidateSearch();
+    final token = CancelToken();
+    _sourceSwitchCandidateSearchCancelToken = token;
+    try {
+      final searched = await _loadSourceSwitchCandidates(
+        currentBook: currentBook,
+        loadInfoEnabled: loadInfoEnabled ?? _changeSourceLoadInfo,
+        loadWordCountEnabled:
+            loadWordCountEnabled ?? _changeSourceLoadWordCount,
+        loadTocEnabled: loadTocEnabled ?? _changeSourceLoadToc,
+        sourceDelaySeconds: sourceDelaySeconds ?? _changeSourceDelaySeconds,
+        cancelToken: token,
+      );
+      if (token.isCancelled) {
+        return currentCandidates;
+      }
+      return searched;
+    } catch (_) {
+      if (token.isCancelled) {
+        return currentCandidates;
+      }
+      rethrow;
+    } finally {
+      if (identical(_sourceSwitchCandidateSearchCancelToken, token)) {
+        _sourceSwitchCandidateSearchCancelToken = null;
+      }
+    }
+  }
+
+  Book _buildCurrentBookForSourceSwitch() {
+    return _bookRepo.getBookById(widget.bookId) ??
+        Book(
+          id: widget.bookId,
+          title: widget.bookTitle,
+          author: _bookAuthor,
+          sourceId: _currentSourceUrl,
+          sourceUrl: _currentSourceUrl,
+          bookUrl: null,
+          latestChapter: _currentTitle,
+          totalChapters: _chapters.length,
+          currentChapter: _currentChapterIndex,
+          readProgress: _getBookProgress(),
+          isLocal: false,
+        );
+  }
+
+  SearchResult _copySourceSwitchSearchResult(
+    SearchResult source, {
+    required String lastChapter,
+  }) {
+    return SearchResult(
+      name: source.name,
+      author: source.author,
+      coverUrl: source.coverUrl,
+      intro: source.intro,
+      kind: source.kind,
+      lastChapter: lastChapter,
+      updateTime: source.updateTime,
+      wordCount: source.wordCount,
+      bookUrl: source.bookUrl,
+      sourceUrl: source.sourceUrl,
+      sourceName: source.sourceName,
+    );
+  }
+
+  String _resolveCurrentChapterTitleForSourceSwitch(Book currentBook) {
+    if (_chapters.isNotEmpty) {
+      final chapterIndex = currentBook.currentChapter.clamp(
+        0,
+        _chapters.length - 1,
+      );
+      final chapterTitle = _chapters[chapterIndex].title.trim();
+      if (chapterTitle.isNotEmpty) {
+        return chapterTitle;
+      }
+    }
+    return _currentTitle.trim();
+  }
+
+  String _buildSourceSwitchWordCountText({
+    required int chapterIndex,
+    required String chapterTitle,
+    required int wordCount,
+  }) {
+    final trimmedTitle = chapterTitle.trim();
+    final displayTitle = trimmedTitle.isEmpty ? '未知章节' : trimmedTitle;
+    final foldedTitle = displayTitle.length > 20
+        ? '${displayTitle.substring(0, 20)}…'
+        : displayTitle;
+    return '[${chapterIndex + 1}] $foldedTitle\n字数：$wordCount';
+  }
+
+  Future<
+      ({
+        SearchResult result,
+        String chapterWordCountText,
+        int chapterWordCount,
+        int respondTimeMs
+      })> _hydrateSourceSwitchSearchResult({
+    required Book currentBook,
+    required BookSource source,
+    required SearchResult result,
+    required bool loadInfoEnabled,
+    required bool loadTocEnabled,
+    required bool loadWordCountEnabled,
+    CancelToken? cancelToken,
+  }) async {
+    final bookUrl = result.bookUrl.trim();
+    if (bookUrl.isEmpty ||
+        (!loadInfoEnabled && !loadTocEnabled && !loadWordCountEnabled)) {
+      return (
+        result: result,
+        chapterWordCountText: '',
+        chapterWordCount: -1,
+        respondTimeMs: -1,
+      );
+    }
+
+    final detail = await _ruleEngine.getBookInfo(
+      source,
+      bookUrl,
+      clearRuntimeVariables: true,
+      cancelToken: cancelToken,
+    );
+    final detailLastChapter = detail?.lastChapter.trim() ?? '';
+    final tocUrl = detail?.tocUrl.trim().isNotEmpty == true
+        ? detail!.tocUrl.trim()
+        : bookUrl;
+    var toc = const <TocItem>[];
+    if (loadTocEnabled || loadWordCountEnabled) {
+      toc = await _ruleEngine.getToc(
+        source,
+        tocUrl,
+        clearRuntimeVariables: false,
+        cancelToken: cancelToken,
+      );
+    }
+
+    var nextLastChapter = result.lastChapter;
+    if (loadTocEnabled && toc.isNotEmpty) {
+      final latest = toc.last.name.trim();
+      if (latest.isNotEmpty) {
+        nextLastChapter = latest;
+      }
+    } else if (detailLastChapter.isNotEmpty &&
+        (loadInfoEnabled || loadWordCountEnabled || loadTocEnabled)) {
+      nextLastChapter = detailLastChapter;
+    } else if (loadTocEnabled) {
+      if (detailLastChapter.isNotEmpty) {
+        nextLastChapter = detailLastChapter;
+      }
+    }
+    final nextResult = nextLastChapter == result.lastChapter
+        ? result
+        : _copySourceSwitchSearchResult(
+            result,
+            lastChapter: nextLastChapter,
+          );
+    if (!loadWordCountEnabled || toc.isEmpty) {
+      return (
+        result: nextResult,
+        chapterWordCountText: '',
+        chapterWordCount: -1,
+        respondTimeMs: -1,
+      );
+    }
+
+    final parsedChapters = <Chapter>[];
+    for (final item in toc) {
+      final chapterTitle = item.name.trim();
+      final chapterUrl = item.url.trim();
+      if (chapterTitle.isEmpty || chapterUrl.isEmpty) continue;
+      parsedChapters.add(
+        Chapter(
+          id: '${widget.bookId}_switch_word_count_${parsedChapters.length}',
+          bookId: widget.bookId,
+          title: chapterTitle,
+          url: chapterUrl,
+          index: parsedChapters.length,
+        ),
+      );
+    }
+    if (parsedChapters.isEmpty) {
+      return (
+        result: nextResult,
+        chapterWordCountText: '',
+        chapterWordCount: -1,
+        respondTimeMs: -1,
+      );
+    }
+
+    final currentChapterTitle = _resolveCurrentChapterTitleForSourceSwitch(
+      currentBook,
+    );
+    final currentChapterIndex = currentBook.currentChapter.clamp(
+      0,
+      parsedChapters.length - 1,
+    );
+    final oldChapterCount = currentBook.totalChapters > 0
+        ? currentBook.totalChapters
+        : _chapters.length;
+    final targetChapterIndex =
+        ReaderSourceSwitchHelper.resolveTargetChapterIndex(
+      newChapters: parsedChapters,
+      currentChapterTitle: currentChapterTitle,
+      currentChapterIndex: currentChapterIndex,
+      oldChapterCount: oldChapterCount,
+    ).clamp(0, parsedChapters.length - 1);
+    final targetChapter = parsedChapters[targetChapterIndex];
+    final targetNextChapterUrl = targetChapterIndex + 1 < parsedChapters.length
+        ? parsedChapters[targetChapterIndex + 1].url
+        : null;
+
+    final startedAtMs = DateTime.now().millisecondsSinceEpoch;
+    try {
+      final content = await _ruleEngine.getContent(
+        source,
+        targetChapter.url ?? '',
+        nextChapterUrl: targetNextChapterUrl,
+        clearRuntimeVariables: false,
+        cancelToken: cancelToken,
+      );
+      final elapsedMs = DateTime.now().millisecondsSinceEpoch - startedAtMs;
+      final chapterWordCount = content.length;
+      return (
+        result: nextResult,
+        chapterWordCountText: _buildSourceSwitchWordCountText(
+          chapterIndex: targetChapterIndex,
+          chapterTitle: targetChapter.title,
+          wordCount: chapterWordCount,
+        ),
+        chapterWordCount: chapterWordCount,
+        respondTimeMs: elapsedMs,
+      );
+    } catch (error) {
+      if (cancelToken?.isCancelled == true) rethrow;
+      final elapsedMs = DateTime.now().millisecondsSinceEpoch - startedAtMs;
+      final message = _normalizeReaderErrorMessage(error);
+      final errorText = message.isEmpty ? '未知错误' : message;
+      return (
+        result: nextResult,
+        chapterWordCountText:
+            '[${targetChapterIndex + 1}] ${targetChapter.title}\n获取字数失败：$errorText',
+        chapterWordCount: -1,
+        respondTimeMs: elapsedMs,
+      );
+    }
+  }
+
+  Future<void> _handleChangeSourceLoadWordCountChanged(bool enabled) async {
+    _changeSourceLoadWordCount = enabled;
+    await _settingsService.saveChangeSourceLoadWordCount(enabled);
+  }
+
+  Future<void> _handleChangeSourceLoadInfoChanged(bool enabled) async {
+    _changeSourceLoadInfo = enabled;
+    await _settingsService.saveChangeSourceLoadInfo(enabled);
+  }
+
+  Future<void> _handleChangeSourceLoadTocChanged(bool enabled) async {
+    _changeSourceLoadToc = enabled;
+    await _settingsService.saveChangeSourceLoadToc(enabled);
+  }
+
+  Future<void> _handleChangeSourceCheckAuthorChanged(bool enabled) async {
+    _changeSourceCheckAuthor = enabled;
+    await _settingsService.saveChangeSourceCheckAuthor(enabled);
+  }
+
+  String _normalizeChangeSourceGroup(String group) {
+    return group.trim();
+  }
+
+  Future<void> _handleChangeSourceGroupChanged(String group) async {
+    final normalized = _normalizeChangeSourceGroup(group);
+    _changeSourceGroup = normalized;
+    await _settingsService.saveChangeSourceGroup(normalized);
+  }
+
+  List<String> _buildChangeSourceGroups() {
+    return SearchScopeGroupHelper.enabledGroupsFromSources(
+      _sourceRepo.getAllSources(),
+    );
+  }
+
+  List<BookSource> _scopeChangeSourceSourcesByGroup(
+    List<BookSource> enabledSources,
+  ) {
+    final selectedGroup = _normalizeChangeSourceGroup(_changeSourceGroup);
+    if (selectedGroup.isEmpty) {
+      return enabledSources;
+    }
+    final scopedSources = enabledSources.where((source) {
+      return SearchScope.splitSourceGroups(source.bookSourceGroup)
+          .contains(selectedGroup);
+    }).toList(growable: false);
+    if (scopedSources.isNotEmpty) {
+      return scopedSources;
+    }
+    _changeSourceGroup = '';
+    unawaited(_settingsService.saveChangeSourceGroup(''));
+    return enabledSources;
+  }
+
+  Future<bool> _confirmSwitchChangeSourceGroupToAll(String group) async {
+    final result = await showCupertinoBottomDialog<bool>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('搜索结果为空'),
+        content: Text('$group分组搜索结果为空,是否切换到全部分组'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  Future<List<ReaderSourceSwitchCandidate>>
+      _loadSourceSwitchCandidatesWithGroupFallback({
+    required Book currentBook,
+    bool? loadInfoEnabled,
+    bool? loadWordCountEnabled,
+    bool? loadTocEnabled,
+    int? sourceDelaySeconds,
+    CancelToken? cancelToken,
+  }) async {
+    var candidates = await _loadSourceSwitchCandidates(
+      currentBook: currentBook,
+      loadInfoEnabled: loadInfoEnabled,
+      loadWordCountEnabled: loadWordCountEnabled,
+      loadTocEnabled: loadTocEnabled,
+      sourceDelaySeconds: sourceDelaySeconds,
+      cancelToken: cancelToken,
+    );
+    if (!mounted) {
+      return candidates;
+    }
+    final selectedGroup = _normalizeChangeSourceGroup(_changeSourceGroup);
+    if (candidates.isNotEmpty ||
+        selectedGroup.isEmpty ||
+        cancelToken?.isCancelled == true) {
+      return candidates;
+    }
+    final fallbackToAll = await _confirmSwitchChangeSourceGroupToAll(
+      selectedGroup,
+    );
+    if (!mounted || !fallbackToAll || cancelToken?.isCancelled == true) {
+      return candidates;
+    }
+    await _handleChangeSourceGroupChanged('');
+    candidates = await _loadSourceSwitchCandidates(
+      currentBook: currentBook,
+      loadInfoEnabled: loadInfoEnabled,
+      loadWordCountEnabled: loadWordCountEnabled,
+      loadTocEnabled: loadTocEnabled,
+      sourceDelaySeconds: sourceDelaySeconds,
+      cancelToken: cancelToken,
+    );
+    return candidates;
+  }
+
+  int _normalizeChangeSourceDelaySeconds(int seconds) {
+    return seconds.clamp(0, 9999).toInt();
+  }
+
+  Future<void> _handleChangeSourceDelayChanged(int seconds) async {
+    final normalized = _normalizeChangeSourceDelaySeconds(seconds);
+    _changeSourceDelaySeconds = normalized;
+    await _settingsService.saveBatchChangeSourceDelay(normalized);
+  }
+
+  Future<bool> _waitSourceSwitchDelayWithCancel({
+    required int seconds,
+    CancelToken? cancelToken,
+  }) async {
+    if (seconds <= 0) return true;
+    final totalMs = seconds * 1000;
+    var elapsedMs = 0;
+    while (elapsedMs < totalMs) {
+      if (cancelToken?.isCancelled == true) {
+        return false;
+      }
+      final remainingMs = totalMs - elapsedMs;
+      final stepMs = remainingMs > 200 ? 200 : remainingMs;
+      await Future<void>.delayed(Duration(milliseconds: stepMs));
+      elapsedMs += stepMs;
+    }
+    return cancelToken?.isCancelled != true;
+  }
+
+  Future<List<ReaderSourceSwitchCandidate>> _loadSourceSwitchCandidates({
+    required Book currentBook,
+    bool? loadInfoEnabled,
+    bool? loadWordCountEnabled,
+    bool? loadTocEnabled,
+    int? sourceDelaySeconds,
+    CancelToken? cancelToken,
+  }) async {
+    final enabledSources = _sourceRepo
+        .getAllSources()
+        .where((source) => source.enabled)
+        .toList(growable: false);
+    if (enabledSources.isEmpty) {
+      return const <ReaderSourceSwitchCandidate>[];
+    }
+    final orderedSources = enabledSources
+        .asMap()
+        .entries
+        .toList(growable: false)
+      ..sort((a, b) {
+        final orderCompare = a.value.customOrder.compareTo(b.value.customOrder);
+        if (orderCompare != 0) return orderCompare;
+        return a.key.compareTo(b.key);
+      });
+    final sortedEnabledSources =
+        orderedSources.map((entry) => entry.value).toList(growable: false);
+    final scopedSources = _scopeChangeSourceSourcesByGroup(
+      sortedEnabledSources,
+    );
+
+    return _loadSourceSwitchCandidatesBySources(
+      currentBook: currentBook,
+      sourcesToSearch: scopedSources,
+      loadInfoEnabled: loadInfoEnabled ?? _changeSourceLoadInfo,
+      loadWordCountEnabled: loadWordCountEnabled ?? _changeSourceLoadWordCount,
+      loadTocEnabled: loadTocEnabled ?? _changeSourceLoadToc,
+      sourceDelaySeconds: sourceDelaySeconds ?? _changeSourceDelaySeconds,
+      cancelToken: cancelToken,
+    );
+  }
+
+  Future<List<ReaderSourceSwitchCandidate>>
+      _refreshSourceSwitchCandidatesByCurrentList({
+    required Book currentBook,
+    required List<ReaderSourceSwitchCandidate> currentCandidates,
+    bool? loadInfoEnabled,
+    bool? loadWordCountEnabled,
+    bool? loadTocEnabled,
+    int? sourceDelaySeconds,
+    CancelToken? cancelToken,
+  }) async {
+    if (currentCandidates.isEmpty) {
+      return const <ReaderSourceSwitchCandidate>[];
+    }
+
+    final enabledSourceByUrl = <String, BookSource>{
+      for (final source in _sourceRepo.getAllSources())
+        if (source.enabled)
+          ReaderSourceSwitchHelper.normalizeForCompare(source.bookSourceUrl):
+              source,
+    };
+    final scopedSources = <BookSource>[];
+    final scopedSourceKeys = <String>{};
+    for (final candidate in currentCandidates) {
+      final sourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
+        candidate.source.bookSourceUrl,
+      );
+      if (sourceKey.isEmpty || !scopedSourceKeys.add(sourceKey)) {
+        continue;
+      }
+      final source = enabledSourceByUrl[sourceKey];
+      if (source == null) continue;
+      scopedSources.add(source);
+    }
+    if (scopedSources.isEmpty) {
+      return const <ReaderSourceSwitchCandidate>[];
+    }
+
+    return _loadSourceSwitchCandidatesBySources(
+      currentBook: currentBook,
+      sourcesToSearch: scopedSources,
+      loadInfoEnabled: loadInfoEnabled ?? _changeSourceLoadInfo,
+      loadWordCountEnabled: loadWordCountEnabled ?? _changeSourceLoadWordCount,
+      loadTocEnabled: loadTocEnabled ?? _changeSourceLoadToc,
+      sourceDelaySeconds: sourceDelaySeconds ?? _changeSourceDelaySeconds,
+      cancelToken: cancelToken,
+    );
+  }
+
+  Future<List<ReaderSourceSwitchCandidate>>
+      _loadSourceSwitchCandidatesBySources({
+    required Book currentBook,
+    required List<BookSource> sourcesToSearch,
+    required bool loadInfoEnabled,
+    required bool loadWordCountEnabled,
+    required bool loadTocEnabled,
+    required int sourceDelaySeconds,
+    CancelToken? cancelToken,
+  }) async {
+    final keyword = currentBook.title.trim();
+    if (keyword.isEmpty || sourcesToSearch.isEmpty) {
+      return const <ReaderSourceSwitchCandidate>[];
+    }
+
+    final searchDelaySeconds = _normalizeChangeSourceDelaySeconds(
+      sourceDelaySeconds,
+    );
+    final searchResults = <SearchResult>[];
+    final chapterWordCountTextByKey = <String, String>{};
+    final chapterWordCountByKey = <String, int>{};
+    final respondTimeMsByKey = <String, int>{};
+
+    String buildCandidateMetricKey(SearchResult result) {
+      final sourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
+        result.sourceUrl,
+      );
+      final bookUrl = result.bookUrl.trim();
+      return '$sourceKey|$bookUrl';
+    }
+
+    void recordWordCountMeta(
+      SearchResult result, {
+      required String chapterWordCountText,
+      required int chapterWordCount,
+      required int respondTimeMs,
+    }) {
+      if (!loadWordCountEnabled) return;
+      final sourceKey = ReaderSourceSwitchHelper.normalizeForCompare(
+        result.sourceUrl,
+      );
+      if (sourceKey.isEmpty) return;
+      final bookUrl = result.bookUrl.trim();
+      if (bookUrl.isEmpty) return;
+      final key = buildCandidateMetricKey(result);
+      chapterWordCountTextByKey[key] = chapterWordCountText.trim();
+      chapterWordCountByKey[key] = chapterWordCount;
+      respondTimeMsByKey[key] = respondTimeMs;
+    }
+
+    for (var index = 0; index < sourcesToSearch.length; index++) {
+      if (cancelToken?.isCancelled == true) {
+        break;
+      }
+      final source = sourcesToSearch[index];
+      if (index > 0 && searchDelaySeconds > 0) {
+        final continueSearch = await _waitSourceSwitchDelayWithCancel(
+          seconds: searchDelaySeconds,
+          cancelToken: cancelToken,
+        );
+        if (!continueSearch) {
+          break;
+        }
+      }
+      try {
+        final list = await _ruleEngine.search(
+          source,
+          keyword,
+          filter: (name, _) {
+            if (name != keyword) return false;
+            return true;
+          },
+          cancelToken: cancelToken,
+        );
+        if (cancelToken?.isCancelled == true) {
+          break;
+        }
+        if (!(loadInfoEnabled || loadTocEnabled || loadWordCountEnabled) ||
+            list.isEmpty) {
+          searchResults.addAll(list);
+          continue;
+        }
+
+        for (final item in list) {
+          if (cancelToken?.isCancelled == true) {
+            break;
+          }
+          try {
+            final hydrated = await _hydrateSourceSwitchSearchResult(
+              currentBook: currentBook,
+              source: source,
+              result: item,
+              loadInfoEnabled: loadInfoEnabled,
+              loadTocEnabled: loadTocEnabled,
+              loadWordCountEnabled: loadWordCountEnabled,
+              cancelToken: cancelToken,
+            );
+            final hydratedResult = hydrated.result;
+            searchResults.add(hydratedResult);
+            recordWordCountMeta(
+              hydratedResult,
+              chapterWordCountText: hydrated.chapterWordCountText,
+              chapterWordCount: hydrated.chapterWordCount,
+              respondTimeMs: hydrated.respondTimeMs,
+            );
+          } catch (_) {
+            if (cancelToken?.isCancelled == true) {
+              break;
+            }
+            searchResults.add(item);
+          }
+        }
+      } catch (_) {
+        if (cancelToken?.isCancelled == true) {
+          break;
+        }
+        // 单源失败隔离
+      }
+    }
+
+    return ReaderSourceSwitchHelper.buildCandidates(
+      currentBook: currentBook,
+      enabledSources: sourcesToSearch,
+      searchResults: searchResults,
+      loadWordCountEnabled: loadWordCountEnabled,
+      chapterWordCountTextByKey: chapterWordCountTextByKey,
+      chapterWordCountByKey: chapterWordCountByKey,
+      respondTimeMsByKey: respondTimeMsByKey,
+    );
+  }
+
+  Future<void> _showSwitchSourceBookMenu() async {
+    final currentBook = _buildCurrentBookForSourceSwitch();
+    final keyword = currentBook.title.trim();
+    if (keyword.isEmpty) {
+      _showToast('书名为空，无法换源');
+      return;
+    }
+
+    final enabledSourceCount =
+        _sourceRepo.getAllSources().where((source) => source.enabled).length;
+    if (enabledSourceCount <= 0) {
+      _showToast('没有可用书源');
+      return;
+    }
+
+    final candidates = await _loadSourceSwitchCandidatesWithGroupFallback(
+      currentBook: currentBook,
+      loadInfoEnabled: _changeSourceLoadInfo,
+      loadWordCountEnabled: _changeSourceLoadWordCount,
+      loadTocEnabled: _changeSourceLoadToc,
+      sourceDelaySeconds: _changeSourceDelaySeconds,
+    );
+    if (!mounted) return;
+    if (candidates.isEmpty) {
+      _showToast('未找到可切换的匹配书源');
+      return;
+    }
+
+    final selected = await showSourceSwitchCandidateSheet(
+      context: context,
+      keyword: keyword,
+      candidates: candidates,
+      changeSourceGroup: _changeSourceGroup,
+      sourceGroups: _buildChangeSourceGroups(),
+      authorKeyword: currentBook.author,
+      checkAuthorEnabled: _changeSourceCheckAuthor,
+      loadInfoEnabled: _changeSourceLoadInfo,
+      loadWordCountEnabled: _changeSourceLoadWordCount,
+      loadTocEnabled: _changeSourceLoadToc,
+      changeSourceDelaySeconds: _changeSourceDelaySeconds,
+      onChangeSourceGroupChanged: _handleChangeSourceGroupChanged,
+      onCheckAuthorChanged: _handleChangeSourceCheckAuthorChanged,
+      onLoadInfoChanged: _handleChangeSourceLoadInfoChanged,
+      onLoadWordCountChanged: _handleChangeSourceLoadWordCountChanged,
+      onLoadTocChanged: _handleChangeSourceLoadTocChanged,
+      onChangeSourceDelayChanged: _handleChangeSourceDelayChanged,
+      onOpenSourceManage: _openSourceManageFromReader,
+      onStartCandidatesSearch: (currentCandidates) {
+        return _startSourceSwitchCandidateSearch(
+          currentBook: currentBook,
+          currentCandidates: currentCandidates,
+          loadInfoEnabled: _changeSourceLoadInfo,
+          loadWordCountEnabled: _changeSourceLoadWordCount,
+          loadTocEnabled: _changeSourceLoadToc,
+          sourceDelaySeconds: _changeSourceDelaySeconds,
+        );
+      },
+      onStopCandidatesSearch: () async {
+        _stopSourceSwitchCandidateSearch();
+      },
+      onRefreshCandidates: (currentCandidates) {
+        return _refreshSourceSwitchCandidatesByCurrentList(
+          currentBook: currentBook,
+          currentCandidates: currentCandidates,
+          loadInfoEnabled: _changeSourceLoadInfo,
+          loadWordCountEnabled: _changeSourceLoadWordCount,
+          loadTocEnabled: _changeSourceLoadToc,
+          sourceDelaySeconds: _changeSourceDelaySeconds,
+        );
+      },
+      onTopSourceCandidate: (candidate, currentCandidates) {
+        return _topSourceSwitchCandidate(
+          candidate: candidate,
+          currentCandidates: currentCandidates,
+        );
+      },
+      onEditSourceCandidate: (candidate, currentCandidates) {
+        return _editSourceSwitchCandidate(
+          candidate: candidate,
+          currentCandidates: currentCandidates,
+          currentBook: currentBook,
+          refreshAllAfterEdit: false,
+        );
+      },
+      onBottomSourceCandidate: (candidate, currentCandidates) {
+        return _bottomSourceSwitchCandidate(
+          candidate: candidate,
+          currentCandidates: currentCandidates,
+        );
+      },
+      onDisableSourceCandidate: (candidate, currentCandidates) {
+        return _disableSourceSwitchCandidate(
+          candidate: candidate,
+          currentCandidates: currentCandidates,
+        );
+      },
+      onDeleteSourceCandidate: (candidate, currentCandidates) {
+        return _deleteSourceSwitchCandidate(
+          candidate: candidate,
+          currentCandidates: currentCandidates,
+        );
+      },
+      confirmDeleteSourceCandidate: true,
+    );
+    _stopSourceSwitchCandidateSearch();
+    if (selected == null) return;
+    await _switchToSourceCandidate(selected);
+  }
+
+  Future<void> _showSwitchSourceChapterMenu() async {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      _showToast('当前章节不存在');
+      return;
+    }
+
+    final currentBook = _buildCurrentBookForSourceSwitch();
+    final keyword = currentBook.title.trim();
+    if (keyword.isEmpty) {
+      _showToast('书名为空，无法换源');
+      return;
+    }
+
+    final enabledSourceCount =
+        _sourceRepo.getAllSources().where((source) => source.enabled).length;
+    if (enabledSourceCount <= 0) {
+      _showToast('没有可用书源');
+      return;
+    }
+
+    final candidates = await _loadSourceSwitchCandidatesWithGroupFallback(
+      currentBook: currentBook,
+      loadInfoEnabled: _changeSourceLoadInfo,
+      loadWordCountEnabled: _changeSourceLoadWordCount,
+      loadTocEnabled: _changeSourceLoadToc,
+      sourceDelaySeconds: _changeSourceDelaySeconds,
+    );
+    if (!mounted) return;
+    if (candidates.isEmpty) {
+      _showToast('未找到可切换的匹配书源');
+      return;
+    }
+
+    final selected = await showSourceSwitchCandidateSheet(
+      context: context,
+      keyword: keyword,
+      candidates: candidates,
+      changeSourceGroup: _changeSourceGroup,
+      sourceGroups: _buildChangeSourceGroups(),
+      authorKeyword: currentBook.author,
+      checkAuthorEnabled: _changeSourceCheckAuthor,
+      loadInfoEnabled: _changeSourceLoadInfo,
+      loadWordCountEnabled: _changeSourceLoadWordCount,
+      loadTocEnabled: _changeSourceLoadToc,
+      changeSourceDelaySeconds: _changeSourceDelaySeconds,
+      onChangeSourceGroupChanged: _handleChangeSourceGroupChanged,
+      onCheckAuthorChanged: _handleChangeSourceCheckAuthorChanged,
+      onLoadInfoChanged: _handleChangeSourceLoadInfoChanged,
+      onLoadWordCountChanged: _handleChangeSourceLoadWordCountChanged,
+      onLoadTocChanged: _handleChangeSourceLoadTocChanged,
+      onChangeSourceDelayChanged: _handleChangeSourceDelayChanged,
+      onOpenSourceManage: _openSourceManageFromReader,
+      onStartCandidatesSearch: (currentCandidates) {
+        return _startSourceSwitchCandidateSearch(
+          currentBook: currentBook,
+          currentCandidates: currentCandidates,
+          loadInfoEnabled: _changeSourceLoadInfo,
+          loadWordCountEnabled: _changeSourceLoadWordCount,
+          loadTocEnabled: _changeSourceLoadToc,
+          sourceDelaySeconds: _changeSourceDelaySeconds,
+        );
+      },
+      onStopCandidatesSearch: () async {
+        _stopSourceSwitchCandidateSearch();
+      },
+      onRefreshCandidates: (currentCandidates) {
+        return _refreshSourceSwitchCandidatesByCurrentList(
+          currentBook: currentBook,
+          currentCandidates: currentCandidates,
+          loadInfoEnabled: _changeSourceLoadInfo,
+          loadWordCountEnabled: _changeSourceLoadWordCount,
+          loadTocEnabled: _changeSourceLoadToc,
+          sourceDelaySeconds: _changeSourceDelaySeconds,
+        );
+      },
+      onTopSourceCandidate: (candidate, currentCandidates) {
+        return _topSourceSwitchCandidate(
+          candidate: candidate,
+          currentCandidates: currentCandidates,
+        );
+      },
+      onEditSourceCandidate: (candidate, currentCandidates) {
+        return _editSourceSwitchCandidate(
+          candidate: candidate,
+          currentCandidates: currentCandidates,
+          currentBook: currentBook,
+          refreshAllAfterEdit: true,
+        );
+      },
+      onBottomSourceCandidate: (candidate, currentCandidates) {
+        return _bottomSourceSwitchCandidate(
+          candidate: candidate,
+          currentCandidates: currentCandidates,
+        );
+      },
+      onDisableSourceCandidate: (candidate, currentCandidates) {
+        return _disableSourceSwitchCandidate(
+          candidate: candidate,
+          currentCandidates: currentCandidates,
+        );
+      },
+      onDeleteSourceCandidate: (candidate, currentCandidates) {
+        return _deleteSourceSwitchCandidate(
+          candidate: candidate,
+          currentCandidates: currentCandidates,
+        );
+      },
+    );
+    _stopSourceSwitchCandidateSearch();
+    if (selected == null) return;
+    await _switchCurrentChapterSourceCandidate(selected);
+  }
+
+  Future<void> _switchCurrentChapterSourceCandidate(
+    ReaderSourceSwitchCandidate candidate,
+  ) async {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      _showToast('当前章节不存在');
+      return;
+    }
+
+    final source = candidate.source;
+    final result = candidate.book;
+    final currentChapterIndex = _currentChapterIndex;
+    final currentChapter = _chapters[currentChapterIndex];
+    final currentRawTitle = currentChapter.title;
+
+    try {
+      final detail = await _ruleEngine.getBookInfo(
+        source,
+        result.bookUrl,
+        clearRuntimeVariables: true,
+      );
+      final primaryTocUrl =
+          detail?.tocUrl.isNotEmpty == true ? detail!.tocUrl : result.bookUrl;
+      final toc = await _ruleEngine.getToc(
+        source,
+        primaryTocUrl,
+        clearRuntimeVariables: false,
+      );
+      if (toc.isEmpty) {
+        _showToast('章节换源失败：目录为空（可能是 ruleToc 不匹配）');
+        return;
+      }
+
+      final parsedChapters = <Chapter>[];
+      for (final item in toc) {
+        final title = item.name.trim();
+        final url = item.url.trim();
+        if (title.isEmpty || url.isEmpty) continue;
+        parsedChapters.add(
+          Chapter(
+            id: '${widget.bookId}_tmp_${parsedChapters.length}',
+            bookId: widget.bookId,
+            title: title,
+            url: url,
+            index: parsedChapters.length,
+          ),
+        );
+      }
+      if (parsedChapters.isEmpty) {
+        _showToast('章节换源失败：新源章节为空');
+        return;
+      }
+
+      final selectedIndex = await _showChapterSourcePicker(
+        source: source,
+        chapters: parsedChapters,
+        currentChapterTitle: currentRawTitle,
+        currentChapterIndex: currentChapterIndex,
+        oldChapterCount: _chapters.length,
+      );
+      if (selectedIndex == null) {
+        return;
+      }
+      if (selectedIndex < 0 || selectedIndex >= parsedChapters.length) {
+        _showToast('章节换源失败：目标章节不存在');
+        return;
+      }
+
+      final targetChapter = parsedChapters[selectedIndex];
+      final nextChapterUrl = selectedIndex + 1 < parsedChapters.length
+          ? parsedChapters[selectedIndex + 1].url
+          : null;
+      final content = await _ruleEngine.getContent(
+        source,
+        targetChapter.url ?? '',
+        nextChapterUrl: nextChapterUrl,
+      );
+
+      if (!widget.isEphemeral) {
+        await _chapterRepo.cacheChapterContent(currentChapter.id, content);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _replaceStageCache.remove(currentChapter.id);
+        _catalogDisplayTitleCacheByChapterId.remove(currentChapter.id);
+        _chapterContentInFlight.remove(currentChapter.id);
+        _chapters[currentChapterIndex] = currentChapter.copyWith(
+          content: content,
+          isDownloaded: true,
+        );
+      });
+
+      await _loadChapter(currentChapterIndex, restoreOffset: true);
+    } catch (e) {
+      if (!mounted) return;
+      final message = _normalizeReaderErrorMessage(e);
+      if (message.isEmpty) {
+        _showToast('章节换源失败：获取正文出错');
+      } else {
+        _showToast('章节换源失败：$message');
+      }
+    }
+  }
+
+  Future<int?> _showChapterSourcePicker({
+    required BookSource source,
+    required List<Chapter> chapters,
+    required String currentChapterTitle,
+    required int currentChapterIndex,
+    required int oldChapterCount,
+  }) async {
+    if (chapters.isEmpty) return null;
+    final suggestedIndex = ReaderSourceSwitchHelper.resolveTargetChapterIndex(
+      newChapters: chapters,
+      currentChapterTitle: currentChapterTitle,
+      currentChapterIndex: currentChapterIndex,
+      oldChapterCount: oldChapterCount,
+    );
+    final currentValue = suggestedIndex.clamp(0, chapters.length - 1).toInt();
+
+    final items = <OptionPickerItem<int>>[];
+    for (var i = 0; i < chapters.length; i++) {
+      final rawTitle = chapters[i].title.trim();
+      final title = rawTitle.isEmpty ? '第${i + 1}章' : rawTitle;
+      items.add(
+        OptionPickerItem<int>(
+          value: i,
+          label: '${i + 1}. $title',
+          isRecommended: i == currentValue,
+        ),
+      );
+    }
+
+    return showOptionPickerSheet<int>(
+      context: context,
+      title: '单章换源',
+      message: '${source.bookSourceName} · 选择目标章节',
+      items: items,
+      currentValue: currentValue,
+    );
+  }
+
+  Future<void> _switchToSourceCandidate(
+    ReaderSourceSwitchCandidate candidate,
+  ) async {
+    final source = candidate.source;
+    final result = candidate.book;
+    final previousSourceUrl = _currentSourceUrl;
+    final previousSourceName = _currentSourceName;
+    final previousBookUrl = _bookRepo.getBookById(widget.bookId)?.bookUrl;
+    final previousChapterIndex = _currentChapterIndex;
+    final previousTitle = _currentTitle;
+    final previousChapters = List<Chapter>.from(_chapters);
+    final previousChapterVipByUrl = Map<String, bool>.from(_chapterVipByUrl);
+    final previousChapterPayByUrl = Map<String, bool>.from(_chapterPayByUrl);
+
+    try {
+      final detail = await _ruleEngine.getBookInfo(
+        source,
+        result.bookUrl,
+        clearRuntimeVariables: true,
+      );
+      final primaryTocUrl =
+          detail?.tocUrl.isNotEmpty == true ? detail!.tocUrl : result.bookUrl;
+      final toc = await _ruleEngine.getToc(
+        source,
+        primaryTocUrl,
+        clearRuntimeVariables: false,
+      );
+      if (toc.isEmpty) {
+        _showToast('切换失败：目录为空（可能是 ruleToc 不匹配）');
+        return;
+      }
+
+      final newChapters = <Chapter>[];
+      for (final item in toc) {
+        final title = item.name.trim();
+        final url = item.url.trim();
+        if (title.isEmpty || url.isEmpty) continue;
+        final chapterId = '${widget.bookId}_${newChapters.length}';
+        newChapters.add(
+          Chapter(
+            id: chapterId,
+            bookId: widget.bookId,
+            title: title,
+            url: url,
+            index: newChapters.length,
+          ),
+        );
+      }
+      if (newChapters.isEmpty) {
+        _showToast('切换失败：新源章节为空');
+        return;
+      }
+
+      final previousRawTitle = previousChapters.isEmpty
+          ? previousTitle
+          : previousChapters[
+                  previousChapterIndex.clamp(0, previousChapters.length - 1)]
+              .title;
+
+      if (!widget.isEphemeral) {
+        await _chapterRepo.clearChaptersForBook(widget.bookId);
+        await _chapterRepo.addChapters(newChapters);
+
+        final oldBook = _bookRepo.getBookById(widget.bookId);
+        if (oldBook != null) {
+          await _bookRepo.updateBook(
+            oldBook.copyWith(
+              sourceId: source.bookSourceUrl,
+              sourceUrl: source.bookSourceUrl,
+              bookUrl: result.bookUrl.trim(),
+              latestChapter: newChapters.last.title,
+              totalChapters: newChapters.length,
+              currentChapter: 0,
+              readProgress: 0,
+            ),
+          );
+        }
+      }
+
+      final targetIndex = ReaderSourceSwitchHelper.resolveTargetChapterIndex(
+        newChapters: newChapters,
+        currentChapterTitle: previousRawTitle,
+        currentChapterIndex: previousChapterIndex,
+        oldChapterCount: previousChapters.length,
+      );
+
+      if (!mounted) return;
+      _cacheChapterPayFlags(toc);
+      setState(() {
+        _catalogDisplayTitleCacheByChapterId.clear();
+        _chapters = newChapters;
+        _currentSourceUrl = source.bookSourceUrl;
+        _currentSourceName = source.bookSourceName;
+      });
+
+      await _loadChapter(
+        _clampChapterIndexToReadableRange(targetIndex),
+        restoreOffset: true,
+      );
+    } catch (e) {
+      try {
+        if (!widget.isEphemeral) {
+          await _chapterRepo.clearChaptersForBook(widget.bookId);
+          await _chapterRepo.addChapters(previousChapters);
+          final oldBook = _bookRepo.getBookById(widget.bookId);
+          if (oldBook != null && previousSourceUrl != null) {
+            await _bookRepo.updateBook(
+              oldBook.copyWith(
+                sourceId: previousSourceUrl,
+                sourceUrl: previousSourceUrl,
+                bookUrl: previousBookUrl,
+                latestChapter: previousChapters.isEmpty
+                    ? oldBook.latestChapter
+                    : previousChapters.last.title,
+                totalChapters: previousChapters.length,
+                currentChapter: previousChapterIndex.clamp(
+                  0,
+                  previousChapters.isEmpty ? 0 : previousChapters.length - 1,
+                ),
+              ),
+            );
+          }
+        }
+      } catch (_) {
+        // 回滚失败时保留原错误提示，避免吞掉主错误
+      }
+      if (mounted) {
+        setState(() {
+          _catalogDisplayTitleCacheByChapterId.clear();
+          _chapters = previousChapters;
+          _currentSourceUrl = previousSourceUrl;
+          _currentSourceName = previousSourceName;
+          _chapterVipByUrl
+            ..clear()
+            ..addAll(previousChapterVipByUrl);
+          _chapterPayByUrl
+            ..clear()
+            ..addAll(previousChapterPayByUrl);
+        });
+      }
+      if (!mounted) return;
+      _showToast('换源失败：$e');
+    }
+  }
+
+  int _legacyTextSizeProgress() {
+    return (_settings.fontSize.round() - 5).clamp(0, 45).toInt();
+  }
+
+  int _legacyLetterSpacingProgress() {
+    return ((_settings.letterSpacing * 100).round() + 50).clamp(0, 100).toInt();
+  }
+
+  int _legacyLineSpacingProgress() {
+    final mapped = ((_settings.lineHeight - 1.0) * 10 + 10).round();
+    return mapped.clamp(0, 20).toInt();
+  }
+
+  int _legacyParagraphSpacingProgress() {
+    return _settings.paragraphSpacing.round().clamp(0, 20).toInt();
+  }
+
+  int _nextTextBoldValue(int current) {
+    switch (current) {
+      case 2:
+        return 0;
+      case 0:
+        return 1;
+      case 1:
+      default:
+        return 2;
+    }
+  }
+
+  String _legacyLetterSpacingLabel(int progress) {
+    return ((progress - 50) / 100).toStringAsFixed(2);
+  }
+
+  String _legacyLineSpacingLabel(int progress) {
+    return ((progress - 10) / 10).toStringAsFixed(1);
+  }
+
+  String _legacyParagraphSpacingLabel(int progress) {
+    return (progress / 10).toStringAsFixed(1);
+  }
+
+  PageTurnMode _legacyStyleDialogPageAnimMode() {
+    switch (_settings.pageTurnMode) {
+      case PageTurnMode.cover:
+      case PageTurnMode.slide:
+      case PageTurnMode.simulation:
+      case PageTurnMode.scroll:
+      case PageTurnMode.none:
+        return _settings.pageTurnMode;
+      case PageTurnMode.simulation2:
+        return PageTurnMode.simulation;
+    }
+  }
 
   // ignore: unused_element
   void _showReadStyleDialog() {
@@ -12239,5 +16153,1274 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
     );
   }
 
+  /// 以 legado 同义语义添加书签：打开编辑弹窗，确认后落库。
+  Future<void> _openAddBookmarkDialog() async {
+    final draft = _buildBookmarkDraft();
+    await _openBookmarkEditorFromDraft(draft);
+  }
+
+  Future<void> _openBookmarkEditorFromSelectedText(String selectedText) async {
+    final baseDraft = _buildBookmarkDraft();
+    if (baseDraft == null) {
+      _showToast('创建书签失败');
+      return;
+    }
+    final draft = _ReaderBookmarkDraft(
+      chapterTitle: baseDraft.chapterTitle,
+      chapterPos: baseDraft.chapterPos,
+      pageText: selectedText.trim(),
+    );
+    await _openBookmarkEditorFromDraft(draft);
+  }
+
+  Future<void> _openBookmarkEditorFromDraft(_ReaderBookmarkDraft? draft) async {
+    if (draft == null || !mounted) return;
+    final result = await _showBookmarkEditorDialog(draft);
+    if (result == null) return;
+
+    try {
+      await _bookmarkRepo.addBookmark(
+        bookId: widget.bookId,
+        bookName: widget.bookTitle,
+        bookAuthor: _bookAuthor,
+        chapterIndex: _currentChapterIndex,
+        chapterTitle: draft.chapterTitle,
+        chapterPos: draft.chapterPos,
+        content: _composeBookmarkPreview(
+          bookText: result.bookText,
+          note: result.note,
+        ),
+      );
+      _updateBookmarkStatus();
+    } catch (e) {
+      if (!mounted) return;
+      _showToast('书签操作失败：$e');
+    }
+  }
+
+  _ReaderBookmarkDraft? _buildBookmarkDraft() {
+    if (_chapters.isEmpty ||
+        _currentChapterIndex < 0 ||
+        _currentChapterIndex >= _chapters.length) {
+      return null;
+    }
+    final fallbackTitle = _chapters[_currentChapterIndex].title.trim();
+    final chapterTitle =
+        _currentTitle.trim().isNotEmpty ? _currentTitle.trim() : fallbackTitle;
+    return _ReaderBookmarkDraft(
+      chapterTitle: chapterTitle.isEmpty
+          ? '第 ${_currentChapterIndex + 1} 章'
+          : chapterTitle,
+      chapterPos: _encodeCurrentBookmarkChapterPos(),
+      pageText: _resolveCurrentBookmarkText(),
+    );
+  }
+
+  Future<_ReaderBookmarkEditResult?> _showBookmarkEditorDialog(
+    _ReaderBookmarkDraft draft,
+  ) async {
+    final bookTextController = TextEditingController(text: draft.pageText);
+    final noteController = TextEditingController();
+    final result = await showCupertinoBottomDialog<_ReaderBookmarkEditResult>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('书签'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              draft.chapterTitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 10),
+            CupertinoTextField(
+              controller: bookTextController,
+              placeholder: '内容',
+              maxLines: 3,
+            ),
+            const SizedBox(height: 8),
+            CupertinoTextField(
+              controller: noteController,
+              placeholder: '备注',
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('取消'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () {
+              Navigator.pop(
+                dialogContext,
+                _ReaderBookmarkEditResult(
+                  bookText: bookTextController.text,
+                  note: noteController.text,
+                ),
+              );
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+    bookTextController.dispose();
+    noteController.dispose();
+    return result;
+  }
+
+  String _resolveCurrentBookmarkText() {
+    final pageText = _pageFactory.curPage.trim();
+    if (pageText.isNotEmpty) {
+      return pageText;
+    }
+    final content = _currentContent.trim();
+    if (content.isEmpty) {
+      return '';
+    }
+    final progress = _getChapterProgress().clamp(0.0, 1.0).toDouble();
+    final center =
+        (content.length * progress).round().clamp(0, content.length).toInt();
+    final start = (center - 90).clamp(0, content.length).toInt();
+    final end = (start + 180).clamp(0, content.length).toInt();
+    return content.substring(start, end).trim();
+  }
+
+  String _composeBookmarkPreview({
+    required String bookText,
+    required String note,
+  }) {
+    final trimmedText = bookText.trim();
+    final trimmedNote = note.trim();
+    if (trimmedText.isEmpty) {
+      return trimmedNote;
+    }
+    if (trimmedNote.isEmpty) {
+      return trimmedText;
+    }
+    return '$trimmedText\n\n笔记：$trimmedNote';
+  }
+
+  int _encodeCurrentBookmarkChapterPos() {
+    return (_getChapterProgress().clamp(0.0, 1.0) * 10000).round();
+  }
+
+  double _decodeBookmarkChapterProgress(int chapterPos) {
+    return (chapterPos / 10000.0).clamp(0.0, 1.0).toDouble();
+  }
+
+  /// 更新书签状态
+  void _updateBookmarkStatus() {
+    if (!mounted) return;
+    bool hasBookmark = false;
+    try {
+      hasBookmark =
+          _bookmarkRepo.hasBookmark(widget.bookId, _currentChapterIndex);
+    } catch (_) {
+      hasBookmark = false;
+    }
+    if (_hasBookmarkAtCurrent == hasBookmark) return;
+    setState(() {
+      _hasBookmarkAtCurrent = hasBookmark;
+    });
+  }
+
+  Future<ChapterCacheInfo> _clearBookCache() async {
+    final info = await _chapterRepo.clearDownloadedCacheForBook(widget.bookId);
+
+    if (!mounted) return info;
+
+    setState(() {
+      // 保持当前阅读不中断：不强行清空当前章节的内存内容，但把“已下载标记”与缓存阶段清空。
+      _replaceStageCache.clear();
+
+      final currentId =
+          _chapters.isNotEmpty ? _chapters[_currentChapterIndex].id : null;
+      _chapters = _chapters.map((chapter) {
+        if (!chapter.isDownloaded) return chapter;
+        final keepContent = chapter.id == currentId ? chapter.content : null;
+        return chapter.copyWith(isDownloaded: false, content: keepContent);
+      }).toList(growable: false);
+    });
+
+    _syncPageFactoryChapters(
+      keepPosition: _settings.pageTurnMode != PageTurnMode.scroll,
+    );
+    return info;
+  }
+
+  String _normalizeReaderErrorMessage(Object error) {
+    final raw = error.toString().trim();
+    const stateErrorPrefix = 'Bad state:';
+    if (raw.startsWith(stateErrorPrefix)) {
+      final message = raw.substring(stateErrorPrefix.length).trim();
+      return message.isEmpty ? raw : message;
+    }
+    return raw;
+  }
+
+  String _legacyUpdateTocErrorMessage({
+    required bool isLocalBook,
+    required Object error,
+  }) {
+    if (!isLocalBook) {
+      return '加载目录失败';
+    }
+    final message = _normalizeReaderErrorMessage(error);
+    if (message.isEmpty) {
+      return 'LoadTocError:unknown';
+    }
+    if (message.startsWith('LoadTocError:')) {
+      return message;
+    }
+    return 'LoadTocError:$message';
+  }
+
+  String _extractCatalogUpdateFailureReason(List<String> failedDetails) {
+    if (failedDetails.isEmpty) return '加载目录失败';
+    final raw = failedDetails.first.trim();
+    final separatorIndex = raw.indexOf('：');
+    if (separatorIndex <= -1 || separatorIndex >= raw.length - 1) {
+      return raw.isEmpty ? '加载目录失败' : raw;
+    }
+    final reason = raw.substring(separatorIndex + 1).trim();
+    return reason.isEmpty ? '加载目录失败' : reason;
+  }
+
+  String _resolveLocalBookFileExtension(Book book) {
+    final localPath = (book.localPath ?? '').trim();
+    if (localPath.isNotEmpty) {
+      return p.extension(localPath).toLowerCase();
+    }
+
+    final rawBookUrl = (book.bookUrl ?? '').trim();
+    if (rawBookUrl.isEmpty) return '';
+    final uri = Uri.tryParse(rawBookUrl);
+    if (uri != null && uri.hasScheme && uri.scheme == 'file') {
+      final filePath = uri.toFilePath();
+      if (filePath.trim().isNotEmpty) {
+        return p.extension(filePath).toLowerCase();
+      }
+    }
+    return p.extension(rawBookUrl).toLowerCase();
+  }
+
+  Future<void> _clearLocalCatalogCacheBeforeRefresh() async {
+    if (!widget.isEphemeral) {
+      await _chapterRepo.clearDownloadedCacheForBook(widget.bookId);
+    }
+
+    if (!mounted || _chapters.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _replaceStageCache.clear();
+      _catalogDisplayTitleCacheByChapterId.clear();
+      _chapterContentInFlight.clear();
+      _chapters = _chapters
+          .map(
+            (chapter) => chapter.copyWith(
+              isDownloaded: false,
+              content: null,
+            ),
+          )
+          .toList(growable: false);
+    });
+    _syncPageFactoryChapters(
+      keepPosition: _settings.pageTurnMode != PageTurnMode.scroll,
+    );
+  }
+
+  Future<List<Chapter>> _applyLocalRefreshedCatalog({
+    required SearchBookInfoLocalRefreshResult refreshed,
+  }) async {
+    final newChapters = refreshed.chapters;
+    if (newChapters.isEmpty) {
+      throw StateError('LoadTocError:重解析后章节为空');
+    }
+
+    final previousRawTitle = _chapters.isEmpty
+        ? _currentTitle
+        : _chapters[_currentChapterIndex.clamp(0, _chapters.length - 1)].title;
+    final targetIndex = ReaderSourceSwitchHelper.resolveTargetChapterIndex(
+      newChapters: newChapters,
+      currentChapterTitle: previousRawTitle,
+      currentChapterIndex: _currentChapterIndex,
+      oldChapterCount: _chapters.length,
+    );
+
+    if (!widget.isEphemeral) {
+      await _chapterRepo.clearChaptersForBook(widget.bookId);
+      await _chapterRepo.addChapters(newChapters);
+      await _bookRepo.updateBook(
+        refreshed.book.copyWith(
+          totalChapters: newChapters.length,
+          latestChapter: newChapters.last.title,
+          currentChapter: targetIndex,
+        ),
+      );
+    }
+
+    if (!mounted) return newChapters;
+    setState(() {
+      _bookAuthor = refreshed.book.author;
+      _bookCoverUrl = refreshed.book.coverUrl;
+      _replaceStageCache.clear();
+      _catalogDisplayTitleCacheByChapterId.clear();
+      _chapterContentInFlight.clear();
+      _chapters = newChapters;
+      _chapterVipByUrl.clear();
+      _chapterPayByUrl.clear();
+    });
+    await _loadChapter(
+      _clampChapterIndexToReadableRange(targetIndex),
+      restoreOffset: true,
+    );
+    return newChapters;
+  }
+
+  Future<List<Chapter>> _refreshLocalCatalogFromSource(Book book) async {
+    try {
+      final extension = _resolveLocalBookFileExtension(book);
+      if (extension == '.epub' || extension == '.mobi') {
+        await _clearLocalCatalogCacheBeforeRefresh();
+      }
+
+      final preferredCharset = _readerCharsetService.getBookCharset(
+            widget.bookId,
+          ) ??
+          ReaderCharsetService.defaultCharset;
+      final refreshed = await SearchBookInfoRefreshHelper.refreshLocalBook(
+        book: book,
+        preferredTxtCharset: preferredCharset,
+        splitLongChapter: _settingsService.getBookSplitLongChapter(
+          widget.bookId,
+        ),
+        txtTocRuleRegex: _settingsService.getBookTxtTocRule(widget.bookId),
+      );
+      return _applyLocalRefreshedCatalog(refreshed: refreshed);
+    } catch (error) {
+      final message = _normalizeReaderErrorMessage(error);
+      if (message.startsWith('LoadTocError:')) {
+        throw StateError(message);
+      }
+      throw StateError(
+        message.isEmpty ? 'LoadTocError:unknown' : 'LoadTocError:$message',
+      );
+    }
+  }
+
+  Future<List<Chapter>> _refreshCatalogFromSource() async {
+    final book = _bookRepo.getBookById(widget.bookId);
+    if (book == null) {
+      throw StateError('书籍信息不存在');
+    }
+    if (book.isLocal) {
+      return _refreshLocalCatalogFromSource(book);
+    }
+
+    final summary = await _catalogUpdateService.updateBooks([book]);
+    if (summary.failedCount > 0) {
+      final reason = _extractCatalogUpdateFailureReason(summary.failedDetails);
+      ExceptionLogService().record(
+        node: 'reader.menu.update_toc.online_failed',
+        message: '阅读页在线更新目录失败',
+        error: reason,
+        context: <String, dynamic>{
+          'bookId': widget.bookId,
+          'bookTitle': widget.bookTitle,
+          'sourceUrl': _currentSourceUrl,
+          'failedDetails': summary.failedDetails,
+        },
+      );
+      throw StateError('加载目录失败');
+    }
+    if (summary.updateCandidateCount <= 0) {
+      throw StateError('加载目录失败');
+    }
+
+    final updated = _chapterRepo.getChaptersForBook(widget.bookId);
+    if (updated.isEmpty) {
+      throw StateError('加载目录失败');
+    }
+
+    if (!mounted) return updated;
+
+    final maxChapter = updated.length - 1;
+    final refreshedBook = _bookRepo.getBookById(widget.bookId);
+    setState(() {
+      _chapters = updated;
+      _currentChapterIndex = _currentChapterIndex.clamp(0, maxChapter).toInt();
+      _currentTitle = _postProcessTitle(updated[_currentChapterIndex].title);
+      if (refreshedBook != null) {
+        _bookAuthor = refreshedBook.author;
+        _bookCoverUrl = refreshedBook.coverUrl;
+        _currentSourceUrl =
+            (refreshedBook.sourceUrl ?? refreshedBook.sourceId ?? '').trim();
+      }
+      _chapterVipByUrl.clear();
+      _chapterPayByUrl.clear();
+    });
+    _refreshCurrentSourceName();
+    _syncPageFactoryChapters(
+      keepPosition: _settings.pageTurnMode != PageTurnMode.scroll,
+    );
+
+    return updated;
+  }
+
+  Future<void> _applyCatalogSplitLongChapterSetting(bool enabled) async {
+    final bookId = widget.bookId.trim();
+    if (bookId.isNotEmpty && !widget.isEphemeral) {
+      await _settingsService.saveBookSplitLongChapter(bookId, enabled);
+    }
+
+    if (!_isCurrentBookLocalTxt()) {
+      return;
+    }
+
+    final book = _bookRepo.getBookById(widget.bookId);
+    if (book == null) {
+      throw StateError('书籍信息不存在');
+    }
+
+    if (!mounted) return;
+    setState(() => _isLoadingChapter = true);
+    try {
+      final charset = _readerCharsetService.getBookCharset(widget.bookId) ??
+          ReaderCharsetService.defaultCharset;
+      await _reparseLocalTxtBookWithCharset(
+        book: book,
+        charset: charset,
+        splitLongChapter: enabled,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingChapter = false);
+      }
+    }
+  }
+
+  void _showChapterList() {
+    if (_showSearchMenu) {
+      _setSearchMenuVisible(false);
+    }
+    if (_showMenu) {
+      _setReaderMenuVisible(false);
+    }
+    showCupertinoBottomSheetDialog(
+      context: context,
+      builder: (popupContext) => ReaderCatalogSheet(
+        bookId: widget.bookId,
+        bookTitle: widget.bookTitle,
+        bookAuthor: _bookAuthor,
+        coverUrl: _bookCoverUrl,
+        chapters: _effectiveReadableChapters(),
+        currentChapterIndex: _currentChapterIndex,
+        bookmarks: _bookmarkRepo.getBookmarksForBook(widget.bookId),
+        onClearBookCache: _clearBookCache,
+        onRefreshCatalog: _refreshCatalogFromSource,
+        onChapterSelected: (index) {
+          Navigator.pop(popupContext);
+          _loadChapter(index);
+        },
+        onBookmarkSelected: (bookmark) {
+          Navigator.pop(popupContext);
+          final progress = _decodeBookmarkChapterProgress(bookmark.chapterPos);
+          _loadChapter(
+            bookmark.chapterIndex,
+            restoreOffset: true,
+            targetChapterProgress: progress,
+          );
+        },
+        onDeleteBookmark: (bookmark) async {
+          await _bookmarkRepo.removeBookmark(bookmark.id);
+          _updateBookmarkStatus();
+        },
+        isLocalTxtBook: _isCurrentBookLocalTxt(),
+        initialUseReplace: _tocUiUseReplace,
+        initialLoadWordCount: _tocUiLoadWordCount,
+        initialSplitLongChapter: _tocUiSplitLongChapter,
+        onUseReplaceChanged: (value) {
+          _tocUiUseReplace = value;
+          _catalogDisplayTitleCacheByChapterId.clear();
+          unawaited(_settingsService.saveTocUiUseReplace(value));
+        },
+        onLoadWordCountChanged: (value) {
+          _tocUiLoadWordCount = value;
+          unawaited(_settingsService.saveTocUiLoadWordCount(value));
+        },
+        onSplitLongChapterChanged: (value) {
+          _tocUiSplitLongChapter = value;
+        },
+        onApplySplitLongChapter: _applyCatalogSplitLongChapterSetting,
+        onOpenLogs: _openExceptionLogsFromReader,
+        onExportBookmark: () async {
+          await _exportBookmarksFromReader(markdown: false);
+        },
+        onExportBookmarkMarkdown: () async {
+          await _exportBookmarksFromReader(markdown: true);
+        },
+        onEditTocRule: () {
+          Navigator.pop(popupContext);
+          unawaited(_showTxtTocRuleDialogFromMenu());
+        },
+        initialDisplayTitlesByIndex: _buildCatalogInitialDisplayTitlesByIndex(),
+        resolveDisplayTitle: _resolveCatalogDisplayTitle,
+      ),
+    );
+  }
 }
 
+class _ReaderContentEditPayload {
+  final String title;
+  final String content;
+
+  const _ReaderContentEditPayload({
+    required this.title,
+    required this.content,
+  });
+}
+
+class _ReaderContentEditorPage extends StatefulWidget {
+  final String initialTitle;
+  final String initialContent;
+  final Future<String> Function()? onResetContent;
+
+  const _ReaderContentEditorPage({
+    required this.initialTitle,
+    required this.initialContent,
+    this.onResetContent,
+  });
+
+  @override
+  State<_ReaderContentEditorPage> createState() =>
+      _ReaderContentEditorPageState();
+}
+
+class _ReaderContentEditorPageState extends State<_ReaderContentEditorPage> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _contentController;
+  bool _returned = false;
+  bool _resetting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.initialTitle);
+    _contentController = TextEditingController(text: widget.initialContent);
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    super.dispose();
+  }
+
+  void _popWithPayload() {
+    if (_returned || _resetting) return;
+    _returned = true;
+    Navigator.of(context).pop(
+      _ReaderContentEditPayload(
+        title: _titleController.text,
+        content: _contentController.text,
+      ),
+    );
+  }
+
+  Future<void> _copyAll() async {
+    final payload = '${_titleController.text}\n${_contentController.text}';
+    try {
+      await Clipboard.setData(ClipboardData(text: payload));
+    } catch (error, stackTrace) {
+      ExceptionLogService().record(
+        node: 'reader.menu.content_edit.copy_all.failed',
+        message: '拷贝所有失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, dynamic>{
+          'payloadLength': payload.length,
+        },
+      );
+      return;
+    }
+    if (!mounted) return;
+    _showCopyToast('已拷贝');
+  }
+
+  void _showCopyToast(String message) {
+    if (!mounted) return;
+    showCupertinoBottomSheetDialog<void>(
+      context: context,
+      barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
+      builder: (toastContext) {
+        final navigator = Navigator.of(toastContext);
+        unawaited(Future<void>.delayed(const Duration(milliseconds: 1100), () {
+          if (navigator.mounted && navigator.canPop()) {
+            navigator.pop();
+          }
+        }));
+        return SafeArea(
+          top: false,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 28),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.systemBackground
+                        .resolveFrom(context)
+                        .withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    message,
+                    style: TextStyle(
+                      color: CupertinoColors.label.resolveFrom(context),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _moveContentCursorToEnd() {
+    _contentController.selection = TextSelection.fromPosition(
+      TextPosition(offset: _contentController.text.length),
+    );
+  }
+
+  Future<void> _resetContent() async {
+    if (_resetting) return;
+    final handler = widget.onResetContent;
+    if (handler == null) {
+      _contentController.text = widget.initialContent;
+      _moveContentCursorToEnd();
+      return;
+    }
+    setState(() {
+      _resetting = true;
+    });
+    try {
+      final content = await handler();
+      if (!mounted) return;
+      _contentController.text = content;
+      _moveContentCursorToEnd();
+    } catch (_) {
+      // 对齐 legado：重置失败时保持当前编辑内容并静默返回。
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _resetting = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop || _resetting) return;
+        _popWithPayload();
+      },
+      child: CupertinoPageScaffold(
+        navigationBar: CupertinoNavigationBar(
+          middle: const Text('编辑正文'),
+          automaticallyImplyLeading: false,
+          leading: AppNavBarButton(
+            onPressed: _resetting ? null : _popWithPayload,
+            child: const Text('关闭'),
+          ),
+          trailing: AppNavBarButton(
+            onPressed: _resetting ? null : _popWithPayload,
+            child: const Text('保存'),
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              IgnorePointer(
+                ignoring: _resetting,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                  child: Column(
+                    children: [
+                      CupertinoTextField(
+                        controller: _titleController,
+                        placeholder: '章节标题',
+                        enabled: !_resetting,
+                        clearButtonMode: OverlayVisibilityMode.editing,
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            onPressed: _resetting ? null : _resetContent,
+                            child: const Text('重置'),
+                          ),
+                          const SizedBox(width: 8),
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            onPressed: _resetting ? null : _copyAll,
+                            child: const Text('复制全文'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: CupertinoColors.systemBackground.resolveFrom(
+                              context,
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: CupertinoColors.systemGrey4
+                                  .resolveFrom(context),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: CupertinoTextField(
+                            controller: _contentController,
+                            enabled: !_resetting,
+                            maxLines: null,
+                            expands: true,
+                            keyboardType: TextInputType.multiline,
+                            textAlignVertical: TextAlignVertical.top,
+                            clearButtonMode: OverlayVisibilityMode.never,
+                            padding: const EdgeInsets.all(12),
+                            decoration: null,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_resetting)
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: CupertinoColors.systemBackground
+                          .resolveFrom(context)
+                          .withValues(alpha: 0.78),
+                    ),
+                    child: const Center(
+                      child: CupertinoActivityIndicator(radius: 14),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum _ReadStyleBgAction {
+  asset,
+  file,
+  clear,
+}
+
+class _ReadAloudCapability {
+  final bool available;
+  final String reason;
+
+  const _ReadAloudCapability({
+    required this.available,
+    required this.reason,
+  });
+}
+
+enum _ReaderImageWarmupFailureKind {
+  timeout,
+  auth,
+  decode,
+  other,
+}
+
+class _ReaderImageSizeProbeResult {
+  final Size? size;
+  final _ReaderImageWarmupFailureKind? failureKind;
+  final bool attempted;
+
+  const _ReaderImageSizeProbeResult._({
+    required this.size,
+    required this.failureKind,
+    required this.attempted,
+  });
+
+  const _ReaderImageSizeProbeResult.success(Size value)
+      : this._(
+          size: value,
+          failureKind: null,
+          attempted: true,
+        );
+
+  const _ReaderImageSizeProbeResult.failure(_ReaderImageWarmupFailureKind kind)
+      : this._(
+          size: null,
+          failureKind: kind,
+          attempted: true,
+        );
+
+  const _ReaderImageSizeProbeResult.skipped()
+      : this._(
+          size: null,
+          failureKind: null,
+          attempted: false,
+        );
+}
+
+class _ReaderImageBytesProbeResult {
+  final Uint8List? bytes;
+  final _ReaderImageWarmupFailureKind? failureKind;
+
+  const _ReaderImageBytesProbeResult._({
+    required this.bytes,
+    required this.failureKind,
+  });
+
+  const _ReaderImageBytesProbeResult.success(Uint8List value)
+      : this._(
+          bytes: value,
+          failureKind: null,
+        );
+
+  const _ReaderImageBytesProbeResult.failure(_ReaderImageWarmupFailureKind kind)
+      : this._(
+          bytes: null,
+          failureKind: kind,
+        );
+}
+
+class _ReaderImageWarmupSourceTelemetry {
+  int sampleCount = 0;
+  int timeoutStreak = 0;
+  int authStreak = 0;
+  int decodeStreak = 0;
+  double successRateEma = 0.0;
+  double timeoutRateEma = 0.0;
+  double authRateEma = 0.0;
+  double decodeRateEma = 0.0;
+  DateTime updatedAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  void recordSuccess() {
+    _apply(success: true, failureKind: null);
+  }
+
+  void recordFailure(_ReaderImageWarmupFailureKind kind) {
+    _apply(success: false, failureKind: kind);
+  }
+
+  void _apply({
+    required bool success,
+    required _ReaderImageWarmupFailureKind? failureKind,
+  }) {
+    final alpha = sampleCount < 8 ? 0.34 : 0.18;
+    successRateEma = _ema(successRateEma, success ? 1.0 : 0.0, alpha);
+    timeoutRateEma = _ema(
+      timeoutRateEma,
+      failureKind == _ReaderImageWarmupFailureKind.timeout ? 1.0 : 0.0,
+      alpha,
+    );
+    authRateEma = _ema(
+      authRateEma,
+      failureKind == _ReaderImageWarmupFailureKind.auth ? 1.0 : 0.0,
+      alpha,
+    );
+    decodeRateEma = _ema(
+      decodeRateEma,
+      failureKind == _ReaderImageWarmupFailureKind.decode ? 1.0 : 0.0,
+      alpha,
+    );
+
+    if (success) {
+      timeoutStreak = 0;
+      authStreak = 0;
+      decodeStreak = 0;
+    } else {
+      switch (failureKind) {
+        case _ReaderImageWarmupFailureKind.timeout:
+          timeoutStreak = (timeoutStreak + 1).clamp(0, 24).toInt();
+          authStreak = 0;
+          decodeStreak = 0;
+          break;
+        case _ReaderImageWarmupFailureKind.auth:
+          authStreak = (authStreak + 1).clamp(0, 24).toInt();
+          timeoutStreak = 0;
+          decodeStreak = 0;
+          break;
+        case _ReaderImageWarmupFailureKind.decode:
+          decodeStreak = (decodeStreak + 1).clamp(0, 24).toInt();
+          timeoutStreak = 0;
+          authStreak = 0;
+          break;
+        case _ReaderImageWarmupFailureKind.other:
+          timeoutStreak = 0;
+          authStreak = 0;
+          decodeStreak = 0;
+          break;
+        case null:
+          timeoutStreak = 0;
+          authStreak = 0;
+          decodeStreak = 0;
+          break;
+      }
+    }
+
+    sampleCount = (sampleCount + 1).clamp(0, 4096).toInt();
+    updatedAt = DateTime.now();
+  }
+
+  double _ema(double current, double value, double alpha) {
+    if (sampleCount <= 0) {
+      return value;
+    }
+    return current * (1 - alpha) + value * alpha;
+  }
+}
+
+class _ReaderImageWarmupBudget {
+  final int probeCount;
+  final Duration maxDuration;
+  final Duration perProbeTimeout;
+
+  const _ReaderImageWarmupBudget({
+    required this.probeCount,
+    required this.maxDuration,
+    required this.perProbeTimeout,
+  });
+}
+
+class _ReaderOfflineCacheInput {
+  final String startChapter;
+  final String endChapter;
+
+  const _ReaderOfflineCacheInput({
+    required this.startChapter,
+    required this.endChapter,
+  });
+}
+
+class _ReaderOfflineCacheRange {
+  final int startIndex;
+  final int endIndex;
+
+  const _ReaderOfflineCacheRange({
+    required this.startIndex,
+    required this.endIndex,
+  });
+}
+
+enum _ReaderTextActionMenuAction {
+  replace,
+  copy,
+  bookmark,
+  readAloud,
+  dict,
+  searchContent,
+  browser,
+  share,
+  processText,
+  more,
+  collapse,
+}
+
+enum _ReaderAudioPlayMenuAction {
+  login,
+  changeSource,
+  copyAudioUrl,
+  editSource,
+  wakeLock,
+  log,
+}
+
+class _DuplicateTitleRemovalResult {
+  final String content;
+  final bool removed;
+
+  const _DuplicateTitleRemovalResult({
+    required this.content,
+    required this.removed,
+  });
+}
+
+class _ReaderSimulatedReadingInput {
+  final bool enabled;
+  final String startChapter;
+  final String dailyChapters;
+  final DateTime startDate;
+
+  const _ReaderSimulatedReadingInput({
+    required this.enabled,
+    required this.startChapter,
+    required this.dailyChapters,
+    required this.startDate,
+  });
+}
+
+class _ReaderBookmarkDraft {
+  final String chapterTitle;
+  final int chapterPos;
+  final String pageText;
+
+  const _ReaderBookmarkDraft({
+    required this.chapterTitle,
+    required this.chapterPos,
+    required this.pageText,
+  });
+}
+
+class _ReaderBookmarkEditResult {
+  final String bookText;
+  final String note;
+
+  const _ReaderBookmarkEditResult({
+    required this.bookText,
+    required this.note,
+  });
+}
+
+class _ReaderFontOption {
+  final String label;
+  final int? presetIndex;
+  final String? filePath;
+
+  const _ReaderFontOption.preset({
+    required this.label,
+    required this.presetIndex,
+  }) : filePath = null;
+
+  const _ReaderFontOption.custom({
+    required this.label,
+    required this.filePath,
+  }) : presetIndex = null;
+}
+
+class _ReaderSystemTypefaceOption {
+  final String label;
+  final int presetIndex;
+
+  const _ReaderSystemTypefaceOption({
+    required this.label,
+    required this.presetIndex,
+  });
+}
+
+class _TipOption {
+  final int value;
+  final String label;
+
+  const _TipOption(this.value, this.label);
+}
+
+class _EffectiveReplaceMenuEntry {
+  final String label;
+  final ReplaceRule? rule;
+  final bool isChineseConverter;
+
+  const _EffectiveReplaceMenuEntry._({
+    required this.label,
+    required this.rule,
+    required this.isChineseConverter,
+  });
+
+  const _EffectiveReplaceMenuEntry.rule({
+    required String label,
+    required ReplaceRule rule,
+  }) : this._(
+          label: label,
+          rule: rule,
+          isChineseConverter: false,
+        );
+
+  const _EffectiveReplaceMenuEntry.chineseConverter({
+    required String label,
+  }) : this._(
+          label: label,
+          rule: null,
+          isChineseConverter: true,
+        );
+}
+
+class _ReplaceStageCache {
+  final String rawTitle;
+  final String rawContent;
+  final String title;
+  final String content;
+  final List<ReplaceRule> effectiveContentReplaceRules;
+
+  const _ReplaceStageCache({
+    required this.rawTitle,
+    required this.rawContent,
+    required this.title,
+    required this.content,
+    required this.effectiveContentReplaceRules,
+  });
+}
+
+class _ResolvedChapterSnapshot {
+  final String chapterId;
+  final int postProcessSignature;
+  final int baseTitleHash;
+  final int baseContentHash;
+  final String title;
+  final String content;
+  final bool isDeferredPlaceholder;
+
+  const _ResolvedChapterSnapshot({
+    required this.chapterId,
+    required this.postProcessSignature,
+    required this.baseTitleHash,
+    required this.baseContentHash,
+    required this.title,
+    required this.content,
+    this.isDeferredPlaceholder = false,
+  });
+}
+
+class _ChapterImageMetaSnapshot {
+  final String chapterId;
+  final int postProcessSignature;
+  final int contentHash;
+  final List<ReaderImageMarkerMeta> metas;
+
+  const _ChapterImageMetaSnapshot({
+    required this.chapterId,
+    required this.postProcessSignature,
+    required this.contentHash,
+    required this.metas,
+  });
+}
+
+class _ReaderSearchHit {
+  final int chapterIndex;
+  final String chapterTitle;
+  final int chapterContentLength;
+  final int start;
+  final int end;
+  final String query;
+  final int occurrenceIndex;
+  final String previewBefore;
+  final String previewMatch;
+  final String previewAfter;
+  final int? pageIndex;
+
+  const _ReaderSearchHit({
+    required this.chapterIndex,
+    required this.chapterTitle,
+    required this.chapterContentLength,
+    required this.start,
+    required this.end,
+    required this.query,
+    required this.occurrenceIndex,
+    required this.previewBefore,
+    required this.previewMatch,
+    required this.previewAfter,
+    required this.pageIndex,
+  });
+}
+
+class _ReaderSearchProgressSnapshot {
+  final int chapterIndex;
+  final double chapterProgress;
+
+  const _ReaderSearchProgressSnapshot({
+    required this.chapterIndex,
+    required this.chapterProgress,
+  });
+}
+
+class _ScrollSegmentSeed {
+  final String chapterId;
+  final String title;
+  final String content;
+
+  const _ScrollSegmentSeed({
+    required this.chapterId,
+    required this.title,
+    required this.content,
+  });
+}
+
+class _ReaderRenderBlock {
+  final String? text;
+  final String? imageSrc;
+
+  const _ReaderRenderBlock._({
+    this.text,
+    this.imageSrc,
+  });
+
+  const _ReaderRenderBlock.text(String value)
+      : this._(
+          text: value,
+        );
+
+  const _ReaderRenderBlock.image(String value)
+      : this._(
+          imageSrc: value,
+        );
+
+  bool get isImage => imageSrc != null;
+}
+
+class _ScrollSegment {
+  final int chapterIndex;
+  final String chapterId;
+  final String title;
+  final String content;
+  final double estimatedHeight;
+
+  const _ScrollSegment({
+    required this.chapterIndex,
+    required this.chapterId,
+    required this.title,
+    required this.content,
+    required this.estimatedHeight,
+  });
+}
+
+class _ScrollSegmentOffsetRange {
+  final _ScrollSegment segment;
+  final double start;
+  final double end;
+  final double height;
+
+  const _ScrollSegmentOffsetRange({
+    required this.segment,
+    required this.start,
+    required this.end,
+    required this.height,
+  });
+}
