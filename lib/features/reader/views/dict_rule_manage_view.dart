@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/widgets/app_blocking_progress.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
@@ -853,7 +854,7 @@ class _DictRuleManageViewState extends State<DictRuleManageView> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => const CupertinoAlertDialog(
-        content: _BlockingProgressContent(text: '导入中...'),
+        content: AppBlockingProgress(text: '导入中...'),
       ),
     );
     await Future<void>.delayed(Duration.zero);
@@ -1258,25 +1259,4 @@ class _DictRuleImportCandidateTile extends StatelessWidget {
   }
 }
 
-class _BlockingProgressContent extends StatelessWidget {
-  const _BlockingProgressContent({
-    required this.text,
-  });
 
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CupertinoActivityIndicator(),
-          const SizedBox(height: 10),
-          Text(text),
-        ],
-      ),
-    );
-  }
-}
