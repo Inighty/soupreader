@@ -905,6 +905,13 @@ class _MoreTab extends StatelessWidget {
                       settings.copyWith(cleanChapterTitle: v),
                     ),
                   ),
+                  _SwitchRowData(
+                    label: '章节跳转确认',
+                    value: settings.confirmSkipChapter,
+                    onChanged: (v) => onSettingsChanged(
+                      settings.copyWith(confirmSkipChapter: v),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
