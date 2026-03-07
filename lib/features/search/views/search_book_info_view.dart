@@ -1845,7 +1845,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     try {
       await _chapterRepo.clearDownloadedCacheForBook(id);
       if (!mounted) return;
-      _showMessage('成功清理缓存');
+      unawaited(showAppToast(context, message: '成功清理缓存'));
     } catch (e) {
       if (!mounted) return;
       _showMessage('清理缓存出错\n${_compactReason(e.toString())}');
@@ -1934,7 +1934,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     });
 
     if (localToc.isNotEmpty && refreshError == null && showSuccessToast) {
-      _showMessage('目录已刷新（共 ${localToc.length} 章）');
+      unawaited(showAppToast(context, message: '目录已刷新（共 ${localToc.length} 章）'));
     } else if (refreshError != null) {
       _showMessage(refreshError);
     }
@@ -2409,7 +2409,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
     });
 
     if (localToc.isNotEmpty && tocRefreshError == null) {
-      _showMessage('目录已刷新（共 ${localToc.length} 章）');
+      unawaited(showAppToast(context, message: '目录已刷新（共 ${localToc.length} 章）'));
     } else if (tocRefreshError != null) {
       _showMessage(tocRefreshError);
     }
@@ -3092,7 +3092,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
     _removeSessionCacheEntry(_buildSessionCacheKeyForResult(previousResult));
     if (!mounted) return;
-    _showMessage('已切换到：${candidate.source.bookSourceName}');
+    unawaited(showAppToast(context, message: '已切换到：${candidate.source.bookSourceName}'));
   }
 
   void _showMessage(String message) {
