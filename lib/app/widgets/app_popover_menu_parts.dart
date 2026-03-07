@@ -17,7 +17,7 @@ class _PopoverSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = AppUiTokens.resolve(context).isDark;
     final shadowColor =
-        (isDark ? CupertinoColors.black : const Color(0xFF0B2F66))
+        (isDark ? CupertinoColors.black : AppDesignTokens.shadowLight)
             .withValues(alpha: isDark ? 0.28 : 0.12);
     return AppSquircleSurface(
       padding: EdgeInsets.zero,

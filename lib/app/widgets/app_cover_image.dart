@@ -140,7 +140,7 @@ class AppCoverFrame extends StatelessWidget {
         ? AppDesignTokens.glassInnerHighlightDark
         : AppDesignTokens.glassInnerHighlightLight;
     final shadowColor =
-        (isDark ? CupertinoColors.black : const Color(0xFF0B2F66))
+        (isDark ? CupertinoColors.black : AppDesignTokens.shadowLight)
             .withValues(alpha: isDark ? 0.24 : 0.13);
     final shape = ContinuousRectangleBorder(
       borderRadius: BorderRadius.all(Radius.circular(borderRadius)),

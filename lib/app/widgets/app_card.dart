@@ -40,7 +40,7 @@ class AppCard extends StatelessWidget {
         tokens.colors.sectionBackground.withValues(
           alpha: isDark ? _kDarkSurfaceAlpha : _kLightSurfaceAlpha,
         );
-    final shadow = (isDark ? CupertinoColors.black : const Color(0xFF042852))
+    final shadow = (isDark ? CupertinoColors.black : AppDesignTokens.shadowLight)
         .withValues(alpha: isDark ? _kShadowDarkAlpha : _kShadowLightAlpha);
     return _AppCardStyle(
       background: background,

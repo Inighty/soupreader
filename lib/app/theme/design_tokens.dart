@@ -9,6 +9,9 @@ class AppDesignTokens {
   static const Color brandSecondary = Color(0xFF64D2FF);
   static const Color cta = Color(0xFF30D158);
 
+  // ===== 阴影底色（亮色模式卡片/按钮投影基色） =====
+  static const Color shadowLight = Color(0xFF0A2A5E);
+
   // ===== 功能语义色 =====
   static const Color success = Color(0xFF34C759);
   static const Color warning = Color(0xFFFF9F0A);

@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
+import '../theme/design_tokens.dart';
 import '../theme/source_ui_tokens.dart';
 import 'app_squircle_surface.dart';
 
@@ -38,7 +39,7 @@ class SourceConsistentCard extends StatelessWidget {
     final background = backgroundColor ??
         SourceUiTokens.resolveCardBackgroundColor(context).withValues(
             alpha: isDark ? _kDarkSurfaceAlpha : _kLightSurfaceAlpha);
-    final shadow = (isDark ? CupertinoColors.black : const Color(0xFF0A2A5E))
+    final shadow = (isDark ? CupertinoColors.black : AppDesignTokens.shadowLight)
         .withValues(alpha: isDark ? _kShadowDarkAlpha : _kShadowLightAlpha);
     return _SourceCardStyle(
       background: background,

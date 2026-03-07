@@ -107,7 +107,7 @@ class _AppNavBarButtonState extends State<AppNavBarButton> {
     );
     final border = ui.colors.separator.withValues(alpha: _kGlassBorderAlpha);
     final shadow =
-        (isDark ? CupertinoColors.black : const Color(0xFF0A2A5E)).withValues(
+        (isDark ? CupertinoColors.black : AppDesignTokens.shadowLight).withValues(
       alpha: isDark ? _kGlassShadowDarkAlpha : _kGlassShadowLightAlpha,
     );
     return _NavButtonGlassStyle(

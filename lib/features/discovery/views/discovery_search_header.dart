@@ -56,7 +56,7 @@ class DiscoverySearchHeader extends StatelessWidget {
 
   _DiscoveryHeaderShellStyle _resolveShellStyle(AppUiTokens uiTokens) {
     final isDark = uiTokens.isDark;
-    final shadow = (isDark ? CupertinoColors.black : const Color(0xFF0A2A5E))
+    final shadow = (isDark ? CupertinoColors.black : AppDesignTokens.shadowLight)
         .withValues(alpha: isDark ? _shadowDarkAlpha : _shadowLightAlpha);
     return _DiscoveryHeaderShellStyle(
       background: uiTokens.colors.sectionBackground,

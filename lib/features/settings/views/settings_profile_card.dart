@@ -61,7 +61,7 @@ class SettingsProfileCard extends StatelessWidget {
 
   Widget _buildSurface(AppUiTokens tokens, Widget content) {
     final isDark = tokens.isDark;
-    final shadow = (isDark ? CupertinoColors.black : const Color(0xFF052049))
+    final shadow = (isDark ? CupertinoColors.black : AppDesignTokens.shadowLight)
         .withValues(alpha: isDark ? _shadowDarkAlpha : _shadowLightAlpha);
     return AppSquircleSurface(
       padding: EdgeInsets.zero,
