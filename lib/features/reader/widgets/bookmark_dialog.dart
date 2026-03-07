@@ -43,7 +43,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
 
   Color get _panelBg =>
-      _isDark ? AppDesignTokens.pageBgDark : CupertinoColors.systemGroupedBackground.resolveFrom(context);
+      CupertinoColors.systemGroupedBackground.resolveFrom(context);
 
   Color get _textStrong =>
       CupertinoColors.label.resolveFrom(context);
