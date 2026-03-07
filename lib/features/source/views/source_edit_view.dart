@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/theme/typography.dart';
 import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
@@ -1577,7 +1579,7 @@ class _SourceEditViewState extends State<SourceEditView> {
           return;
         }
         await Clipboard.setData(ClipboardData(text: structuredSummary));
-        _showMessage('已复制调试摘要（脱敏）');
+        if (mounted) unawaited(showAppToast(context, message: '已复制调试摘要（脱敏）'));
         return;
       case _SourceEditDebugToolsAction.exportDebugBundleQuick:
         if (_debugLinesAll.isEmpty) {
@@ -1608,7 +1610,7 @@ class _SourceEditViewState extends State<SourceEditView> {
           return;
         }
         await Clipboard.setData(ClipboardData(text: runtimeSnapshot));
-        _showMessage('已复制变量快照（脱敏）');
+        if (mounted) unawaited(showAppToast(context, message: '已复制变量快照（脱敏）'));
         return;
       case _SourceEditDebugToolsAction.copyDebugConsole:
         _copyDebugConsole();
@@ -2170,7 +2172,7 @@ class _SourceEditViewState extends State<SourceEditView> {
               ? null
               : () {
                   Clipboard.setData(ClipboardData(text: structuredSummaryText));
-                  _showMessage('已复制调试摘要（脱敏）');
+                  if (mounted) unawaited(showAppToast(context, message: '已复制调试摘要（脱敏）'));
                 },
         ),
         CupertinoListTile.notched(
@@ -2246,7 +2248,7 @@ class _SourceEditViewState extends State<SourceEditView> {
                       ),
                     ),
                   );
-                  _showMessage('已复制变量快照（脱敏）');
+                  if (mounted) unawaited(showAppToast(context, message: '已复制变量快照（脱敏）'));
                 },
         ),
       ],
@@ -2349,7 +2351,7 @@ class _SourceEditViewState extends State<SourceEditView> {
             padding: EdgeInsets.zero,
             onPressed: () {
               Clipboard.setData(ClipboardData(text: line.text));
-              _showMessage('已复制该行日志');
+              if (mounted) unawaited(showAppToast(context, message: '已复制该行日志'));
             },
             child: const Icon(
               CupertinoIcons.doc_on_doc,
@@ -2500,13 +2502,13 @@ class _SourceEditViewState extends State<SourceEditView> {
     }
     final text = _debugLinesAll.map((e) => e.text).join('\n');
     Clipboard.setData(ClipboardData(text: text));
-    _showMessage('已复制全部日志');
+    if (mounted) unawaited(showAppToast(context, message: '已复制全部日志'));
   }
 
   void _copyMinimalReproInfo() {
     final text = _buildMinimalReproText();
     Clipboard.setData(ClipboardData(text: text));
-    _showMessage('已复制最小复现信息');
+    if (mounted) unawaited(showAppToast(context, message: '已复制最小复现信息'));
   }
 
   String _buildMinimalReproText() {
@@ -2762,7 +2764,7 @@ class _SourceEditViewState extends State<SourceEditView> {
         final bundle = _buildDebugBundle(includeRawSources: false);
         final json = _prettyJson(LegadoJson.encode(bundle));
         Clipboard.setData(ClipboardData(text: json));
-        _showMessage('已复制调试包（不含源码）');
+        if (mounted) unawaited(showAppToast(context, message: '已复制调试包（不含源码）'));
         return;
       case _SourceEditExportBundleAction.saveBundleWithoutRawSources:
         await _exportDebugBundleToFile(includeRawSources: false);
@@ -3204,7 +3206,7 @@ class _SourceEditViewState extends State<SourceEditView> {
         return;
       case _SourceEditMoreAction.copyJson:
         Clipboard.setData(ClipboardData(text: _jsonCtrl.text));
-        _showMessage('已复制 JSON');
+        if (mounted) unawaited(showAppToast(context, message: '已复制 JSON'));
         return;
       case _SourceEditMoreAction.pasteJsonFromClipboard:
         await _pasteJsonFromClipboard();
