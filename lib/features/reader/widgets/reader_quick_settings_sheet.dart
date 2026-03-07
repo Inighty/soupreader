@@ -581,7 +581,7 @@ class _MarginPresetRow extends StatelessWidget {
             color: selected
                 ? accent.withValues(alpha: isDark ? 0.18 : 0.12)
                 : chipBg,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
             border: selected
                 ? Border.all(color: accent.withValues(alpha: 0.5), width: 1.5)
                 : null,
@@ -1198,7 +1198,7 @@ class _ModeChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: baseColor,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
             border: selected
                 ? Border.all(
                     color: accent.withValues(alpha: 0.5), width: 1.5)

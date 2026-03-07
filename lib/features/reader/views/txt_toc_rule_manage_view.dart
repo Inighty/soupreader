@@ -1,3 +1,4 @@
+import '../../../app/theme/design_tokens.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -926,7 +927,7 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
                                     decoration: BoxDecoration(
                                       color: CupertinoColors.systemGrey6
                                           .resolveFrom(context),
-                                      borderRadius: BorderRadius.circular(10),
+                                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                                     ),
                                     padding:
                                         const EdgeInsets.fromLTRB(10, 8, 8, 8),
@@ -1309,7 +1310,7 @@ class _TxtTocRuleListTile extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: cardColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
         ),
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Column(
@@ -1407,7 +1408,7 @@ class _TxtTocRuleImportCandidateTile extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: backgroundColor,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppDesignTokens.radiusToast),
         ),
         padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
         child: Row(

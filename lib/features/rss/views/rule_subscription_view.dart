@@ -1,3 +1,4 @@
+import '../../../app/theme/design_tokens.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_action_list_sheet.dart';
@@ -96,7 +97,7 @@ class _RuleSubscriptionViewState extends State<RuleSubscriptionView> {
       decoration: BoxDecoration(
         color: CupertinoColors.secondarySystemGroupedBackground
             .resolveFrom(context),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),

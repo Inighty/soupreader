@@ -600,7 +600,7 @@ class _SourceAvailabilityCheckViewState
                         decoration: BoxDecoration(
                           color: _diagnosisLabelColor(item.diagnosis.primary)
                               .withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                           border: Border.all(
                             color: _diagnosisLabelColor(item.diagnosis.primary)
                                 .withValues(alpha: 0.35),
