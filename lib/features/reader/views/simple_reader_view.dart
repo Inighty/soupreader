@@ -3164,7 +3164,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
       _uiAccent.withValues(alpha: _isUiDark ? 0.28 : 0.2);
 
   Color get _searchHighlightTextColor =>
-      _isUiDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+      CupertinoColors.label.resolveFrom(context);
 
   /// 获取当前字体
   String? get _currentFontFamily {
@@ -12687,7 +12687,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                       decoration: BoxDecoration(
                         color: _isUiDark
                             ? CupertinoColors.white.withValues(alpha: 0.24)
-                            : AppDesignTokens.textMuted.withValues(alpha: 0.35),
+                            : CupertinoColors.separator.resolveFrom(context),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -13336,7 +13336,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
                     decoration: BoxDecoration(
                       color: _isUiDark
                           ? CupertinoColors.white.withValues(alpha: 0.24)
-                          : AppDesignTokens.textMuted.withValues(alpha: 0.35),
+                          : CupertinoColors.separator.resolveFrom(context),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -15982,7 +15982,7 @@ class _SimpleReaderViewState extends State<SimpleReaderView>
               decoration: BoxDecoration(
                 color: _isUiDark
                     ? CupertinoColors.white.withValues(alpha: 0.24)
-                    : AppDesignTokens.textMuted.withValues(alpha: 0.35),
+                    : CupertinoColors.separator.resolveFrom(context),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
