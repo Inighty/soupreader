@@ -477,6 +477,13 @@ class _TypographyTab extends StatelessWidget {
                       ),
                     ),
                   ),
+                  _SwitchRowData(
+                    label: '底部对齐',
+                    value: settings.textBottomJustify,
+                    onChanged: (v) => onSettingsChanged(
+                      settings.copyWith(textBottomJustify: v),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
