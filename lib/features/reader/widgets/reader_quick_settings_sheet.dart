@@ -911,6 +911,14 @@ class _MoreTab extends StatelessWidget {
           ),
         ),
         _Section(
+          title: '屏幕方向',
+          child: _ScreenOrientationRow(
+            value: settings.screenOrientation,
+            onChanged: (v) =>
+                onSettingsChanged(settings.copyWith(screenOrientation: v)),
+          ),
+        ),
+        _Section(
           title: '高级',
           child: CupertinoButton(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -919,6 +927,42 @@ class _MoreTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
+      ],
+    );
+  }
+}
+
+class _ScreenOrientationRow extends StatelessWidget {
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  const _ScreenOrientationRow({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final options = [
+      (ReadingSettings.screenOrientationUnspecified, '跟随'),
+      (ReadingSettings.screenOrientationPortrait, '竖屏'),
+      (ReadingSettings.screenOrientationLandscape, '横屏'),
+      (ReadingSettings.screenOrientationSensor, '传感器'),
+    ];
+    final safeValue = options.any((o) => o.$1 == value)
+        ? value
+        : ReadingSettings.screenOrientationUnspecified;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final option in options)
+          _ModeChip(
+            label: option.$2,
+            selected: safeValue == option.$1,
+            disabled: false,
+            onTap: () => onChanged(option.$1),
+          ),
       ],
     );
   }
