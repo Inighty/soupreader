@@ -30,21 +30,20 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
 
   Color get _panelBg =>
-      _isDark ? const Color(0xFF1C1C1E) : AppDesignTokens.surfaceLight;
+      _isDark ? AppDesignTokens.pageBgDark : CupertinoColors.systemGroupedBackground.resolveFrom(context);
 
   Color get _textStrong =>
-      _isDark ? CupertinoColors.white : AppDesignTokens.textStrong;
+      CupertinoColors.label.resolveFrom(context);
 
-  Color get _textSubtle => _isDark
-      ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.75)
-      : AppDesignTokens.textMuted;
+  Color get _textSubtle =>
+      CupertinoColors.secondaryLabel.resolveFrom(context);
 
   Color get _lineColor =>
-      _isDark ? AppDesignTokens.borderDark : AppDesignTokens.borderLight;
+      CupertinoColors.separator.resolveFrom(context);
 
   Color get _chipBg => _isDark
       ? CupertinoColors.systemGrey.resolveFrom(context).withValues(alpha: 0.16)
-      : AppDesignTokens.pageBgLight;
+      : CupertinoColors.systemGroupedBackground.resolveFrom(context);
 
   @override
   void initState() {
@@ -66,7 +65,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
       height: MediaQuery.of(context).size.height * 0.75,
       decoration: BoxDecoration(
         color: _panelBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDesignTokens.radiusSheet)),
       ),
       child: SafeArea(
         top: false,
@@ -415,7 +414,7 @@ class _TypographySettingsDialogState extends State<TypographySettingsDialog> {
                     decoration: BoxDecoration(
                       color:
                           isSelected ? _accent.withValues(alpha: 0.2) : _chipBg,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
                       border: Border.all(
                         color: isSelected ? _accent : _lineColor,
                         width: isSelected ? 1.5 : 1.0,
