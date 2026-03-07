@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
@@ -96,38 +97,7 @@ class _BookmarkDialogState extends State<BookmarkDialog> {
 
   void _showToast(String message) {
     if (!mounted) return;
-
-    showCupertinoBottomSheetDialog<void>(
-      context: context,
-      barrierColor: CupertinoColors.black.withValues(alpha: 0.08),
-      builder: (toastContext) {
-        final navigator = Navigator.of(toastContext);
-        unawaited(Future<void>.delayed(const Duration(milliseconds: 900), () {
-          if (navigator.mounted && navigator.canPop()) {
-            navigator.pop();
-          }
-        }));
-        return SafeArea(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 28),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: (_isDark ? AppDesignTokens.surfaceDark : _panelBg)
-                    .withValues(alpha: 0.96),
-                borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
-                border: Border.all(color: _lineColor.withValues(alpha: 0.9)),
-              ),
-              child: Text(
-                message,
-                style: TextStyle(color: _textStrong, fontSize: 13),
-              ),
-            ),
-          ),
-        );
-      },
-    );
+    unawaited(showAppToast(context, message: message));
   }
 
   Future<void> _deleteBookmark(BookmarkEntity bookmark) async {

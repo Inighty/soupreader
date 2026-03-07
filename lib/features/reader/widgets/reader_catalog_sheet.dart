@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
@@ -1019,19 +1020,8 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
   }
 
   void _showToast(String message) {
-    showCupertinoBottomDialog<void>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('提示'),
-        content: Text('\n$message'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('好'),
-          ),
-        ],
-      ),
-    );
+    if (!mounted) return;
+    unawaited(showAppToast(context, message: message));
   }
 
   int _estimateCachedChapters() {
