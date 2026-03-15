@@ -642,6 +642,17 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
   }
 
   Widget _buildRulesTab() {
+    final args = SourceEditArgs(
+      originalUrl: widget.originalUrl,
+      initialRawJson: widget.initialRawJson,
+    );
+    final notifier = ref.read(sourceEditProvider(args).notifier);
+    final source = ref.watch(sourceEditProvider(args)).source;
+    final sr = source.ruleSearch ?? const SearchRule();
+    final er = source.ruleExplore ?? const ExploreRule();
+    final bir = source.ruleBookInfo ?? const BookInfoRule();
+    final tr = source.ruleToc ?? const TocRule();
+    final cr = source.ruleContent ?? const ContentRule();
     final hasPreviewChapterUrl =
         _previewChapterUrl != null && _previewChapterUrl!.trim().isNotEmpty;
 
@@ -654,109 +665,67 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
             '常用规则为 CSS 选择器，可用 “selector@href/@src/@text/@html” 等形式取值。',
           ),
           children: [
-            _buildTextFieldTile('校验关键词', _searchCheckKeyWordCtrl,
-                placeholder: 'ruleSearch.checkKeyWord（用于可用性检测）'),
-            _buildTextFieldTile('书籍列表', _searchBookListCtrl,
-                placeholder: 'ruleSearch.bookList（CSS 选择器）'),
-            _buildTextFieldTile('书名', _searchNameCtrl,
-                placeholder: 'ruleSearch.name'),
-            _buildTextFieldTile('作者', _searchAuthorCtrl,
-                placeholder: 'ruleSearch.author'),
-            _buildTextFieldTile('分类/类型', _searchKindCtrl,
-                placeholder: 'ruleSearch.kind（可选）'),
-            _buildTextFieldTile('封面', _searchCoverUrlCtrl,
-                placeholder: 'ruleSearch.coverUrl（@src）'),
-            _buildTextFieldTile('简介', _searchIntroCtrl,
-                placeholder: 'ruleSearch.intro'),
-            _buildTextFieldTile('最新章节', _searchLastChapterCtrl,
-                placeholder: 'ruleSearch.lastChapter'),
-            _buildTextFieldTile('更新时间', _searchUpdateTimeCtrl,
-                placeholder: 'ruleSearch.updateTime（可选）'),
-            _buildTextFieldTile('字数', _searchWordCountCtrl,
-                placeholder: 'ruleSearch.wordCount（可选）'),
-            _buildTextFieldTile('详情链接', _searchBookUrlCtrl,
-                placeholder: 'ruleSearch.bookUrl（@href）'),
+            _buildTextFieldTile('校验关键词', null, value: sr.checkKeyWord ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleSearch: sr.copyWith(checkKeyWord: v.isEmpty ? null : v))), placeholder: 'ruleSearch.checkKeyWord（用于可用性检测）'),
+            _buildTextFieldTile('书籍列表', null, value: sr.bookList ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleSearch: sr.copyWith(bookList: v.isEmpty ? null : v))), placeholder: 'ruleSearch.bookList（CSS 选择器）'),
+            _buildTextFieldTile('书名', null, value: sr.name ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleSearch: sr.copyWith(name: v.isEmpty ? null : v))), placeholder: 'ruleSearch.name'),
+            _buildTextFieldTile('作者', null, value: sr.author ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleSearch: sr.copyWith(author: v.isEmpty ? null : v))), placeholder: 'ruleSearch.author'),
+            _buildTextFieldTile('分类/类型', null, value: sr.kind ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleSearch: sr.copyWith(kind: v.isEmpty ? null : v))), placeholder: 'ruleSearch.kind（可选）'),
+            _buildTextFieldTile('封面', null, value: sr.coverUrl ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleSearch: sr.copyWith(coverUrl: v.isEmpty ? null : v))), placeholder: 'ruleSearch.coverUrl（@src）'),
+            _buildTextFieldTile('简介', null, value: sr.intro ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleSearch: sr.copyWith(intro: v.isEmpty ? null : v))), placeholder: 'ruleSearch.intro'),
+            _buildTextFieldTile('最新章节', null, value: sr.lastChapter ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleSearch: sr.copyWith(lastChapter: v.isEmpty ? null : v))), placeholder: 'ruleSearch.lastChapter'),
+            _buildTextFieldTile('更新时间', null, value: sr.updateTime ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleSearch: sr.copyWith(updateTime: v.isEmpty ? null : v))), placeholder: 'ruleSearch.updateTime（可选）'),
+            _buildTextFieldTile('字数', null, value: sr.wordCount ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleSearch: sr.copyWith(wordCount: v.isEmpty ? null : v))), placeholder: 'ruleSearch.wordCount（可选）'),
+            _buildTextFieldTile('详情链接', null, value: sr.bookUrl ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleSearch: sr.copyWith(bookUrl: v.isEmpty ? null : v))), placeholder: 'ruleSearch.bookUrl（@href）'),
           ],
         ),
         AppListSection(
           header: const Text('发现规则（ruleExplore）'),
           children: [
-            _buildTextFieldTile('书籍列表', _exploreBookListCtrl,
-                placeholder: 'ruleExplore.bookList'),
-            _buildTextFieldTile('书名', _exploreNameCtrl,
-                placeholder: 'ruleExplore.name'),
-            _buildTextFieldTile('作者', _exploreAuthorCtrl,
-                placeholder: 'ruleExplore.author'),
-            _buildTextFieldTile('分类/类型', _exploreKindCtrl,
-                placeholder: 'ruleExplore.kind（可选）'),
-            _buildTextFieldTile('封面', _exploreCoverUrlCtrl,
-                placeholder: 'ruleExplore.coverUrl'),
-            _buildTextFieldTile('简介', _exploreIntroCtrl,
-                placeholder: 'ruleExplore.intro'),
-            _buildTextFieldTile('最新章节', _exploreLastChapterCtrl,
-                placeholder: 'ruleExplore.lastChapter'),
-            _buildTextFieldTile('更新时间', _exploreUpdateTimeCtrl,
-                placeholder: 'ruleExplore.updateTime（可选）'),
-            _buildTextFieldTile('字数', _exploreWordCountCtrl,
-                placeholder: 'ruleExplore.wordCount（可选）'),
-            _buildTextFieldTile('详情链接', _exploreBookUrlCtrl,
-                placeholder: 'ruleExplore.bookUrl'),
+            _buildTextFieldTile('书籍列表', null, value: er.bookList ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleExplore: er.copyWith(bookList: v.isEmpty ? null : v))), placeholder: 'ruleExplore.bookList'),
+            _buildTextFieldTile('书名', null, value: er.name ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleExplore: er.copyWith(name: v.isEmpty ? null : v))), placeholder: 'ruleExplore.name'),
+            _buildTextFieldTile('作者', null, value: er.author ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleExplore: er.copyWith(author: v.isEmpty ? null : v))), placeholder: 'ruleExplore.author'),
+            _buildTextFieldTile('分类/类型', null, value: er.kind ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleExplore: er.copyWith(kind: v.isEmpty ? null : v))), placeholder: 'ruleExplore.kind（可选）'),
+            _buildTextFieldTile('封面', null, value: er.coverUrl ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleExplore: er.copyWith(coverUrl: v.isEmpty ? null : v))), placeholder: 'ruleExplore.coverUrl'),
+            _buildTextFieldTile('简介', null, value: er.intro ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleExplore: er.copyWith(intro: v.isEmpty ? null : v))), placeholder: 'ruleExplore.intro'),
+            _buildTextFieldTile('最新章节', null, value: er.lastChapter ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleExplore: er.copyWith(lastChapter: v.isEmpty ? null : v))), placeholder: 'ruleExplore.lastChapter'),
+            _buildTextFieldTile('更新时间', null, value: er.updateTime ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleExplore: er.copyWith(updateTime: v.isEmpty ? null : v))), placeholder: 'ruleExplore.updateTime（可选）'),
+            _buildTextFieldTile('字数', null, value: er.wordCount ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleExplore: er.copyWith(wordCount: v.isEmpty ? null : v))), placeholder: 'ruleExplore.wordCount（可选）'),
+            _buildTextFieldTile('详情链接', null, value: er.bookUrl ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleExplore: er.copyWith(bookUrl: v.isEmpty ? null : v))), placeholder: 'ruleExplore.bookUrl'),
           ],
         ),
         AppListSection(
           header: const Text('详情规则（ruleBookInfo）'),
           children: [
-            _buildTextFieldTile('根节点', _infoInitCtrl,
-                placeholder: 'ruleBookInfo.init（可选）'),
-            _buildTextFieldTile('书名', _infoNameCtrl,
-                placeholder: 'ruleBookInfo.name'),
-            _buildTextFieldTile('作者', _infoAuthorCtrl,
-                placeholder: 'ruleBookInfo.author'),
-            _buildTextFieldTile('封面', _infoCoverUrlCtrl,
-                placeholder: 'ruleBookInfo.coverUrl'),
-            _buildTextFieldTile('简介', _infoIntroCtrl,
-                placeholder: 'ruleBookInfo.intro', maxLines: 3),
-            _buildTextFieldTile('分类/类型', _infoKindCtrl,
-                placeholder: 'ruleBookInfo.kind（可选）'),
-            _buildTextFieldTile('最新章节', _infoLastChapterCtrl,
-                placeholder: 'ruleBookInfo.lastChapter'),
-            _buildTextFieldTile('更新时间', _infoUpdateTimeCtrl,
-                placeholder: 'ruleBookInfo.updateTime（可选）'),
-            _buildTextFieldTile('字数', _infoWordCountCtrl,
-                placeholder: 'ruleBookInfo.wordCount（可选）'),
-            _buildTextFieldTile('目录链接', _infoTocUrlCtrl,
-                placeholder: 'ruleBookInfo.tocUrl（@href）'),
+            _buildTextFieldTile('根节点', null, value: bir.init ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleBookInfo: bir.copyWith(init: v.isEmpty ? null : v))), placeholder: 'ruleBookInfo.init（可选）'),
+            _buildTextFieldTile('书名', null, value: bir.name ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleBookInfo: bir.copyWith(name: v.isEmpty ? null : v))), placeholder: 'ruleBookInfo.name'),
+            _buildTextFieldTile('作者', null, value: bir.author ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleBookInfo: bir.copyWith(author: v.isEmpty ? null : v))), placeholder: 'ruleBookInfo.author'),
+            _buildTextFieldTile('封面', null, value: bir.coverUrl ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleBookInfo: bir.copyWith(coverUrl: v.isEmpty ? null : v))), placeholder: 'ruleBookInfo.coverUrl'),
+            _buildTextFieldTile('简介', null, value: bir.intro ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleBookInfo: bir.copyWith(intro: v.isEmpty ? null : v))), placeholder: 'ruleBookInfo.intro', maxLines: 3),
+            _buildTextFieldTile('分类/类型', null, value: bir.kind ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleBookInfo: bir.copyWith(kind: v.isEmpty ? null : v))), placeholder: 'ruleBookInfo.kind（可选）'),
+            _buildTextFieldTile('最新章节', null, value: bir.lastChapter ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleBookInfo: bir.copyWith(lastChapter: v.isEmpty ? null : v))), placeholder: 'ruleBookInfo.lastChapter'),
+            _buildTextFieldTile('更新时间', null, value: bir.updateTime ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleBookInfo: bir.copyWith(updateTime: v.isEmpty ? null : v))), placeholder: 'ruleBookInfo.updateTime（可选）'),
+            _buildTextFieldTile('字数', null, value: bir.wordCount ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleBookInfo: bir.copyWith(wordCount: v.isEmpty ? null : v))), placeholder: 'ruleBookInfo.wordCount（可选）'),
+            _buildTextFieldTile('目录链接', null, value: bir.tocUrl ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleBookInfo: bir.copyWith(tocUrl: v.isEmpty ? null : v))), placeholder: 'ruleBookInfo.tocUrl（@href）'),
           ],
         ),
         AppListSection(
           header: const Text('目录规则（ruleToc）'),
           children: [
-            _buildTextFieldTile('章节列表', _tocChapterListCtrl,
-                placeholder: 'ruleToc.chapterList'),
-            _buildTextFieldTile('章节名', _tocChapterNameCtrl,
-                placeholder: 'ruleToc.chapterName'),
-            _buildTextFieldTile('章节链接', _tocChapterUrlCtrl,
-                placeholder: 'ruleToc.chapterUrl（@href）'),
-            _buildTextFieldTile('目录下一页', _tocNextTocUrlCtrl,
-                placeholder: 'ruleToc.nextTocUrl（可选，支持多候选）'),
-            _buildTextFieldTile('目录预处理JS', _tocPreUpdateJsCtrl,
-                placeholder: 'ruleToc.preUpdateJs（可选，JS）', maxLines: 4),
-            _buildTextFieldTile('标题格式化JS', _tocFormatJsCtrl,
-                placeholder: 'ruleToc.formatJs（可选，JS）', maxLines: 4),
+            _buildTextFieldTile('章节列表', null, value: tr.chapterList ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleToc: tr.copyWith(chapterList: v.isEmpty ? null : v))), placeholder: 'ruleToc.chapterList'),
+            _buildTextFieldTile('章节名', null, value: tr.chapterName ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleToc: tr.copyWith(chapterName: v.isEmpty ? null : v))), placeholder: 'ruleToc.chapterName'),
+            _buildTextFieldTile('章节链接', null, value: tr.chapterUrl ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleToc: tr.copyWith(chapterUrl: v.isEmpty ? null : v))), placeholder: 'ruleToc.chapterUrl（@href）'),
+            _buildTextFieldTile('目录下一页', null, value: tr.nextTocUrl ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleToc: tr.copyWith(nextTocUrl: v.isEmpty ? null : v))), placeholder: 'ruleToc.nextTocUrl（可选，支持多候选）'),
+            _buildTextFieldTile('目录预处理JS', null, value: tr.preUpdateJs ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleToc: tr.copyWith(preUpdateJs: v.isEmpty ? null : v))), placeholder: 'ruleToc.preUpdateJs（可选，JS）', maxLines: 4),
+            _buildTextFieldTile('标题格式化JS', null, value: tr.formatJs ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleToc: tr.copyWith(formatJs: v.isEmpty ? null : v))), placeholder: 'ruleToc.formatJs（可选，JS）', maxLines: 4),
           ],
         ),
         AppListSection(
           header: const Text('正文规则（ruleContent）'),
           children: [
-            _buildTextFieldTile('标题（可选）', _contentTitleCtrl,
-                placeholder: 'ruleContent.title'),
-            _buildTextFieldTile('正文', _contentContentCtrl,
-                placeholder: 'ruleContent.content（@text/@html）', maxLines: 4),
-            _buildTextFieldTile('正文下一页', _contentNextContentUrlCtrl,
-                placeholder: 'ruleContent.nextContentUrl（可选，支持多候选）'),
-            _buildTextFieldTile('替换正则', _contentReplaceRegexCtrl,
-                placeholder: 'ruleContent.replaceRegex（regex##rep##...）',
-                maxLines: 4),
+            _buildTextFieldTile('标题（可选）', null, value: cr.title ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleContent: cr.copyWith(title: v.isEmpty ? null : v))), placeholder: 'ruleContent.title'),
+            _buildTextFieldTile('正文', null, value: cr.content ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleContent: cr.copyWith(content: v.isEmpty ? null : v))), placeholder: 'ruleContent.content（@text/@html）', maxLines: 4),
+            _buildTextFieldTile('正文下一页', null, value: cr.nextContentUrl ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleContent: cr.copyWith(nextContentUrl: v.isEmpty ? null : v))), placeholder: 'ruleContent.nextContentUrl（可选，支持多候选）'),
+            _buildTextFieldTile('替换正则', null, value: cr.replaceRegex ?? '', onChanged: (v) => notifier.updateSource((s) => s.copyWith(ruleContent: cr.copyWith(replaceRegex: v.isEmpty ? null : v))), placeholder: 'ruleContent.replaceRegex（regex##rep##...）', maxLines: 4),
           ],
         ),
         AppListSection(
@@ -872,15 +841,29 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
   }
 
   Widget _buildBasicTab() {
+    final args = SourceEditArgs(
+      originalUrl: widget.originalUrl,
+      initialRawJson: widget.initialRawJson,
+    );
+    final notifier = ref.read(sourceEditProvider(args).notifier);
+    final source = ref.watch(sourceEditProvider(args)).source;
     return AppListView(
       controller: _basicTabScrollController,
       children: [
         AppListSection(
           header: const Text('基础信息'),
           children: [
-            _buildTextFieldTile('名称', _nameCtrl, placeholder: 'bookSourceName'),
-            _buildTextFieldTile('地址', _urlCtrl, placeholder: 'bookSourceUrl'),
-            _buildTextFieldTile('分组', _groupCtrl,
+            _buildTextFieldTile('名称', null,
+                value: source.bookSourceName,
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(bookSourceName: v)),
+                placeholder: 'bookSourceName'),
+            _buildTextFieldTile('地址', null,
+                value: source.bookSourceUrl,
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(bookSourceUrl: v)),
+                placeholder: 'bookSourceUrl'),
+            _buildTextFieldTile('分组', null,
+                value: source.bookSourceGroup ?? '',
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(bookSourceGroup: v.isEmpty ? null : v)),
                 placeholder: 'bookSourceGroup'),
             CupertinoListTile.notched(
               title: const Text('类型'),
@@ -893,60 +876,58 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
               ),
               onTap: _pickSourceType,
             ),
-            _buildTextFieldTile(
-              '自定义排序',
-              _customOrderCtrl,
-              placeholder: 'customOrder（数字）',
-            ),
-            _buildTextFieldTile('权重', _weightCtrl, placeholder: 'weight（数字）'),
+            _buildTextFieldTile('自定义排序', null,
+                value: source.customOrder.toString(),
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(customOrder: int.tryParse(v.trim()) ?? 0)),
+                placeholder: 'customOrder（数字）'),
+            _buildTextFieldTile('权重', null,
+                value: source.weight.toString(),
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(weight: int.tryParse(v.trim()) ?? 0)),
+                placeholder: 'weight（数字）'),
 
           ],
         ),
         AppListSection(
           header: const Text('网络/登录'),
           children: [
-            _buildTextFieldTile(
-              '请求超时',
-              _respondTimeCtrl,
-              placeholder: 'respondTime（毫秒）',
-            ),
+            _buildTextFieldTile('请求超时', null,
+                value: source.respondTime.toString(),
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(respondTime: int.tryParse(v.trim()) ?? 180000)),
+                placeholder: 'respondTime（毫秒）'),
 
-            _buildTextFieldTile(
-              '并发速率',
-              _concurrentRateCtrl,
-              placeholder: 'concurrentRate（可空）',
-            ),
-            _buildTextFieldTile(
-              'Header',
-              _headerCtrl,
-              placeholder: 'header（支持 JSON 或每行 key:value）',
-              maxLines: 6,
-            ),
-            _buildTextFieldTile('登录地址', _loginUrlCtrl, placeholder: 'loginUrl'),
-            _buildTextFieldTile(
-              '登录 UI',
-              _loginUiCtrl,
-              placeholder: 'loginUi（可空）',
-              maxLines: 3,
-            ),
-            _buildTextFieldTile(
-              '登录检查 JS',
-              _loginCheckJsCtrl,
-              placeholder: 'loginCheckJs（可空）',
-              maxLines: 3,
-            ),
-            _buildTextFieldTile(
-              'JS 库',
-              _jsLibCtrl,
-              placeholder: 'jsLib（可空）',
-              maxLines: 2,
-            ),
-            _buildTextFieldTile(
-              '封面解码 JS',
-              _coverDecodeJsCtrl,
-              placeholder: 'coverDecodeJs（可空）',
-              maxLines: 3,
-            ),
+            _buildTextFieldTile('并发速率', null,
+                value: source.concurrentRate ?? '',
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(concurrentRate: v.isEmpty ? null : v)),
+                placeholder: 'concurrentRate（可空）'),
+            _buildTextFieldTile('Header', null,
+                value: source.header ?? '',
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(header: v.isEmpty ? null : v)),
+                placeholder: 'header（支持 JSON 或每行 key:value）',
+                maxLines: 6),
+            _buildTextFieldTile('登录地址', null,
+                value: source.loginUrl ?? '',
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(loginUrl: v.isEmpty ? null : v)),
+                placeholder: 'loginUrl'),
+            _buildTextFieldTile('登录 UI', null,
+                value: source.loginUi ?? '',
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(loginUi: v.isEmpty ? null : v)),
+                placeholder: 'loginUi（可空）',
+                maxLines: 3),
+            _buildTextFieldTile('登录检查 JS', null,
+                value: source.loginCheckJs ?? '',
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(loginCheckJs: v.isEmpty ? null : v)),
+                placeholder: 'loginCheckJs（可空）',
+                maxLines: 3),
+            _buildTextFieldTile('JS 库', null,
+                value: source.jsLib ?? '',
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(jsLib: v.isEmpty ? null : v)),
+                placeholder: 'jsLib（可空）',
+                maxLines: 2),
+            _buildTextFieldTile('封面解码 JS', null,
+                value: source.coverDecodeJs ?? '',
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(coverDecodeJs: v.isEmpty ? null : v)),
+                placeholder: 'coverDecodeJs（可空）',
+                maxLines: 3),
             _buildTextFieldTile(
               '登录头缓存(JSON)',
               _loginHeaderCacheCtrl,
@@ -984,34 +965,32 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
         AppListSection(
           header: const Text('URL'),
           children: [
-            _buildTextFieldTile(
-              '书籍 URL 正则',
-              _bookUrlPatternCtrl,
-              placeholder: 'bookUrlPattern（可空）',
-            ),
-            _buildTextFieldTile(
-              '搜索 URL',
-              _searchUrlCtrl,
-              placeholder: 'searchUrl（含 {key} 或 {{key}}）',
-            ),
-            _buildTextFieldTile('发现 URL', _exploreUrlCtrl,
+            _buildTextFieldTile('书籍 URL 正则', null,
+                value: source.bookUrlPattern ?? '',
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(bookUrlPattern: v.isEmpty ? null : v)),
+                placeholder: 'bookUrlPattern（可空）'),
+            _buildTextFieldTile('搜索 URL', null,
+                value: source.searchUrl ?? '',
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(searchUrl: v.isEmpty ? null : v)),
+                placeholder: 'searchUrl（含 {key} 或 {{key}}）'),
+            _buildTextFieldTile('发现 URL', null,
+                value: source.exploreUrl ?? '',
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(exploreUrl: v.isEmpty ? null : v)),
                 placeholder: 'exploreUrl'),
-            _buildTextFieldTile(
-              '发现屏蔽',
-              _exploreScreenCtrl,
-              placeholder: 'exploreScreen（可空）',
-            ),
+            _buildTextFieldTile('发现屏蔽', null,
+                value: source.exploreScreen ?? '',
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(exploreScreen: v.isEmpty ? null : v)),
+                placeholder: 'exploreScreen（可空）'),
           ],
         ),
         AppListSection(
           header: const Text('备注'),
           children: [
-            _buildTextFieldTile(
-              '书源备注',
-              _bookSourceCommentCtrl,
-              placeholder: 'bookSourceComment（可空）',
-              maxLines: 4,
-            ),
+            _buildTextFieldTile('书源备注', null,
+                value: source.bookSourceComment ?? '',
+                onChanged: (v) => notifier.updateSource((s) => s.copyWith(bookSourceComment: v.isEmpty ? null : v)),
+                placeholder: 'bookSourceComment（可空）',
+                maxLines: 4),
             _buildTextFieldTile(
               '变量备注',
               _variableCommentCtrl,
@@ -1089,7 +1068,14 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
                 fontFamily: AppTypography.fontFamilyMonospace,
                 fontSize: 13,
               ),
-              onChanged: (_) => _validateJson(silent: true),
+              onChanged: (v) {
+                final args = SourceEditArgs(
+                  originalUrl: widget.originalUrl,
+                  initialRawJson: widget.initialRawJson,
+                );
+                ref.read(sourceEditProvider(args).notifier).updateRawJson(v);
+                _validateJson(silent: true);
+              },
             ),
           ),
         ),
@@ -1960,7 +1946,13 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
             placeholder: '输入关键字或调试 key',
             textInputAction: TextInputAction.search,
             onSubmitted: (_) => _startDebugFromInputSubmit(),
-            onChanged: (_) => setState(() {}),
+            onChanged: (v) {
+              ref.read(sourceEditProvider(SourceEditArgs(
+                originalUrl: widget.originalUrl,
+                initialRawJson: widget.initialRawJson,
+              )).notifier).updateDebugKey(v);
+              setState(() {});
+            },
           ),
         ),
         Padding(
@@ -3853,10 +3845,14 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
 
   CupertinoListTile _buildTextFieldTile(
     String title,
-    TextEditingController controller, {
+    TextEditingController? controller, {
+    String? value,
+    ValueChanged<String>? onChanged,
     String? placeholder,
     int maxLines = 1,
   }) {
+    assert(controller != null || (value != null && onChanged != null),
+        '_buildTextFieldTile requires either controller or value+onChanged');
     final ui = AppUiTokens.resolve(context);
     final bg = CupertinoColors.tertiarySystemFill.resolveFrom(context);
     final baseStyle = CupertinoTheme.of(context).textTheme.textStyle;
@@ -3869,28 +3865,38 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
             color: bg,
             borderRadius: BorderRadius.circular(ui.radii.control),
           ),
-          child: CupertinoTextField(
-            controller: controller,
-            placeholder: placeholder,
-            maxLines: maxLines,
-            autocorrect: false,
-            enableSuggestions: false,
-            keyboardType: maxLines > 1
-                ? TextInputType.multiline
-                : TextInputType.url,
-            decoration: null,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            style: baseStyle.copyWith(
-              fontSize: 13,
-              color: ui.colors.label,
-              letterSpacing: -0.2,
-            ),
-            placeholderStyle: baseStyle.copyWith(
-              fontSize: 13,
-              color: ui.colors.tertiaryLabel,
-              letterSpacing: -0.2,
-            ),
-          ),
+          child: controller != null
+              ? CupertinoTextField(
+                  controller: controller,
+                  placeholder: placeholder,
+                  maxLines: maxLines,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  keyboardType: maxLines > 1
+                      ? TextInputType.multiline
+                      : TextInputType.url,
+                  decoration: null,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  style: baseStyle.copyWith(
+                    fontSize: 13,
+                    color: ui.colors.label,
+                    letterSpacing: -0.2,
+                  ),
+                  placeholderStyle: baseStyle.copyWith(
+                    fontSize: 13,
+                    color: ui.colors.tertiaryLabel,
+                    letterSpacing: -0.2,
+                  ),
+                )
+              : _SourceTextField(
+                  value: value ?? '',
+                  onChanged: onChanged ?? (_) {},
+                  placeholder: placeholder,
+                  maxLines: maxLines,
+                  baseStyle: baseStyle,
+                  labelColor: ui.colors.label,
+                  placeholderColor: ui.colors.tertiaryLabel,
+                ),
         ),
       ),
     );
@@ -3905,4 +3911,78 @@ class _DebugLine {
     required this.state,
     required this.text,
   });
+}
+
+class _SourceTextField extends StatefulWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+  final String? placeholder;
+  final int maxLines;
+  final TextStyle baseStyle;
+  final Color labelColor;
+  final Color placeholderColor;
+
+  const _SourceTextField({
+    required this.value,
+    required this.onChanged,
+    this.placeholder,
+    this.maxLines = 1,
+    required this.baseStyle,
+    required this.labelColor,
+    required this.placeholderColor,
+  });
+
+  @override
+  State<_SourceTextField> createState() => _SourceTextFieldState();
+}
+
+class _SourceTextFieldState extends State<_SourceTextField> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.value);
+  }
+
+  @override
+  void didUpdateWidget(_SourceTextField old) {
+    super.didUpdateWidget(old);
+    if (old.value != widget.value && _ctrl.text != widget.value) {
+      _ctrl.value = _ctrl.value.copyWith(text: widget.value);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoTextField(
+      controller: _ctrl,
+      onChanged: widget.onChanged,
+      placeholder: widget.placeholder,
+      maxLines: widget.maxLines,
+      autocorrect: false,
+      enableSuggestions: false,
+      keyboardType: widget.maxLines > 1
+          ? TextInputType.multiline
+          : TextInputType.url,
+      decoration: null,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      style: widget.baseStyle.copyWith(
+        fontSize: 13,
+        color: widget.labelColor,
+        letterSpacing: -0.2,
+      ),
+      placeholderStyle: widget.baseStyle.copyWith(
+        fontSize: 13,
+        color: widget.placeholderColor,
+        letterSpacing: -0.2,
+      ),
+    );
+  }
 }

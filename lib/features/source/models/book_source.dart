@@ -379,6 +379,32 @@ class SearchRule implements BookListRule {
       'wordCount': wordCount,
     };
   }
+
+  SearchRule copyWith({
+    String? checkKeyWord,
+    String? bookList,
+    String? name,
+    String? author,
+    String? intro,
+    String? kind,
+    String? lastChapter,
+    String? updateTime,
+    String? bookUrl,
+    String? coverUrl,
+    String? wordCount,
+  }) => SearchRule(
+    checkKeyWord: checkKeyWord ?? this.checkKeyWord,
+    bookList: bookList ?? this.bookList,
+    name: name ?? this.name,
+    author: author ?? this.author,
+    intro: intro ?? this.intro,
+    kind: kind ?? this.kind,
+    lastChapter: lastChapter ?? this.lastChapter,
+    updateTime: updateTime ?? this.updateTime,
+    bookUrl: bookUrl ?? this.bookUrl,
+    coverUrl: coverUrl ?? this.coverUrl,
+    wordCount: wordCount ?? this.wordCount,
+  );
 }
 
 class ExploreRule implements BookListRule {
@@ -445,6 +471,18 @@ class ExploreRule implements BookListRule {
       'wordCount': wordCount,
     };
   }
+
+  ExploreRule copyWith({
+    String? bookList, String? name, String? author, String? intro,
+    String? kind, String? lastChapter, String? updateTime,
+    String? bookUrl, String? coverUrl, String? wordCount,
+  }) => ExploreRule(
+    bookList: bookList ?? this.bookList, name: name ?? this.name,
+    author: author ?? this.author, intro: intro ?? this.intro,
+    kind: kind ?? this.kind, lastChapter: lastChapter ?? this.lastChapter,
+    updateTime: updateTime ?? this.updateTime, bookUrl: bookUrl ?? this.bookUrl,
+    coverUrl: coverUrl ?? this.coverUrl, wordCount: wordCount ?? this.wordCount,
+  );
 }
 
 class BookInfoRule {
@@ -509,6 +547,19 @@ class BookInfoRule {
       'downloadUrls': downloadUrls,
     };
   }
+
+  BookInfoRule copyWith({
+    String? init, String? name, String? author, String? intro, String? kind,
+    String? lastChapter, String? updateTime, String? coverUrl, String? tocUrl,
+    String? wordCount, String? canReName, String? downloadUrls,
+  }) => BookInfoRule(
+    init: init ?? this.init, name: name ?? this.name, author: author ?? this.author,
+    intro: intro ?? this.intro, kind: kind ?? this.kind,
+    lastChapter: lastChapter ?? this.lastChapter, updateTime: updateTime ?? this.updateTime,
+    coverUrl: coverUrl ?? this.coverUrl, tocUrl: tocUrl ?? this.tocUrl,
+    wordCount: wordCount ?? this.wordCount, canReName: canReName ?? this.canReName,
+    downloadUrls: downloadUrls ?? this.downloadUrls,
+  );
 }
 
 class TocRule {
@@ -565,6 +616,18 @@ class TocRule {
       'nextTocUrl': nextTocUrl,
     };
   }
+
+  TocRule copyWith({
+    String? preUpdateJs, String? chapterList, String? chapterName,
+    String? chapterUrl, String? formatJs, String? nextTocUrl,
+  }) => TocRule(
+    preUpdateJs: preUpdateJs ?? this.preUpdateJs,
+    chapterList: chapterList ?? this.chapterList,
+    chapterName: chapterName ?? this.chapterName,
+    chapterUrl: chapterUrl ?? this.chapterUrl,
+    formatJs: formatJs ?? this.formatJs,
+    nextTocUrl: nextTocUrl ?? this.nextTocUrl,
+  );
 }
 
 class ContentRule {
@@ -617,6 +680,19 @@ class ContentRule {
       'payAction': payAction,
     };
   }
+
+  ContentRule copyWith({
+    String? content, String? title, String? nextContentUrl, String? webJs,
+    String? sourceRegex, String? replaceRegex, String? imageStyle,
+    String? imageDecode, String? payAction,
+  }) => ContentRule(
+    content: content ?? this.content, title: title ?? this.title,
+    nextContentUrl: nextContentUrl ?? this.nextContentUrl,
+    webJs: webJs ?? this.webJs, sourceRegex: sourceRegex ?? this.sourceRegex,
+    replaceRegex: replaceRegex ?? this.replaceRegex,
+    imageStyle: imageStyle ?? this.imageStyle, imageDecode: imageDecode ?? this.imageDecode,
+    payAction: payAction ?? this.payAction,
+  );
 }
 
 class ReviewRule {
