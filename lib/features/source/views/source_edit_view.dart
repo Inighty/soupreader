@@ -27,7 +27,6 @@ import '../services/source_debug_orchestrator.dart';
 import '../services/source_explore_kinds_service.dart';
 import '../services/source_cookie_scope_resolver.dart';
 import '../services/source_debug_summary_parser.dart';
-import '../services/source_debug_summary_store.dart';
 import '../services/source_quick_test_helper.dart';
 import '../services/source_rule_lint_service.dart';
 import '../providers/source_edit_notifier.dart';
@@ -231,8 +230,6 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
   bool _showDebugQuickHelp = true;
   String? _previewChapterName;
   String? _previewChapterUrl;
-  bool _awaitingChapterNameValue = false;
-  bool _awaitingChapterUrlValue = false;
 
   @override
   void initState() {
@@ -455,6 +452,43 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(sourceEditProvider(_args), (prev, next) {
+      if (!mounted) return;
+      // Sync debug state from Notifier to local State for UI rendering
+      final prevLen = prev?.debugLinesAll.length ?? 0;
+      if (prev?.debugLoading != next.debugLoading ||
+          prevLen != next.debugLinesAll.length ||
+          prev?.debugError != next.debugError ||
+          prev?.debugListSrcHtml != next.debugListSrcHtml) {
+        setState(() {
+          _debugLoading = next.debugLoading;
+          _debugError = next.debugError;
+          _debugLines
+            ..clear()
+            ..addAll(next.debugLines.map((l) => _DebugLine(state: l.state, text: l.text)));
+          _debugLinesAll
+            ..clear()
+            ..addAll(next.debugLinesAll.map((l) => _DebugLine(state: l.state, text: l.text)));
+          _debugAutoFollowLogs = next.debugAutoFollowLogs;
+          _debugListSrcHtml = next.debugListSrcHtml;
+          _debugBookSrcHtml = next.debugBookSrcHtml;
+          _debugTocSrcHtml = next.debugTocSrcHtml;
+          _debugContentSrcHtml = next.debugContentSrcHtml;
+          _debugContentResult = next.debugContentResult;
+          _debugMethodDecision = next.debugMethodDecision;
+          _debugRetryDecision = next.debugRetryDecision;
+          _debugRequestCharsetDecision = next.debugRequestCharsetDecision;
+          _debugBodyDecision = next.debugBodyDecision;
+          _debugResponseCharset = next.debugResponseCharset;
+          _debugResponseCharsetDecision = next.debugResponseCharsetDecision;
+          _debugRuntimeVarsSnapshot = next.debugRuntimeVarsSnapshot;
+          _debugIntentType = next.debugIntentType;
+          _previewChapterName = next.previewChapterName;
+          _previewChapterUrl = next.previewChapterUrl;
+        });
+        if (next.debugLinesAll.length > prevLen) _queueDebugAutoScroll();
+      }
+    });
     final segStyle = CupertinoTheme.of(context).textTheme.textStyle.copyWith(
       fontSize: 14,
       fontWeight: FontWeight.w500,
@@ -2879,77 +2913,6 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
     );
   }
 
-  String _stripDebugTimePrefix(String text) {
-    final t = text.trimLeft();
-    if (!t.startsWith('[')) return t;
-    final idx = t.indexOf('] ');
-    if (idx < 0) return t;
-    return t.substring(idx + 2);
-  }
-
-  void _updateRequestDecisionSummary(String message) {
-    final plain = _stripDebugTimePrefix(message).trimLeft();
-    String valueOf(String prefix) {
-      return plain.substring(prefix.length).trim();
-    }
-
-    if (plain.startsWith('└请求决策：')) {
-      _debugMethodDecision = valueOf('└请求决策：');
-      return;
-    }
-    if (plain.startsWith('└重试决策：')) {
-      _debugRetryDecision = valueOf('└重试决策：');
-      return;
-    }
-    if (plain.startsWith('└请求编码：')) {
-      _debugRequestCharsetDecision = valueOf('└请求编码：');
-      return;
-    }
-    if (plain.startsWith('└请求体决策：')) {
-      _debugBodyDecision = valueOf('└请求体决策：');
-      return;
-    }
-    if (plain.startsWith('└响应编码：')) {
-      _debugResponseCharset = valueOf('└响应编码：');
-      return;
-    }
-    if (plain.startsWith('└响应解码决策：')) {
-      _debugResponseCharsetDecision = valueOf('└响应解码决策：');
-    }
-  }
-
-  void _updateRuleFieldPreviewFromLine(String message) {
-    final plain = _stripDebugTimePrefix(message).trimLeft();
-    if (plain.startsWith('┌获取章节名')) {
-      _awaitingChapterNameValue = true;
-      return;
-    }
-    if (plain.startsWith('┌获取章节链接')) {
-      _awaitingChapterUrlValue = true;
-      return;
-    }
-    if (plain.startsWith('┌')) {
-      _awaitingChapterNameValue = false;
-      _awaitingChapterUrlValue = false;
-      return;
-    }
-    if (!plain.startsWith('└')) return;
-
-    final value = plain.substring(1).trim();
-    if (_awaitingChapterNameValue) {
-      if (value.isNotEmpty) {
-        _previewChapterName = value;
-      }
-      _awaitingChapterNameValue = false;
-    }
-    if (_awaitingChapterUrlValue) {
-      if (value.isNotEmpty) {
-        _previewChapterUrl = value;
-      }
-      _awaitingChapterUrlValue = false;
-    }
-  }
-
   List<String> _buildDebugDecisionSummaryLines() {
     final lines = <String>[];
     if (_debugMethodDecision != null && _debugMethodDecision!.isNotEmpty) {
@@ -2996,8 +2959,6 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
       _debugRuntimeVarsSnapshot = <String, String>{};
       _previewChapterName = null;
       _previewChapterUrl = null;
-      _awaitingChapterNameValue = false;
-      _awaitingChapterUrlValue = false;
     });
     _queueDebugAutoScroll(force: true);
   }
@@ -3331,182 +3292,10 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
 
   Future<void> _startLegadoStyleDebug() async {
     _debugKeyFocusNode.unfocus();
-    // Use Notifier state.source (always up-to-date via onChanged)
-    final source = ref.read(sourceEditProvider(_args)).source;
-    if (source.bookSourceUrl.trim().isEmpty) {
-      setState(() => _debugError = 'bookSourceUrl 不能为空（否则无法构建请求地址）');
-      return;
-    }
-    var key = _debugKeyCtrl.text.trim();
-    if (key.isEmpty) {
-      key = _defaultDebugSearchKey();
-      _debugKeyCtrl.text = key;
-    }
-    final parsed = _debugOrchestrator.parseKey(key);
-    final intent = parsed.intent;
-    if (intent == null) {
-      setState(() => _debugError = parsed.error ?? '请输入有效 key');
-      return;
-    }
-
-    setState(() {
-      _debugLoading = true;
-      _debugError = null;
-      _debugLines.clear();
-      _debugLinesAll.clear();
-      _debugAutoFollowLogs = true;
-      _debugAutoScrollQueued = false;
-      _debugListSrcHtml = null;
-      _debugBookSrcHtml = null;
-      _debugTocSrcHtml = null;
-      _debugContentSrcHtml = null;
-      _debugContentResult = null;
-      _debugMethodDecision = null;
-      _debugRetryDecision = null;
-      _debugRequestCharsetDecision = null;
-      _debugBodyDecision = null;
-      _debugResponseCharset = null;
-      _debugResponseCharsetDecision = null;
-      _debugRuntimeVarsSnapshot = <String, String>{};
-      _debugIntentType = intent.type;
-      _previewChapterName = null;
-      _previewChapterUrl = null;
-      _awaitingChapterNameValue = false;
-      _awaitingChapterUrlValue = false;
-    });
-    _queueDebugAutoScroll(force: true);
-
-    SourceDebugRunResult? runResult;
-    try {
-      runResult = await _debugOrchestrator.run(
-        source: source,
-        key: key,
-        onEvent: _onDebugEvent,
-      );
-      if (!mounted) return;
-      setState(() {
-        _debugRuntimeVarsSnapshot = _engine.debugRuntimeVariablesSnapshot();
-        if (_debugError == null &&
-            runResult?.error?.trim().isNotEmpty == true) {
-          _debugError = runResult!.error!.trim();
-        }
-      });
-      _publishDebugSummary(
-        source: source,
-        intent: runResult.intent,
-        runResult: runResult,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _debugError = '调试失败：$e');
-      _publishDebugSummary(
-        source: source,
-        intent: intent,
-        runResult: runResult,
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _debugLoading = false);
-      }
-    }
-  }
-
-  void _onDebugEvent(SourceDebugEvent event) {
-    if (!mounted) return;
-    if (event.isRaw) {
-      setState(() {
-        switch (event.state) {
-          case 10:
-            _debugListSrcHtml = event.message;
-            break;
-          case 20:
-            _debugBookSrcHtml = event.message;
-            break;
-          case 30:
-            _debugTocSrcHtml = event.message;
-            break;
-          case 40:
-            _debugContentSrcHtml = event.message;
-            break;
-          case 41:
-            _debugContentResult = event.message;
-            break;
-        }
-      });
-      return;
-    }
-
-    setState(() {
-      final line = _DebugLine(state: event.state, text: event.message);
-      _updateRequestDecisionSummary(event.message);
-      _updateRuleFieldPreviewFromLine(event.message);
-      _debugLinesAll.add(line);
-      _debugLines.add(line);
-      // UI 列表模式保持轻量：仅保留最近一部分；“全文控制台/导出调试包”使用全量日志。
-      const maxUiLines = 600;
-      if (_debugLines.length > maxUiLines) {
-        _debugLines.removeRange(0, _debugLines.length - maxUiLines);
-      }
-
-      if (event.state == -1) {
-        _debugError = event.message;
-      }
-    });
-    _queueDebugAutoScroll();
-  }
-
-  void _publishDebugSummary({
-    required BookSource source,
-    required SourceDebugIntent intent,
-    required SourceDebugRunResult? runResult,
-  }) {
-    final logLines = _debugLinesAll.map((line) => line.text).toList();
-    final errorLines = _debugLinesAll
-        .where((line) => line.state == -1)
-        .map((line) => line.text)
-        .toList();
-    final summary = SourceDebugSummaryParser.build(
-      logLines: logLines,
-      debugError: _debugError,
-      errorLines: errorLines,
-    );
-    final diagnosisRaw = summary['diagnosis'];
-    final diagnosis = diagnosisRaw is Map
-        ? diagnosisRaw.map((k, v) => MapEntry('$k', v))
-        : const <String, dynamic>{};
-    final primary = (diagnosis['primary'] ?? 'no_data').toString();
-    final labels = (diagnosis['labels'] is List)
-        ? (diagnosis['labels'] as List)
-            .map((e) => e.toString())
-            .where((e) => e.trim().isNotEmpty)
-            .toList(growable: false)
-        : const <String>[];
-    final hints = (diagnosis['hints'] is List)
-        ? (diagnosis['hints'] as List)
-            .map((e) => e.toString())
-            .where((e) => e.trim().isNotEmpty)
-            .toList(growable: false)
-        : const <String>[];
-
-    final success = runResult?.success ??
-        (_debugError == null &&
-            !labels.contains('request_failure') &&
-            !labels.contains('parse_failure'));
-
-    SourceDebugSummaryStore.instance.push(
-      SourceDebugSummary(
-        finishedAt: DateTime.now(),
-        sourceUrl: source.bookSourceUrl,
-        sourceName: source.bookSourceName,
-        key: intent.runKey,
-        intentType: intent.type,
-        success: success,
-        debugError: _debugError,
-        primaryDiagnosis: primary,
-        diagnosisLabels: labels,
-        diagnosisHints: hints,
-      ),
-    );
+    // Sync debug key to Notifier before starting
+    _notifier.updateDebugKey(_debugKeyCtrl.text.trim());
+    await _notifier.startDebug();
+    // UI updates are handled by ref.listen in build()
   }
 
   Future<void> _openDebugText({
