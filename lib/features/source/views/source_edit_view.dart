@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/theme/design_tokens.dart';
@@ -34,11 +35,12 @@ import '../services/source_debug_summary_parser.dart';
 import '../services/source_debug_summary_store.dart';
 import '../services/source_quick_test_helper.dart';
 import '../services/source_rule_lint_service.dart';
+import '../providers/source_edit_notifier.dart';
 import 'source_debug_text_view.dart';
 import 'source_web_verify_view.dart';
 
 
-class SourceEditView extends StatefulWidget {
+class SourceEditView extends ConsumerStatefulWidget {
   final String? originalUrl;
   final String initialRawJson;
   final int? initialTab;
@@ -70,7 +72,7 @@ class SourceEditView extends StatefulWidget {
   }
 
   @override
-  State<SourceEditView> createState() => _SourceEditViewState();
+  ConsumerState<SourceEditView> createState() => _SourceEditViewState();
 }
 
 enum _SourceEditDebugMenuAction {
@@ -109,7 +111,7 @@ enum _SourceEditMoreAction {
   pasteJsonFromClipboard,
 }
 
-class _SourceEditViewState extends State<SourceEditView> {
+class _SourceEditViewState extends ConsumerState<SourceEditView> {
   late final DatabaseService _db;
   late final SourceRepository _repo;
   late final SourceLegacySaveService _saveService;
@@ -1619,38 +1621,27 @@ class _SourceEditViewState extends State<SourceEditView> {
   }
 
   Future<void> _save() async {
-    // 优先用表单内容生成 JSON，避免用户忘记点“同步到 JSON”导致保存旧数据。
-    // 若用户只编辑 JSON，可直接切换到 JSON 页保存（此处仍会做一次规范化）。
+    // 先同步表单字段到 JSON，再通过 Notifier 保存
     _syncFieldsToJson(switchToJsonTab: false);
-    _validateJson();
-    if (_jsonError != null) {
-      _showMessage(_jsonError!);
+    final args = SourceEditArgs(
+      originalUrl: widget.originalUrl,
+      initialRawJson: _jsonCtrl.text,
+    );
+    final notifier = ref.read(sourceEditProvider(args).notifier);
+    // 同步当前 JSON 到 Notifier
+    notifier.updateRawJson(_jsonCtrl.text);
+    final error = await notifier.save();
+    if (!mounted) return;
+    if (error != null) {
+      _showMessage(error);
       return;
     }
-
-    try {
-      final decoded = _tryDecodeJsonMap(_jsonCtrl.text);
-      if (decoded == null) {
-        _showMessage('JSON 格式错误');
-        return;
-      }
-      final source = BookSource.fromJson(decoded);
-      final saved = await _saveService.save(
-        source: source,
-        originalSource: _savedSource,
-      );
-      _savedSource = saved;
-      _currentOriginalUrl = saved.bookSourceUrl;
-      _urlCtrl.text = saved.bookSourceUrl;
-      _jsonCtrl.text = _prettyJson(LegadoJson.encode(saved.toJson()));
-      _validateJson(silent: true);
-      await _saveLoginState(showMessage: false);
-      if (!mounted) return;
-      unawaited(showAppToast(context, message: '保存成功'));
-    } catch (e) {
-      if (!mounted) return;
-      _showMessage('保存失败：$e');
-    }
+    // 同步保存后的数据回 UI
+    final saved = ref.read(sourceEditProvider(args)).source;
+    _urlCtrl.text = saved.bookSourceUrl;
+    _jsonCtrl.text = _prettyJson(LegadoJson.encode(saved.toJson()));
+    _validateJson(silent: true);
+    unawaited(showAppToast(context, message: '保存成功'));
   }
 
   Future<void> _runRuleLint() async {
