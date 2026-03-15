@@ -15,13 +15,9 @@ import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../app/widgets/option_picker_sheet.dart';
-import '../../../core/database/database_service.dart';
-import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/cookie_store.dart';
 import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/legado_json.dart';
-import '../../../core/services/source_login_store.dart';
-import '../../../core/services/source_variable_store.dart';
 import '../models/book_source.dart';
 import '../constants/source_help_texts.dart';
 import '../services/rule_parser_engine.dart';
@@ -30,7 +26,6 @@ import '../services/source_debug_key_parser.dart';
 import '../services/source_debug_orchestrator.dart';
 import '../services/source_explore_kinds_service.dart';
 import '../services/source_cookie_scope_resolver.dart';
-import '../services/source_legacy_save_service.dart';
 import '../services/source_debug_summary_parser.dart';
 import '../services/source_debug_summary_store.dart';
 import '../services/source_quick_test_helper.dart';
@@ -112,11 +107,11 @@ enum _SourceEditMoreAction {
 }
 
 class _SourceEditViewState extends ConsumerState<SourceEditView> {
-  late final DatabaseService _db;
-  late final SourceRepository _repo;
-  late final SourceLegacySaveService _saveService;
-  String? _currentOriginalUrl;
-  BookSource? _savedSource;
+  SourceEditArgs get _args => SourceEditArgs(
+    originalUrl: widget.originalUrl,
+    initialRawJson: widget.initialRawJson,
+  );
+  SourceEditNotifier get _notifier => ref.read(sourceEditProvider(_args).notifier);
   final RuleParserEngine _engine = RuleParserEngine();
   late final SourceDebugOrchestrator _debugOrchestrator;
   final SourceDebugExportService _debugExportService =
@@ -242,37 +237,12 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
   @override
   void initState() {
     super.initState();
-    _db = DatabaseService();
-    _repo = SourceRepository(_db);
-    _saveService = SourceLegacySaveService(
-      upsertSourceRawJson: ({
-        String? originalUrl,
-        required String rawJson,
-      }) {
-        return _repo.upsertSourceRawJson(
-          originalUrl: originalUrl,
-          rawJson: rawJson,
-        );
-      },
-      clearExploreKindsCache: _exploreKindsService.clearExploreKindsCache,
-      clearJsLibScope: (_) {
-        // Flutter 侧当前无跨源共享 JS Scope，保留回调位以维持行为完整性。
-      },
-      removeSourceVariable: (sourceUrl) {
-        return SourceVariableStore.removeVariable(sourceUrl);
-      },
-    );
-    _currentOriginalUrl = (widget.originalUrl ?? '').trim();
-    if (_currentOriginalUrl?.isEmpty == true) {
-      _currentOriginalUrl = null;
-    }
     _debugOrchestrator = SourceDebugOrchestrator(engine: _engine);
 
     _tab = widget.initialTab ?? 0;
     _jsonCtrl = TextEditingController(text: _prettyJson(widget.initialRawJson));
     final initialMap = _tryDecodeJsonMap(_jsonCtrl.text);
     final source = initialMap != null ? BookSource.fromJson(initialMap) : null;
-    _savedSource = source;
 
     _nameCtrl = TextEditingController(text: source?.bookSourceName ?? '');
     _urlCtrl = TextEditingController(text: source?.bookSourceUrl ?? '');
@@ -642,12 +612,8 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
   }
 
   Widget _buildRulesTab() {
-    final args = SourceEditArgs(
-      originalUrl: widget.originalUrl,
-      initialRawJson: widget.initialRawJson,
-    );
-    final notifier = ref.read(sourceEditProvider(args).notifier);
-    final source = ref.watch(sourceEditProvider(args)).source;
+    final notifier = _notifier;
+    final source = ref.watch(sourceEditProvider(_args)).source;
     final sr = source.ruleSearch ?? const SearchRule();
     final er = source.ruleExplore ?? const ExploreRule();
     final bir = source.ruleBookInfo ?? const BookInfoRule();
@@ -841,12 +807,8 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
   }
 
   Widget _buildBasicTab() {
-    final args = SourceEditArgs(
-      originalUrl: widget.originalUrl,
-      initialRawJson: widget.initialRawJson,
-    );
-    final notifier = ref.read(sourceEditProvider(args).notifier);
-    final source = ref.watch(sourceEditProvider(args)).source;
+    final notifier = _notifier;
+    final source = ref.watch(sourceEditProvider(_args)).source;
     return AppListView(
       controller: _basicTabScrollController,
       children: [
@@ -928,18 +890,16 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
                 onChanged: (v) => notifier.updateSource((s) => s.copyWith(coverDecodeJs: v.isEmpty ? null : v)),
                 placeholder: 'coverDecodeJs（可空）',
                 maxLines: 3),
-            _buildTextFieldTile(
-              '登录头缓存(JSON)',
-              _loginHeaderCacheCtrl,
-              placeholder: '{"Cookie":"sid=...","Authorization":"Bearer ..."}',
-              maxLines: 4,
-            ),
-            _buildTextFieldTile(
-              '登录信息缓存',
-              _loginInfoCtrl,
-              placeholder: 'userInfo（JSON 或文本，可空）',
-              maxLines: 3,
-            ),
+            _buildTextFieldTile('登录头缓存(JSON)', null,
+                value: ref.watch(sourceEditProvider(SourceEditArgs(originalUrl: widget.originalUrl, initialRawJson: widget.initialRawJson))).loginHeaderCache,
+                onChanged: (v) => ref.read(sourceEditProvider(SourceEditArgs(originalUrl: widget.originalUrl, initialRawJson: widget.initialRawJson)).notifier).updateLoginHeaderCache(v),
+                placeholder: '{"Cookie":"sid=...","Authorization":"Bearer ..."}',
+                maxLines: 4),
+            _buildTextFieldTile('登录信息缓存', null,
+                value: ref.watch(sourceEditProvider(SourceEditArgs(originalUrl: widget.originalUrl, initialRawJson: widget.initialRawJson))).loginInfo,
+                onChanged: (v) => ref.read(sourceEditProvider(SourceEditArgs(originalUrl: widget.originalUrl, initialRawJson: widget.initialRawJson)).notifier).updateLoginInfo(v),
+                placeholder: 'userInfo（JSON 或文本，可空）',
+                maxLines: 3),
             CupertinoListTile.notched(
               title: const Text('加载登录态缓存'),
               additionalInfo: _loginStateLoading ? const Text('加载中…') : null,
@@ -1417,165 +1377,30 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
   }
 
   Future<void> _loadLoginStateForSource(String? sourceKey) async {
-    final key = (sourceKey ?? '').trim();
-    if (key.isEmpty) {
-      if (!mounted) return;
-      setState(() {
-        _loginHeaderCacheCtrl.text = '';
-        _loginInfoCtrl.text = '';
-      });
-      return;
-    }
-
-    if (mounted) {
-      setState(() => _loginStateLoading = true);
-    }
-
-    final headerMap = await SourceLoginStore.getLoginHeaderMap(key);
-    final loginInfo = await SourceLoginStore.getLoginInfo(key);
-
-    if (!mounted) return;
-    setState(() {
-      _loginStateLoading = false;
-      _loginHeaderCacheCtrl.text = headerMap == null || headerMap.isEmpty
-          ? ''
-          : _prettyJson(jsonEncode(headerMap));
-      _loginInfoCtrl.text = loginInfo ?? '';
-    });
+    await _notifier.loadLoginState();
   }
 
   Future<void> _saveLoginState({bool showMessage = true}) async {
-    final key = _effectiveSourceKey();
-    if (key.isEmpty) {
-      if (showMessage) {
-        _showMessage('请先填写 bookSourceUrl，再保存登录态');
-      }
-      return;
-    }
-
-    final headerRaw = _loginHeaderCacheCtrl.text.trim();
-    final loginInfo = _loginInfoCtrl.text.trim();
-
     try {
-      if (headerRaw.isEmpty) {
-        await SourceLoginStore.removeLoginHeader(key);
-      } else {
-        await SourceLoginStore.putLoginHeaderJson(key, headerRaw);
-      }
-
-      if (loginInfo.isEmpty) {
-        await SourceLoginStore.removeLoginInfo(key);
-      } else {
-        await SourceLoginStore.putLoginInfo(key, loginInfo);
-      }
-
-      if (showMessage) {
-        unawaited(showAppToast(context, message: '登录态缓存已保存'));
-      }
+      await _notifier.saveLoginState();
+      if (showMessage && mounted) unawaited(showAppToast(context, message: '登录态缓存已保存'));
     } catch (e) {
-      if (showMessage) {
-        _showMessage('登录态保存失败：$e');
-      }
+      if (showMessage && mounted) _showMessage('登录态保存失败：$e');
     }
   }
 
   Future<void> _clearLoginState() async {
-    final key = _effectiveSourceKey();
-    if (key.isNotEmpty) {
-      await SourceLoginStore.removeLoginHeader(key);
-      await SourceLoginStore.removeLoginInfo(key);
-    }
-
-    if (!mounted) return;
-    setState(() {
-      _loginHeaderCacheCtrl.text = '';
-      _loginInfoCtrl.text = '';
-    });
-    unawaited(showAppToast(context, message: '登录态缓存已清除'));
+    await _notifier.clearLoginState();
+    if (mounted) unawaited(showAppToast(context, message: '登录态缓存已清除'));
   }
 
   void _syncJsonToFields() {
-    final map = _tryDecodeJsonMap(_jsonCtrl.text);
-    if (map == null) {
-      _validateJson();
-      return;
-    }
-    final source = BookSource.fromJson(map);
-    setState(() {
-      _nameCtrl.text = source.bookSourceName;
-      _urlCtrl.text = source.bookSourceUrl;
-      _groupCtrl.text = source.bookSourceGroup ?? '';
-      _typeCtrl.text = source.bookSourceType.toString();
-      _customOrderCtrl.text = source.customOrder.toString();
-      _weightCtrl.text = source.weight.toString();
-      _respondTimeCtrl.text = source.respondTime.toString();
-      _enabledCookieJar = source.enabledCookieJar ?? true;
-      _concurrentRateCtrl.text = source.concurrentRate ?? '';
-      _bookUrlPatternCtrl.text = source.bookUrlPattern ?? '';
-      _jsLibCtrl.text = source.jsLib ?? '';
-      _headerCtrl.text = source.header ?? '';
-      _loginUrlCtrl.text = source.loginUrl ?? '';
-      _loginUiCtrl.text = source.loginUi ?? '';
-      _loginCheckJsCtrl.text = source.loginCheckJs ?? '';
-      _coverDecodeJsCtrl.text = source.coverDecodeJs ?? '';
-      _bookSourceCommentCtrl.text = source.bookSourceComment ?? '';
-      _variableCommentCtrl.text = source.variableComment ?? '';
-      _searchUrlCtrl.text = source.searchUrl ?? '';
-      _exploreUrlCtrl.text = source.exploreUrl ?? '';
-      _exploreScreenCtrl.text = source.exploreScreen ?? '';
-      _enabled = source.enabled;
-      _enabledExplore = source.enabledExplore;
-
-      _searchCheckKeyWordCtrl.text = source.ruleSearch?.checkKeyWord ?? '';
-      _searchBookListCtrl.text = source.ruleSearch?.bookList ?? '';
-      _searchNameCtrl.text = source.ruleSearch?.name ?? '';
-      _searchAuthorCtrl.text = source.ruleSearch?.author ?? '';
-      _searchBookUrlCtrl.text = source.ruleSearch?.bookUrl ?? '';
-      _searchCoverUrlCtrl.text = source.ruleSearch?.coverUrl ?? '';
-      _searchIntroCtrl.text = source.ruleSearch?.intro ?? '';
-      _searchKindCtrl.text = source.ruleSearch?.kind ?? '';
-      _searchLastChapterCtrl.text = source.ruleSearch?.lastChapter ?? '';
-      _searchUpdateTimeCtrl.text = source.ruleSearch?.updateTime ?? '';
-      _searchWordCountCtrl.text = source.ruleSearch?.wordCount ?? '';
-
-      _exploreBookListCtrl.text = source.ruleExplore?.bookList ?? '';
-      _exploreNameCtrl.text = source.ruleExplore?.name ?? '';
-      _exploreAuthorCtrl.text = source.ruleExplore?.author ?? '';
-      _exploreBookUrlCtrl.text = source.ruleExplore?.bookUrl ?? '';
-      _exploreCoverUrlCtrl.text = source.ruleExplore?.coverUrl ?? '';
-      _exploreIntroCtrl.text = source.ruleExplore?.intro ?? '';
-      _exploreKindCtrl.text = source.ruleExplore?.kind ?? '';
-      _exploreLastChapterCtrl.text = source.ruleExplore?.lastChapter ?? '';
-      _exploreUpdateTimeCtrl.text = source.ruleExplore?.updateTime ?? '';
-      _exploreWordCountCtrl.text = source.ruleExplore?.wordCount ?? '';
-
-      _infoInitCtrl.text = source.ruleBookInfo?.init ?? '';
-      _infoNameCtrl.text = source.ruleBookInfo?.name ?? '';
-      _infoAuthorCtrl.text = source.ruleBookInfo?.author ?? '';
-      _infoIntroCtrl.text = source.ruleBookInfo?.intro ?? '';
-      _infoKindCtrl.text = source.ruleBookInfo?.kind ?? '';
-      _infoCoverUrlCtrl.text = source.ruleBookInfo?.coverUrl ?? '';
-      _infoTocUrlCtrl.text = source.ruleBookInfo?.tocUrl ?? '';
-      _infoLastChapterCtrl.text = source.ruleBookInfo?.lastChapter ?? '';
-      _infoUpdateTimeCtrl.text = source.ruleBookInfo?.updateTime ?? '';
-      _infoWordCountCtrl.text = source.ruleBookInfo?.wordCount ?? '';
-
-      _tocChapterListCtrl.text = source.ruleToc?.chapterList ?? '';
-      _tocChapterNameCtrl.text = source.ruleToc?.chapterName ?? '';
-      _tocChapterUrlCtrl.text = source.ruleToc?.chapterUrl ?? '';
-      _tocNextTocUrlCtrl.text = source.ruleToc?.nextTocUrl ?? '';
-      _tocPreUpdateJsCtrl.text = source.ruleToc?.preUpdateJs ?? '';
-      _tocFormatJsCtrl.text = source.ruleToc?.formatJs ?? '';
-
-      _contentTitleCtrl.text = source.ruleContent?.title ?? '';
-      _contentContentCtrl.text = source.ruleContent?.content ?? '';
-      _contentNextContentUrlCtrl.text =
-          source.ruleContent?.nextContentUrl ?? '';
-      _contentReplaceRegexCtrl.text = source.ruleContent?.replaceRegex ?? '';
-    });
-    _validateJson();
-    _loadLoginStateForSource(source.bookSourceUrl);
-    unawaited(showAppToast(context, message: '已从 JSON 同步到表单'));
+    // In the new architecture, JSON tab already updates Notifier via onChanged.
+    // This method now syncs the JSON text field from Notifier state.
+    final source = ref.read(sourceEditProvider(_args)).source;
+    final rawJson = _prettyJson(LegadoJson.encode(source.toJson()));
+    setState(() => _jsonCtrl.text = rawJson);
+    _validateJson(silent: true);
   }
 
   static const _sourceTypes = [
