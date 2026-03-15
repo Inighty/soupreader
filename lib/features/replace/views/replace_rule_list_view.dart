@@ -27,6 +27,7 @@ import '../../settings/views/app_help_dialog.dart';
 import '../models/replace_rule.dart';
 import '../services/replace_rule_import_export_service.dart';
 import 'replace_rule_edit_view.dart';
+import 'replace_rule_import_types.dart';
 
 
 
@@ -1008,23 +1009,23 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   Future<void> _showRuleItemMenu(ReplaceRule rule) async {
-    final action = await showAppActionListSheet<_ReplaceRuleItemMenuAction>(
+    final action = await showAppActionListSheet<ReplaceRuleItemMenuAction>(
       context: context,
       title: rule.name.isEmpty ? '未命名规则' : rule.name,
       showCancel: true,
       items: const [
-        AppActionListItem<_ReplaceRuleItemMenuAction>(
-          value: _ReplaceRuleItemMenuAction.top,
+        AppActionListItem<ReplaceRuleItemMenuAction>(
+          value: ReplaceRuleItemMenuAction.top,
           icon: CupertinoIcons.arrow_up_circle,
           label: '置顶',
         ),
-        AppActionListItem<_ReplaceRuleItemMenuAction>(
-          value: _ReplaceRuleItemMenuAction.bottom,
+        AppActionListItem<ReplaceRuleItemMenuAction>(
+          value: ReplaceRuleItemMenuAction.bottom,
           icon: CupertinoIcons.arrow_down_circle,
           label: '置底',
         ),
-        AppActionListItem<_ReplaceRuleItemMenuAction>(
-          value: _ReplaceRuleItemMenuAction.delete,
+        AppActionListItem<ReplaceRuleItemMenuAction>(
+          value: ReplaceRuleItemMenuAction.delete,
           icon: CupertinoIcons.delete,
           label: '删除',
           isDestructiveAction: true,
@@ -1033,13 +1034,13 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     );
     if (action == null || !mounted) return;
     switch (action) {
-      case _ReplaceRuleItemMenuAction.top:
+      case ReplaceRuleItemMenuAction.top:
         await _moveRuleToTop(rule);
         return;
-      case _ReplaceRuleItemMenuAction.bottom:
+      case ReplaceRuleItemMenuAction.bottom:
         await _moveRuleToBottom(rule);
         return;
-      case _ReplaceRuleItemMenuAction.delete:
+      case ReplaceRuleItemMenuAction.delete:
         if (_selectedRuleIds.remove(rule.id)) {
           setState(() {});
         }
@@ -1189,32 +1190,32 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
 
   Future<void> _showSelectionMoreMenu(List<ReplaceRule> visibleRules) async {
     if (_menuBusy || _selectedCountIn(visibleRules) == 0) return;
-    final selected = await showAppPopoverMenu<_ReplaceRuleSelectionMenuAction>(
+    final selected = await showAppPopoverMenu<ReplaceRuleSelectionMenuAction>(
       context: context,
       anchorKey: _moreMenuKey,
       items: const [
         AppPopoverMenuItem(
-          value: _ReplaceRuleSelectionMenuAction.enableSelection,
+          value: ReplaceRuleSelectionMenuAction.enableSelection,
           icon: CupertinoIcons.check_mark,
           label: '启用所选',
         ),
         AppPopoverMenuItem(
-          value: _ReplaceRuleSelectionMenuAction.disableSelection,
+          value: ReplaceRuleSelectionMenuAction.disableSelection,
           icon: CupertinoIcons.xmark,
           label: '禁用所选',
         ),
         AppPopoverMenuItem(
-          value: _ReplaceRuleSelectionMenuAction.topSelection,
+          value: ReplaceRuleSelectionMenuAction.topSelection,
           icon: CupertinoIcons.arrow_up_to_line,
           label: '置顶所选',
         ),
         AppPopoverMenuItem(
-          value: _ReplaceRuleSelectionMenuAction.bottomSelection,
+          value: ReplaceRuleSelectionMenuAction.bottomSelection,
           icon: CupertinoIcons.arrow_down_to_line,
           label: '置底所选',
         ),
         AppPopoverMenuItem(
-          value: _ReplaceRuleSelectionMenuAction.exportSelection,
+          value: ReplaceRuleSelectionMenuAction.exportSelection,
           icon: CupertinoIcons.square_arrow_up,
           label: '导出所选',
         ),
@@ -1222,19 +1223,19 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     );
     if (selected == null) return;
     switch (selected) {
-      case _ReplaceRuleSelectionMenuAction.enableSelection:
+      case ReplaceRuleSelectionMenuAction.enableSelection:
         await _enableSelectedRules(visibleRules);
         return;
-      case _ReplaceRuleSelectionMenuAction.disableSelection:
+      case ReplaceRuleSelectionMenuAction.disableSelection:
         await _disableSelectedRules(visibleRules);
         return;
-      case _ReplaceRuleSelectionMenuAction.topSelection:
+      case ReplaceRuleSelectionMenuAction.topSelection:
         await _topSelectedRules(visibleRules);
         return;
-      case _ReplaceRuleSelectionMenuAction.bottomSelection:
+      case ReplaceRuleSelectionMenuAction.bottomSelection:
         await _bottomSelectedRules(visibleRules);
         return;
-      case _ReplaceRuleSelectionMenuAction.exportSelection:
+      case ReplaceRuleSelectionMenuAction.exportSelection:
         await _exportSelectedRules(visibleRules);
         return;
     }
@@ -1850,7 +1851,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     }
   }
 
-  List<_ReplaceRuleImportCandidate> _buildImportCandidates(
+  List<ReplaceRuleImportCandidate> _buildImportCandidates(
     List<ReplaceRule> importedRules,
   ) {
     final localById = <int, ReplaceRule>{
@@ -1858,7 +1859,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     };
     return importedRules.map((rule) {
       final localRule = localById[rule.id];
-      return _ReplaceRuleImportCandidate(
+      return ReplaceRuleImportCandidate(
         rule: rule,
         localRule: localRule,
         state: _resolveCandidateState(
@@ -1869,24 +1870,24 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     }).toList(growable: false);
   }
 
-  _ReplaceRuleImportCandidateState _resolveCandidateState({
+  ReplaceRuleImportCandidateState _resolveCandidateState({
     required ReplaceRule importedRule,
     required ReplaceRule? localRule,
   }) {
     if (localRule == null) {
-      return _ReplaceRuleImportCandidateState.newRule;
+      return ReplaceRuleImportCandidateState.newRule;
     }
     if (importedRule.pattern != localRule.pattern ||
         importedRule.replacement != localRule.replacement ||
         importedRule.isRegex != localRule.isRegex ||
         importedRule.scope != localRule.scope) {
-      return _ReplaceRuleImportCandidateState.update;
+      return ReplaceRuleImportCandidateState.update;
     }
-    return _ReplaceRuleImportCandidateState.existing;
+    return ReplaceRuleImportCandidateState.existing;
   }
 
-  Future<_ReplaceRuleImportSelectionDecision?> _showImportSelectionSheet(
-    List<_ReplaceRuleImportCandidate> candidates,
+  Future<ReplaceRuleImportSelectionDecision?> _showImportSelectionSheet(
+    List<ReplaceRuleImportCandidate> candidates,
   ) async {
     final selectedIndexes = <int>{
       for (var index = 0; index < candidates.length; index++)
@@ -1894,7 +1895,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     };
     var customGroupName = '';
     var appendCustomGroup = false;
-    return showCupertinoBottomSheetDialog<_ReplaceRuleImportSelectionDecision>(
+    return showCupertinoBottomSheetDialog<ReplaceRuleImportSelectionDecision>(
       context: context,
       builder: (popupContext) {
         return CupertinoPopupSurface(
@@ -1938,11 +1939,11 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                                 ? null
                                 : () => Navigator.pop(
                                       popupContext,
-                                      _ReplaceRuleImportSelectionDecision(
+                                      ReplaceRuleImportSelectionDecision(
                                         selectedIndexes:
                                             selectedIndexes.toSet(),
                                         groupPolicy:
-                                            _ReplaceRuleImportGroupPolicy(
+                                            ReplaceRuleImportGroupPolicy(
                                           groupName: customGroupName,
                                           appendGroup: appendCustomGroup,
                                         ),
@@ -2021,7 +2022,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                         itemBuilder: (context, index) {
                           final candidate = candidates[index];
                           final selected = selectedIndexes.contains(index);
-                          return _ReplaceRuleImportCandidateTile(
+                          return ReplaceRuleImportCandidateTile(
                             candidate: candidate,
                             selected: selected,
                             onTap: () {
@@ -2049,7 +2050,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
 
   ReplaceRule _applyImportGroupPolicy({
     required ReplaceRule rule,
-    required _ReplaceRuleImportGroupPolicy policy,
+    required ReplaceRuleImportGroupPolicy policy,
   }) {
     final groupName = policy.groupName.trim();
     if (groupName.isEmpty) {
@@ -2086,14 +2087,14 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     return title;
   }
 
-  Future<_ReplaceRuleImportGroupInput?> _showImportCustomGroupDialog({
+  Future<ReplaceRuleImportGroupInput?> _showImportCustomGroupDialog({
     required String initialGroupName,
     required bool initialAppendGroup,
   }) async {
     final controller = TextEditingController(text: initialGroupName.trim());
     var appendGroup = initialAppendGroup;
     try {
-      return showCupertinoBottomSheetDialog<_ReplaceRuleImportGroupInput>(
+      return showCupertinoBottomSheetDialog<ReplaceRuleImportGroupInput>(
         context: context,
         builder: (dialogContext) {
           return StatefulBuilder(
@@ -2135,7 +2136,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                   CupertinoDialogAction(
                     onPressed: () {
                       Navigator.of(dialogContext).pop(
-                        _ReplaceRuleImportGroupInput(
+                        ReplaceRuleImportGroupInput(
                           groupName: controller.text.trim(),
                           appendGroup: appendGroup,
                         ),
@@ -2243,187 +2244,3 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 }
 
-enum _ReplaceRuleImportCandidateState {
-  newRule,
-  update,
-  existing,
-}
-
-class _ReplaceRuleImportSelectionDecision {
-  const _ReplaceRuleImportSelectionDecision({
-    required this.selectedIndexes,
-    required this.groupPolicy,
-  });
-
-  final Set<int> selectedIndexes;
-  final _ReplaceRuleImportGroupPolicy groupPolicy;
-}
-
-class _ReplaceRuleImportGroupPolicy {
-  const _ReplaceRuleImportGroupPolicy({
-    required this.groupName,
-    required this.appendGroup,
-  });
-
-  final String groupName;
-  final bool appendGroup;
-}
-
-class _ReplaceRuleImportGroupInput {
-  const _ReplaceRuleImportGroupInput({
-    required this.groupName,
-    required this.appendGroup,
-  });
-
-  final String groupName;
-  final bool appendGroup;
-}
-
-enum _ReplaceRuleItemMenuAction {
-  top,
-  bottom,
-  delete,
-}
-
-enum _ReplaceRuleSelectionMenuAction {
-  enableSelection,
-  disableSelection,
-  topSelection,
-  bottomSelection,
-  exportSelection,
-}
-
-class _ReplaceRuleImportCandidate {
-  const _ReplaceRuleImportCandidate({
-    required this.rule,
-    required this.localRule,
-    required this.state,
-  });
-
-  final ReplaceRule rule;
-  final ReplaceRule? localRule;
-  final _ReplaceRuleImportCandidateState state;
-
-  bool get selectedByDefault =>
-      state == _ReplaceRuleImportCandidateState.newRule;
-}
-
-class _ReplaceRuleImportCandidateTile extends StatelessWidget {
-  const _ReplaceRuleImportCandidateTile({
-    required this.candidate,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final _ReplaceRuleImportCandidate candidate;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final stateLabel = _stateLabel(candidate.state);
-    final stateColor = _stateColor(context, candidate.state);
-    final title = candidate.rule.name.trim().isEmpty
-        ? '未命名规则'
-        : candidate.rule.name.trim();
-    final group = candidate.rule.group?.trim();
-    final subtitle = group == null || group.isEmpty ? '未分组' : '分组：$group';
-    final backgroundColor = selected
-        ? CupertinoColors.systemGrey5.resolveFrom(context)
-        : CupertinoColors.systemBackground.resolveFrom(context);
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      onPressed: onTap,
-      child: AppCard(
-        backgroundColor: backgroundColor,
-        borderColor: CupertinoColors.separator.resolveFrom(context),
-        borderWidth: 0.5,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        child: Row(
-          children: [
-            Icon(
-              selected
-                  ? CupertinoIcons.check_mark_circled_solid
-                  : CupertinoIcons.circle,
-              color: selected
-                  ? CupertinoColors.activeBlue.resolveFrom(context)
-                  : CupertinoColors.secondaryLabel.resolveFrom(context),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: CupertinoColors.secondaryLabel.resolveFrom(
-                        context,
-                      ),
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: stateColor.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 2,
-                ),
-                child: Text(
-                  stateLabel,
-                  style: TextStyle(
-                    color: stateColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static String _stateLabel(_ReplaceRuleImportCandidateState state) {
-    return switch (state) {
-      _ReplaceRuleImportCandidateState.newRule => '新增',
-      _ReplaceRuleImportCandidateState.update => '更新',
-      _ReplaceRuleImportCandidateState.existing => '已有',
-    };
-  }
-
-  static Color _stateColor(
-    BuildContext context,
-    _ReplaceRuleImportCandidateState state,
-  ) {
-    return switch (state) {
-      _ReplaceRuleImportCandidateState.newRule =>
-        CupertinoColors.systemGreen.resolveFrom(context),
-      _ReplaceRuleImportCandidateState.update =>
-        CupertinoColors.systemOrange.resolveFrom(context),
-      _ReplaceRuleImportCandidateState.existing =>
-        CupertinoColors.secondaryLabel.resolveFrom(context),
-    };
-  }
-}

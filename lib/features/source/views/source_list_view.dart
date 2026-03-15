@@ -43,18 +43,11 @@ import '../services/source_login_url_resolver.dart';
 import '../services/source_login_ui_helper.dart';
 import '../../search/models/search_scope_group_helper.dart';
 import 'source_edit_view.dart';
+import 'source_group_filter_sheet.dart';
+import 'source_list_types.dart';
 import 'source_login_form_view.dart';
 import 'source_login_webview_view.dart';
-
-enum _SourceSortMode {
-  manual,
-  weight,
-  name,
-  url,
-  update,
-  respond,
-  enabled,
-}
+import 'source_sort_sheet.dart';
 
 enum _SourceMainMenuAction {
   sort,
@@ -92,11 +85,6 @@ enum _SourceBatchAction {
   checkSelected,
   selectInterval,
 }
-
-typedef SourceMoveSourcesHandler = Future<void> Function(
-  List<BookSource> sources, {
-  required bool toTop,
-});
 
 class _ImportSelectionDecision {
   const _ImportSelectionDecision({
@@ -150,7 +138,7 @@ class SourceListView extends StatefulWidget {
 }
 
 class _SourceListViewState extends State<SourceListView> {
-  _SourceSortMode _sortMode = _SourceSortMode.manual;
+  SourceSortMode _sortMode = SourceSortMode.manual;
   bool _sortAscending = true;
   bool _groupSourcesByDomain = false;
   SourceCheckTaskSnapshot? _lastCheckSnapshot;
@@ -563,23 +551,23 @@ class _SourceListViewState extends State<SourceListView> {
 
     int compareByMode(BookSource a, BookSource b) {
       switch (_sortMode) {
-        case _SourceSortMode.manual:
+        case SourceSortMode.manual:
           return a.customOrder.compareTo(b.customOrder);
-        case _SourceSortMode.weight:
+        case SourceSortMode.weight:
           return a.weight.compareTo(b.weight);
-        case _SourceSortMode.name:
+        case SourceSortMode.name:
           return SearchScopeGroupHelper.cnCompareLikeLegado(
             a.bookSourceName,
             b.bookSourceName,
           );
-        case _SourceSortMode.url:
+        case SourceSortMode.url:
           return a.bookSourceUrl.compareTo(b.bookSourceUrl);
-        case _SourceSortMode.update:
+        case SourceSortMode.update:
           // 对齐 legado：升序模式下更新时间为“新到旧”。
           return b.lastUpdateTime.compareTo(a.lastUpdateTime);
-        case _SourceSortMode.respond:
+        case SourceSortMode.respond:
           return a.respondTime.compareTo(b.respondTime);
-        case _SourceSortMode.enabled:
+        case SourceSortMode.enabled:
           final enabledCmp =
               (a.enabled == b.enabled) ? 0 : (a.enabled ? -1 : 1);
           if (enabledCmp != 0) return enabledCmp;
@@ -591,7 +579,7 @@ class _SourceListViewState extends State<SourceListView> {
     }
 
     list.sort((a, b) {
-      if (_sortMode == _SourceSortMode.enabled) {
+      if (_sortMode == SourceSortMode.enabled) {
         final enabledCmp = _sortAscending
             ? (a.enabled == b.enabled ? 0 : (a.enabled ? -1 : 1))
             : (a.enabled == b.enabled ? 0 : (a.enabled ? 1 : -1));
@@ -615,7 +603,7 @@ class _SourceListViewState extends State<SourceListView> {
   }
 
   bool get _canManualReorder {
-    return _sortMode == _SourceSortMode.manual && !_groupSourcesByDomain;
+    return _sortMode == SourceSortMode.manual && !_groupSourcesByDomain;
   }
 
   Widget _buildSourceList(
@@ -824,7 +812,7 @@ class _SourceListViewState extends State<SourceListView> {
         key: ValueKey(source.bookSourceUrl),
         endActionPane: ActionPane(
           motion: const DrawerMotion(),
-          extentRatio: _sortMode == _SourceSortMode.manual ? 0.75 : 0.6,
+          extentRatio: _sortMode == SourceSortMode.manual ? 0.75 : 0.6,
           children: [
             SlidableAction(
               onPressed: (_) => _openEditor(source.bookSourceUrl),
@@ -833,7 +821,7 @@ class _SourceListViewState extends State<SourceListView> {
               icon: CupertinoIcons.pencil,
               label: '编辑',
             ),
-            if (_sortMode == _SourceSortMode.manual)
+            if (_sortMode == SourceSortMode.manual)
               SlidableAction(
                 onPressed: (_) => _toTop(source),
                 backgroundColor:
@@ -1277,7 +1265,7 @@ class _SourceListViewState extends State<SourceListView> {
     showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
-      builder: (_) => _SourceSortSheet(
+      builder: (_) => SourceSortSheet(
         mode: _sortMode,
         ascending: _sortAscending,
         modeLabelBuilder: _sortModeLabel,
@@ -1286,26 +1274,26 @@ class _SourceListViewState extends State<SourceListView> {
     );
   }
 
-  String _sortModeLabel(_SourceSortMode mode) {
+  String _sortModeLabel(SourceSortMode mode) {
     switch (mode) {
-      case _SourceSortMode.manual:
+      case SourceSortMode.manual:
         return '自定义';
-      case _SourceSortMode.weight:
+      case SourceSortMode.weight:
         return '搜索权重';
-      case _SourceSortMode.name:
+      case SourceSortMode.name:
         return '名称';
-      case _SourceSortMode.url:
+      case SourceSortMode.url:
         return 'URL';
-      case _SourceSortMode.update:
+      case SourceSortMode.update:
         return '更新时间';
-      case _SourceSortMode.respond:
+      case SourceSortMode.respond:
         return '响应时间';
-      case _SourceSortMode.enabled:
+      case SourceSortMode.enabled:
         return '是否禁用';
     }
   }
 
-  void _applySortChange(_SourceSortMode mode, bool ascending) {
+  void _applySortChange(SourceSortMode mode, bool ascending) {
     setState(() {
       _sortMode = mode;
       _sortAscending = ascending;
@@ -1317,7 +1305,7 @@ class _SourceListViewState extends State<SourceListView> {
     showCupertinoBottomSheetDialog<void>(
       context: context,
       barrierDismissible: true,
-      builder: (_) => _SourceGroupFilterSheet(
+      builder: (_) => SourceGroupFilterSheet(
         groups: groups,
         groupSourcesByDomain: _groupSourcesByDomain,
         onOpenGroupManage: (sheetContext) {
@@ -1460,7 +1448,7 @@ class _SourceListViewState extends State<SourceListView> {
 
   Future<void> _showSourceActions(BookSource source) async {
     final items = <AppActionListItem<_SourceItemAction>>[];
-    if (_sortMode == _SourceSortMode.manual) {
+    if (_sortMode == SourceSortMode.manual) {
       items.add(
         const AppActionListItem(
           value: _SourceItemAction.toTop,
@@ -3767,388 +3755,6 @@ class _SourceListViewState extends State<SourceListView> {
           ),
         ],
       ),
-    );
-  }
-}
-
-typedef _SourceSortModeLabelBuilder = String Function(_SourceSortMode mode);
-typedef _SourceSortChanged = void Function(
-    _SourceSortMode mode, bool ascending);
-
-class _SourceSortSheet extends StatefulWidget {
-  static const double _radius = 18;
-  static const double _handleWidth = 36;
-  static const double _handleHeight = 4;
-  static const List<_SourceSortMode> _modeOrder = [
-    _SourceSortMode.name,
-    _SourceSortMode.url,
-    _SourceSortMode.update,
-    _SourceSortMode.weight,
-    _SourceSortMode.respond,
-    _SourceSortMode.enabled,
-    _SourceSortMode.manual,
-  ];
-
-  final _SourceSortMode mode;
-  final bool ascending;
-  final _SourceSortModeLabelBuilder modeLabelBuilder;
-  final _SourceSortChanged onChanged;
-
-  const _SourceSortSheet({
-    required this.mode,
-    required this.ascending,
-    required this.modeLabelBuilder,
-    required this.onChanged,
-  });
-
-  @override
-  State<_SourceSortSheet> createState() => _SourceSortSheetState();
-}
-
-class _SourceSortSheetState extends State<_SourceSortSheet> {
-  late _SourceSortMode _mode;
-  late bool _ascending;
-
-  @override
-  void initState() {
-    super.initState();
-    _mode = widget.mode;
-    _ascending = widget.ascending;
-  }
-
-  void _update({
-    _SourceSortMode? mode,
-    bool? ascending,
-  }) {
-    setState(() {
-      if (mode != null) _mode = mode;
-      if (ascending != null) _ascending = ascending;
-    });
-    widget.onChanged(_mode, _ascending);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final sheetBg =
-        CupertinoColors.systemGroupedBackground.resolveFrom(context);
-    final titleColor = CupertinoColors.label.resolveFrom(context);
-    final handleColor = CupertinoColors.separator.resolveFrom(context);
-    final mediaQuery = MediaQuery.of(context);
-    final bottomInset = math.max(mediaQuery.padding.bottom, 8.0);
-
-    return SafeArea(
-      top: false,
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: sheetBg,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(_SourceSortSheet._radius),
-          ),
-        ),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(0, 10, 0, bottomInset),
-          child: ListView(
-            shrinkWrap: true,
-            physics: const BouncingScrollPhysics(),
-            children: [
-              _buildHeader(handleColor: handleColor, titleColor: titleColor),
-              AppListSection(
-                header: const Text('类型'),
-                hasLeading: false,
-                children: [
-                  for (final mode in _SourceSortSheet._modeOrder)
-                    _buildOptionRow(
-                      title: widget.modeLabelBuilder(mode),
-                      selected: _mode == mode,
-                      onTap: () => _update(mode: mode),
-                    ),
-                ],
-              ),
-              AppListSection(
-                header: const Text('顺序'),
-                hasLeading: false,
-                children: [
-                  _buildOptionRow(
-                    title: '升序',
-                    selected: _ascending,
-                    onTap: () => _update(ascending: true),
-                  ),
-                  _buildOptionRow(
-                    title: '降序',
-                    selected: !_ascending,
-                    onTap: () => _update(ascending: false),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader({
-    required Color handleColor,
-    required Color titleColor,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: _SourceSortSheet._handleWidth,
-          height: _SourceSortSheet._handleHeight,
-          decoration: BoxDecoration(
-            color: handleColor,
-            borderRadius: BorderRadius.circular(999),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-          child: Text(
-            '排序',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: titleColor,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOptionRow({
-    required String title,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final accent = CupertinoTheme.of(context).primaryColor;
-    return AppListTile(
-      title: Text(
-        title,
-        style: TextStyle(
-          color: selected ? accent : CupertinoColors.label.resolveFrom(context),
-          fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-        ),
-      ),
-      trailing: selected
-          ? Icon(CupertinoIcons.check_mark, size: 18, color: accent)
-          : null,
-      onTap: onTap,
-      showChevron: false,
-    );
-  }
-}
-
-typedef _SourceGroupManageCallback = void Function(BuildContext sheetContext);
-typedef _SourceGroupToggleCallback = void Function(BuildContext sheetContext);
-typedef _SourceGroupApplyQueryCallback = void Function(
-  String query,
-  BuildContext sheetContext,
-);
-
-class _SourceGroupFilterSheet extends StatelessWidget {
-  static const double _radius = 18;
-  static const double _handleWidth = 36;
-  static const double _handleHeight = 4;
-
-  final List<String> groups;
-  final bool groupSourcesByDomain;
-  final _SourceGroupManageCallback onOpenGroupManage;
-  final _SourceGroupToggleCallback onToggleGroupByDomain;
-  final _SourceGroupApplyQueryCallback onApplyQuery;
-
-  const _SourceGroupFilterSheet({
-    required this.groups,
-    required this.groupSourcesByDomain,
-    required this.onOpenGroupManage,
-    required this.onToggleGroupByDomain,
-    required this.onApplyQuery,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final sheetBg =
-        CupertinoColors.systemGroupedBackground.resolveFrom(context);
-    final titleColor = CupertinoColors.label.resolveFrom(context);
-    final handleColor = CupertinoColors.separator.resolveFrom(context);
-    final mediaQuery = MediaQuery.of(context);
-    final bottomInset = math.max(mediaQuery.padding.bottom, 8.0);
-
-    final children = <Widget>[
-      _buildHeader(handleColor: handleColor, titleColor: titleColor),
-      _buildManageSection(context),
-      _buildPresetFiltersSection(context),
-      if (groups.isNotEmpty) _buildGroupsSection(context),
-      _buildCancelSection(context),
-    ];
-    return _buildFrame(
-      context,
-      sheetBg: sheetBg,
-      bottomInset: bottomInset,
-      children: children,
-    );
-  }
-
-  Widget _buildFrame(
-    BuildContext context, {
-    required Color sheetBg,
-    required double bottomInset,
-    required List<Widget> children,
-  }) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: sheetBg,
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(_radius)),
-        ),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(0, 10, 0, bottomInset),
-          child: ListView(
-            shrinkWrap: true,
-            physics: const BouncingScrollPhysics(),
-            children: children,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildManageSection(BuildContext context) {
-    return AppListSection(
-      hasLeading: false,
-      children: [
-        AppListTile(
-          title: const Text('分组管理'),
-          onTap: () => onOpenGroupManage(context),
-        ),
-        _buildCheckRow(
-          context: context,
-          title: '按域名分组显示',
-          selected: groupSourcesByDomain,
-          onTap: () => onToggleGroupByDomain(context),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPresetFiltersSection(BuildContext context) {
-    return AppListSection(
-      hasLeading: false,
-      children: [
-        _buildActionRow(
-            title: '已启用', onTap: () => onApplyQuery('已启用', context)),
-        _buildActionRow(
-            title: '已禁用', onTap: () => onApplyQuery('已禁用', context)),
-        _buildActionRow(
-            title: '需要登录', onTap: () => onApplyQuery('需要登录', context)),
-        _buildActionRow(
-            title: '未分组', onTap: () => onApplyQuery('未分组', context)),
-        _buildActionRow(
-            title: '已启用发现', onTap: () => onApplyQuery('已启用发现', context)),
-        _buildActionRow(
-            title: '已禁用发现', onTap: () => onApplyQuery('已禁用发现', context)),
-      ],
-    );
-  }
-
-  Widget _buildGroupsSection(BuildContext context) {
-    return AppListSection(
-      header: const Text('分组'),
-      hasLeading: false,
-      children: [
-        for (final group in groups)
-          _buildActionRow(
-            title: group,
-            onTap: () => onApplyQuery('group:$group', context),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildCancelSection(BuildContext context) {
-    return AppListSection(
-      hasLeading: false,
-      children: [
-        AppListTile(
-          title: const Text('取消'),
-          onTap: () => Navigator.of(context).pop(),
-          showChevron: false,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHeader({
-    required Color handleColor,
-    required Color titleColor,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: _handleWidth,
-          height: _handleHeight,
-          decoration: BoxDecoration(
-            color: handleColor,
-            borderRadius: BorderRadius.circular(999),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-          child: Text(
-            '分组',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: titleColor,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionRow({
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return AppListTile(
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      onTap: onTap,
-      showChevron: false,
-    );
-  }
-
-  Widget _buildCheckRow({
-    required BuildContext context,
-    required String title,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final accent = CupertinoTheme.of(context).primaryColor;
-    return AppListTile(
-      title: Text(
-        title,
-        style: TextStyle(
-          color: selected ? accent : CupertinoColors.label.resolveFrom(context),
-          fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-        ),
-      ),
-      trailing: selected
-          ? Icon(CupertinoIcons.check_mark, size: 18, color: accent)
-          : null,
-      onTap: onTap,
-      showChevron: false,
     );
   }
 }
