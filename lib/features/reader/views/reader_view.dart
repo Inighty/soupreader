@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
-import '../../../app/theme/colors.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/services/screen_brightness_service.dart';
 import '../../../core/services/keep_screen_on_service.dart';
@@ -16,8 +15,6 @@ import '../controllers/reader_state.dart';
 import '../services/read_aloud_service.dart' show ReadAloudChapterDirection;
 import '../models/reader_view_models.dart';
 import '../models/reading_settings.dart';
-import '../services/reader_theme_mode_helper.dart';
-import '../services/reader_theme_resolver.dart';
 import '../widgets/auto_pager.dart';
 import '../widgets/paged_reader_widget.dart';
 import 'reader_dialog_helpers.dart';

@@ -14,7 +14,6 @@ import '../../settings/views/app_log_dialog.dart';
 import '../controllers/actions_coordinator.dart';
 import '../controllers/reader_coordinator.dart';
 import '../controllers/reader_state.dart';
-import '../models/reader_view_models.dart';
 import '../models/reading_settings.dart';
 import '../services/reader_image_request_parser.dart';
 import '../services/reader_image_resolver.dart';

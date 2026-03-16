@@ -3,9 +3,6 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../models/reader_view_models.dart';
-import '../models/reading_settings.dart';
-import '../services/reader_theme_resolver.dart';
-import '../widgets/scroll_text_layout_engine.dart';
 
 /// Callback invoked when the scroll view determines the visible chapter
 /// has changed. The host should update currentChapterIndex/title/content
@@ -70,14 +67,7 @@ class ReaderScrollManager {
   bool programmaticScrollInFlight = false;
   double anchorWithinViewport = 32.0;
 
-  DateTime _lastProgressSyncAt = DateTime.fromMillisecondsSinceEpoch(0);
-  DateTime _lastUiSyncAt = DateTime.fromMillisecondsSinceEpoch(0);
-  DateTime _lastPreloadCheckAt = DateTime.fromMillisecondsSinceEpoch(0);
 
-  static const int _uiSyncIntervalMs = 100;
-  static const int _saveProgressIntervalMs = 450;
-  static const int _preloadIntervalMs = 80;
-  static const double _preloadExtent = 280.0;
 
   // ── Segment management ──
 

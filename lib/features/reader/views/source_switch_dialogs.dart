@@ -5,7 +5,6 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../controllers/reader_coordinator.dart';
 import '../controllers/source_switch_coordinator.dart';
-import '../services/reader_source_switch_helper.dart';
 import '../widgets/source_switch_candidate_sheet.dart';
 import 'reader_dialog_helpers.dart';
 
@@ -33,7 +32,7 @@ class SourceSwitchDialogs {
     }
 
     final book = ssc.buildCurrentBookForSwitch();
-    final keyword = (book.title ?? '').trim();
+    final keyword = book.title.trim();
     if (keyword.isEmpty) {
       ReaderDialogHelpers.showToast(context, '书名为空，无法换源');
       return;
@@ -58,7 +57,7 @@ class SourceSwitchDialogs {
       currentSourceUrl: ssc.image.sourceUrl ?? '',
       changeSourceGroup: ssc.group,
       sourceGroups: ssc.buildSourceGroups(),
-      authorKeyword: book.author ?? '',
+      authorKeyword: book.author,
       checkAuthorEnabled: ssc.checkAuthor,
       loadInfoEnabled: ssc.loadInfo,
       loadWordCountEnabled: ssc.loadWordCount,

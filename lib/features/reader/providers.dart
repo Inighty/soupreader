@@ -1,10 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/providers.dart';
 import 'controllers/reader_bookmark_controller.dart';
 import 'controllers/reader_read_aloud_controller.dart';
 import 'controllers/reader_search_controller.dart';
-import 'services/read_aloud_service.dart';
 
 /// Creates a [ReaderReadAloudController] scoped to a specific reading session.
 ///

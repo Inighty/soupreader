@@ -5,14 +5,12 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
-import '../../../core/database/repositories/replace_rule_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/book.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/services/webdav_service.dart';
 import '../../../core/utils/chinese_script_converter.dart';
 import '../../bookshelf/services/bookshelf_catalog_update_service.dart';
-import '../../replace/services/replace_rule_service.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../models/reader_view_models.dart';
 import '../models/reading_settings.dart';
@@ -20,9 +18,6 @@ import '../services/reader_charset_service.dart';
 import '../widgets/auto_pager.dart';
 import '../widgets/page_factory.dart';
 import '../services/reader_content_processor.dart';
-import '../services/reader_image_marker_codec.dart';
-import '../services/reader_theme_mode_helper.dart';
-import '../services/reader_theme_resolver.dart';
 import '../utils/chapter_progress_utils.dart';
 import 'actions_coordinator.dart';
 import 'image_coordinator.dart';
@@ -91,8 +86,6 @@ class ReaderCoordinator {
   /// 公开 BookRepository 以供 View 层导航使用。
   BookRepository get bookRepo => _bookRepo;
   late final SourceRepository _sourceRepo;
-  late final ReplaceRuleRepository _replaceRuleRepo;
-  late final ReplaceRuleService _replaceService;
   late final SettingsService _settingsService;
   late final WebDavService _webDavService;
   late final BookshelfCatalogUpdateService _catalogUpdateService;
@@ -163,8 +156,6 @@ class ReaderCoordinator {
     _chapterRepo = ChapterRepository(db);
     _bookRepo = BookRepository(db);
     _sourceRepo = SourceRepository(db);
-    _replaceRuleRepo = ReplaceRuleRepository(db);
-    _replaceService = ReplaceRuleService(db);
     _settingsService = SettingsService();
     _webDavService = WebDavService();
     _catalogUpdateService = BookshelfCatalogUpdateService(
@@ -286,7 +277,7 @@ class ReaderCoordinator {
         onSourceSwitched: (newSourceUrl) async {
           chapter.chapters =
               _chapterRepo.getChaptersForBook(bookId);
-          chapter.notifyListeners();
+          chapter.notify();
         },
       );
     }

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform, kIsWeb, listEquals;
+    show kIsWeb, listEquals;
 import 'package:flutter/services.dart';
 
 import '../../../core/config/migration_exclusions.dart';
@@ -12,8 +12,6 @@ import '../../../core/services/screen_brightness_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../models/reading_settings.dart';
 import '../services/reader_system_ui_helper.dart';
-import '../services/reader_theme_mode_helper.dart';
-import '../services/reader_theme_resolver.dart';
 
 /// Manages reading settings updates, brightness sync, and orientation.
 ///

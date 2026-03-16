@@ -13,7 +13,6 @@ import '../services/reader_theme_resolver.dart';
 import '../widgets/auto_pager.dart';
 import '../widgets/page_factory.dart';
 import '../widgets/paged_reader_widget.dart';
-import '../widgets/scroll_text_layout_engine.dart';
 
 // ═══════════════════════════════════════════════════════════════════════
 // 状态分组：将 50+ 个散乱变量归类为 6 个内聚的 "数据仓库"，
@@ -54,6 +53,9 @@ class ChapterState extends ChangeNotifier {
 
   int get readableCount => chapters.length;
   int get maxIndex => (chapters.length - 1).clamp(0, 999999);
+
+  /// 供外部 Coordinator 调用，触发 UI 刷新（ChangeNotifier.notifyListeners 是 protected）。
+  void notify() => notifyListeners();
 }
 
 /// UI / 菜单 / 覆盖层状态
@@ -118,6 +120,9 @@ class SettingsState extends ChangeNotifier {
     themeResolver = resolver;
     notifyListeners();
   }
+
+  /// 供外部 Coordinator 调用，触发 UI 刷新。
+  void notify() => notifyListeners();
 }
 
 /// 滚动模式状态

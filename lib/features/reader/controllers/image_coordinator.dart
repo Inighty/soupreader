@@ -10,7 +10,6 @@ import '../../../core/models/book_source.dart';
 import '../../../core/services/settings_service.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../../source/services/source_cover_loader.dart';
-import '../models/reader_view_models.dart';
 import '../services/reader_image_marker_codec.dart';
 import '../services/reader_image_request_parser.dart';
 import '../services/reader_image_warmup_telemetry.dart';

@@ -3,9 +3,6 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 
 import '../models/reader_view_models.dart';
-import '../models/reading_settings.dart';
-import '../services/reader_content_processor.dart';
-import '../utils/chapter_progress_utils.dart';
 import 'reader_state.dart';
 
 /// 构建滚动片段所需的参数。

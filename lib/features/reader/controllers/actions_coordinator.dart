@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
-
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/book.dart';
@@ -12,7 +10,6 @@ import '../../bookshelf/services/bookshelf_catalog_update_service.dart';
 import '../../import/txt_parser.dart';
 import '../../search/services/search_book_info_refresh_helper.dart';
 import '../../source/services/rule_parser_engine.dart';
-import '../models/reader_view_models.dart';
 import '../services/reader_charset_service.dart';
 import '../services/reader_content_processor.dart';
 import '../services/reader_source_switch_helper.dart';
@@ -237,7 +234,7 @@ class ActionsCoordinator {
       await settingsService.saveBookReSegment(bookId, next);
     }
     settings.reSegment = next;
-    settings.notifyListeners();
+    settings.notify();
 
     if (chapter.chapters.isEmpty) return;
     final targetIndex = chapter.currentIndex.clamp(0, chapter.maxIndex);
@@ -251,7 +248,7 @@ class ActionsCoordinator {
       await settingsService.saveBookUseReplaceRule(bookId, next);
     }
     settings.useReplaceRule = next;
-    settings.notifyListeners();
+    settings.notify();
 
     _clearContentCaches();
     if (chapter.chapters.isEmpty) return;
@@ -278,7 +275,7 @@ class ActionsCoordinator {
     } else {
       settings.delHTag = next;
     }
-    settings.notifyListeners();
+    settings.notify();
 
     _clearContentCaches();
     final targetIndex = chapter.currentIndex.clamp(0, chapter.maxIndex);
@@ -327,7 +324,7 @@ class ActionsCoordinator {
       content: reversed,
       isDownloaded: true,
     );
-    chapter.notifyListeners();
+    chapter.notify();
     await onLoadChapter(idx, restoreOffset: true);
   }
 
@@ -362,7 +359,7 @@ class ActionsCoordinator {
 
     _clearContentCacheForChapter(ch.id);
     chapter.chapters[chapterIndex] = updated;
-    chapter.notifyListeners();
+    chapter.notify();
     await onLoadChapter(chapterIndex, restoreOffset: true);
     return true;
   }
@@ -469,7 +466,7 @@ class ActionsCoordinator {
       await settingsService.saveBookImageStyle(bookId, normalized);
     }
     settings.imageStyle = normalized;
-    settings.notifyListeners();
+    settings.notify();
 
     if (normalized == 'SINGLE') {
       await _applyBookPageAnim(0);
@@ -667,7 +664,7 @@ class ActionsCoordinator {
           (refreshedBook.sourceUrl ?? refreshedBook.sourceId ?? '')
               .trim();
     }
-    chapter.notifyListeners();
+    chapter.notify();
     return updated;
   }
 
@@ -775,7 +772,7 @@ class ActionsCoordinator {
     }
     _clearContentCaches();
     chapter.chapters = newChapters;
-    chapter.notifyListeners();
+    chapter.notify();
 
     await onLoadChapter(
       targetIndex.clamp(0, newChapters.length - 1),
@@ -789,7 +786,7 @@ class ActionsCoordinator {
       await settingsService.saveBookPageAnim(bookId, animIndex);
     }
     settings.bookPageAnimOverride = animIndex;
-    settings.notifyListeners();
+    settings.notify();
   }
 
   String _normalizeLegacyImageStyle(String style) {

@@ -3,16 +3,13 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
 
-import '../../../core/database/database_service.dart';
 import '../../../core/models/book.dart' show Chapter;
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
-import '../../../core/services/js_runtime.dart';
 import '../../../core/services/keep_screen_on_service.dart';
 import '../../../core/services/screen_brightness_service.dart';
 import '../../../core/services/settings_service.dart';
-import '../../../core/services/source_variable_store.dart';
 import '../../../core/services/webdav_service.dart';
 import '../../../core/utils/chinese_script_converter.dart';
 import '../../bookshelf/services/bookshelf_catalog_update_service.dart';
@@ -26,9 +23,6 @@ import '../services/reader_image_resolver.dart';
 import '../services/reader_image_warmup_telemetry.dart';
 import '../services/reader_theme_mode_helper.dart';
 import '../services/reader_theme_resolver.dart';
-import '../services/reader_tip_selection_helper.dart';
-import '../services/read_aloud_service.dart';
-import '../utils/chapter_progress_utils.dart';
 import '../widgets/paged_reader_widget.dart';
 import '../widgets/page_factory.dart';
 import '../widgets/auto_pager.dart';

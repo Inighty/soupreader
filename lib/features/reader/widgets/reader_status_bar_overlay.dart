@@ -4,7 +4,6 @@ import '../../../app/theme/colors.dart';
 
 import '../models/reader_view_models.dart';
 import '../models/reading_settings.dart';
-import '../services/reader_theme_resolver.dart';
 import 'reader_status_bar.dart';
 
 /// Overlay that shows the top header bar and bottom status bar in scroll mode.
