@@ -16,7 +16,7 @@ import '../../../core/services/settings_service.dart';
 import '../../replace/models/replace_rule.dart';
 import '../../replace/services/replace_rule_engine.dart';
 import '../../replace/services/replace_rule_service.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import '../../source/services/source_cover_loader.dart';
 import '../models/book.dart';
 

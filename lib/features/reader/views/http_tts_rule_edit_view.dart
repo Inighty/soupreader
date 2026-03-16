@@ -11,7 +11,7 @@ import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/source_login_store.dart';
 import '../../../core/utils/legado_json.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import '../../source/services/source_login_script_service.dart';
 import '../../source/services/source_login_ui_helper.dart';
 import '../../source/services/source_login_url_resolver.dart';

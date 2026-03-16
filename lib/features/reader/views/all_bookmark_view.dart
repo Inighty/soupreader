@@ -14,9 +14,9 @@ import '../../../core/database/repositories/bookmark_repository.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
-import '../../bookshelf/models/book.dart';
+import '../../../core/models/book.dart';
 import '../services/reader_bookmark_export_service.dart';
-import 'simple_reader_view.dart';
+import 'reader_view.dart';
 
 /// 所有书签（对齐 legado `AllBookmarkActivity`）
 class AllBookmarkView extends StatefulWidget {
@@ -208,7 +208,7 @@ class _AllBookmarkViewState extends State<AllBookmarkView> {
       if (!mounted) return;
       await Navigator.of(context, rootNavigator: true).push(
         CupertinoPageRoute<void>(
-          builder: (_) => SimpleReaderView(
+          builder: (_) => ReaderView(
             bookId: book.id,
             bookTitle: book.title,
             initialChapter: chapterIndex,

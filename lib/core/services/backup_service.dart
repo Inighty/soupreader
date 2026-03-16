@@ -5,10 +5,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
-import '../../features/bookshelf/models/book.dart';
+import '../models/book.dart';
 import '../../features/replace/models/replace_rule.dart';
 import '../../features/reader/models/reading_settings.dart';
-import '../../features/source/models/book_source.dart';
+import '../models/book_source.dart';
 import '../database/database_service.dart';
 import '../database/repositories/book_repository.dart';
 import '../database/repositories/replace_rule_repository.dart';

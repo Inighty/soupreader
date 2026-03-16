@@ -1,4 +1,4 @@
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../models/rss_source.dart';
 import 'rss_default_xml_parser.dart';

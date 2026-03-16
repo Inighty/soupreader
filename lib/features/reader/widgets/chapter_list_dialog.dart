@@ -4,7 +4,7 @@ import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_sheet_panel.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
-import '../../bookshelf/models/book.dart';
+import '../../../core/models/book.dart';
 
 /// 目录/书签弹窗 - Cupertino 风格
 /// 支持倒序和 Tab 切换

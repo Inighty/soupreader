@@ -1,6 +1,6 @@
 import 'package:pinyin/pinyin.dart';
 
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import 'search_scope.dart';
 
 /// 搜索范围分组处理（对齐 legado BookSourceDao.dealGroups）：

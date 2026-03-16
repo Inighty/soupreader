@@ -1,6 +1,6 @@
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 
 /// 书架管理导出服务（对齐 legado `menu_export_all_use_book_source`）。
 ///

@@ -24,11 +24,11 @@ import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../import/book_import_file_name_rule_service.dart';
 import '../../import/import_service.dart';
-import '../../reader/views/simple_reader_view.dart';
+import '../../reader/views/reader_view.dart';
 import '../../search/views/search_book_info_view.dart';
 import '../../search/views/search_view.dart';
 import '../../settings/views/app_log_dialog.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
 import 'cache_export_placeholder_view.dart';
 import 'bookshelf_manage_placeholder_view.dart';
@@ -2968,7 +2968,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     Navigator.of(context, rootNavigator: true)
         .push(
           CupertinoPageRoute(
-            builder: (context) => SimpleReaderView(
+            builder: (context) => ReaderView(
               bookId: book.id,
               bookTitle: book.title,
               initialChapter: book.currentChapter,

@@ -11,7 +11,7 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
 
 /// 书籍信息编辑页「封面换源」承载（对齐 legado ChangeCoverDialog）。

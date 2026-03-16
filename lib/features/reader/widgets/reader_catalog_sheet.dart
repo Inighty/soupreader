@@ -9,7 +9,7 @@ import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/book_repository.dart';
-import '../../bookshelf/models/book.dart';
+import '../../../core/models/book.dart';
 import '../services/reader_legacy_menu_helper.dart';
 
 /// 阅读器目录/书签面板（对标 legado 目录抽屉交互）

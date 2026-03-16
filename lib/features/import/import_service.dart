@@ -4,7 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import '../bookshelf/models/book.dart';
+import '../../core/models/book.dart';
 import '../../core/database/database_service.dart';
 import '../../core/database/repositories/book_repository.dart';
 import '../../core/services/exception_log_service.dart';

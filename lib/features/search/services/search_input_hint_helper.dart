@@ -1,4 +1,4 @@
-import '../../bookshelf/models/book.dart';
+import '../../../core/models/book.dart';
 
 /// 搜索输入帮助（书架匹配 + 历史词过滤）语义辅助。
 class SearchInputHintHelper {

@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path/path.dart' as p;
 
-import '../../features/bookshelf/models/book.dart';
+import '../models/book.dart';
 import '../models/app_settings.dart';
 
 class WebDavOperationException implements Exception {

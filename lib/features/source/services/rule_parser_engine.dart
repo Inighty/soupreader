@@ -14,6 +14,7 @@ import 'package:xpath_selector_html_parser/xpath_selector_html_parser.dart';
 import '../../../core/utils/html_text_formatter.dart';
 import '../../../core/services/cookie_store.dart';
 import '../../../core/services/source_login_store.dart';
+import 'rule_text_utils.dart';
 
 /// 书源规则解析引擎
 /// 支持 CSS 选择器、XPath（简化版）和正则表达式
@@ -8618,69 +8619,26 @@ class RuleParserEngine {
     return result;
   }
 
+  /// Applies a single regex replacement (Legado semantics).
+  /// Delegated to [RuleTextUtils.applyLegacyReplace] for testability.
   String _applyLegacyReplaceRegex({
     required String content,
     required String pattern,
     required String replacement,
     required bool firstOnly,
-  }) {
-    if (pattern.isEmpty) return content;
-
-    if (firstOnly) {
-      try {
-        final regex = RegExp(pattern);
-        final matcher = regex.firstMatch(content);
-        if (matcher == null) return '';
-        final matchedText = matcher.group(0) ?? '';
-        return matchedText.replaceFirst(regex, replacement);
-      } catch (_) {
-        return replacement;
-      }
-    }
-
-    try {
-      return content.replaceAll(RegExp(pattern), replacement);
-    } catch (_) {
-      return content.replaceAll(pattern, replacement);
-    }
-  }
-
-  /// 应用替换正则
-  String _applyReplaceRegex(String content, String replaceRegex) {
-    // 源阅格式: regex##replacement##regex2##replacement2...
-    final parts = replaceRegex.split('##');
-    if (parts.isEmpty) return content;
-
-    var start = 0;
-    // 对齐 legado：`##regex##replacement###` 触发 replaceFirst 语义。
-    if (parts.length >= 3 && parts.length.isOdd) {
-      final pattern = parts[0];
-      if (pattern.isNotEmpty) {
-        final replacement = parts[1];
-        content = _applyLegacyReplaceRegex(
-          content: content,
-          pattern: pattern,
-          replacement: replacement,
-          firstOnly: true,
-        );
-      }
-      start = 3;
-    }
-
-    for (int i = start; i < parts.length - 1; i += 2) {
-      final pattern = parts[i];
-      if (pattern.isEmpty) continue;
-      final replacement = parts.length > i + 1 ? parts[i + 1] : '';
-      content = _applyLegacyReplaceRegex(
+  }) =>
+      RuleTextUtils.applyLegacyReplace(
         content: content,
         pattern: pattern,
         replacement: replacement,
-        firstOnly: false,
+        firstOnly: firstOnly,
       );
-    }
 
-    return content;
-  }
+  /// 应用替换正则
+  /// Applies Legado-format replacement regex chain.
+  /// Delegated to [RuleTextUtils.applyReplaceRegex] for testability.
+  String _applyReplaceRegex(String content, String replaceRegex) =>
+      RuleTextUtils.applyReplaceRegex(content, replaceRegex);
 
   /// 清理正文内容
   String _cleanContent(

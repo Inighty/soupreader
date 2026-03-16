@@ -6,7 +6,7 @@ import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/services/reader_source_switch_helper.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../models/book.dart';
 

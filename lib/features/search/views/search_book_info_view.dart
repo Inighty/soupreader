@@ -31,7 +31,7 @@ import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/services/source_variable_store.dart';
 import '../../../core/services/webdav_service.dart';
-import '../../bookshelf/models/book.dart';
+import '../../../core/models/book.dart';
 import '../../bookshelf/services/book_add_service.dart';
 import '../../import/txt_parser.dart';
 import '../../reader/models/reading_settings.dart';
@@ -40,11 +40,11 @@ import '../../reader/services/reader_charset_service.dart';
 import '../../reader/services/chapter_title_display_helper.dart';
 import '../../reader/services/reader_source_switch_helper.dart';
 import '../../reader/services/txt_toc_rule_store.dart';
-import '../../reader/views/simple_reader_view.dart';
+import '../../reader/views/reader_view.dart';
 import '../../reader/widgets/source_switch_candidate_sheet.dart';
 import '../../replace/services/replace_rule_service.dart';
 import '../../settings/views/app_log_dialog.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../../source/services/source_login_ui_helper.dart';
 import '../../source/services/source_login_url_resolver.dart';
@@ -2092,7 +2092,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
           if (!mounted) return;
           await Navigator.of(context, rootNavigator: true).push(
             CupertinoPageRoute(
-              builder: (_) => SimpleReaderView(
+              builder: (_) => ReaderView(
                 bookId: stored.id,
                 bookTitle: stored.title,
                 initialChapter: initialChapter.clamp(0, maxChapter),
@@ -2123,7 +2123,7 @@ class _SearchBookInfoViewState extends State<SearchBookInfoView> {
 
     await Navigator.of(context, rootNavigator: true).push(
       CupertinoPageRoute(
-        builder: (_) => SimpleReaderView.ephemeral(
+        builder: (_) => ReaderView.ephemeral(
           sessionId: sessionId,
           bookTitle: _displayName,
           initialChapter: initialChapter.clamp(0, chapters.length - 1),

@@ -14,7 +14,7 @@ import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../../source/services/source_import_export_service.dart';
 import '../../search/views/search_book_info_view.dart';

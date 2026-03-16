@@ -7,7 +7,7 @@ import '../../../app/widgets/app_manage_search_field.dart';
 import '../models/search_scope.dart';
 import '../models/search_scope_group_helper.dart';
 import '../services/search_scope_picker_helper.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 
 class SearchScopePickerView extends StatefulWidget {
   final List<BookSource> sources;

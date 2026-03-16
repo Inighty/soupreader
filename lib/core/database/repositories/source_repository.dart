@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
-import '../../../features/source/models/book_source.dart';
+import '../../models/book_source.dart';
 import '../../utils/legado_json.dart';
 import '../database_service.dart';
 import '../drift/source_drift_database.dart';

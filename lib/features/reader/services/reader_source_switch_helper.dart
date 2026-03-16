@@ -1,5 +1,5 @@
-import '../../bookshelf/models/book.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book.dart';
+import '../../../core/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
 
 class ReaderSourceSwitchCandidate {

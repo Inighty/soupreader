@@ -1,6 +1,6 @@
 import 'dart:collection';
 
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import '../../source/services/rule_parser_engine.dart';
 import '../models/search_scope.dart';
 class ResolvedSearchScope {

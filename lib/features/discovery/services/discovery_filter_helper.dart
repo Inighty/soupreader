@@ -1,4 +1,4 @@
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 
 /// 发现页筛选规则（对齐 legado ExploreFragment + BookSourceDao.flowExplore）。
 class DiscoveryFilterHelper {

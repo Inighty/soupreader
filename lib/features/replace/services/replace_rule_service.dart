@@ -1,7 +1,7 @@
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import '../models/replace_rule.dart';
 import 'replace_rule_engine.dart';
 

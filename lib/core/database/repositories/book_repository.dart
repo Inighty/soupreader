@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
-import '../../../features/bookshelf/models/book.dart';
+import '../../models/book.dart';
 import '../database_service.dart';
 import '../drift/source_drift_database.dart';
 

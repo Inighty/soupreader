@@ -9,7 +9,7 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import '../models/book.dart';
 import '../models/bookshelf_book_group.dart';
 class BookshelfManageGroupSelectDialog extends StatefulWidget {

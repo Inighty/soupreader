@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import '../../bookshelf/models/book.dart';
+import '../../../core/models/book.dart';
 
 /// 详情页分享载荷辅助（对齐 legado `BookInfoActivity.menu_share_it`）。
 class SearchBookInfoShareHelper {

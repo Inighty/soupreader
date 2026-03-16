@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import '../../source/services/source_login_url_resolver.dart';
 import '../../source/views/source_login_form_view.dart';
 import '../../source/views/source_login_webview_view.dart';

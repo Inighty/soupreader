@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:epubx/epubx.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
-import '../bookshelf/models/book.dart';
+import '../../core/models/book.dart';
 import '../../core/utils/html_text_formatter.dart';
 
 /// EPUB 文件解析器

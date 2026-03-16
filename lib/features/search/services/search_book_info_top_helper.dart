@@ -1,4 +1,4 @@
-import '../../bookshelf/models/book.dart';
+import '../../../core/models/book.dart';
 
 /// 详情页置顶辅助（对齐 legado `BookInfoViewModel.topBook`）。
 class SearchBookInfoTopHelper {

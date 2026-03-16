@@ -1,4 +1,4 @@
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 
 class SearchScopePickerHelper {
   const SearchScopePickerHelper._();

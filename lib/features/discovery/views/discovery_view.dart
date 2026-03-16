@@ -24,7 +24,7 @@ import '../../../core/services/source_variable_store.dart';
 import '../../search/models/search_scope.dart';
 import '../../search/models/search_scope_group_helper.dart';
 import '../../search/views/search_view.dart';
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 import '../../source/services/source_explore_kinds_service.dart';
 import '../../source/services/source_login_url_resolver.dart';
 import '../../source/views/source_edit_view.dart';

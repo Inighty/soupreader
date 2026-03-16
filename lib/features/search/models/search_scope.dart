@@ -1,4 +1,4 @@
-import '../../source/models/book_source.dart';
+import '../../../core/models/book_source.dart';
 
 /// 搜索范围语义（对齐 legado）：
 /// - `""`：全部书源

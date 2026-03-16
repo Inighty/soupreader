@@ -1,4 +1,4 @@
-import '../../bookshelf/models/book.dart';
+import '../../../core/models/book.dart';
 
 class SearchBookInfoEditDraft {
   final String name;

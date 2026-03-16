@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
-import '../../bookshelf/models/book.dart';
+import '../../../core/models/book.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../import/epub_parser.dart';
 import '../../import/txt_parser.dart';

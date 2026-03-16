@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:fast_gbk/fast_gbk.dart';
 import 'package:uuid/uuid.dart';
-import '../bookshelf/models/book.dart';
+import '../../core/models/book.dart';
 
 /// TXT 目录规则（对齐 legado `TxtTocRule.rule` 语义）。
 class TxtTocRuleOption {

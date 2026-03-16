@@ -1,4 +1,4 @@
-import '../../bookshelf/models/book.dart';
+import '../../../core/models/book.dart';
 import 'reader_legacy_menu_helper.dart';
 
 class ReaderRefreshSelection {

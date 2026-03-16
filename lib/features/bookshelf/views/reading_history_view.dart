@@ -12,7 +12,7 @@ import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/services/settings_service.dart';
-import '../../reader/views/simple_reader_view.dart';
+import '../../reader/views/reader_view.dart';
 import '../../search/models/search_scope_group_helper.dart';
 import '../models/book.dart';
 
@@ -427,7 +427,7 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
   void _openReader(Book book) {
     Navigator.of(context, rootNavigator: true).push(
       CupertinoPageRoute(
-        builder: (context) => SimpleReaderView(
+        builder: (context) => ReaderView(
           bookId: book.id,
           bookTitle: book.title,
           initialChapter: book.currentChapter,
