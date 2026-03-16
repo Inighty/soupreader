@@ -93,6 +93,9 @@ class _ReaderViewState extends State<ReaderView>
   // ── 焦点（键盘事件监听）──
   final FocusNode _focusNode = FocusNode();
 
+  // ── 分页内容区域尺寸（用于 PageFactory 布局参数）──
+  final GlobalKey _pagedContentKey = GlobalKey();
+
   // ── 动画（需要 vsync，必须在 State 中）──
   late final AnimationController _menuAnimController;
   late final Animation<double> _menuFadeAnim;
@@ -157,6 +160,13 @@ class _ReaderViewState extends State<ReaderView>
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) cb();
         });
+      },
+      getPagedContentSize: () {
+        final ctx = _pagedContentKey.currentContext;
+        if (ctx == null) return null;
+        final box = ctx.findRenderObject() as RenderBox?;
+        if (box == null || !box.hasSize) return null;
+        return box.size;
       },
     );
 
@@ -361,7 +371,9 @@ class _ReaderViewState extends State<ReaderView>
   Widget _buildPagedContent() {
     final theme = _settings.themeResolver;
     final readingSettings = _settings.settings;
-    return PagedReaderWidget(
+    return KeyedSubtree(
+      key: _pagedContentKey,
+      child: PagedReaderWidget(
       pageFactory: _paged.pageFactory,
       pageTurnMode: readingSettings.pageTurnMode,
       textStyle: TextStyle(
@@ -405,6 +417,7 @@ class _ReaderViewState extends State<ReaderView>
       pageDirection: readingSettings.pageDirection,
       pageTouchSlop: readingSettings.pageTouchSlop,
       enableGestures: !_ui.showMenu,
+    ),
     );
   }
 

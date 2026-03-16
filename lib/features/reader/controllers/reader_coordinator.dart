@@ -18,6 +18,7 @@ import '../models/reader_view_models.dart';
 import '../models/reading_settings.dart';
 import '../services/reader_charset_service.dart';
 import '../widgets/auto_pager.dart';
+import '../widgets/page_factory.dart';
 import '../services/reader_content_processor.dart';
 import '../services/reader_image_marker_codec.dart';
 import '../services/reader_theme_mode_helper.dart';
@@ -53,6 +54,7 @@ class ReaderCoordinator {
     required this.readAloudCtrl,
     required this.bookmarkCtrl,
     required this.postFrameCallback,
+    this.getPagedContentSize,
   });
 
   final String bookId;
@@ -77,6 +79,10 @@ class ReaderCoordinator {
 
   /// 安全地在下一帧执行 UI 操作（替代 WidgetsBinding.addPostFrameCallback）
   final void Function(VoidCallback callback) postFrameCallback;
+
+  /// 由 View 层提供，返回分页模式内容区域的实际尺寸。
+  /// 如果为 null 则使用默认尺寸估算。
+  final Size? Function()? getPagedContentSize;
 
   // ── Services ──
   late final ChapterRepository _chapterRepo;
@@ -435,6 +441,34 @@ class ReaderCoordinator {
     required bool restoreOffset,
     double? targetProgress,
   }) {
+    // 构建 ChapterData 并注入 PageFactory
+    final chapterDataList = chapter.chapters.map((ch) => ChapterData(
+      title: ch.title,
+      content: ch.content ?? '',
+    )).toList();
+    paged.pageFactory.setChapters(chapterDataList, chapterIndex);
+
+    // 设置布局参数
+    final contentSize = getPagedContentSize?.call();
+    final s = settings.settings;
+    final contentW = (contentSize?.width ?? 360) - s.paddingLeft - s.paddingRight;
+    final contentH = (contentSize?.height ?? 700) - s.paddingTop - s.paddingBottom;
+    if (contentW > 50 && contentH > 100) {
+      paged.pageFactory.setLayoutParams(
+        contentHeight: contentH,
+        contentWidth: contentW,
+        fontSize: s.fontSize,
+        lineHeight: s.lineHeight,
+        letterSpacing: s.letterSpacing,
+        paragraphSpacing: s.paragraphSpacing,
+        fontFamily: settings.customFontFamily,
+        paragraphIndent: s.paragraphIndent,
+        underline: s.underline,
+        showTitle: s.titleMode != 2,
+        legacyImageStyle: settings.imageStyle,
+      );
+    }
+
     // 触发分页
     paged.pageFactory.paginateAll();
     paged.pageFactory.jumpToChapter(chapterIndex, goToLastPage: goToLastPage);
