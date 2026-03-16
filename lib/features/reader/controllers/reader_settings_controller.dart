@@ -110,7 +110,7 @@ class ReaderSettingsController {
     }
   }
 
-  double safeBrightness(double value, {double fallback = 1.0}) {
+  double _safeBrightness(double value, {double fallback = 1.0}) {
     if (value.isNaN || value.isInfinite) return fallback;
     return value.clamp(0.0, 1.0);
   }

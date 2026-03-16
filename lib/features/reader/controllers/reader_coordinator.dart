@@ -565,8 +565,8 @@ class ReaderCoordinator {
     try {
       await _bookRepo.updateReadProgress(
         bookId,
-        chapter.currentIndex,
-        getChapterProgress(),
+        currentChapter: chapter.currentIndex,
+        readProgress: getChapterProgress(),
       );
     } catch (_) {}
   }

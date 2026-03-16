@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../app/theme/colors.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../search/views/search_book_info_view.dart';
