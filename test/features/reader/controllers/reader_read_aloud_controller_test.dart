@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:soupreader/core/services/settings_service.dart';
 import 'package:soupreader/features/reader/controllers/reader_read_aloud_controller.dart';
-import 'package:soupreader/features/reader/services/read_aloud_service.dart';
 
 void main() {
   group('ReaderReadAloudController', () {
@@ -9,7 +9,7 @@ void main() {
 
       setUp(() {
         controller = ReaderReadAloudController(
-          settingsService: _FakeSettingsService(),
+          settingsService: SettingsService(),
           onRequestChapterSwitch: (_) async => false,
           onMessage: (_) {},
         );
@@ -91,7 +91,7 @@ void main() {
 
       setUp(() {
         controller = ReaderReadAloudController(
-          settingsService: _FakeSettingsService(),
+          settingsService: SettingsService(),
           onRequestChapterSwitch: (_) async => false,
           onMessage: (_) {},
         );
@@ -117,14 +117,3 @@ void main() {
   });
 }
 
-/// Minimal fake for SettingsService to avoid depending on real implementation.
-class _FakeSettingsService {
-  int getAudioPlayUseWakeLock() => 0;
-  bool getAudioPlayUseWakeLockBool() => false;
-  int getContentSelectSpeakMode() => 0;
-  Future<void> saveContentSelectSpeakMode(int mode) async {}
-  Future<void> saveAudioPlayUseWakeLock(bool value) async {}
-
-  // Dynamic dispatch compatibility
-  dynamic noSuchMethod(Invocation invocation) => null;
-}

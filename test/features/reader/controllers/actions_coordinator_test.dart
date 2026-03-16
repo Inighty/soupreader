@@ -97,33 +97,33 @@ void main() {
       });
 
       test('replaceStageCache starts empty', () {
-        expect(chapter.replaceStageCache, isEmpty);
+        expect(chapter.cache.replaceStage, isEmpty);
       });
 
       test('catalogDisplayTitleCache starts empty', () {
-        expect(chapter.catalogDisplayTitleCache, isEmpty);
+        expect(chapter.cache.catalogDisplayTitle, isEmpty);
       });
 
       test('contentInFlight starts empty', () {
-        expect(chapter.contentInFlight, isEmpty);
+        expect(chapter.cache.contentInFlight, isEmpty);
       });
 
       test('sameTitleRemovedById starts empty', () {
-        expect(chapter.sameTitleRemovedById, isEmpty);
+        expect(chapter.cache.sameTitleRemovedById, isEmpty);
       });
 
       test('clearing caches works', () {
-        chapter.replaceStageCache['a'] = null as dynamic;
-        chapter.catalogDisplayTitleCache['b'] = 'title';
-        chapter.contentInFlight['c'] = Future.value('');
+        chapter.cache.replaceStage['a'] = null as dynamic;
+        chapter.cache.catalogDisplayTitle['b'] = 'title';
+        chapter.cache.contentInFlight['c'] = Future.value('');
 
-        chapter.replaceStageCache.clear();
-        chapter.catalogDisplayTitleCache.clear();
-        chapter.contentInFlight.clear();
+        chapter.cache.replaceStage.clear();
+        chapter.cache.catalogDisplayTitle.clear();
+        chapter.cache.contentInFlight.clear();
 
-        expect(chapter.replaceStageCache, isEmpty);
-        expect(chapter.catalogDisplayTitleCache, isEmpty);
-        expect(chapter.contentInFlight, isEmpty);
+        expect(chapter.cache.replaceStage, isEmpty);
+        expect(chapter.cache.catalogDisplayTitle, isEmpty);
+        expect(chapter.cache.contentInFlight, isEmpty);
       });
     });
 

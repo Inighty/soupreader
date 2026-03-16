@@ -1,10 +1,12 @@
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:soupreader/core/services/settings_service.dart';
 import 'package:soupreader/features/reader/controllers/image_coordinator.dart';
 import 'package:soupreader/features/reader/controllers/reader_state.dart';
-import 'package:soupreader/features/reader/services/reader_image_marker_codec.dart';
+import 'package:soupreader/features/reader/services/reader_image_request_parser.dart';
 import 'package:soupreader/features/reader/services/reader_image_warmup_telemetry.dart';
+import 'package:soupreader/features/source/services/rule_parser_engine.dart';
 
 void main() {
   group('ImageCoordinator', () {
@@ -17,8 +19,8 @@ void main() {
         bookId: 'test-book',
         isEphemeral: false,
         image: image,
-        settingsService: _FakeSettingsService(),
-        ruleEngine: _FakeRuleEngine(),
+        settingsService: SettingsService(),
+        ruleEngine: RuleParserEngine(),
         resolveCurrentSource: () => null,
         recentFetchDuration: () => Duration.zero,
       );
@@ -162,7 +164,10 @@ void main() {
       test('does nothing with null source', () async {
         // resolveCurrentSource returns null
         await coordinator.ensureCookieHeaderCached(
-          _FakeImageRequest('https://example.com/img.jpg'),
+          const ReaderImageRequest(
+            raw: 'https://example.com/img.jpg',
+            url: 'https://example.com/img.jpg',
+          ),
         );
         expect(image.cookieHeaderByHost, isEmpty);
       });
@@ -170,31 +175,3 @@ void main() {
   });
 }
 
-/// Minimal fake for SettingsService.
-class _FakeSettingsService {
-  String? getBookReaderImageSizeSnapshot(String bookId) => null;
-  Future<void> saveBookReaderImageSizeSnapshot(
-    String bookId,
-    String payload,
-  ) async {}
-
-  // Required by ActionsCoordinator but not used here
-  dynamic get appSettings => null;
-  dynamic get readingSettings => null;
-}
-
-/// Minimal fake for RuleParserEngine.
-class _FakeRuleEngine {
-  Future<dynamic> fetchCoverBytes({
-    required dynamic source,
-    required String imageUrl,
-  }) async =>
-      null;
-}
-
-/// Minimal fake for ReaderImageRequest.
-class _FakeImageRequest {
-  _FakeImageRequest(this.url);
-  final String url;
-  String get raw => url;
-}
