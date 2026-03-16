@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter/services.dart';
 
 import '../../../core/config/migration_exclusions.dart';
+import '../../../core/models/app_settings.dart';
 import '../../../core/services/keep_screen_on_service.dart';
 import '../../../core/services/screen_brightness_service.dart';
 import '../../../core/services/settings_service.dart';
@@ -133,19 +134,19 @@ class ReaderSettingsController {
     _keepLightTimer = null;
 
     if (keepLightSeconds < 0) {
-      await keepScreenOnService.enable();
+      await keepScreenOnService.setEnabled(true);
       return;
     }
     if (keepLightSeconds == 0) {
-      await keepScreenOnService.disable();
+      await keepScreenOnService.setEnabled(false);
       return;
     }
-    await keepScreenOnService.enable();
+    await keepScreenOnService.setEnabled(true);
     _keepLightTimer = Timer(
       Duration(seconds: keepLightSeconds),
       () async {
         _keepLightTimer = null;
-        await keepScreenOnService.disable();
+        await keepScreenOnService.setEnabled(false);
       },
     );
   }
@@ -187,15 +188,17 @@ class ReaderSettingsController {
     required ReadingSettings settings,
     required Brightness effectiveBrightness,
   }) {
-    final config = ReaderSystemUiHelper.resolveSystemUiConfig(
-      showMenu: showMenu,
-      showStatusBar: settings.showStatusBar,
-      hideNavigationBar: settings.hideNavigationBar,
-      effectiveBrightness: effectiveBrightness,
+    final config = ReaderSystemUiHelper.resolveReaderUiConfig(
+      settings: settings,
+      showOverlay: showMenu,
     );
     if (config == _appliedSystemUiConfig) return;
     _appliedSystemUiConfig = config;
-    ReaderSystemUiHelper.applySystemUiConfig(config);
+    // Apply system UI via Flutter SystemChrome directly
+    SystemChrome.setEnabledSystemUIMode(
+      config.mode,
+      overlays: config.overlays,
+    );
   }
 
   // ── Theme normalization ──

@@ -192,7 +192,7 @@ class SourceSwitchCoordinator {
     final sources = sourceRepo.getAllSources();
     final groups = <String>{};
     for (final source in sources) {
-      final g = source.bookSourceGroup.trim();
+      final g = (source.bookSourceGroup ?? '').trim();
       if (g.isNotEmpty) groups.add(g);
     }
     return groups.toList()..sort();

@@ -27,7 +27,7 @@ import 'services/read_aloud_service.dart';
 /// )
 /// ```
 final readerReadAloudProvider =
-    ChangeNotifierProvider.autoDispose<ReaderReadAloudController>(
+    Provider.autoDispose<ReaderReadAloudController>(
   (ref) => throw UnimplementedError(
     'readerReadAloudProvider must be overridden per reading session.',
   ),
@@ -37,7 +37,7 @@ final readerReadAloudProvider =
 ///
 /// Override with the correct bookId/bookTitle per-screen.
 final readerBookmarkProvider =
-    ChangeNotifierProvider.autoDispose<ReaderBookmarkController>(
+    Provider.autoDispose<ReaderBookmarkController>(
   (ref) => throw UnimplementedError(
     'readerBookmarkProvider must be overridden per reading session.',
   ),
@@ -47,7 +47,7 @@ final readerBookmarkProvider =
 ///
 /// Override with the correct content loader and chapter accessors.
 final readerSearchProvider =
-    ChangeNotifierProvider.autoDispose<ReaderSearchController>(
+    Provider.autoDispose<ReaderSearchController>(
   (ref) => throw UnimplementedError(
     'readerSearchProvider must be overridden per reading session.',
   ),

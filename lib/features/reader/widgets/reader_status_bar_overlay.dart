@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
+import '../../../app/theme/colors.dart';
+
 import '../models/reader_view_models.dart';
 import '../models/reading_settings.dart';
 import '../services/reader_theme_resolver.dart';

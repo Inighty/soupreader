@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
+import '../../../app/theme/typography.dart';
 import '../models/reading_settings.dart';
 import '../services/reader_theme_mode_helper.dart';
 

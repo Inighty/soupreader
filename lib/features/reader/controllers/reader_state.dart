@@ -3,10 +3,12 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
 
+import '../../../core/models/book.dart' show Chapter;
 import '../models/reader_view_models.dart';
 import '../models/reading_settings.dart';
 import '../services/reader_image_marker_codec.dart';
 import '../services/reader_image_warmup_telemetry.dart';
+import '../services/reader_theme_mode_helper.dart';
 import '../services/reader_theme_resolver.dart';
 import '../widgets/auto_pager.dart';
 import '../widgets/page_factory.dart';
@@ -91,10 +93,10 @@ class UiState extends ChangeNotifier {
 /// 阅读设置 + 主题
 class SettingsState extends ChangeNotifier {
   ReadingSettings settings = const ReadingSettings();
-  ReaderThemeResolver themeResolver = const ReaderThemeResolver(
-    settings: ReadingSettings(),
+  ReaderThemeResolver themeResolver = ReaderThemeResolver(
+    settings: const ReadingSettings(),
     themeMode: ReaderThemeMode.day,
-    readStyleConfigs: [],
+    readStyleConfigs: const [],
   );
   int? bookPageAnimOverride;
   bool useReplaceRule = true;

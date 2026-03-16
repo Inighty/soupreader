@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
 
 import '../../../core/database/database_service.dart';
+import '../../../core/models/book.dart' show Chapter;
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';

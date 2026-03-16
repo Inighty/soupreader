@@ -13,6 +13,7 @@ import '../controllers/reader_coordinator.dart';
 import '../controllers/reader_read_aloud_controller.dart';
 import '../controllers/reader_settings_controller.dart';
 import '../controllers/reader_state.dart';
+import '../services/read_aloud_service.dart' show ReadAloudChapterDirection;
 import '../models/reader_view_models.dart';
 import '../models/reading_settings.dart';
 import '../services/reader_theme_mode_helper.dart';
