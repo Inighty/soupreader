@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, listEquals;
 import 'package:flutter/services.dart';

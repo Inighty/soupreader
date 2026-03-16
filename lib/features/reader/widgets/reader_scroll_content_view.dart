@@ -152,6 +152,7 @@ class ReaderScrollContentConfig {
 }
 class ReaderScrollContentView extends StatefulWidget {
   const ReaderScrollContentView({
+    super.key,
     required this.config,
     required this.scrollInsets,
     required this.segments,

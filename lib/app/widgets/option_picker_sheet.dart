@@ -152,6 +152,7 @@ class OptionPickerHeader extends StatelessWidget {
   final Color subtitleColor;
 
   const OptionPickerHeader({
+    super.key,
     required this.title,
     required this.message,
     required this.handleColor,
@@ -219,6 +220,7 @@ class OptionPickerBody<T> extends StatelessWidget {
   final VoidCallback onCancel;
 
   const OptionPickerBody({
+    super.key,
     required this.header,
     required this.items,
     required this.currentValue,
@@ -296,6 +298,7 @@ class OptionPickerCard extends StatelessWidget {
   final double radius;
 
   const OptionPickerCard({
+    super.key,
     required this.child,
     required this.color,
     required this.radius,
@@ -320,6 +323,7 @@ class OptionPickerRow<T> extends StatelessWidget {
   final VoidCallback? onTap;
 
   const OptionPickerRow({
+    super.key,
     required this.item,
     required this.selected,
     required this.accent,

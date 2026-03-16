@@ -284,6 +284,7 @@ class AppPopoverSurface extends StatelessWidget {
   final double radius;
 
   const AppPopoverSurface({
+    super.key,
     required this.child,
     required this.backgroundColor,
     required this.borderColor,
@@ -330,6 +331,7 @@ class AppPopoverMenuRow extends StatelessWidget {
   final VoidCallback? onTap;
 
   const AppPopoverMenuRow({
+    super.key,
     required this.height,
     required this.icon,
     required this.label,

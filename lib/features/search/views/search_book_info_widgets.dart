@@ -162,7 +162,7 @@ class SearchBookInfoMetaActionChip extends StatelessWidget {
     final resolvedBackground = resolvedColor.withValues(alpha: 0.12);
     return CupertinoButton(
       padding: EdgeInsets.zero,
-      minSize: 0,
+      minimumSize: Size.zero,
       onPressed: onPressed,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

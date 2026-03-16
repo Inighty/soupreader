@@ -12,7 +12,6 @@ import '../../../core/utils/legado_json.dart';
 import '../models/book_source.dart';
 import '../services/rule_parser_engine.dart';
 import '../services/source_cookie_scope_resolver.dart';
-import '../services/source_debug_export_service.dart';
 import '../services/source_debug_key_parser.dart';
 import '../services/source_debug_orchestrator.dart';
 import '../services/source_debug_summary_parser.dart';
@@ -206,7 +205,6 @@ class SourceEditNotifier extends Notifier<SourceEditState> {
 
   late final SourceLegacySaveService _saveService;
   late final SourceDebugOrchestrator _debugOrchestrator;
-  final SourceDebugExportService _debugExportService = SourceDebugExportService();
   final SourceExploreKindsService _exploreKindsService = SourceExploreKindsService();
   final SourceRuleLintService _ruleLintService = const SourceRuleLintService();
 

@@ -75,7 +75,7 @@ class ReaderSearchOverlayState extends State<ReaderSearchOverlay>
   List<ReaderSearchHit> _hits = const [];
   int _currentHitIndex = -1;
   bool _isSearching = false;
-  bool _useReplace = false;
+  final bool _useReplace = false;
   ReaderSearchProgressSnapshot? _progressSnapshot;
   int _taskToken = 0;
 
@@ -219,7 +219,7 @@ class ReaderSearchOverlayState extends State<ReaderSearchOverlay>
       if (_taskToken != token || !mounted) return;
 
       final chapter = widget.chapters[i];
-      final title = (chapter is dynamic && chapter.title != null)
+      final title = (chapter.title != null)
           ? chapter.title as String
           : '第${i + 1}章';
 

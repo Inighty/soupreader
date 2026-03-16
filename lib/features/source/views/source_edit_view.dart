@@ -139,7 +139,7 @@ class _SourceEditViewState extends ConsumerState<SourceEditView> {
   late final TextEditingController _coverDecodeJsCtrl;
   late final TextEditingController _loginHeaderCacheCtrl;
   late final TextEditingController _loginInfoCtrl;
-  bool _loginStateLoading = false;
+  final bool _loginStateLoading = false;
   late final TextEditingController _bookSourceCommentCtrl;
   late final TextEditingController _variableCommentCtrl;
   late final TextEditingController _searchUrlCtrl;
