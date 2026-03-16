@@ -139,11 +139,16 @@ class ReaderCoordinator {
 
     // 加载初始章节
     chapter.currentIndex = initialChapter.clamp(0, chapter.maxIndex);
-    if (chapter.chapters.isNotEmpty) {
-      await loadChapter(chapter.currentIndex, restoreOffset: true);
+    try {
+      if (chapter.chapters.isNotEmpty) {
+        await loadChapter(chapter.currentIndex, restoreOffset: true);
+      }
+    } catch (e) {
+      debugPrint('[coordinator] init loadChapter error: $e');
+    } finally {
+      // 无论成功失败，都要解除 UI 加载门控，避免界面永远停在 spinner。
+      chapter.update(initialized: true);
     }
-
-    chapter.update(initialized: true);
   }
 
   // ═══════════════════════════════════════════════════════════════════

@@ -391,6 +391,15 @@ class _ReaderViewState extends State<ReaderView>
       paddingDisplayCutouts: readingSettings.paddingDisplayCutouts,
       bookTitle: widget.bookTitle,
       clickActions: ClickAction.defaultZoneConfig,
+      // PagedReaderWidget 内层 GestureDetector 会吃掉外层的 onTapUp，
+      // 必须在这里连接 onTap，否则菜单区域点击事件被丢弃。
+      onTap: () {
+        final size = MediaQuery.sizeOf(context);
+        _coordinator.inputCoordinator.handleTap(
+          Offset(size.width / 2, size.height / 2),
+          size,
+        );
+      },
       onAction: (action) {
         _coordinator.inputCoordinator.handleClickAction(action);
       },
