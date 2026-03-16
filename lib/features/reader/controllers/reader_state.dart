@@ -42,8 +42,17 @@ class ChapterState extends ChangeNotifier {
     bool? restoring,
     bool? initialized,
   }) {
+    final resolvedIndex = index ?? currentIndex;
     if (index != null) currentIndex = index;
-    if (content != null) currentContent = content;
+    if (content != null) {
+      currentContent = content;
+      // 同步回写到 chapters 列表，确保 _paginateAndJump 能读到正确内容。
+      // Chapter.content 是 final，需通过 copyWith 替换列表元素。
+      if (resolvedIndex >= 0 && resolvedIndex < chapters.length) {
+        chapters[resolvedIndex] =
+            chapters[resolvedIndex].copyWith(content: content);
+      }
+    }
     if (title != null) currentTitle = title;
     if (loading != null) isLoading = loading;
     if (restoring != null) isRestoring = restoring;

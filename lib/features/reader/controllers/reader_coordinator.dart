@@ -431,11 +431,16 @@ class ReaderCoordinator {
     required bool restoreOffset,
     double? targetProgress,
   }) {
-    // 构建 ChapterData 并注入 PageFactory
-    final chapterDataList = chapter.chapters.map((ch) => ChapterData(
-      title: ch.title,
-      content: ch.content ?? '',
-    )).toList();
+    // 构建 ChapterData 并注入 PageFactory。
+    // 当前章节优先使用 chapter.currentContent（已经过处理的内容），
+    // 避免 Chapter.content 尚未回写时出现空白页。
+    final chapterDataList = List.generate(chapter.chapters.length, (i) {
+      final ch = chapter.chapters[i];
+      final content = (i == chapterIndex)
+          ? chapter.currentContent        // 当前章：用处理后内容
+          : (ch.content ?? '');           // 邻章：用缓存内容（或空）
+      return ChapterData(title: ch.title, content: content);
+    });
     paged.pageFactory.setChapters(chapterDataList, chapterIndex);
 
     // 设置布局参数
