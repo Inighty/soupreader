@@ -547,6 +547,12 @@ class ReaderCoordinator {
     if (persist) {
       unawaited(_settingsService.saveReadingSettings(normalized));
     }
+    // 翻页模式切换：分页 ↔ 滚动 之间彼此的内容容器（PageFactory / segments）
+    // 是各自维护的，不会自动填充。切换时需要主动触发对应模式的首次构建，
+    // 否则切过去会显示空白。
+    if (old.pageTurnMode != normalized.pageTurnMode) {
+      postFrameCallback(() => requestRepaginate(restoreOffset: true));
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════
