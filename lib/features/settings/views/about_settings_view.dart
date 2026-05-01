@@ -17,6 +17,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
+import '../../../app/widgets/app_toast.dart';
+import '../../../core/build/build_info.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import 'app_help_dialog.dart';
@@ -595,6 +597,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
 
     _AppUpdateInfo? updateInfo;
     String? errorMessage;
+    bool alreadyLatest = false;
 
     try {
       final response = await Dio().get(
@@ -610,6 +613,8 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
           errorMessage = '检查更新失败：未找到安装包';
         } else if (parsed.updateBody.trim().isEmpty) {
           errorMessage = '检查更新失败：更新说明为空';
+        } else if (_isAlreadyLatest(parsed)) {
+          alreadyLatest = true;
         } else {
           updateInfo = parsed;
         }
@@ -633,7 +638,36 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
       _showUpdateInfo(updateInfo);
       return;
     }
+    if (alreadyLatest) {
+      showAppToast(context, message: '已是最新版本');
+      return;
+    }
     await _showMessage(errorMessage ?? '检查更新失败');
+  }
+
+  /// 比较远端发布与当前构建的 commit SHA，相同视为已是最新。
+  bool _isAlreadyLatest(_AppUpdateInfo info) {
+    final currentSha = BuildInfo.gitSha.trim().toLowerCase();
+    if (currentSha.isEmpty || currentSha == 'unknown') return false;
+    final remoteSha = _extractRemoteSha(info)?.toLowerCase();
+    if (remoteSha == null || remoteSha.isEmpty) return false;
+    final shorter = currentSha.length < remoteSha.length
+        ? currentSha.length
+        : remoteSha.length;
+    if (shorter < 7) return false;
+    return currentSha.substring(0, shorter) ==
+        remoteSha.substring(0, shorter);
+  }
+
+  /// 从更新说明或文件名中提取最新构建的 commit SHA。
+  String? _extractRemoteSha(_AppUpdateInfo info) {
+    final shaPattern = RegExp(r'\b([0-9a-fA-F]{7,40})\b');
+    final bodyMatch = shaPattern.firstMatch(info.updateBody);
+    if (bodyMatch != null) return bodyMatch.group(1);
+    final fileMatch = RegExp(r'-([0-9a-fA-F]{7,40})\.ipa$', caseSensitive: false)
+        .firstMatch(info.fileName);
+    if (fileMatch != null) return fileMatch.group(1);
+    return null;
   }
 
   Future<void> _showMessage(String message) async {
@@ -796,6 +830,13 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
       return;
     }
 
+    if (await _launchTrollStoreInstall(downloadUrl, fileName)) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).maybePop();
+      showAppToast(context, message: '已交给巨魔下载安装');
+      return;
+    }
+
     try {
       final started = await launchUrl(
         uri,
@@ -810,11 +851,11 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
             'fileName': fileName,
           },
         );
-        await _showMessage('下载启动失败');
+        await _showMessage('未检测到巨魔，且浏览器下载也启动失败');
         return;
       }
       if (!mounted) return;
-      await _showMessage('开始下载');
+      await _showMessage('未检测到巨魔，已用浏览器打开下载链接');
     } catch (error, stackTrace) {
       _exceptionLogService.record(
         node: 'app_update.menu_download',
@@ -829,6 +870,42 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
       if (!mounted) return;
       await _showMessage('下载启动失败');
     }
+  }
+
+  /// 优先尝试唤起巨魔（TrollStore）直接下载并安装 IPA。
+  ///
+  /// TrollStore 注册了 `apple-magnifier://install?url=<ipa-url>` 这一 URL Scheme，
+  /// 可让其在自身进程内完成下载与安装，无需我们先把 IPA 写入沙盒。
+  Future<bool> _launchTrollStoreInstall(
+    String ipaUrl,
+    String fileName,
+  ) async {
+    final encoded = Uri.encodeComponent(ipaUrl);
+    final candidates = <Uri>[
+      Uri.parse('apple-magnifier://install?url=$encoded'),
+      Uri.parse('tsinstall://install?url=$encoded'),
+    ];
+    for (final uri in candidates) {
+      try {
+        final launched = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (launched) return true;
+      } catch (error, stackTrace) {
+        _exceptionLogService.record(
+          node: 'app_update.trollstore_launch',
+          message: '巨魔安装跳转失败',
+          error: error,
+          stackTrace: stackTrace,
+          context: {
+            'scheme': uri.scheme,
+            'fileName': fileName,
+          },
+        );
+      }
+    }
+    return false;
   }
 }
 
@@ -917,7 +994,7 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog> {
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         onPressed: widget.onDownload,
                         minimumSize: const Size(30, 30),
-                        child: const Text('下载'),
+                        child: const Text('巨魔安装'),
                       ),
                     ],
                   ),
