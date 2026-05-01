@@ -12,7 +12,6 @@ import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -870,167 +869,84 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
       return;
     }
 
-    final localPath = await _downloadIpaWithProgress(downloadUrl, fileName);
-    if (localPath == null) return;
-
-    if (!mounted) return;
-    Navigator.of(context, rootNavigator: true).maybePop();
+    if (await _launchTrollStoreInstall(downloadUrl, fileName)) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).maybePop();
+      showAppToast(context, message: '已交给巨魔下载安装');
+      return;
+    }
 
     try {
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(localPath, mimeType: 'application/octet-stream')],
-          text: '使用巨魔（TrollStore）打开此 IPA 安装',
-        ),
+      final started = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
       );
+      if (!started) {
+        _exceptionLogService.record(
+          node: 'app_update.menu_download',
+          message: '更新下载未能启动',
+          context: {
+            'downloadUrl': downloadUrl,
+            'fileName': fileName,
+          },
+        );
+        await _showMessage('未检测到巨魔，且浏览器下载也启动失败');
+        return;
+      }
+      if (!mounted) return;
+      await _showMessage('未检测到巨魔，已用浏览器打开下载链接');
     } catch (error, stackTrace) {
       _exceptionLogService.record(
-        node: 'app_update.share_ipa',
-        message: '分享 IPA 失败',
+        node: 'app_update.menu_download',
+        message: '更新下载触发失败',
         error: error,
         stackTrace: stackTrace,
         context: {
-          'localPath': localPath,
+          'downloadUrl': downloadUrl,
           'fileName': fileName,
         },
       );
       if (!mounted) return;
-      await _showMessage('唤起分享失败：${_errorSummary(error)}');
+      await _showMessage('下载启动失败');
     }
   }
 
-  /// 下载 IPA 到沙盒缓存目录，并显示进度对话框，可取消。
+  /// 优先尝试唤起巨魔（TrollStore）直接下载并安装 IPA。
   ///
-  /// 不直接交给 TrollStore 的 `apple-magnifier://` URL Scheme，
-  /// 是因为部分设备上系统“放大镜”会抢同名 scheme，导致跳错应用。
-  /// 改为下载到沙盒后通过 iOS 系统分享面板让用户选择巨魔进行安装。
-  Future<String?> _downloadIpaWithProgress(
-    String url,
+  /// TrollStore 注册了 `apple-magnifier://install?url=<ipa-url>` URL Scheme，
+  /// 由其自身完成下载与安装，无需我们写入沙盒。注意需要在 TrollStore
+  /// 设置中开启 “URL Scheme”（默认关闭，未开启时此 scheme 会被系统
+  /// 放大镜抢走）。
+  Future<bool> _launchTrollStoreInstall(
+    String ipaUrl,
     String fileName,
   ) async {
-    final progress = ValueNotifier<double>(0.0);
-    final cancelToken = CancelToken();
-    var dialogClosed = false;
-
-    void closeDialog() {
-      if (dialogClosed) return;
-      dialogClosed = true;
-      if (mounted) {
-        Navigator.of(context, rootNavigator: true).maybePop();
-      }
-    }
-
-    showCupertinoDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return CupertinoAlertDialog(
-          title: const Text('下载安装包'),
-          content: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CupertinoActivityIndicator(),
-                const SizedBox(height: 8),
-                ValueListenableBuilder<double>(
-                  valueListenable: progress,
-                  builder: (_, value, __) {
-                    final percent = (value.clamp(0.0, 1.0) * 100)
-                        .toStringAsFixed(0);
-                    return Text('已下载 $percent%');
-                  },
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  fileName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            CupertinoDialogAction(
-              isDestructiveAction: true,
-              onPressed: () {
-                if (!cancelToken.isCancelled) {
-                  cancelToken.cancel('user_cancel');
-                }
-              },
-              child: const Text('取消'),
-            ),
-          ],
+    final encoded = Uri.encodeComponent(ipaUrl);
+    final candidates = <Uri>[
+      Uri.parse('apple-magnifier://install?url=$encoded'),
+      Uri.parse('tsinstall://install?url=$encoded'),
+    ];
+    for (final uri in candidates) {
+      try {
+        final launched = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
         );
-      },
-    );
-
-    try {
-      final cacheDir = await getTemporaryDirectory();
-      final updatesDir = Directory(p.join(cacheDir.path, 'app_updates'));
-      if (!await updatesDir.exists()) {
-        await updatesDir.create(recursive: true);
+        if (launched) return true;
+      } catch (error, stackTrace) {
+        _exceptionLogService.record(
+          node: 'app_update.trollstore_launch',
+          message: '巨魔安装跳转失败',
+          error: error,
+          stackTrace: stackTrace,
+          context: {
+            'scheme': uri.scheme,
+            'fileName': fileName,
+          },
+        );
       }
-      final safeFileName = fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
-      final savePath = p.join(updatesDir.path, safeFileName);
-
-      await Dio().download(
-        url,
-        savePath,
-        cancelToken: cancelToken,
-        options: Options(
-          followRedirects: true,
-          receiveTimeout: const Duration(minutes: 5),
-        ),
-        onReceiveProgress: (received, total) {
-          if (total > 0) {
-            progress.value = received / total;
-          }
-        },
-      );
-
-      closeDialog();
-      progress.dispose();
-      return savePath;
-    } on DioException catch (error, stackTrace) {
-      closeDialog();
-      progress.dispose();
-      if (CancelToken.isCancel(error)) {
-        return null;
-      }
-      _exceptionLogService.record(
-        node: 'app_update.download_ipa',
-        message: 'IPA 下载失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: {
-          'url': url,
-          'fileName': fileName,
-        },
-      );
-      if (mounted) {
-        await _showMessage('下载失败：${_errorSummary(error)}');
-      }
-      return null;
-    } catch (error, stackTrace) {
-      closeDialog();
-      progress.dispose();
-      _exceptionLogService.record(
-        node: 'app_update.download_ipa',
-        message: 'IPA 下载异常',
-        error: error,
-        stackTrace: stackTrace,
-        context: {
-          'url': url,
-          'fileName': fileName,
-        },
-      );
-      if (mounted) {
-        await _showMessage('下载失败：${_errorSummary(error)}');
-      }
-      return null;
     }
+    return false;
   }
 }
 
