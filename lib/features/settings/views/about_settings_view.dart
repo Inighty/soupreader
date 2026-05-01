@@ -12,6 +12,7 @@ import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -664,10 +665,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
     final shaPattern = RegExp(r'\b([0-9a-fA-F]{7,40})\b');
     final bodyMatch = shaPattern.firstMatch(info.updateBody);
     if (bodyMatch != null) return bodyMatch.group(1);
-    final fileMatch = RegExp(r'-([0-9a-fA-F]{7,40})\.ipa$', caseSensitive: false)
-        .firstMatch(info.fileName);
-    if (fileMatch != null) return fileMatch.group(1);
-    return null;
+    return _extractShaFromFileName(info.fileName);
   }
 
   Future<void> _showMessage(String message) async {
@@ -734,18 +732,6 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
         'nightly';
     final name = _readString(map, 'name') ?? 'Nightly Build';
     final publishedAtText = _formatPublishedAt(_readString(map, 'publishedAt'));
-    final updateBody = _firstNonEmptyString([
-          _readString(map, 'updateLog'),
-          _readString(map, 'body'),
-          _readString(map, 'note'),
-          _readString(map, 'description'),
-          _readString(map, 'info'),
-        ]) ??
-        [
-          name,
-          if (publishedAtText != null && publishedAtText.isNotEmpty)
-            publishedAtText,
-        ].join('\n');
     final downloadUrl = _firstNonEmptyString([
           _readString(map, 'downloadUrl'),
           _readString(map, 'apkUrl'),
@@ -758,12 +744,66 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
           _readString(map, 'name'),
         ]) ??
         _fallbackApkName(tagName);
+    final remoteShaPrefix = _extractShaFromFileName(fileName) ??
+        _firstNonEmptyString([
+          _readString(map, 'commit'),
+          _readString(map, 'sha'),
+          _readString(map, 'commitSha'),
+        ]);
+    final updateBody = _firstNonEmptyString([
+          _readString(map, 'updateLog'),
+          _readString(map, 'body'),
+          _readString(map, 'note'),
+          _readString(map, 'description'),
+          _readString(map, 'info'),
+        ]) ??
+        _buildFallbackBody(
+          name: name,
+          tagName: tagName,
+          fileName: fileName,
+          publishedAtText: publishedAtText,
+          remoteSha: remoteShaPrefix,
+          downloadUrl: downloadUrl,
+        );
     return _AppUpdateInfo(
       tagName: tagName,
       updateBody: updateBody,
       downloadUrl: downloadUrl,
       fileName: fileName,
     );
+  }
+
+  String _buildFallbackBody({
+    required String name,
+    required String tagName,
+    required String fileName,
+    required String? publishedAtText,
+    required String? remoteSha,
+    required String downloadUrl,
+  }) {
+    final lines = <String>[];
+    if (name.isNotEmpty) lines.add(name);
+    if (tagName.isNotEmpty) lines.add('Tag：$tagName');
+    if (fileName.isNotEmpty) lines.add('文件：$fileName');
+    if (remoteSha != null && remoteSha.isNotEmpty) {
+      final shortSha = remoteSha.length >= 7 ? remoteSha.substring(0, 7) : remoteSha;
+      lines.add('Commit：$shortSha');
+    }
+    if (publishedAtText != null && publishedAtText.isNotEmpty) {
+      lines.add('发布时间：$publishedAtText');
+    }
+    if (downloadUrl.isNotEmpty) {
+      lines.add('');
+      lines.add('下载地址：');
+      lines.add(downloadUrl);
+    }
+    return lines.join('\n');
+  }
+
+  String? _extractShaFromFileName(String fileName) {
+    final match = RegExp(r'-([0-9a-fA-F]{7,40})\.ipa$', caseSensitive: false)
+        .firstMatch(fileName);
+    return match?.group(1);
   }
 
   String? _readString(Map<String, dynamic> map, String key) {
@@ -830,82 +870,167 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
       return;
     }
 
-    if (await _launchTrollStoreInstall(downloadUrl, fileName)) {
-      if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).maybePop();
-      showAppToast(context, message: '已交给巨魔下载安装');
-      return;
-    }
+    final localPath = await _downloadIpaWithProgress(downloadUrl, fileName);
+    if (localPath == null) return;
+
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).maybePop();
 
     try {
-      final started = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(localPath, mimeType: 'application/octet-stream')],
+          text: '使用巨魔（TrollStore）打开此 IPA 安装',
+        ),
       );
-      if (!started) {
-        _exceptionLogService.record(
-          node: 'app_update.menu_download',
-          message: '更新下载未能启动',
-          context: {
-            'downloadUrl': downloadUrl,
-            'fileName': fileName,
-          },
-        );
-        await _showMessage('未检测到巨魔，且浏览器下载也启动失败');
-        return;
-      }
-      if (!mounted) return;
-      await _showMessage('未检测到巨魔，已用浏览器打开下载链接');
     } catch (error, stackTrace) {
       _exceptionLogService.record(
-        node: 'app_update.menu_download',
-        message: '更新下载触发失败',
+        node: 'app_update.share_ipa',
+        message: '分享 IPA 失败',
         error: error,
         stackTrace: stackTrace,
         context: {
-          'downloadUrl': downloadUrl,
+          'localPath': localPath,
           'fileName': fileName,
         },
       );
       if (!mounted) return;
-      await _showMessage('下载启动失败');
+      await _showMessage('唤起分享失败：${_errorSummary(error)}');
     }
   }
 
-  /// 优先尝试唤起巨魔（TrollStore）直接下载并安装 IPA。
+  /// 下载 IPA 到沙盒缓存目录，并显示进度对话框，可取消。
   ///
-  /// TrollStore 注册了 `apple-magnifier://install?url=<ipa-url>` 这一 URL Scheme，
-  /// 可让其在自身进程内完成下载与安装，无需我们先把 IPA 写入沙盒。
-  Future<bool> _launchTrollStoreInstall(
-    String ipaUrl,
+  /// 不直接交给 TrollStore 的 `apple-magnifier://` URL Scheme，
+  /// 是因为部分设备上系统“放大镜”会抢同名 scheme，导致跳错应用。
+  /// 改为下载到沙盒后通过 iOS 系统分享面板让用户选择巨魔进行安装。
+  Future<String?> _downloadIpaWithProgress(
+    String url,
     String fileName,
   ) async {
-    final encoded = Uri.encodeComponent(ipaUrl);
-    final candidates = <Uri>[
-      Uri.parse('apple-magnifier://install?url=$encoded'),
-      Uri.parse('tsinstall://install?url=$encoded'),
-    ];
-    for (final uri in candidates) {
-      try {
-        final launched = await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
-        if (launched) return true;
-      } catch (error, stackTrace) {
-        _exceptionLogService.record(
-          node: 'app_update.trollstore_launch',
-          message: '巨魔安装跳转失败',
-          error: error,
-          stackTrace: stackTrace,
-          context: {
-            'scheme': uri.scheme,
-            'fileName': fileName,
-          },
-        );
+    final progress = ValueNotifier<double>(0.0);
+    final cancelToken = CancelToken();
+    var dialogClosed = false;
+
+    void closeDialog() {
+      if (dialogClosed) return;
+      dialogClosed = true;
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).maybePop();
       }
     }
-    return false;
+
+    showCupertinoDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return CupertinoAlertDialog(
+          title: const Text('下载安装包'),
+          content: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CupertinoActivityIndicator(),
+                const SizedBox(height: 8),
+                ValueListenableBuilder<double>(
+                  valueListenable: progress,
+                  builder: (_, value, __) {
+                    final percent = (value.clamp(0.0, 1.0) * 100)
+                        .toStringAsFixed(0);
+                    return Text('已下载 $percent%');
+                  },
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                if (!cancelToken.isCancelled) {
+                  cancelToken.cancel('user_cancel');
+                }
+              },
+              child: const Text('取消'),
+            ),
+          ],
+        );
+      },
+    );
+
+    try {
+      final cacheDir = await getTemporaryDirectory();
+      final updatesDir = Directory(p.join(cacheDir.path, 'app_updates'));
+      if (!await updatesDir.exists()) {
+        await updatesDir.create(recursive: true);
+      }
+      final safeFileName = fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+      final savePath = p.join(updatesDir.path, safeFileName);
+
+      await Dio().download(
+        url,
+        savePath,
+        cancelToken: cancelToken,
+        options: Options(
+          followRedirects: true,
+          receiveTimeout: const Duration(minutes: 5),
+        ),
+        onReceiveProgress: (received, total) {
+          if (total > 0) {
+            progress.value = received / total;
+          }
+        },
+      );
+
+      closeDialog();
+      progress.dispose();
+      return savePath;
+    } on DioException catch (error, stackTrace) {
+      closeDialog();
+      progress.dispose();
+      if (CancelToken.isCancel(error)) {
+        return null;
+      }
+      _exceptionLogService.record(
+        node: 'app_update.download_ipa',
+        message: 'IPA 下载失败',
+        error: error,
+        stackTrace: stackTrace,
+        context: {
+          'url': url,
+          'fileName': fileName,
+        },
+      );
+      if (mounted) {
+        await _showMessage('下载失败：${_errorSummary(error)}');
+      }
+      return null;
+    } catch (error, stackTrace) {
+      closeDialog();
+      progress.dispose();
+      _exceptionLogService.record(
+        node: 'app_update.download_ipa',
+        message: 'IPA 下载异常',
+        error: error,
+        stackTrace: stackTrace,
+        context: {
+          'url': url,
+          'fileName': fileName,
+        },
+      );
+      if (mounted) {
+        await _showMessage('下载失败：${_errorSummary(error)}');
+      }
+      return null;
+    }
   }
 }
 
