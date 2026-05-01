@@ -201,8 +201,10 @@ class RuleParserEngineBookDetailSupport {
 
       final document = html_parser.parse(body);
       Element? root = document.documentElement;
-      if (rule.init != null && rule.init!.trim().isNotEmpty) {
-        root = _selectFirstElementByRule(document, rule.init!.trim());
+      if (root != null &&
+          rule.init != null &&
+          rule.init!.trim().isNotEmpty) {
+        root = _selectFirstElementByRule(root, rule.init!.trim());
       }
       if (root == null) return null;
       final name =

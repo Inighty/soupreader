@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 
 import 'package:soupreader/core/database/repositories/source_repository.dart';
-import 'package:soupreader/features/source/models/book_source.dart';
 import 'package:soupreader/features/source/services/rule_parser/rule_parser_engine.dart';
 import 'package:soupreader/features/source/services/source_availability/check_models.dart';
 import 'package:soupreader/features/source/services/source_availability/check_stage_runner.dart';

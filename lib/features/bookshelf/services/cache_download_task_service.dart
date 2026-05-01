@@ -7,7 +7,7 @@ import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/models/book_source.dart';
-import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/rule_parser/rule_parser_engine.dart';
 import '../models/book.dart';
 import 'bookshelf_catalog_update_service.dart';
 

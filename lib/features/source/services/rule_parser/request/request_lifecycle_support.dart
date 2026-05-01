@@ -1,5 +1,6 @@
 import 'package:soupreader/features/source/models/book_source.dart';
 import 'package:soupreader/features/source/services/rule_parser/models.dart';
+import 'package:soupreader/features/source/services/rule_parser/request/request_types.dart';
 import 'package:soupreader/features/source/services/rule_parser/rule_parser_context.dart';
 
 class RuleParserEngineRequestLifecycleSupport {

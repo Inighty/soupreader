@@ -3,7 +3,6 @@ import 'package:html/parser.dart' as html_parser;
 
 import 'package:soupreader/features/source/services/rule_parser/parse/legacy_rule_types.dart';
 import 'package:soupreader/features/source/services/rule_parser/core/selector_support.dart';
-import 'package:soupreader/features/source/services/rule_parser/core/selector_types.dart';
 import 'package:soupreader/features/source/services/rule_parser/rule_parser_context.dart';
 import 'package:soupreader/features/source/services/source/rule_text_utils.dart';
 

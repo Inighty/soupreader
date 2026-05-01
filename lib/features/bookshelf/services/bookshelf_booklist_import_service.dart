@@ -1,7 +1,7 @@
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/book_source.dart';
-import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/rule_parser/rule_parser_engine.dart';
 import 'book_add_service.dart';
 import 'bookshelf_import_export_service.dart';
 

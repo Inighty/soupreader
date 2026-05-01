@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:soupreader/features/source/models/book_source.dart';
 import 'package:soupreader/features/source/providers/source_edit_notifier.dart';

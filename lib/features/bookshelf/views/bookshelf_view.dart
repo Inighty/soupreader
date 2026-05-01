@@ -29,7 +29,7 @@ import '../../search/views/search_book_info_view.dart';
 import '../../search/views/search_view.dart';
 import '../../settings/views/app_log_dialog.dart';
 import '../../../core/models/book_source.dart';
-import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/rule_parser/rule_parser_engine.dart';
 import 'cache_export_placeholder_view.dart';
 import 'bookshelf_manage_placeholder_view.dart';
 import 'bookshelf_group_manage_placeholder_dialog.dart';

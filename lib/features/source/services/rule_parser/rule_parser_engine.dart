@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
@@ -10,7 +9,9 @@ import 'package:html/dom.dart';
 import 'package:soupreader/core/services/cookie_store.dart';
 import 'package:soupreader/core/services/js_runtime.dart';
 import 'package:soupreader/features/source/models/book_source.dart';
+import 'package:soupreader/features/source/services/rule_parser/core/selector_types.dart';
 import 'package:soupreader/features/source/services/rule_parser/models.dart';
+import 'package:soupreader/features/source/services/rule_parser/request/request_types.dart';
 import 'package:soupreader/features/source/services/rule_parser/rule_parser_context.dart';
 
 export 'package:soupreader/features/source/services/rule_parser/models.dart';
@@ -427,10 +428,10 @@ class RuleParserEngine {
     }..removeWhere((item) => item.isEmpty);
     final queuedKeys = queuedUrls == null
         ? null
-        : <String>{
+        : (<String>{
             for (final item in queuedUrls)
               _ctx.runtimeSupport.normalizeUrlVisitKey(item),
-          }..removeWhere((item) => item.isEmpty);
+          }..removeWhere((item) => item.isEmpty));
     final blockedKey = (blockedUrl == null || blockedUrl.trim().isEmpty)
         ? null
         : _ctx.runtimeSupport.normalizeUrlVisitKey(blockedUrl);

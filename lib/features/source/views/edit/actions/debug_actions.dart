@@ -2,13 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:soupreader/app/widgets/app_action_list_sheet.dart';
 import 'package:soupreader/app/widgets/app_toast.dart';
 import 'package:soupreader/core/services/qr_scan_service.dart';
 import 'package:soupreader/features/source/constants/source_help_texts.dart';
-import 'package:soupreader/features/source/providers/source_edit_notifier.dart';
 import 'package:soupreader/features/source/services/source/quick_test_helper.dart';
 import 'package:soupreader/features/source/views/edit/actions/page_actions.dart';
 import 'package:soupreader/features/source/views/edit/actions/debug_bundle.dart';

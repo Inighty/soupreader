@@ -56,28 +56,6 @@ class RuleParserEngineTocSupport {
         onFinalUrl: onFinalUrl,
         onIsRedirect: onIsRedirect,
       );
-  Future<FetchDebugResult> _fetchDebug(
-    String url, {
-    String? header,
-    String? jsLib,
-    String? loginCheckJs,
-    int? timeoutMs,
-    bool? enabledCookieJar,
-    String? sourceKey,
-    String? concurrentRate,
-    CancelToken? cancelToken,
-  }) =>
-      _ctx.fetchSupport.fetchDebug(
-        url,
-        header: header,
-        jsLib: jsLib,
-        loginCheckJs: loginCheckJs,
-        timeoutMs: timeoutMs,
-        enabledCookieJar: enabledCookieJar,
-        sourceKey: sourceKey,
-        concurrentRate: concurrentRate,
-        cancelToken: cancelToken,
-      );
   dynamic _tryDecodeJsonValue(String text) => _ctx.tryDecodeJsonValue(text);
   bool _looksLikeJsonPath(String rule) =>
       _ctx.ruleParseSupport.looksLikeJsonPath(rule);

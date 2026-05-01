@@ -5,7 +5,7 @@ import '../../../app/widgets/app_ui_kit.dart';
 import '../../../core/config/migration_exclusions.dart';
 import '../../reader/views/txt_toc_rule_manage_view.dart';
 import '../../rss/views/rss_source_manage_view.dart';
-import '../../source/views/source_list_view.dart';
+import '../../source/views/list/source_list_view.dart';
 import 'settings_placeholders.dart';
 import 'settings_ui_tokens.dart';
 import 'text_rules_settings_view.dart';

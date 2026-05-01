@@ -1,7 +1,7 @@
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_article_repository.dart';
 import '../../../core/models/book_source.dart';
-import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/rule_parser/rule_parser_engine.dart';
 import '../models/rss_article.dart';
 import '../models/rss_source.dart';
 import 'rss_default_xml_parser.dart';

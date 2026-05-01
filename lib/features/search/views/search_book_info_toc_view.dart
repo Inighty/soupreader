@@ -7,7 +7,7 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../settings/views/app_log_dialog.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
-import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/rule_parser/rule_parser_engine.dart';
 import '../services/search_book_toc_filter_helper.dart';
 import 'search_book_info_widgets.dart';
 

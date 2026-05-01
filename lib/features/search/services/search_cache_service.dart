@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/preferences_store.dart';
-import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/rule_parser/rule_parser_engine.dart';
 
 /// 搜索页本地状态存储（历史词 + 结果缓存）。
 class SearchCacheService {

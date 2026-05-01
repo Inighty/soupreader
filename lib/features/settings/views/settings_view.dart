@@ -18,7 +18,7 @@ import '../../reader/views/all_bookmark_view.dart';
 import '../../reader/views/dict_rule_manage_view.dart';
 import '../../reader/views/txt_toc_rule_manage_view.dart';
 import '../../replace/views/replace_rule_list_view.dart';
-import '../../source/views/source_list_view.dart';
+import '../../source/views/list/source_list_view.dart';
 import 'about_settings_view.dart';
 import 'app_help_dialog.dart';
 import 'backup_settings_view.dart';

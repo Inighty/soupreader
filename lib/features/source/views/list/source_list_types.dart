@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import 'package:soupreader/features/source/models/book_source.dart';
+import 'package:soupreader/features/source/services/source_import/selection_helper.dart';
 
 enum SourceSortMode {
   manual,

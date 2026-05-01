@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 
-import 'package:soupreader/app/theme/source_ui_tokens.dart';
 import 'package:soupreader/features/search/models/search_scope_group_helper.dart';
 import 'package:soupreader/features/source/models/book_source.dart';
 import 'package:soupreader/features/source/services/source_availability/check_task_service.dart';

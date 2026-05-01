@@ -1,4 +1,4 @@
-import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/rule_parser/rule_parser_engine.dart';
 
 /// 搜索详情目录检索辅助（对齐 legado `BookChapterDao.search(title like ...)`）：
 /// - 目录检索仅基于章节原始标题字段；

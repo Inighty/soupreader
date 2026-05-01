@@ -3,7 +3,6 @@ import 'package:html/parser.dart' as html_parser;
 
 import 'package:soupreader/features/source/models/book_source.dart';
 import 'package:soupreader/features/source/services/rule_parser/book/book_detail_support.dart';
-import 'package:soupreader/features/source/services/rule_parser/book/book_support_types.dart';
 import 'package:soupreader/features/source/services/rule_parser/models.dart';
 import 'package:soupreader/features/source/services/rule_parser/rule_parser_context.dart';
 
@@ -107,8 +106,8 @@ class RuleParserEngineBookInfoSupport {
 
     final document = html_parser.parse(body);
     Element? root = document.documentElement;
-    if (rule.init != null && rule.init!.isNotEmpty) {
-      root = _selectFirstElementByRule(document, rule.init!);
+    if (root != null && rule.init != null && rule.init!.isNotEmpty) {
+      root = _selectFirstElementByRule(root, rule.init!);
     }
     if (root == null) return null;
 
@@ -169,8 +168,8 @@ class RuleParserEngineBookInfoSupport {
     final document = html_parser.parse(body);
     Element? root = document.documentElement;
     var initMatched = true;
-    if (rule.init != null && rule.init!.isNotEmpty) {
-      root = _selectFirstElementByRule(document, rule.init!);
+    if (root != null && rule.init != null && rule.init!.isNotEmpty) {
+      root = _selectFirstElementByRule(root, rule.init!);
       initMatched = root != null;
     }
     if (root == null) {

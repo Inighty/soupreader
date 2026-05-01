@@ -8,7 +8,7 @@ import 'package:html/dom.dart';
 import 'package:html/parser.dart' as html_parser;
 
 import '../../../core/services/preferences_store.dart';
-import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/rule_parser/rule_parser_engine.dart';
 import '../models/dict_rule.dart';
 
 enum DictRuleImportCandidateState {

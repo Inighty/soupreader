@@ -9,7 +9,7 @@ import '../../../core/services/webdav_service.dart';
 import '../../bookshelf/services/bookshelf_catalog_update_service.dart';
 import '../../import/txt_parser.dart';
 import '../../search/services/search_book_info_refresh_helper.dart';
-import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/rule_parser/rule_parser_engine.dart';
 import '../services/reader_charset_service.dart';
 import '../services/reader_content_processor.dart';
 import '../services/reader_source_switch_helper.dart';

@@ -7,7 +7,7 @@ import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/book.dart';
 import '../../../core/models/book_source.dart';
 import '../../../core/services/settings_service.dart';
-import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/rule_parser/rule_parser_engine.dart';
 import '../services/reader_source_switch_helper.dart';
 import 'reader_state.dart';
 

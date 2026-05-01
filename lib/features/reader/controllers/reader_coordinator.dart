@@ -10,7 +10,7 @@ import '../../../core/services/settings_service.dart';
 import '../../../core/services/webdav_service.dart';
 import '../../../core/utils/chinese_script_converter.dart';
 import '../../bookshelf/services/bookshelf_catalog_update_service.dart';
-import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/rule_parser/rule_parser_engine.dart';
 import '../models/reader_view_models.dart';
 import '../models/reading_settings.dart';
 import '../services/reader_charset_service.dart';

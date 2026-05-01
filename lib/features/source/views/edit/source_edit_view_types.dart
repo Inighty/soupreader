@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
 import 'package:soupreader/app/theme/ui_tokens.dart';
-import 'package:soupreader/app/widgets/app_ui_kit.dart';
 
 class SourceEditValueFieldTile extends StatelessWidget {
   const SourceEditValueFieldTile({

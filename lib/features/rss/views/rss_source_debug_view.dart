@@ -6,7 +6,7 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_ui_kit.dart';
-import '../../source/views/source_debug_text_view.dart';
+import '../../source/views/shared/debug_text_view.dart';
 import '../models/rss_source.dart';
 import '../services/rss_source_debug_service.dart';
 

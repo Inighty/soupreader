@@ -377,7 +377,7 @@ class SourceListContent extends StatelessWidget {
             sliver: SliverReorderableList(
               itemCount: visibleSources.length,
               onReorder: (oldIndex, newIndex) {
-                return onReorderVisible(visibleSources, oldIndex, newIndex);
+                onReorderVisible(visibleSources, oldIndex, newIndex);
               },
               itemBuilder: (context, index) {
                 final source = visibleSources[index];

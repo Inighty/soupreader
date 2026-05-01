@@ -84,7 +84,7 @@ class SourceEditTopControlBar extends ConsumerWidget {
           const SizedBox(width: 12),
           _TopSwitch(
             label: 'Cookie',
-            value: source.enabledCookieJar,
+            value: source.enabledCookieJar ?? false,
             onChanged: (value) => notifier.updateSource(
               (current) => current.copyWith(enabledCookieJar: value),
             ),

@@ -11,7 +11,7 @@ import '../../../core/database/database_service.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../bookshelf/services/book_add_service.dart';
 import '../../../core/models/book_source.dart';
-import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/rule_parser/rule_parser_engine.dart';
 import '../../search/views/search_book_info_view.dart';
 
 /// 发现二级页：单书源 + 单发现入口结果（对标 legado ExploreShowActivity）

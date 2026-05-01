@@ -8,6 +8,7 @@ import 'package:soupreader/features/source/services/rule_parser/book/content_sup
 import 'package:soupreader/features/source/services/rule_parser/book/toc_support.dart';
 import 'package:soupreader/features/source/services/rule_parser/core/runtime_support.dart';
 import 'package:soupreader/features/source/services/rule_parser/core/selector_support.dart';
+import 'package:soupreader/features/source/services/rule_parser/core/selector_types.dart';
 import 'package:soupreader/features/source/services/rule_parser/core/url_build_support.dart';
 import 'package:soupreader/features/source/services/rule_parser/debug/debug_book_support.dart';
 import 'package:soupreader/features/source/services/rule_parser/debug/debug_content_support.dart';
@@ -19,11 +20,11 @@ import 'package:soupreader/features/source/services/rule_parser/fetch/fetch_debu
 import 'package:soupreader/features/source/services/rule_parser/fetch/fetch_support.dart';
 import 'package:soupreader/features/source/services/rule_parser/js/js_support.dart';
 import 'package:soupreader/features/source/services/rule_parser/js/js_template_support.dart';
-import 'package:soupreader/features/source/services/rule_parser/models.dart';
 import 'package:soupreader/features/source/services/rule_parser/parse/rule_parse_support.dart';
 import 'package:soupreader/features/source/services/rule_parser/parse/rule_query_support.dart';
 import 'package:soupreader/features/source/services/rule_parser/request/request_codec_support.dart';
 import 'package:soupreader/features/source/services/rule_parser/request/request_lifecycle_support.dart';
+import 'package:soupreader/features/source/services/rule_parser/request/request_types.dart';
 import 'package:soupreader/features/source/services/rule_parser/request/request_url_support.dart';
 import 'package:soupreader/features/source/services/rule_parser/wiring/parser_wiring.dart';
 import 'package:soupreader/features/source/services/rule_parser/workflow/discovery_workflow.dart';

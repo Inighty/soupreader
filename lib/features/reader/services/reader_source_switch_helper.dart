@@ -1,6 +1,6 @@
 import '../../../core/models/book.dart';
 import '../../../core/models/book_source.dart';
-import '../../source/services/rule_parser_engine.dart';
+import '../../source/services/rule_parser/rule_parser_engine.dart';
 
 class ReaderSourceSwitchCandidate {
   final BookSource source;

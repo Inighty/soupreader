@@ -14,24 +14,6 @@ class RuleParserEngineJsSupport {
   String _runtimeEvaluate(String script) => _ctx.runtimeEvaluate(script);
   dynamic _tryDecodeJsonValue(String text) => _ctx.tryDecodeJsonValue(text);
 
-  bool _looksLikeXPath(String rule) {
-    final trimmed = rule.trimLeft();
-    return trimmed.startsWith('@XPath:') || trimmed.startsWith('//');
-  }
-
-  bool _looksLikeJsonPath(String rule) {
-    final trimmed = rule.trimLeft();
-    return trimmed.startsWith('@Json:') ||
-        trimmed == r'$' ||
-        trimmed.startsWith(r'$.') ||
-        trimmed.startsWith(r'$[') ||
-        trimmed.startsWith(r'$..');
-  }
-
-  bool _looksLikeRegexRule(String rule) {
-    return rule.trimLeft().startsWith(':');
-  }
-
   bool _isValidJsIdentifier(String key) {
     return RegExp(r'^[A-Za-z_\$][A-Za-z0-9_\$]*$').hasMatch(key);
   }

@@ -485,4 +485,13 @@ class RuleParserEngineFetchSupport {
     }
   }
 
+  String? _snippet(dynamic text) {
+    final raw = text?.toString();
+    if (raw == null) return null;
+    final normalized = raw.replaceAll('\r\n', '\n');
+    return normalized.length <= 1200
+        ? normalized
+        : normalized.substring(0, 1200);
+  }
+
 }

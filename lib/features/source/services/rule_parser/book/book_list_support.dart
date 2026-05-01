@@ -4,6 +4,7 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:soupreader/features/source/models/book_source.dart';
 import 'package:soupreader/features/source/services/rule_parser/book/book_detail_support.dart';
 import 'package:soupreader/features/source/services/rule_parser/book/book_support_types.dart';
+import 'package:soupreader/features/source/services/rule_parser/core/selector_types.dart';
 import 'package:soupreader/features/source/services/rule_parser/models.dart';
 import 'package:soupreader/features/source/services/rule_parser/rule_parser_context.dart';
 
