@@ -329,8 +329,17 @@ class ReaderCoordinator {
       );
       bookmarkCtrl.updateStatus(clamped);
 
-      // 分页模式：下一帧执行分页
-      if (settings.settings.pageTurnMode != PageTurnMode.scroll) {
+      // 根据翻页模式触发后续渲染
+      if (settings.settings.pageTurnMode == PageTurnMode.scroll) {
+        // 滚动模式：构建 segments 窗口
+        unawaited(scrollCoordinator.initializeSegments(
+          centerIndex: clamped,
+          restoreOffset: restoreOffset,
+          goToLastPage: goToLastPage,
+          targetChapterProgress: targetChapterProgress,
+        ));
+      } else {
+        // 分页模式：下一帧执行分页
         postFrameCallback(() {
           _paginateAndJump(
             chapterIndex: clamped,
@@ -436,6 +445,23 @@ class ReaderCoordinator {
     required bool restoreOffset,
     double? targetProgress,
   }) {
+    // 设置布局参数（依赖 PagedReaderWidget 已 mount + layout）。
+    // 如 RenderBox 尚未就绪（首次进入阅读器时 chapter.update(initialized=true)
+    // 与 postFrameCallback 触发时序竞速），延迟一帧重试，避免分页用 fallback
+    // 尺寸算出的页数与最终布局不一致。
+    final contentSize = getPagedContentSize?.call();
+    if (contentSize == null) {
+      postFrameCallback(() {
+        _paginateAndJump(
+          chapterIndex: chapterIndex,
+          goToLastPage: goToLastPage,
+          restoreOffset: restoreOffset,
+          targetProgress: targetProgress,
+        );
+      });
+      return;
+    }
+
     // 构建 ChapterData 并注入 PageFactory。
     // 当前章节优先使用 chapter.currentContent（已经过处理的内容），
     // 避免 Chapter.content 尚未回写时出现空白页。
@@ -448,11 +474,9 @@ class ReaderCoordinator {
     });
     paged.pageFactory.setChapters(chapterDataList, chapterIndex);
 
-    // 设置布局参数
-    final contentSize = getPagedContentSize?.call();
     final s = settings.settings;
-    final contentW = (contentSize?.width ?? 360) - s.paddingLeft - s.paddingRight;
-    final contentH = (contentSize?.height ?? 700) - s.paddingTop - s.paddingBottom;
+    final contentW = contentSize.width - s.paddingLeft - s.paddingRight;
+    final contentH = contentSize.height - s.paddingTop - s.paddingBottom;
     if (contentW > 50 && contentH > 100) {
       paged.pageFactory.setLayoutParams(
         contentHeight: contentH,
