@@ -3,195 +3,25 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/database/database_service.dart';
-import '../../../core/database/repositories/source_repository.dart';
-import '../../../core/services/cookie_store.dart';
-import '../../../core/services/source_login_store.dart';
-import '../../../core/services/source_variable_store.dart';
-import '../../../core/utils/legado_json.dart';
-import '../models/book_source.dart';
-import '../services/rule_parser_engine.dart';
-import '../services/source_cookie_scope_resolver.dart';
-import '../services/source_debug_key_parser.dart';
-import '../services/source_debug_orchestrator.dart';
-import '../services/source_debug_summary_parser.dart';
-import '../services/source_debug_summary_store.dart';
-import '../services/source_explore_kinds_service.dart';
-import '../services/source_legacy_save_service.dart';
-import '../services/source_rule_lint_service.dart';
+import 'package:soupreader/core/database/database_service.dart';
+import 'package:soupreader/core/database/repositories/source_repository.dart';
+import 'package:soupreader/core/services/cookie_store.dart';
+import 'package:soupreader/core/services/source_login_store.dart';
+import 'package:soupreader/core/services/source_variable_store.dart';
+import 'package:soupreader/core/utils/legado_json.dart';
+import 'package:soupreader/features/source/models/book_source.dart';
+import 'package:soupreader/features/source/services/rule_parser/rule_parser_engine.dart';
+import 'package:soupreader/features/source/services/source/cookie_scope_resolver.dart';
+import 'package:soupreader/features/source/services/source_debug/key_parser.dart';
+import 'package:soupreader/features/source/services/source_debug/orchestrator.dart';
+import 'package:soupreader/features/source/services/source_debug/summary_parser.dart';
+import 'package:soupreader/features/source/services/source_debug/summary_store.dart';
+import 'package:soupreader/features/source/services/source/explore_kinds_service.dart';
+import 'package:soupreader/features/source/services/source/legacy_save_service.dart';
+import 'package:soupreader/features/source/services/source_rule/rule_lint_service.dart';
+import 'package:soupreader/features/source/providers/source_edit_state.dart';
 
-const _sentinel = Object();
-
-class DebugLine {
-  final int state;
-  final String text;
-  const DebugLine({required this.state, required this.text});
-}
-
-class SourceEditState {
-  final BookSource source;
-  final BookSource? savedSource;
-  final String? currentOriginalUrl;
-  final String rawJson;
-  final String? jsonError;
-  final bool loginStateLoading;
-  final String loginHeaderCache;
-  final String loginInfo;
-  final bool debugLoading;
-  final String? debugError;
-  final List<DebugLine> debugLines;
-  final List<DebugLine> debugLinesAll;
-  final bool debugAutoFollowLogs;
-  final String debugKey;
-  final String? debugListSrcHtml;
-  final String? debugBookSrcHtml;
-  final String? debugTocSrcHtml;
-  final String? debugContentSrcHtml;
-  final String? debugContentResult;
-  final String? debugMethodDecision;
-  final String? debugRetryDecision;
-  final String? debugRequestCharsetDecision;
-  final String? debugBodyDecision;
-  final String? debugResponseCharset;
-  final String? debugResponseCharsetDecision;
-  final Map<String, String> debugRuntimeVarsSnapshot;
-  final SourceDebugIntentType? debugIntentType;
-  final String? previewChapterName;
-  final String? previewChapterUrl;
-  final bool debugAwaitingChapterNameValue;
-  final bool debugAwaitingChapterUrlValue;
-  final bool showDebugQuickHelp;
-  final List<MapEntry<String, String>> cachedExploreQuickEntries;
-  final bool refreshingExploreQuickActions;
-
-  const SourceEditState({
-    required this.source,
-    this.savedSource,
-    this.currentOriginalUrl,
-    required this.rawJson,
-    this.jsonError,
-    this.loginStateLoading = false,
-    this.loginHeaderCache = '',
-    this.loginInfo = '',
-    this.debugLoading = false,
-    this.debugError,
-    this.debugLines = const [],
-    this.debugLinesAll = const [],
-    this.debugAutoFollowLogs = true,
-    this.debugKey = '',
-    this.debugListSrcHtml,
-    this.debugBookSrcHtml,
-    this.debugTocSrcHtml,
-    this.debugContentSrcHtml,
-    this.debugContentResult,
-    this.debugMethodDecision,
-    this.debugRetryDecision,
-    this.debugRequestCharsetDecision,
-    this.debugBodyDecision,
-    this.debugResponseCharset,
-    this.debugResponseCharsetDecision,
-    this.debugRuntimeVarsSnapshot = const {},
-    this.debugIntentType,
-    this.previewChapterName,
-    this.previewChapterUrl,
-    this.debugAwaitingChapterNameValue = false,
-    this.debugAwaitingChapterUrlValue = false,
-    this.showDebugQuickHelp = true,
-    this.cachedExploreQuickEntries = const [],
-    this.refreshingExploreQuickActions = false,
-  });
-
-  SourceEditState copyWith({
-    BookSource? source,
-    Object? savedSource = _sentinel,
-    Object? currentOriginalUrl = _sentinel,
-    String? rawJson,
-    Object? jsonError = _sentinel,
-    bool? loginStateLoading,
-    String? loginHeaderCache,
-    String? loginInfo,
-    bool? debugLoading,
-    Object? debugError = _sentinel,
-    List<DebugLine>? debugLines,
-    List<DebugLine>? debugLinesAll,
-    bool? debugAutoFollowLogs,
-    String? debugKey,
-    Object? debugListSrcHtml = _sentinel,
-    Object? debugBookSrcHtml = _sentinel,
-    Object? debugTocSrcHtml = _sentinel,
-    Object? debugContentSrcHtml = _sentinel,
-    Object? debugContentResult = _sentinel,
-    Object? debugMethodDecision = _sentinel,
-    Object? debugRetryDecision = _sentinel,
-    Object? debugRequestCharsetDecision = _sentinel,
-    Object? debugBodyDecision = _sentinel,
-    Object? debugResponseCharset = _sentinel,
-    Object? debugResponseCharsetDecision = _sentinel,
-    Map<String, String>? debugRuntimeVarsSnapshot,
-    Object? debugIntentType = _sentinel,
-    Object? previewChapterName = _sentinel,
-    Object? previewChapterUrl = _sentinel,
-    bool? debugAwaitingChapterNameValue,
-    bool? debugAwaitingChapterUrlValue,
-    bool? showDebugQuickHelp,
-    List<MapEntry<String, String>>? cachedExploreQuickEntries,
-    bool? refreshingExploreQuickActions,
-  }) {
-    return SourceEditState(
-      source: source ?? this.source,
-      savedSource: savedSource == _sentinel ? this.savedSource : savedSource as BookSource?,
-      currentOriginalUrl: currentOriginalUrl == _sentinel ? this.currentOriginalUrl : currentOriginalUrl as String?,
-      rawJson: rawJson ?? this.rawJson,
-      jsonError: jsonError == _sentinel ? this.jsonError : jsonError as String?,
-      loginStateLoading: loginStateLoading ?? this.loginStateLoading,
-      loginHeaderCache: loginHeaderCache ?? this.loginHeaderCache,
-      loginInfo: loginInfo ?? this.loginInfo,
-      debugLoading: debugLoading ?? this.debugLoading,
-      debugError: debugError == _sentinel ? this.debugError : debugError as String?,
-      debugLines: debugLines ?? this.debugLines,
-      debugLinesAll: debugLinesAll ?? this.debugLinesAll,
-      debugAutoFollowLogs: debugAutoFollowLogs ?? this.debugAutoFollowLogs,
-      debugKey: debugKey ?? this.debugKey,
-      debugListSrcHtml: debugListSrcHtml == _sentinel ? this.debugListSrcHtml : debugListSrcHtml as String?,
-      debugBookSrcHtml: debugBookSrcHtml == _sentinel ? this.debugBookSrcHtml : debugBookSrcHtml as String?,
-      debugTocSrcHtml: debugTocSrcHtml == _sentinel ? this.debugTocSrcHtml : debugTocSrcHtml as String?,
-      debugContentSrcHtml: debugContentSrcHtml == _sentinel ? this.debugContentSrcHtml : debugContentSrcHtml as String?,
-      debugContentResult: debugContentResult == _sentinel ? this.debugContentResult : debugContentResult as String?,
-      debugMethodDecision: debugMethodDecision == _sentinel ? this.debugMethodDecision : debugMethodDecision as String?,
-      debugRetryDecision: debugRetryDecision == _sentinel ? this.debugRetryDecision : debugRetryDecision as String?,
-      debugRequestCharsetDecision: debugRequestCharsetDecision == _sentinel ? this.debugRequestCharsetDecision : debugRequestCharsetDecision as String?,
-      debugBodyDecision: debugBodyDecision == _sentinel ? this.debugBodyDecision : debugBodyDecision as String?,
-      debugResponseCharset: debugResponseCharset == _sentinel ? this.debugResponseCharset : debugResponseCharset as String?,
-      debugResponseCharsetDecision: debugResponseCharsetDecision == _sentinel ? this.debugResponseCharsetDecision : debugResponseCharsetDecision as String?,
-      debugRuntimeVarsSnapshot: debugRuntimeVarsSnapshot ?? this.debugRuntimeVarsSnapshot,
-      debugIntentType: debugIntentType == _sentinel ? this.debugIntentType : debugIntentType as SourceDebugIntentType?,
-      previewChapterName: previewChapterName == _sentinel ? this.previewChapterName : previewChapterName as String?,
-      previewChapterUrl: previewChapterUrl == _sentinel ? this.previewChapterUrl : previewChapterUrl as String?,
-      debugAwaitingChapterNameValue: debugAwaitingChapterNameValue ?? this.debugAwaitingChapterNameValue,
-      debugAwaitingChapterUrlValue: debugAwaitingChapterUrlValue ?? this.debugAwaitingChapterUrlValue,
-      showDebugQuickHelp: showDebugQuickHelp ?? this.showDebugQuickHelp,
-      cachedExploreQuickEntries: cachedExploreQuickEntries ?? this.cachedExploreQuickEntries,
-      refreshingExploreQuickActions: refreshingExploreQuickActions ?? this.refreshingExploreQuickActions,
-    );
-  }
-}
-
-
-// ── Args & Provider ─────────────────────────────────────────────
-class SourceEditArgs {
-  final String? originalUrl;
-  final String? initialRawJson;
-  final int? initialTab;
-  const SourceEditArgs({this.originalUrl, this.initialRawJson, this.initialTab});
-  @override
-  bool operator ==(Object other) =>
-      other is SourceEditArgs &&
-      other.originalUrl == originalUrl &&
-      other.initialRawJson == initialRawJson &&
-      other.initialTab == initialTab;
-  @override
-  int get hashCode => Object.hash(originalUrl, initialRawJson, initialTab);
-}
+export 'package:soupreader/features/source/providers/source_edit_state.dart';
 
 final sourceEditProvider =
     NotifierProvider.family<SourceEditNotifier, SourceEditState, SourceEditArgs>(
@@ -303,7 +133,7 @@ class SourceEditNotifier extends Notifier<SourceEditState> {
       await saveLoginState();
       return null;
     } catch (e) {
-      return '保存失败：\$e';
+      return '保存失败：$e';
     }
   }
 
@@ -508,7 +338,7 @@ class SourceEditNotifier extends Notifier<SourceEditState> {
     );
     final diagnosisRaw = summary['diagnosis'];
     final diagnosis = diagnosisRaw is Map
-        ? diagnosisRaw.map((k, v) => MapEntry('\$k', v))
+        ? diagnosisRaw.map((k, v) => MapEntry('$k', v))
         : const <String, dynamic>{};
     final primary = (diagnosis['primary'] ?? 'no_data').toString();
     final labels = (diagnosis['labels'] is List)

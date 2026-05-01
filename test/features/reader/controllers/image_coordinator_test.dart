@@ -6,7 +6,7 @@ import 'package:soupreader/features/reader/controllers/image_coordinator.dart';
 import 'package:soupreader/features/reader/controllers/reader_state.dart';
 import 'package:soupreader/features/reader/services/reader_image_request_parser.dart';
 import 'package:soupreader/features/reader/services/reader_image_warmup_telemetry.dart';
-import 'package:soupreader/features/source/services/rule_parser_engine.dart';
+import 'package:soupreader/features/source/services/rule_parser/rule_parser_engine.dart';
 
 void main() {
   group('ImageCoordinator', () {

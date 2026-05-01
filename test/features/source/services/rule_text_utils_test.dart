@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:soupreader/features/source/services/rule_text_utils.dart';
+import 'package:soupreader/features/source/services/source/rule_text_utils.dart';
 
 void main() {
   group('RuleTextUtils', () {

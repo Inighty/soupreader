@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/cupertino.dart';
 
 import '../../core/models/book_source.dart';
-import '../../features/source/services/source_cover_loader.dart';
+import '../../features/source/services/source/cover_loader.dart';
 import 'app_cover_image.dart';
 
 enum SourceAwareCoverLoadState {
