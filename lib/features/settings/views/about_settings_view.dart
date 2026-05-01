@@ -589,7 +589,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
 
   Future<void> _checkUpdate() async {
     if (!mounted) return;
-    showCupertinoBottomSheetDialog<void>(
+    showCupertinoDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CupertinoActivityIndicator()),
