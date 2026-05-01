@@ -639,10 +639,35 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
       return;
     }
     if (alreadyLatest) {
-      showAppToast(context, message: '已是最新版本');
+      await _showAlreadyLatestDialog();
       return;
     }
     await _showMessage(errorMessage ?? '检查更新失败');
+  }
+
+  Future<void> _showAlreadyLatestDialog() async {
+    if (!mounted) return;
+    final shaShort = BuildInfo.gitShaShort.trim();
+    final showSha = shaShort.isNotEmpty && shaShort != 'unknown';
+    final lines = <String>[
+      '当前已是最新版本，无需下载安装。',
+      '',
+      '版本：$_version',
+      if (showSha) '构建：$shaShort',
+    ];
+    await showCupertinoBottomSheetDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('已是最新版本'),
+        content: Text('\n${lines.join('\n')}'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('好'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 比较远端发布与当前构建的 commit SHA，相同视为已是最新。
