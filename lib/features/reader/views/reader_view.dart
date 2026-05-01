@@ -92,6 +92,9 @@ class _ReaderViewState extends State<ReaderView>
   // ── 分页内容区域尺寸（用于 PageFactory 布局参数）──
   final GlobalKey _pagedContentKey = GlobalKey();
 
+  // ── 首次进入阅读器时是否已触发首屏分页 ──
+  bool _firstPaginateTriggered = false;
+
   // ── 动画（需要 vsync，必须在 State 中）──
   late final AnimationController _menuAnimController;
   late final Animation<double> _menuFadeAnim;
@@ -196,6 +199,9 @@ class _ReaderViewState extends State<ReaderView>
     // 5b. 监听 toast 消息
     _ui.pendingToast.addListener(_onPendingToast);
 
+    // 5c. 监听 chapter 状态：首次 isInitialized=true 时主动触发首屏分页
+    _chapter.addListener(_onChapterStateChanged);
+
     // 6. 初始化
     unawaited(bookmarkCtrl.init());
     unawaited(readAloudCtrl.init());
@@ -214,6 +220,7 @@ class _ReaderViewState extends State<ReaderView>
     WidgetsBinding.instance.removeObserver(this);
     _ui.pendingToast.removeListener(_onPendingToast);
     _ui.removeListener(_syncMenuAnimation);
+    _chapter.removeListener(_onChapterStateChanged);
     _focusNode.dispose();
     _menuAnimController.dispose();
     _coordinator.dispose();
@@ -242,6 +249,20 @@ class _ReaderViewState extends State<ReaderView>
     if (message == null || message.isEmpty) return;
     _ui.pendingToast.value = null;
     _showToast(message);
+  }
+
+  /// 当 chapter 状态变化时被调用。
+  /// 首次 [ChapterState.isInitialized] 变 true 时，PagedReaderWidget 才会被
+  /// build/mount/layout。此处再 schedule 一次首屏分页，确保 RenderBox
+  /// 已就绪后用真实尺寸分页（避免 init 流程中的时序竞速）。
+  void _onChapterStateChanged() {
+    if (_firstPaginateTriggered) return;
+    if (!_chapter.isInitialized) return;
+    _firstPaginateTriggered = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _coordinator.requestRepaginate(restoreOffset: true);
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════

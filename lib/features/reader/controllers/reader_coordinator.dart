@@ -375,6 +375,25 @@ class ReaderCoordinator {
     }
   }
 
+  /// 由 ReaderView 在 PagedReaderWidget 首次 mount + layout 后主动调用，
+  /// 触发首屏分页，避免 init 流程中 postFrameCallback 与 widget mount 之间的
+  /// 时序竞速导致首次进入空白。
+  void requestRepaginate({bool restoreOffset = true}) {
+    if (chapter.chapters.isEmpty) return;
+    if (settings.settings.pageTurnMode == PageTurnMode.scroll) {
+      unawaited(scrollCoordinator.initializeSegments(
+        centerIndex: chapter.currentIndex,
+        restoreOffset: restoreOffset,
+      ));
+    } else {
+      _paginateAndJump(
+        chapterIndex: chapter.currentIndex,
+        goToLastPage: false,
+        restoreOffset: restoreOffset,
+      );
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   // 内容处理
   // ═══════════════════════════════════════════════════════════════════
