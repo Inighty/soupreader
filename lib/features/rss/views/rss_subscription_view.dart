@@ -4,11 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_toast.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
-import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
@@ -23,6 +21,7 @@ import 'rss_articles_placeholder_view.dart';
 import 'rule_subscription_view.dart';
 import 'rss_source_edit_view.dart';
 import 'rss_source_manage_view.dart';
+import 'rss_subscription_view_widgets.dart';
 
 class RssSubscriptionView extends StatefulWidget {
   const RssSubscriptionView({
@@ -36,13 +35,6 @@ class RssSubscriptionView extends StatefulWidget {
 
   @override
   State<RssSubscriptionView> createState() => _RssSubscriptionViewState();
-}
-
-enum _RssSubscriptionSourceAction {
-  moveToTop,
-  edit,
-  disable,
-  delete,
 }
 
 class _RssSubscriptionViewState extends State<RssSubscriptionView> {
@@ -185,7 +177,7 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
       ),
     );
 
-    final ruleEntry = _buildRuleSubscriptionEntry();
+    final ruleEntry = RssSubscriptionRuleEntry(onTap: _openRuleSubscription);
 
     if (visible.isEmpty) {
       return SliverSafeArea(
@@ -198,7 +190,13 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
               searchField,
               summaryRow,
               ruleEntry,
-              Expanded(child: _buildEmptyState(enabledCount)),
+              Expanded(
+                child: RssSubscriptionEmptyState(
+                  enabledCount: enabledCount,
+                  onOpenSourceSettings: _openSourceSettings,
+                  onClearFilter: () => _setQuery(''),
+                ),
+              ),
             ],
           ),
         ),
@@ -229,113 +227,16 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
             }
             final sourceIndex = local ~/ 2;
             final source = visible[sourceIndex];
-            return _buildSourceItem(source);
+            return RssSubscriptionSourceItem(
+              source: source,
+              onTap: () => _openSource(source),
+              onLongPress: () => _showSourceActions(source),
+              onToggleEnabled: (v) => _toggleSourceEnabled(source, v),
+            );
           },
           childCount: bottomSpacerIndex + 1,
         ),
       ),
-    );
-  }
-
-  Widget _buildEmptyState(int enabledCount) {
-    final noEnabled = enabledCount == 0;
-    final title = noEnabled ? '暂无启用订阅源' : '没有匹配结果';
-    final action = noEnabled ? '返回订阅源管理' : '清除筛选';
-    final message = noEnabled ? '请先在订阅源管理中启用订阅源' : '当前筛选条件下暂无结果';
-    return AppEmptyState(
-      illustration: const AppEmptyPlanetIllustration(size: 84),
-      title: title,
-      message: message,
-      action: CupertinoButton(
-        onPressed: noEnabled ? _openSourceSettings : () => _setQuery(''),
-        child: Text(action),
-      ),
-    );
-  }
-
-  Widget _buildRuleSubscriptionEntry() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-      decoration: BoxDecoration(
-        color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
-            .resolveFrom(context),
-        borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-      ),
-      child: CupertinoListTile.notched(
-        leading: const Icon(CupertinoIcons.square_list),
-        title: const Text('规则订阅'),
-        additionalInfo: Text(
-          '导入地址',
-          style: TextStyle(
-            fontSize: 12,
-            color: CupertinoColors.secondaryLabel.resolveFrom(context),
-          ),
-        ),
-        trailing: const CupertinoListTileChevron(),
-        onTap: _openRuleSubscription,
-      ),
-    );
-  }
-
-  Widget _buildSourceItem(RssSource source) {
-    return GestureDetector(
-      onLongPress: () => _showSourceActions(source),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
-              .resolveFrom(context),
-          borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-        ),
-        child: CupertinoListTile.notched(
-          leading: _buildSourceIcon(source),
-          title: Text(source.sourceName),
-          subtitle: source.sourceGroup?.trim().isNotEmpty == true
-              ? Text(
-                  source.sourceGroup!.trim(),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                  ),
-                )
-              : null,
-          trailing: CupertinoSwitch(
-            value: source.enabled,
-            onChanged: (v) => _toggleSourceEnabled(source, v),
-          ),
-          onTap: () => _openSource(source),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSourceIcon(RssSource source) {
-    final iconUrl = source.sourceIcon.trim();
-    if (iconUrl.isEmpty) {
-      return _defaultIcon();
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
-      child: Image.network(
-        iconUrl,
-        width: 34,
-        height: 34,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _defaultIcon(),
-      ),
-    );
-  }
-
-  Widget _defaultIcon() {
-    return Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemGrey5.resolveFrom(context),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      alignment: Alignment.center,
-      child: const Icon(CupertinoIcons.dot_radiowaves_left_right, size: 18),
     );
   }
 
@@ -457,48 +358,20 @@ class _RssSubscriptionViewState extends State<RssSubscriptionView> {
 
   Future<void> _showSourceActions(RssSource source) async {
     if (!mounted) return;
-    final selected = await showAppActionListSheet<_RssSubscriptionSourceAction>(
+    final selected = await showRssSubscriptionSourceActionsSheet(
       context: context,
-      title: source.sourceName,
-      showCancel: true,
-      items: const [
-        AppActionListItem<_RssSubscriptionSourceAction>(
-          value: _RssSubscriptionSourceAction.moveToTop,
-          icon: CupertinoIcons.arrow_up_circle,
-          label: '置顶',
-        ),
-        AppActionListItem<_RssSubscriptionSourceAction>(
-          value: _RssSubscriptionSourceAction.edit,
-          icon: CupertinoIcons.pencil,
-          label: '编辑',
-        ),
-        AppActionListItem<_RssSubscriptionSourceAction>(
-          value: _RssSubscriptionSourceAction.disable,
-          icon: CupertinoIcons.pause_circle,
-          label: '禁用',
-        ),
-        AppActionListItem<_RssSubscriptionSourceAction>(
-          value: _RssSubscriptionSourceAction.delete,
-          icon: CupertinoIcons.delete,
-          label: '删除',
-          isDestructiveAction: true,
-        ),
-      ],
+      source: source,
     );
     if (selected == null || !mounted) return;
     switch (selected) {
-      case _RssSubscriptionSourceAction.moveToTop:
+      case RssSubscriptionSourceAction.moveToTop:
         await _moveToTop(source);
-        return;
-      case _RssSubscriptionSourceAction.edit:
+      case RssSubscriptionSourceAction.edit:
         await _openEditSource(source);
-        return;
-      case _RssSubscriptionSourceAction.disable:
+      case RssSubscriptionSourceAction.disable:
         await _disableSource(source);
-        return;
-      case _RssSubscriptionSourceAction.delete:
+      case RssSubscriptionSourceAction.delete:
         await _deleteSource(source);
-        return;
     }
   }
 

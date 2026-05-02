@@ -6,8 +6,10 @@ import '../../../app/theme/typography.dart';
 import '../../../app/widgets/app_sheet_header.dart';
 import '../../../app/widgets/app_sheet_panel.dart';
 import '../models/reading_settings.dart';
+import 'reader_quick_sheet_slider_row.dart';
 import 'reader_style_config_list_sheet.dart';
 import 'reader_style_edit_sheet.dart';
+import 'reader_style_theme_picker_row.dart';
 
 /// 阅读界面快速调整面板，对应底部菜单「界面」按钮。
 ///
@@ -60,6 +62,14 @@ class _ReaderStyleQuickSheetState
 
   Color get _accent =>
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
+
+  Color get _labelColor => _isDark
+      ? CupertinoColors.white
+      : CupertinoColors.label.resolveFrom(context);
+
+  Color get _metaColor => _isDark
+      ? CupertinoColors.white.withValues(alpha: 0.5)
+      : CupertinoColors.secondaryLabel.resolveFrom(context);
 
   @override
   Widget build(BuildContext context) {
@@ -245,135 +255,55 @@ class _ReaderStyleQuickSheetState
   }
 
   Widget _buildLineHeightRow() {
-    final isDark = _isDark;
-    final labelColor = isDark
-        ? CupertinoColors.white
-        : CupertinoColors.label.resolveFrom(context);
-    final metaColor = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.5)
-        : CupertinoColors.secondaryLabel.resolveFrom(context);
     final sv = _draft.lineHeight.isFinite
         ? _draft.lineHeight.clamp(1.0, 3.0)
         : 1.8;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: SizedBox(
-        height: 44,
-        child: Row(
-          children: [
-            Text('行距',
-                style: TextStyle(
-                    color: labelColor,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: CupertinoSlider(
-                value: sv.toDouble(),
-                min: 1.0,
-                max: 3.0,
-                activeColor: _accent,
-                onChanged: (v) =>
-                    _apply(_draft.copyWith(lineHeight: v)),
-              ),
-            ),
-            SizedBox(
-              width: 36,
-              child: Text(sv.toStringAsFixed(1),
-                  textAlign: TextAlign.end,
-                  style: TextStyle(color: metaColor, fontSize: 13)),
-            ),
-          ],
-        ),
-      ),
+    return ReaderQuickSheetSliderRow(
+      label: '行距',
+      value: sv.toDouble(),
+      min: 1.0,
+      max: 3.0,
+      labelColor: _labelColor,
+      metaColor: _metaColor,
+      accent: _accent,
+      onChanged: (v) => _apply(_draft.copyWith(lineHeight: v)),
+      formatValue: (v) => v.toStringAsFixed(1),
     );
   }
 
   Widget _buildLetterSpacingRow() {
-    final isDark = _isDark;
-    final labelColor = isDark
-        ? CupertinoColors.white
-        : CupertinoColors.label.resolveFrom(context);
-    final metaColor = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.5)
-        : CupertinoColors.secondaryLabel.resolveFrom(context);
     final sv = _draft.letterSpacing.isFinite
         ? _draft.letterSpacing.clamp(-2.0, 5.0)
         : 0.0;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: SizedBox(
-        height: 44,
-        child: Row(
-          children: [
-            Text('字距',
-                style: TextStyle(
-                    color: labelColor,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: CupertinoSlider(
-                value: sv.toDouble(),
-                min: -2.0,
-                max: 5.0,
-                activeColor: _accent,
-                onChanged: (v) => _apply(_draft.copyWith(letterSpacing: v)),
-              ),
-            ),
-            SizedBox(
-              width: 40,
-              child: Text(sv.toStringAsFixed(1),
-                  textAlign: TextAlign.end,
-                  style: TextStyle(color: metaColor, fontSize: 13)),
-            ),
-          ],
-        ),
-      ),
+    return ReaderQuickSheetSliderRow(
+      label: '字距',
+      value: sv.toDouble(),
+      min: -2.0,
+      max: 5.0,
+      valueWidth: 40,
+      labelColor: _labelColor,
+      metaColor: _metaColor,
+      accent: _accent,
+      onChanged: (v) => _apply(_draft.copyWith(letterSpacing: v)),
+      formatValue: (v) => v.toStringAsFixed(1),
     );
   }
 
   Widget _buildParagraphSpacingRow() {
-    final isDark = _isDark;
-    final labelColor = isDark
-        ? CupertinoColors.white
-        : CupertinoColors.label.resolveFrom(context);
-    final metaColor = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.5)
-        : CupertinoColors.secondaryLabel.resolveFrom(context);
     final sv = _draft.paragraphSpacing.isFinite
         ? _draft.paragraphSpacing.clamp(0.0, 50.0)
         : 0.0;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: SizedBox(
-        height: 44,
-        child: Row(
-          children: [
-            Text('段距',
-                style: TextStyle(
-                    color: labelColor,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: CupertinoSlider(
-                value: sv.toDouble(),
-                min: 0.0,
-                max: 50.0,
-                activeColor: _accent,
-                onChanged: (v) => _apply(_draft.copyWith(paragraphSpacing: v)),
-              ),
-            ),
-            SizedBox(
-              width: 40,
-              child: Text(sv.toStringAsFixed(0),
-                  textAlign: TextAlign.end,
-                  style: TextStyle(color: metaColor, fontSize: 13)),
-            ),
-          ],
-        ),
-      ),
+    return ReaderQuickSheetSliderRow(
+      label: '段距',
+      value: sv.toDouble(),
+      min: 0.0,
+      max: 50.0,
+      valueWidth: 40,
+      labelColor: _labelColor,
+      metaColor: _metaColor,
+      accent: _accent,
+      onChanged: (v) => _apply(_draft.copyWith(paragraphSpacing: v)),
+      formatValue: (v) => v.toStringAsFixed(0),
     );
   }
 
@@ -455,188 +385,16 @@ class _ReaderStyleQuickSheetState
       ),
     );
   }
-
-  // 快速面板最多展示的样式 chip 数量
-  static const int _kQuickChipCount = 4;
-
-  Widget _buildThemeRow() {
-    final isDark = _isDark;
-    final labelColor = isDark
-        ? CupertinoColors.white
-        : CupertinoColors.label.resolveFrom(context);
-    final mutedColor = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.5)
-        : CupertinoColors.secondaryLabel.resolveFrom(context);
-    // 从 _draft 实时派生，确保新增/编辑后立即反映在列表中
-    final configs = _draft.readStyleConfigs.isNotEmpty
-        ? _draft.readStyleConfigs
-        : widget.styleConfigs;
-    final themes = configs
-        .map(
-          (c) => ReadingThemeColors(
-            background: Color(c.backgroundColor),
-            text: Color(c.textColor),
-            name: c.name.trim().isEmpty ? '文字' : c.name.trim(),
-          ),
-        )
-        .toList(growable: false);
-    final safeSelected =
-        (_draft.themeIndex >= 0 && _draft.themeIndex < themes.length)
-            ? _draft.themeIndex
-            : 0;
-    final borderNormal = CupertinoColors.separator.resolveFrom(context);
-    // 快速面板只显示前 _kQuickChipCount 个，其余通过「更多」进入
-    final visibleCount = themes.length.clamp(0, _kQuickChipCount);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text('背景文字样式',
-                  style: TextStyle(
-                      color: labelColor,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w400)),
-              const Spacer(),
-              Text('共用排版',
-                  style: TextStyle(
-                      color: mutedColor,
-                      fontSize: 13)),
-              const SizedBox(width: 4),
-              CupertinoSwitch(
-                value: _draft.shareLayout,
-                activeTrackColor: _accent,
-                onChanged: (v) => _apply(_draft.copyWith(shareLayout: v)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-            children: [
-              // 「+」新建按钮
-              _buildAddCell(isDark, borderNormal),
-              const SizedBox(width: 6),
-              // 前 _kQuickChipCount 个样式
-              ...List.generate(visibleCount, (i) {
-                final selected = i == safeSelected;
-                final t = themes[i];
-                final config = i < configs.length ? configs[i] : null;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: GestureDetector(
-                    onTap: () => _apply(_draft.copyWith(themeIndex: i)),
-                    onLongPress: config != null
-                        ? () => _openEditSheet(i, config, configs)
-                        : null,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: 56,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: t.background,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: selected ? _accent : borderNormal,
-                          width: selected ? 2.0 : 0.5,
-                        ),
-                        boxShadow: selected
-                            ? [
-                                BoxShadow(
-                                  color: _accent.withValues(alpha: 0.25),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                )
-                              ]
-                            : null,
-                      ),
-                      padding: const EdgeInsets.all(6),
-                      child: Stack(
-                        children: [
-                          Align(
-                            alignment: Alignment.bottomLeft,
-                            child: Text(
-                              t.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: t.text.withValues(alpha: 0.9),
-                                fontSize: 10,
-                                fontWeight: selected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          if (selected)
-                            Positioned(
-                              top: 0,
-                              right: 0,
-                              child: Container(
-                                width: 14,
-                                height: 14,
-                                decoration: BoxDecoration(
-                                  color: _accent,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  CupertinoIcons.checkmark,
-                                  color: CupertinoColors.white,
-                                  size: 9,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }),
-              // 「更多」按钮
-              _buildMoreCell(isDark, borderNormal, configs, safeSelected),
-            ],
-          ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMoreCell(
-    bool isDark,
-    Color borderNormal,
-    List<ReadStyleConfig> configs,
-    int safeSelected,
-  ) {
-    final bg = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.08)
-        : CupertinoColors.tertiarySystemFill.resolveFrom(context);
-    final iconColor = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.5)
-        : CupertinoColors.secondaryLabel.resolveFrom(context);
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
-      onPressed: () => _openStyleListSheet(configs, safeSelected),
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: borderNormal, width: 0.5),
-        ),
-        child: Icon(
-          CupertinoIcons.ellipsis,
-          color: iconColor,
-          size: 20,
-        ),
-      ),
-    );
-  }
+  Widget _buildThemeRow() => ReaderStyleThemePickerRow(
+        draft: _draft,
+        fallbackStyleConfigs: widget.styleConfigs,
+        accent: _accent,
+        isDark: _isDark,
+        onApply: _apply,
+        onAddNew: _addNewStyle,
+        onOpenList: _openStyleListSheet,
+        onOpenEdit: _openEditSheet,
+      );
 
   void _openStyleListSheet(
     List<ReadStyleConfig> configs,
@@ -655,33 +413,6 @@ class _ReaderStyleQuickSheetState
         },
         onImport: widget.onImportStyle,
         onExport: widget.onExportStyle,
-      ),
-    );
-  }
-
-  Widget _buildAddCell(bool isDark, Color borderNormal) {
-    final bg = isDark
-        ? CupertinoColors.white.withValues(alpha: 0.08)
-        : CupertinoColors.tertiarySystemFill.resolveFrom(context);
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
-      onPressed: _addNewStyle,
-      child: Container(
-        width: 56,
-        height: 44,
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: borderNormal, width: 0.5),
-        ),
-        child: Icon(
-          CupertinoIcons.add,
-          color: isDark
-              ? CupertinoColors.white.withValues(alpha: 0.5)
-              : CupertinoColors.secondaryLabel.resolveFrom(context),
-          size: 22,
-        ),
       ),
     );
   }

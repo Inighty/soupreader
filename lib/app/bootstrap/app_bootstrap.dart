@@ -212,11 +212,16 @@ Future<void> _runBootStep(
 }) async {
   onStepChanged?.call(step.name);
   BootLog.add('[boot] ${step.name} start');
+  final stopwatch = Stopwatch()..start();
   try {
     await step.action();
-    BootLog.add('[boot] ${step.name} ok');
+    stopwatch.stop();
+    BootLog.add('[boot] ${step.name} ok (${stopwatch.elapsedMilliseconds}ms)');
   } catch (error, stackTrace) {
-    BootLog.add('[boot] ${step.name} failed: $error');
+    stopwatch.stop();
+    BootLog.add(
+      '[boot] ${step.name} failed after ${stopwatch.elapsedMilliseconds}ms: $error',
+    );
     exceptionLogService.record(
       node: 'bootstrap.${step.name}',
       message: '启动步骤失败',

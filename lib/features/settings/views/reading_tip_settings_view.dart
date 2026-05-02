@@ -10,6 +10,7 @@ import '../../../core/services/settings_service.dart';
 import '../../reader/models/reading_settings.dart';
 import '../../reader/services/reader_tip_selection_helper.dart';
 import '../../reader/widgets/reader_color_picker_dialog.dart';
+import 'reading_tip_settings_widgets.dart';
 
 class ReadingTipSettingsView extends StatefulWidget {
   const ReadingTipSettingsView({super.key});
@@ -93,7 +94,7 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
                 value: _titleModeLabel(_settings.titleMode),
                 onTap: _pickTitleMode,
               ),
-              _SliderTile(
+              ReadingTipSliderTile(
                 title: '标题字号偏移',
                 value: _settings.titleSize.toDouble(),
                 min: 0,
@@ -104,7 +105,7 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
                   _settings.copyWith(titleSize: value.round()),
                 ),
               ),
-              _SliderTile(
+              ReadingTipSliderTile(
                 title: '标题上边距',
                 value: _settings.titleTopSpacing,
                 min: 0,
@@ -114,7 +115,7 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
                 onChanged: (value) =>
                     _update(_settings.copyWith(titleTopSpacing: value)),
               ),
-              _SliderTile(
+              ReadingTipSliderTile(
                 title: '标题下边距',
                 value: _settings.titleBottomSpacing,
                 min: 0,
@@ -268,7 +269,7 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
 
   Future<void> _pickTip({
     required String title,
-    required List<_TipOption> options,
+    required List<TipOption> options,
     required int current,
     required ValueChanged<int> onSelected,
   }) async {
@@ -292,9 +293,9 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
 
   Future<void> _pickTitleMode() async {
     const options = [
-      _TipOption(0, '居左'),
-      _TipOption(1, '居中'),
-      _TipOption(2, '隐藏'),
+      TipOption(0, '居左'),
+      TipOption(1, '居中'),
+      TipOption(2, '隐藏'),
     ];
     await _pickTip(
       title: '章节标题位置',
@@ -425,133 +426,56 @@ class _ReadingTipSettingsViewState extends State<ReadingTipSettingsView> {
     );
   }
 
-  String _tipLabel(List<_TipOption> options, int value) {
+  String _tipLabel(List<TipOption> options, int value) {
     for (final opt in options) {
       if (opt.value == value) return opt.label;
     }
     return '无';
   }
 
-  static const List<_TipOption> _headerOptions = [
-    _TipOption(0, '书名'),
-    _TipOption(1, '章节名'),
-    _TipOption(2, '无'),
-    _TipOption(3, '时间'),
-    _TipOption(4, '电量'),
-    _TipOption(5, '进度'),
-    _TipOption(6, '页码'),
-    _TipOption(7, '章节进度'),
-    _TipOption(8, '页码/总页'),
-    _TipOption(9, '时间+电量'),
+  static const List<TipOption> _headerOptions = [
+    TipOption(0, '书名'),
+    TipOption(1, '章节名'),
+    TipOption(2, '无'),
+    TipOption(3, '时间'),
+    TipOption(4, '电量'),
+    TipOption(5, '进度'),
+    TipOption(6, '页码'),
+    TipOption(7, '章节进度'),
+    TipOption(8, '页码/总页'),
+    TipOption(9, '时间+电量'),
   ];
 
-  static const List<_TipOption> _footerOptions = [
-    _TipOption(0, '进度'),
-    _TipOption(1, '页码'),
-    _TipOption(2, '时间'),
-    _TipOption(3, '电量'),
-    _TipOption(4, '无'),
-    _TipOption(5, '章节名'),
-    _TipOption(6, '书名'),
-    _TipOption(7, '章节进度'),
-    _TipOption(8, '页码/总页'),
-    _TipOption(9, '时间+电量'),
+  static const List<TipOption> _footerOptions = [
+    TipOption(0, '进度'),
+    TipOption(1, '页码'),
+    TipOption(2, '时间'),
+    TipOption(3, '电量'),
+    TipOption(4, '无'),
+    TipOption(5, '章节名'),
+    TipOption(6, '书名'),
+    TipOption(7, '章节进度'),
+    TipOption(8, '页码/总页'),
+    TipOption(9, '时间+电量'),
   ];
 
   static const int _customColorPickerValue = -2;
-  static const List<_TipOption> _headerModeOptions = [
-    _TipOption(ReadingSettings.headerModeHideWhenStatusBarShown, '显示状态栏时隐藏'),
-    _TipOption(ReadingSettings.headerModeShow, '显示'),
-    _TipOption(ReadingSettings.headerModeHide, '隐藏'),
+  static const List<TipOption> _headerModeOptions = [
+    TipOption(ReadingSettings.headerModeHideWhenStatusBarShown, '显示状态栏时隐藏'),
+    TipOption(ReadingSettings.headerModeShow, '显示'),
+    TipOption(ReadingSettings.headerModeHide, '隐藏'),
   ];
-  static const List<_TipOption> _footerModeOptions = [
-    _TipOption(ReadingSettings.footerModeShow, '显示'),
-    _TipOption(ReadingSettings.footerModeHide, '隐藏'),
+  static const List<TipOption> _footerModeOptions = [
+    TipOption(ReadingSettings.footerModeShow, '显示'),
+    TipOption(ReadingSettings.footerModeHide, '隐藏'),
   ];
-  static const List<_TipOption> _tipColorOptions = [
-    _TipOption(ReadingSettings.tipColorFollowContent, '同正文颜色'),
-    _TipOption(_customColorPickerValue, '自定义'),
+  static const List<TipOption> _tipColorOptions = [
+    TipOption(ReadingSettings.tipColorFollowContent, '同正文颜色'),
+    TipOption(_customColorPickerValue, '自定义'),
   ];
-  static const List<_TipOption> _tipDividerColorOptions = [
-    _TipOption(ReadingSettings.tipDividerColorDefault, '默认'),
-    _TipOption(ReadingSettings.tipDividerColorFollowContent, '同正文颜色'),
-    _TipOption(_customColorPickerValue, '自定义'),
+  static const List<TipOption> _tipDividerColorOptions = [
+    TipOption(ReadingSettings.tipDividerColorDefault, '默认'),
+    TipOption(ReadingSettings.tipDividerColorFollowContent, '同正文颜色'),
+    TipOption(_customColorPickerValue, '自定义'),
   ];
-}
-
-class _TipOption {
-  final int value;
-  final String label;
-
-  const _TipOption(this.value, this.label);
-}
-
-class _SliderTile extends StatelessWidget {
-  final String title;
-  final double value;
-  final double min;
-  final double max;
-  final String display;
-  final Color activeColor;
-  final ValueChanged<double> onChanged;
-
-  const _SliderTile({
-    required this.title,
-    required this.value,
-    required this.min,
-    required this.max,
-    required this.display,
-    required this.activeColor,
-    required this.onChanged,
-  });
-
-  double _safeMin() => min.isFinite ? min : 0.0;
-
-  double _safeMax() {
-    final safeMin = _safeMin();
-    return max.isFinite && max > safeMin ? max : safeMin + 1.0;
-  }
-
-  double _safeSliderValue() {
-    final safeMin = _safeMin();
-    final safeMax = _safeMax();
-    final safeRaw = value.isFinite ? value : safeMin;
-    return safeRaw.clamp(safeMin, safeMax).toDouble();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = CupertinoTheme.of(context).brightness == Brightness.dark;
-    final safeMin = _safeMin();
-    final safeMax = _safeMax();
-    final safeValue = _safeSliderValue();
-    final canSlide = min.isFinite && max.isFinite && max > min;
-
-    return CupertinoListTile(
-      title: Text(
-        title,
-        style: TextStyle(
-          color: ReaderSettingsTokens.rowTitleColor(isDark: isDark),
-          fontSize: ReaderSettingsTokens.rowTitleSize,
-        ),
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: CupertinoSlider(
-          value: safeValue,
-          min: safeMin,
-          max: safeMax,
-          activeColor: activeColor,
-          onChanged: canSlide ? onChanged : null,
-        ),
-      ),
-      additionalInfo: Text(
-        display,
-        style: TextStyle(
-          color: ReaderSettingsTokens.rowMetaColor(isDark: isDark),
-          fontSize: ReaderSettingsTokens.rowMetaSize,
-        ),
-      ),
-    );
-  }
 }

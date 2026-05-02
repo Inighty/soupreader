@@ -10,71 +10,9 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../core/utils/file_picker_save_compat.dart';
 import '../models/reading_settings.dart';
+import 'read_style_io_results.dart';
 
-typedef ReadStyleHttpFetcher = Future<Response<List<int>>> Function(Uri uri);
-typedef ReadStyleBgDirectoryResolver = Future<Directory> Function();
-
-class ReadStyleImportResult {
-  final bool success;
-  final bool cancelled;
-  final ReadStyleConfig? style;
-  final String? warning;
-  final String? message;
-
-  const ReadStyleImportResult({
-    this.success = false,
-    this.cancelled = false,
-    this.style,
-    this.warning,
-    this.message,
-  });
-}
-
-class ReadStyleExportResult {
-  final bool success;
-  final bool cancelled;
-  final String? outputPath;
-  final String? message;
-
-  const ReadStyleExportResult({
-    this.success = false,
-    this.cancelled = false,
-    this.outputPath,
-    this.message,
-  });
-}
-
-class ReadStyleZipParseResult {
-  final bool success;
-  final ReadStyleConfig? style;
-  final String? warning;
-  final String? errorMessage;
-
-  const ReadStyleZipParseResult({
-    required this.success,
-    this.style,
-    this.warning,
-    this.errorMessage,
-  });
-
-  factory ReadStyleZipParseResult.ok(
-    ReadStyleConfig style, {
-    String? warning,
-  }) {
-    return ReadStyleZipParseResult(
-      success: true,
-      style: style,
-      warning: warning,
-    );
-  }
-
-  factory ReadStyleZipParseResult.error(String message) {
-    return ReadStyleZipParseResult(
-      success: false,
-      errorMessage: message,
-    );
-  }
-}
+export 'read_style_io_results.dart';
 
 class ReadStyleImportExportService {
   ReadStyleImportExportService({

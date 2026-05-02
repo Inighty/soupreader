@@ -5,6 +5,8 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/theme/colors.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../models/reading_settings.dart';
+import 'reader_brightness_panel.dart';
+import 'reader_chapter_slider.dart';
 import 'reader_menu_surface_style.dart';
 
 /// 阅读器底部菜单：操作路径对齐 legado（目录/朗读/界面/设置）。
@@ -80,20 +82,8 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
   static const double _brightnessPanelTopOffset = 78.0;
   static const double _brightnessPanelTopOffsetWithTitleAddition = 94.0;
   static const double _brightnessPanelBottomOffset = 98.0;
-  static const double _brightnessPanelWidth = 42.0;
-  static const double _brightnessPanelButtonHeight = 40.0;
-  static const double _brightnessPanelMinHeight = 180.0;
-  static const double _brightnessPanelMaxHeight = 360.0;
-  static const double _brightnessSliderMaxLength = 320.0;
-
-  bool _isDragging = false;
-  double _dragValue = 0;
 
   bool get _isDarkMode => widget.currentTheme.isDark;
-
-  double _safeFinite(double value, {double fallback = 0.0}) {
-    return value.isFinite ? value : fallback;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,11 +100,17 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     final fadeAnim = widget.menuFadeAnimation;
     final slideAnim = widget.menuSlideAnimation;
 
-    Widget brightnessPanelChild = _buildBrightnessPanel(
-      style.panelBackground,
+    Widget brightnessPanelChild = ReaderBrightnessPanel(
+      rootKey: _brightnessPanelKey,
+      autoToggleKey: _brightnessAutoToggleKey,
+      positionToggleKey: _brightnessPositionToggleKey,
+      settings: widget.settings,
+      onSettingsChanged: widget.onSettingsChanged,
+      panelBackground: style.panelBackground,
       foreground: style.primaryText,
       mutedForeground: style.secondaryText,
       borderColor: style.borderColor,
+      isDarkMode: _isDarkMode,
     );
     if (fadeAnim != null) {
       brightnessPanelChild = FadeTransition(
@@ -146,19 +142,27 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
               if (widget.onSearchContent != null ||
                   widget.onToggleReplaceRule != null ||
                   widget.onToggleNightMode != null ||
-                  widget.onToggleAutoPage != null) ...
-                [
-                  _buildQuickActionRow(
-                    foreground: style.primaryText,
-                    accent: _isDarkMode
-                        ? AppDesignTokens.brandSecondary
-                        : AppDesignTokens.brandPrimary,
-                  ),
-                  _buildDivider(style.dividerColor),
-                ],
-              _buildChapterSlider(
+                  widget.onToggleAutoPage != null) ...[
+                _buildQuickActionRow(
+                  foreground: style.primaryText,
+                  accent: _isDarkMode
+                      ? AppDesignTokens.brandSecondary
+                      : AppDesignTokens.brandPrimary,
+                ),
+                _buildDivider(style.dividerColor),
+              ],
+              ReaderChapterSlider(
+                currentChapterIndex: widget.currentChapterIndex,
+                totalChapters: widget.totalChapters,
+                currentPageIndex: widget.currentPageIndex,
+                totalPages: widget.totalPages,
+                settings: widget.settings,
+                onChapterChanged: widget.onChapterChanged,
+                onSeekPageProgress: widget.onSeekPageProgress,
+                onSeekChapterProgress: widget.onSeekChapterProgress,
                 foreground: style.primaryText,
                 mutedForeground: style.secondaryText,
+                isDarkMode: _isDarkMode,
               ),
               _buildDivider(style.dividerColor),
               _buildBottomTabs(foreground: style.primaryText),
@@ -272,341 +276,6 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
       minimumSize: Size.zero,
       onPressed: onTap,
       child: Icon(icon, size: 22, color: color),
-    );
-  }
-
-  // 对齐 Legado seekReadPage：支持 page/chapter 两种模式
-  Widget _buildChapterSlider({
-    required Color foreground,
-    required Color mutedForeground,
-  }) {
-    final isPageMode =
-        widget.settings.progressBarBehavior == ProgressBarBehavior.page;
-    final accent = _isDarkMode
-        ? AppDesignTokens.brandSecondary
-        : AppDesignTokens.brandPrimary;
-
-    if (isPageMode) {
-      final maxPage = (widget.totalPages - 1).clamp(0, 999999);
-      final canSlide = maxPage > 0;
-      final sliderMax = canSlide ? maxPage.toDouble() : 1.0;
-      final rawValue = _isDragging
-          ? _safeFinite(_dragValue)
-          : _safeFinite(widget.currentPageIndex.toDouble());
-      final sliderValue = rawValue.clamp(0.0, sliderMax).toDouble();
-      final canPrev = widget.currentChapterIndex > 0;
-      final canNext = widget.currentChapterIndex < widget.totalChapters - 1;
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(0, 6, 0, 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _buildChapterNavButton(
-                  label: '上一章',
-                  enabled: canPrev,
-                  color: canPrev ? foreground : mutedForeground,
-                  onTap: canPrev
-                      ? () => widget
-                          .onChapterChanged(widget.currentChapterIndex - 1)
-                      : null,
-                ),
-                Expanded(
-                  child: SizedBox(
-                    height: 28,
-                    child: CupertinoSlider(
-                      value: sliderValue,
-                      min: 0,
-                      max: sliderMax,
-                      activeColor: accent,
-                      thumbColor: _isDarkMode ? CupertinoColors.white : accent,
-                      onChanged: canSlide
-                          ? (value) => setState(() {
-                                _isDragging = true;
-                                _dragValue = value;
-                              })
-                          : null,
-                      onChangeEnd: canSlide
-                          ? (value) {
-                              setState(() => _isDragging = false);
-                              widget.onSeekPageProgress(
-                                  value.round().clamp(0, maxPage).toInt());
-                            }
-                          : null,
-                    ),
-                  ),
-                ),
-                _buildChapterNavButton(
-                  label: '下一章',
-                  enabled: canNext,
-                  color: canNext ? foreground : mutedForeground,
-                  onTap: canNext
-                      ? () => widget
-                          .onChapterChanged(widget.currentChapterIndex + 1)
-                      : null,
-                ),
-              ],
-            ),
-            Text(
-              '${widget.currentPageIndex + 1} / ${widget.totalPages}',
-              style: TextStyle(color: mutedForeground, fontSize: 10),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // chapter 模式
-    final maxChapter = (widget.totalChapters - 1).clamp(0, 9999);
-    final canSlide = maxChapter > 0;
-    final sliderMax = canSlide ? maxChapter.toDouble() : 1.0;
-    final rawSliderValue = _isDragging
-        ? _safeFinite(_dragValue)
-        : _safeFinite(widget.currentChapterIndex.toDouble());
-    final sliderValue = rawSliderValue.clamp(0.0, sliderMax).toDouble();
-    final canPrev = widget.currentChapterIndex > 0;
-    final canNext = widget.currentChapterIndex < widget.totalChapters - 1;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 6, 0, 4),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _buildChapterNavButton(
-                label: '上一章',
-                enabled: canPrev,
-                color: canPrev ? foreground : mutedForeground,
-                onTap: canPrev
-                    ? () =>
-                        widget.onChapterChanged(widget.currentChapterIndex - 1)
-                    : null,
-              ),
-              Expanded(
-                child: SizedBox(
-                  height: 28,
-                  child: CupertinoSlider(
-                    value: sliderValue,
-                    min: 0,
-                    max: sliderMax,
-                    activeColor: accent,
-                    thumbColor: _isDarkMode ? CupertinoColors.white : accent,
-                    onChanged: canSlide
-                        ? (value) => setState(() {
-                              _isDragging = true;
-                              _dragValue = value;
-                            })
-                        : null,
-                    onChangeEnd: canSlide
-                        ? (value) {
-                            setState(() => _isDragging = false);
-                            widget.onSeekChapterProgress(
-                                value.round().clamp(0, maxChapter).toInt());
-                          }
-                        : null,
-                  ),
-                ),
-              ),
-              _buildChapterNavButton(
-                label: '下一章',
-                enabled: canNext,
-                color: canNext ? foreground : mutedForeground,
-                onTap: canNext
-                    ? () =>
-                        widget.onChapterChanged(widget.currentChapterIndex + 1)
-                    : null,
-              ),
-            ],
-          ),
-          Text(
-            '${widget.currentChapterIndex + 1} / ${widget.totalChapters}',
-            style: TextStyle(color: mutedForeground, fontSize: 10),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChapterNavButton({
-    required String label,
-    required bool enabled,
-    required Color color,
-    required VoidCallback? onTap,
-  }) {
-    return CupertinoButton(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-      minimumSize: Size.zero,
-      onPressed: onTap,
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBrightnessPanel(
-    Color panelBg, {
-    required Color foreground,
-    required Color mutedForeground,
-    required Color borderColor,
-  }) {
-    final accent = _isDarkMode
-        ? AppDesignTokens.brandSecondary
-        : AppDesignTokens.brandPrimary;
-    final autoBrightness = widget.settings.useSystemBrightness;
-    final iconColor = autoBrightness ? accent : mutedForeground;
-    // legado 亮度栏语义保持不变：顶部自动亮度 + 中段滑杆 + 底部左右切换。
-    // 仅限制面板可见高度，避免长屏设备出现过长白条。
-    final panelOverlay = _isDarkMode
-        ? CupertinoColors.white.withValues(alpha: 0.02)
-        : CupertinoColors.black.withValues(alpha: 0.08);
-    final panelColor = Color.alphaBlend(
-      panelOverlay,
-      panelBg.withValues(alpha: _isDarkMode ? 0.54 : 0.42),
-    );
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final rawAvailableHeight = constraints.maxHeight.isFinite
-            ? constraints.maxHeight
-            : _brightnessPanelMaxHeight;
-        final availableHeight = rawAvailableHeight
-            .clamp(
-              0.0,
-              double.infinity,
-            )
-            .toDouble();
-        final panelHeight = availableHeight < _brightnessPanelMinHeight
-            ? availableHeight
-            : availableHeight
-                .clamp(
-                  _brightnessPanelMinHeight,
-                  _brightnessPanelMaxHeight,
-                )
-                .toDouble();
-        final sliderRegionHeight =
-            (panelHeight - _brightnessPanelButtonHeight * 2)
-                .clamp(0.0, _brightnessSliderMaxLength)
-                .toDouble();
-
-        return Align(
-          alignment: Alignment.topCenter,
-          child: SizedBox(
-            key: _brightnessPanelKey,
-            width: _brightnessPanelWidth,
-            height: panelHeight,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: panelColor,
-                borderRadius: BorderRadius.circular(AppDesignTokens.radiusCard),
-              ),
-              child: Column(
-                children: [
-                  CupertinoButton(
-                    key: _brightnessAutoToggleKey,
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    onPressed: () {
-                      widget.onSettingsChanged(
-                        widget.settings.copyWith(
-                          useSystemBrightness:
-                              !widget.settings.useSystemBrightness,
-                        ),
-                      );
-                    },
-                    child: SizedBox(
-                      width: _brightnessPanelWidth,
-                      height: _brightnessPanelButtonHeight,
-                      child: Icon(
-                        CupertinoIcons.brightness,
-                        size: 22,
-                        color: iconColor,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: sliderRegionHeight,
-                    child: IgnorePointer(
-                      ignoring: autoBrightness,
-                      child: Opacity(
-                        opacity: autoBrightness ? 0.35 : 1.0,
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final sliderLength = (constraints.maxHeight - 6)
-                                .clamp(24.0, _brightnessSliderMaxLength)
-                                .toDouble();
-                            return Center(
-                              child: SizedBox(
-                                width: sliderLength,
-                                child: RotatedBox(
-                                  quarterTurns: 3,
-                                  child: CupertinoSlider(
-                                    value: _safeFinite(
-                                      widget.settings.brightness,
-                                      fallback: 1.0,
-                                    ).clamp(0.0, 1.0).toDouble(),
-                                    min: 0.0,
-                                    max: 1.0,
-                                    activeColor: accent,
-                                    thumbColor: _isDarkMode
-                                        ? CupertinoColors.white
-                                        : accent,
-                                    onChanged: (value) {
-                                      widget.onSettingsChanged(
-                                        widget.settings
-                                            .copyWith(brightness: value),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                  CupertinoButton(
-                    key: _brightnessPositionToggleKey,
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    onPressed: () {
-                      widget.onSettingsChanged(
-                        widget.settings.copyWith(
-                          brightnessViewOnRight:
-                              !widget.settings.brightnessViewOnRight,
-                        ),
-                      );
-                    },
-                    child: SizedBox(
-                      width: _brightnessPanelWidth,
-                      height: _brightnessPanelButtonHeight,
-                      child: Icon(
-                        CupertinoIcons.arrow_left_right,
-                        size: 20,
-                        color: foreground,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 

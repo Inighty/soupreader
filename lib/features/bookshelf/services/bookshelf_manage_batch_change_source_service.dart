@@ -9,44 +9,9 @@ import '../../reader/services/reader_source_switch_helper.dart';
 import '../../../core/models/book_source.dart';
 import '../../source/services/rule_parser/rule_parser_engine.dart';
 import '../models/book.dart';
+import 'bookshelf_manage_batch_change_source_models.dart';
 
-class BookshelfManageBatchChangeSourceProgress {
-  final int current;
-  final int total;
-  final Book book;
-
-  const BookshelfManageBatchChangeSourceProgress({
-    required this.current,
-    required this.total,
-    required this.book,
-  });
-
-  String get progressText => '$current / $total';
-}
-
-enum BookshelfManageBatchChangeSourceItemStatus {
-  success,
-  skipped,
-  failed,
-}
-
-class BookshelfManageBatchChangeSourceSummary {
-  final int totalCount;
-  final int successCount;
-  final int skippedCount;
-  final int failedCount;
-  final bool cancelled;
-  final List<String> failedDetails;
-
-  const BookshelfManageBatchChangeSourceSummary({
-    required this.totalCount,
-    required this.successCount,
-    required this.skippedCount,
-    required this.failedCount,
-    required this.cancelled,
-    required this.failedDetails,
-  });
-}
+export 'bookshelf_manage_batch_change_source_models.dart';
 
 class BookshelfManageBatchChangeSourceService {
   static const _uuid = Uuid();
@@ -164,29 +129,29 @@ class BookshelfManageBatchChangeSourceService {
     );
   }
 
-  Future<_BatchChangeSourceItemResult> _changeSingleBookSource({
+  Future<BatchChangeSourceItemResult> _changeSingleBookSource({
     required Book book,
     required BookSource targetSource,
     required CancelToken? cancelToken,
   }) async {
     if (_isCancelled(cancelToken)) {
-      return const _BatchChangeSourceItemResult.cancelled();
+      return const BatchChangeSourceItemResult.cancelled();
     }
 
     if (book.isLocal) {
-      return const _BatchChangeSourceItemResult.skipped('本地书籍不参与批量换源');
+      return const BatchChangeSourceItemResult.skipped('本地书籍不参与批量换源');
     }
 
     final currentSourceUrl = (book.sourceUrl ?? book.sourceId ?? '').trim();
     final targetSourceUrl = targetSource.bookSourceUrl.trim();
     if (_normalizeForCompare(currentSourceUrl) ==
         _normalizeForCompare(targetSourceUrl)) {
-      return const _BatchChangeSourceItemResult.skipped('当前书籍已使用目标书源');
+      return const BatchChangeSourceItemResult.skipped('当前书籍已使用目标书源');
     }
 
     final keyword = book.title.trim();
     if (keyword.isEmpty) {
-      return const _BatchChangeSourceItemResult.failed('书名为空，无法换源');
+      return const BatchChangeSourceItemResult.failed('书名为空，无法换源');
     }
 
     SearchResult? matchedResult;
@@ -201,13 +166,13 @@ class BookshelfManageBatchChangeSourceService {
         cancelToken: cancelToken,
       );
       if (_isCancelled(cancelToken)) {
-        return const _BatchChangeSourceItemResult.cancelled();
+        return const BatchChangeSourceItemResult.cancelled();
       }
       if (list.isNotEmpty) {
         matchedResult = list.first;
       }
       if (matchedResult == null) {
-        return const _BatchChangeSourceItemResult.skipped('目标书源未匹配到书籍');
+        return const BatchChangeSourceItemResult.skipped('目标书源未匹配到书籍');
       }
     } catch (error, stackTrace) {
       _recordFailure(
@@ -218,7 +183,7 @@ class BookshelfManageBatchChangeSourceService {
         book: book,
         targetSource: targetSource,
       );
-      return _BatchChangeSourceItemResult.failed(
+      return BatchChangeSourceItemResult.failed(
         '搜索失败：${_compactReason(error.toString())}',
       );
     }
@@ -232,7 +197,7 @@ class BookshelfManageBatchChangeSourceService {
         cancelToken: cancelToken,
       );
       if (_isCancelled(cancelToken)) {
-        return const _BatchChangeSourceItemResult.cancelled();
+        return const BatchChangeSourceItemResult.cancelled();
       }
     } catch (error, stackTrace) {
       _recordFailure(
@@ -243,7 +208,7 @@ class BookshelfManageBatchChangeSourceService {
         book: book,
         targetSource: targetSource,
       );
-      return _BatchChangeSourceItemResult.failed(
+      return BatchChangeSourceItemResult.failed(
         '获取详情失败：${_compactReason(error.toString())}',
       );
     }
@@ -252,7 +217,7 @@ class BookshelfManageBatchChangeSourceService {
         detail?.tocUrl.trim().isNotEmpty == true ? detail!.tocUrl.trim() : '';
     final fallbackTocUrl = matchedResult.bookUrl.trim();
     if (primaryTocUrl.isEmpty && fallbackTocUrl.isEmpty) {
-      return const _BatchChangeSourceItemResult.failed('详情链接为空，无法换源');
+      return const BatchChangeSourceItemResult.failed('详情链接为空，无法换源');
     }
 
     List<TocItem> toc;
@@ -264,10 +229,10 @@ class BookshelfManageBatchChangeSourceService {
         cancelToken: cancelToken,
       );
       if (_isCancelled(cancelToken)) {
-        return const _BatchChangeSourceItemResult.cancelled();
+        return const BatchChangeSourceItemResult.cancelled();
       }
       if (toc.isEmpty) {
-        return const _BatchChangeSourceItemResult.failed(
+        return const BatchChangeSourceItemResult.failed(
           '目录为空（可能是 ruleToc 不匹配）',
           applyDelay: true,
         );
@@ -281,7 +246,7 @@ class BookshelfManageBatchChangeSourceService {
         book: book,
         targetSource: targetSource,
       );
-      return _BatchChangeSourceItemResult.failed(
+      return BatchChangeSourceItemResult.failed(
         '获取目录失败：${_compactReason(error.toString())}',
         applyDelay: true,
       );
@@ -292,7 +257,7 @@ class BookshelfManageBatchChangeSourceService {
       toc: toc,
     );
     if (nextChapters.isEmpty) {
-      return const _BatchChangeSourceItemResult.failed('目录解析失败：章节为空');
+      return const BatchChangeSourceItemResult.failed('目录解析失败：章节为空');
     }
 
     final storedBook = _bookRepository.getBookById(book.id) ?? book;
@@ -360,7 +325,7 @@ class BookshelfManageBatchChangeSourceService {
           currentChapter: targetIndex,
         ),
       );
-      return const _BatchChangeSourceItemResult.success();
+      return const BatchChangeSourceItemResult.success();
     } catch (error, stackTrace) {
       _recordFailure(
         node: 'bookshelf_manage.menu_change_source.persist',
@@ -370,7 +335,7 @@ class BookshelfManageBatchChangeSourceService {
         book: book,
         targetSource: targetSource,
       );
-      return _BatchChangeSourceItemResult.failed(
+      return BatchChangeSourceItemResult.failed(
         '换源写入失败：${_compactReason(error.toString())}',
         applyDelay: true,
       );
@@ -514,55 +479,4 @@ class BookshelfManageBatchChangeSourceService {
       },
     );
   }
-}
-
-class _BatchChangeSourceItemResult {
-  final BookshelfManageBatchChangeSourceItemStatus status;
-  final String message;
-  final bool cancelled;
-  final bool applyDelay;
-
-  const _BatchChangeSourceItemResult._({
-    required this.status,
-    required this.message,
-    required this.cancelled,
-    required this.applyDelay,
-  });
-
-  const _BatchChangeSourceItemResult.success({
-    bool applyDelay = true,
-  }) : this._(
-          status: BookshelfManageBatchChangeSourceItemStatus.success,
-          message: '',
-          cancelled: false,
-          applyDelay: applyDelay,
-        );
-
-  const _BatchChangeSourceItemResult.skipped(
-    String message, {
-    bool applyDelay = false,
-  }) : this._(
-          status: BookshelfManageBatchChangeSourceItemStatus.skipped,
-          message: message,
-          cancelled: false,
-          applyDelay: applyDelay,
-        );
-
-  const _BatchChangeSourceItemResult.failed(
-    String message, {
-    bool applyDelay = false,
-  }) : this._(
-          status: BookshelfManageBatchChangeSourceItemStatus.failed,
-          message: message,
-          cancelled: false,
-          applyDelay: applyDelay,
-        );
-
-  const _BatchChangeSourceItemResult.cancelled()
-      : this._(
-          status: BookshelfManageBatchChangeSourceItemStatus.skipped,
-          message: '已取消',
-          cancelled: true,
-          applyDelay: false,
-        );
 }

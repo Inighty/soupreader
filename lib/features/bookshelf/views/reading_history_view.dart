@@ -13,13 +13,8 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/services/settings_service.dart';
 import '../../reader/views/reader_view.dart';
-import '../../search/models/search_scope_group_helper.dart';
 import '../models/book.dart';
-
-enum _ReadRecordTopMenuAction {
-  sort,
-  toggleRecord,
-}
+import 'reading_history_helpers.dart';
 
 /// 阅读记录
 ///
@@ -35,16 +30,12 @@ class ReadingHistoryView extends StatefulWidget {
 }
 
 class _ReadingHistoryViewState extends State<ReadingHistoryView> {
-  static const int _readRecordSortByName = 0;
-  static const int _readRecordSortByReadLong = 1;
-  static const int _readRecordSortByReadTime = 2;
-
   final GlobalKey _moreMenuKey = GlobalKey();
   late final BookRepository _bookRepo;
   late final SettingsService _settingsService;
   final TextEditingController _searchController = TextEditingController();
   bool _enableReadRecord = true;
-  int _readRecordSort = _readRecordSortByName;
+  int _readRecordSort = ReadingHistorySort.byName;
   String _searchQuery = '';
   bool _clearingAll = false;
 
@@ -55,7 +46,7 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
     _settingsService = SettingsService();
     _enableReadRecord = _settingsService.enableReadRecord;
     _readRecordSort = _settingsService.getReadRecordSort(
-      fallback: _readRecordSortByName,
+      fallback: ReadingHistorySort.byName,
     );
   }
 
@@ -85,7 +76,11 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
                   growable: false,
                 ),
           );
-          _sortHistory(history, readRecordDurationByBookId);
+          sortReadingHistory(
+            books: history,
+            sortMode: _readRecordSort,
+            readRecordDurationByBookId: readRecordDurationByBookId,
+          );
           final filteredHistory = _applySearchFilter(history);
           final totalReadDurationMs =
               _settingsService.getTotalBookReadRecordDurationMs();
@@ -185,7 +180,7 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _formatDuration(allTimeMs),
+                    formatReadingDuration(allTimeMs),
                     style: theme.textTheme.textStyle.copyWith(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
@@ -298,81 +293,24 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
     Book book,
     Map<String, int> readRecordDurationByBookId,
   ) {
-    final lastRead = book.lastReadTime;
     final readDuration = readRecordDurationByBookId[book.id] ?? 0;
-    final lastReadText = lastRead == null
-        ? '—'
-        : '${lastRead.year}-${_two(lastRead.month)}-${_two(lastRead.day)}';
-    return '阅读时长 ${_formatDuration(readDuration)}\n最近阅读 $lastReadText';
-  }
-
-  String _two(int v) => v.toString().padLeft(2, '0');
-
-  String _formatDuration(int milliseconds) {
-    final safeMs = milliseconds < 0 ? 0 : milliseconds;
-    final days = safeMs ~/ (1000 * 60 * 60 * 24);
-    final hours = (safeMs % (1000 * 60 * 60 * 24)) ~/ (1000 * 60 * 60);
-    final minutes = (safeMs % (1000 * 60 * 60)) ~/ (1000 * 60);
-    final seconds = (safeMs % (1000 * 60)) ~/ 1000;
-    final dayText = days > 0 ? '${days}天' : '';
-    final hourText = hours > 0 ? '${hours}小时' : '';
-    final minuteText = minutes > 0 ? '${minutes}分钟' : '';
-    final secondText = seconds > 0 ? '${seconds}秒' : '';
-    final text = '$dayText$hourText$minuteText$secondText';
-    if (text.trim().isEmpty) {
-      return '0秒';
-    }
-    return text;
-  }
-
-  void _sortHistory(
-    List<Book> books,
-    Map<String, int> readRecordDurationByBookId,
-  ) {
-    if (_readRecordSort == _readRecordSortByReadLong) {
-      books.sort((left, right) {
-        final leftDuration = readRecordDurationByBookId[left.id] ?? 0;
-        final rightDuration = readRecordDurationByBookId[right.id] ?? 0;
-        final byDuration = rightDuration.compareTo(leftDuration);
-        if (byDuration != 0) return byDuration;
-        return _compareByReadTimeDescThenTitle(left, right);
-      });
-      return;
-    }
-    if (_readRecordSort == _readRecordSortByReadTime) {
-      books.sort(_compareByReadTimeDescThenTitle);
-      return;
-    }
-    books.sort(_compareByNameLikeLegado);
-  }
-
-  int _compareByReadTimeDescThenTitle(Book left, Book right) {
-    final leftTime =
-        left.lastReadTime ?? DateTime.fromMillisecondsSinceEpoch(0);
-    final rightTime =
-        right.lastReadTime ?? DateTime.fromMillisecondsSinceEpoch(0);
-    final byReadTime = rightTime.compareTo(leftTime);
-    if (byReadTime != 0) return byReadTime;
-    return _compareByNameLikeLegado(left, right);
-  }
-
-  int _compareByNameLikeLegado(Book left, Book right) {
-    return SearchScopeGroupHelper.cnCompareLikeLegado(left.title, right.title);
+    return '阅读时长 ${formatReadingDuration(readDuration)}\n'
+        '最近阅读 ${formatReadingHistoryDate(book.lastReadTime)}';
   }
 
   Future<void> _showTopActions() async {
     if (!mounted) return;
-    final selected = await showAppPopoverMenu<_ReadRecordTopMenuAction>(
+    final selected = await showAppPopoverMenu<ReadingHistoryTopMenuAction>(
       context: context,
       anchorKey: _moreMenuKey,
       items: [
         const AppPopoverMenuItem(
-          value: _ReadRecordTopMenuAction.sort,
+          value: ReadingHistoryTopMenuAction.sort,
           icon: CupertinoIcons.arrow_up_arrow_down,
           label: '排序',
         ),
         AppPopoverMenuItem(
-          value: _ReadRecordTopMenuAction.toggleRecord,
+          value: ReadingHistoryTopMenuAction.toggleRecord,
           icon: CupertinoIcons.check_mark,
           label: '${_enableReadRecord ? '✓ ' : ''}开启记录',
         ),
@@ -380,10 +318,10 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
     );
     if (!mounted || selected == null) return;
     switch (selected) {
-      case _ReadRecordTopMenuAction.sort:
+      case ReadingHistoryTopMenuAction.sort:
         await _showSortActions();
         break;
-      case _ReadRecordTopMenuAction.toggleRecord:
+      case ReadingHistoryTopMenuAction.toggleRecord:
         final nextValue = !_enableReadRecord;
         await _settingsService.saveEnableReadRecord(nextValue);
         if (!mounted) return;
@@ -399,21 +337,22 @@ class _ReadingHistoryViewState extends State<ReadingHistoryView> {
       anchorKey: _moreMenuKey,
       items: [
         AppPopoverMenuItem(
-          value: _readRecordSortByName,
+          value: ReadingHistorySort.byName,
           icon: CupertinoIcons.textformat,
-          label: '${_readRecordSort == _readRecordSortByName ? '✓ ' : ''}名称排序',
+          label:
+              '${_readRecordSort == ReadingHistorySort.byName ? '✓ ' : ''}名称排序',
         ),
         AppPopoverMenuItem(
-          value: _readRecordSortByReadLong,
+          value: ReadingHistorySort.byReadLong,
           icon: CupertinoIcons.time,
           label:
-              '${_readRecordSort == _readRecordSortByReadLong ? '✓ ' : ''}阅读时长排序',
+              '${_readRecordSort == ReadingHistorySort.byReadLong ? '✓ ' : ''}阅读时长排序',
         ),
         AppPopoverMenuItem(
-          value: _readRecordSortByReadTime,
+          value: ReadingHistorySort.byReadTime,
           icon: CupertinoIcons.clock,
           label:
-              '${_readRecordSort == _readRecordSortByReadTime ? '✓ ' : ''}阅读时间排序',
+              '${_readRecordSort == ReadingHistorySort.byReadTime ? '✓ ' : ''}阅读时间排序',
         ),
       ],
     );

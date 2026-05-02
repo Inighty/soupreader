@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
+import 'appearance_settings_dialogs.dart';
 
 class AppearanceSettingsView extends StatefulWidget {
   const AppearanceSettingsView({super.key});
@@ -22,7 +23,6 @@ class AppearanceSettingsView extends StatefulWidget {
 }
 
 class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
-  static const String _defaultInputActionToken = '__default__';
   static const List<({String value, String label})> _launcherIconOptions = [
     (value: AppSettings.defaultLauncherIcon, label: 'iconMain'),
     (value: 'launcher1', label: 'icon1'),
@@ -118,59 +118,11 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
     final currentIndex = _launcherIconOptions.indexWhere(
       (option) => option.value == _settings.launcherIcon,
     );
-    var pendingIndex = currentIndex >= 0 ? currentIndex : 0;
-    final controller = FixedExtentScrollController(initialItem: pendingIndex);
-    final selected = await showCupertinoBottomSheetDialog<int>(
+    final selected = await showLauncherIconPicker(
       context: context,
-      builder: (dialogContext) => Container(
-        height: 300,
-        color: CupertinoDynamicColor.resolve(
-          CupertinoColors.systemBackground.resolveFrom(context),
-          dialogContext,
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              SizedBox(
-                height: 44,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    CupertinoButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: const Text('取消'),
-                    ),
-                    CupertinoButton(
-                      onPressed: () =>
-                          Navigator.of(dialogContext).pop(pendingIndex),
-                      child: const Text('确定'),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: CupertinoPicker(
-                  scrollController: controller,
-                  itemExtent: 36,
-                  onSelectedItemChanged: (index) {
-                    pendingIndex = index;
-                  },
-                  children: _launcherIconOptions
-                      .map(
-                        (option) => Center(
-                          child: Text(option.label),
-                        ),
-                      )
-                      .toList(growable: false),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      options: _launcherIconOptions,
+      currentIndex: currentIndex,
     );
-    controller.dispose();
     if (selected == null || selected == currentIndex) return;
     await _settingsService
         .saveLauncherIcon(_launcherIconOptions[selected].value);
@@ -183,7 +135,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
       initialValue: _settings.barElevation.toString(),
     );
     if (value == null) return;
-    if (value == _defaultInputActionToken) {
+    if (value == kAppearanceDefaultInputActionToken) {
       await _settingsService.saveBarElevation(AppSettings.defaultBarElevation);
       return;
     }
@@ -202,7 +154,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
       initialValue: _settings.fontScale.toString(),
     );
     if (value == null) return;
-    if (value == _defaultInputActionToken) {
+    if (value == kAppearanceDefaultInputActionToken) {
       await _settingsService.saveFontScale(AppSettings.defaultFontScale);
       return;
     }
@@ -342,7 +294,7 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
       initialValue: currentValue.toString(),
     );
     if (value == null) return;
-    if (value == _defaultInputActionToken) {
+    if (value == kAppearanceDefaultInputActionToken) {
       await _saveBackgroundImageBlurring(
         night: night,
         value: AppSettings.defaultBackgroundImageBlurring,
@@ -378,72 +330,21 @@ class _AppearanceSettingsViewState extends State<AppearanceSettingsView> {
     required String title,
     required String placeholder,
     required String initialValue,
-  }) async {
-    final controller = TextEditingController(text: initialValue);
-    return showCupertinoBottomSheetDialog<String>(
+  }) {
+    return showAppearanceIntegerInputDialog(
       context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            placeholder: placeholder,
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(_defaultInputActionToken),
-            child: const Text('默认'),
-          ),
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.of(dialogContext).pop(
-              controller.text.trim(),
-            ),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+      title: title,
+      placeholder: placeholder,
+      initialValue: initialValue,
     );
   }
 
-  Future<void> _showValidationMessage(String message) async {
-    await showCupertinoBottomSheetDialog<void>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('输入无效'),
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('知道了'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _showValidationMessage(String message) {
+    return showAppearanceValidationMessage(context, message);
   }
 
-  Future<void> _showMessage(String message) async {
-    await showCupertinoBottomSheetDialog<void>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('提示'),
-        content: Text('\n$message'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('好'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _showMessage(String message) {
+    return showAppearanceMessage(context, message);
   }
 
   @override

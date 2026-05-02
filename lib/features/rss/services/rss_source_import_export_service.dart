@@ -10,6 +10,10 @@ import 'package:path_provider/path_provider.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
 import '../../../core/utils/legado_json.dart';
 import '../models/rss_source.dart';
+import 'rss_source_import_helpers.dart';
+import 'rss_source_io_models.dart';
+
+export 'rss_source_io_models.dart';
 
 typedef RssSourceImportHttpFetcher = Future<Response<String>> Function(
   Uri uri, {
@@ -19,7 +23,6 @@ typedef RssSourceImportHttpFetcher = Future<Response<String>> Function(
 /// RSS 订阅源导入服务（对齐 legado ImportRssSource 语义）
 class RssSourceImportExportService {
   static const String requestWithoutUaSuffix = '#requestWithoutUA';
-  static const int _maxImportDepth = 3;
 
   RssSourceImportExportService({
     RssSourceImportHttpFetcher? httpFetcher,
@@ -62,104 +65,6 @@ class RssSourceImportExportService {
     return _defaultFetch(uri, requestWithoutUa: requestWithoutUa);
   }
 
-  String? _buildRedirectHint({
-    required Uri requested,
-    required Uri? resolved,
-  }) {
-    if (resolved == null) return null;
-    final from = requested.toString().trim();
-    final to = resolved.toString().trim();
-    if (from.isEmpty || to.isEmpty || from == to) {
-      return null;
-    }
-    return '已跟随重定向：$from -> $to';
-  }
-
-  bool _isLikelyCorsError(String text) {
-    final lower = text.toLowerCase();
-    return lower.contains('xmlhttprequest') ||
-        lower.contains('cors') ||
-        lower.contains('cross-origin') ||
-        lower.contains('access-control-allow-origin');
-  }
-
-  String _networkErrorMessage(Object error) {
-    if (error is DioException) {
-      switch (error.type) {
-        case DioExceptionType.connectionTimeout:
-          return '网络请求失败：连接超时';
-        case DioExceptionType.sendTimeout:
-          return '网络请求失败：发送超时';
-        case DioExceptionType.receiveTimeout:
-          return '网络请求失败：接收超时';
-        case DioExceptionType.badCertificate:
-          return '网络请求失败：证书异常';
-        case DioExceptionType.cancel:
-          return '网络请求已取消';
-        case DioExceptionType.badResponse:
-          final status = error.response?.statusCode;
-          if (status != null) {
-            return '网络请求失败（HTTP $status）';
-          }
-          break;
-        case DioExceptionType.connectionError:
-        case DioExceptionType.unknown:
-          break;
-      }
-      final message = error.message?.trim();
-      if (message != null && message.isNotEmpty) {
-        return '网络请求失败: $message';
-      }
-    }
-    return '网络请求失败: $error';
-  }
-
-  bool _isHttpUrl(String value) {
-    final uri = Uri.tryParse(value);
-    if (uri == null || uri.host.isEmpty) return false;
-    return uri.scheme == 'http' || uri.scheme == 'https';
-  }
-
-  List<String>? _extractSourceUrls(dynamic decoded) {
-    if (decoded is! Map) return null;
-    if (!decoded.containsKey('sourceUrls')) return null;
-
-    final urls = <String>[];
-    void addUrl(dynamic value) {
-      final text = value?.toString().trim();
-      if (text == null || text.isEmpty) return;
-      urls.add(text);
-    }
-
-    final raw = _decodeNestedJsonValue(decoded['sourceUrls']);
-    if (raw is List) {
-      for (final item in raw) {
-        addUrl(item);
-      }
-    } else if (raw is String) {
-      final normalized = _sanitizeJsonInput(raw);
-      if (normalized.startsWith('[')) {
-        final nested = _decodeNestedJsonValue(normalized);
-        if (nested is List) {
-          for (final item in nested) {
-            addUrl(item);
-          }
-        } else {
-          addUrl(normalized);
-        }
-      } else {
-        final parts = normalized.split(RegExp(r'[\n,]'));
-        for (final part in parts) {
-          addUrl(part);
-        }
-      }
-    } else {
-      addUrl(raw);
-    }
-
-    return urls;
-  }
-
   Future<RssSourceImportResult> _importFromSourceUrls(
     List<String> sourceUrls, {
     required int depth,
@@ -177,7 +82,7 @@ class RssSourceImportExportService {
         warnings.add('sourceUrls 第${i + 1}项为空，已跳过');
         continue;
       }
-      if (!_isHttpUrl(targetUrl)) {
+      if (!isHttpUrl(targetUrl)) {
         invalidCount++;
         warnings.add('sourceUrls 第${i + 1}项不是有效 http/https 链接：$targetUrl');
         continue;
@@ -238,14 +143,14 @@ class RssSourceImportExportService {
     String text, {
     required int depth,
   }) async {
-    if (depth > _maxImportDepth) {
+    if (depth > kRssSourceImportMaxDepth) {
       return const RssSourceImportResult(
         success: false,
         errorMessage: '导入层级过深，请检查输入内容是否循环引用',
       );
     }
 
-    final raw = _sanitizeJsonInput(text);
+    final raw = sanitizeJsonInput(text);
     if (raw.isEmpty) {
       return const RssSourceImportResult(
         success: false,
@@ -253,14 +158,14 @@ class RssSourceImportExportService {
       );
     }
 
-    if (_isHttpUrl(raw)) {
+    if (isHttpUrl(raw)) {
       return _importFromUrl(raw, depth: depth + 1);
     }
 
     dynamic decoded;
     try {
       decoded = json.decode(raw);
-      decoded = _decodeNestedJsonValue(decoded);
+      decoded = decodeNestedJsonValue(decoded);
     } catch (_) {
       return const RssSourceImportResult(
         success: false,
@@ -268,7 +173,7 @@ class RssSourceImportExportService {
       );
     }
 
-    final sourceUrls = _extractSourceUrls(decoded);
+    final sourceUrls = extractSourceUrlsFromDecoded(decoded);
     if (sourceUrls != null) {
       if (sourceUrls.isEmpty) {
         return const RssSourceImportResult(
@@ -341,7 +246,7 @@ class RssSourceImportExportService {
     String url, {
     required int depth,
   }) async {
-    if (depth > _maxImportDepth) {
+    if (depth > kRssSourceImportMaxDepth) {
       return const RssSourceImportResult(
         success: false,
         errorMessage: '导入层级过深，请检查输入内容是否循环引用',
@@ -349,7 +254,7 @@ class RssSourceImportExportService {
     }
 
     final normalized = url.trim();
-    if (!_isHttpUrl(normalized)) {
+    if (!isHttpUrl(normalized)) {
       return const RssSourceImportResult(
         success: false,
         errorMessage: '请输入有效的 http/https 链接',
@@ -367,7 +272,7 @@ class RssSourceImportExportService {
     }
 
     final uri = Uri.tryParse(requestUrl);
-    if (uri == null || !_isHttpUrl(requestUrl)) {
+    if (uri == null || !isHttpUrl(requestUrl)) {
       return const RssSourceImportResult(
         success: false,
         errorMessage: '链接格式错误',
@@ -397,7 +302,7 @@ class RssSourceImportExportService {
 
       final result = await _importFromText(data, depth: depth + 1);
       final warnings = <String>[];
-      final redirectHint = _buildRedirectHint(
+      final redirectHint = buildRedirectHint(
         requested: uri,
         resolved: response.realUri,
       );
@@ -412,11 +317,11 @@ class RssSourceImportExportService {
       }
       return result.copyWithMergedWarnings(warnings);
     } catch (error) {
-      final message = _networkErrorMessage(error);
-      if (_isWeb && _isLikelyCorsError(message)) {
+      final message = describeRssNetworkError(error);
+      if (_isWeb && isLikelyCorsError(message)) {
         return const RssSourceImportResult(
           success: false,
-          errorMessage: '网络导入失败：浏览器跨域限制（CORS），请改用“扫码导入”或“文件导入”',
+          errorMessage: '网络导入失败：浏览器跨域限制（CORS），请改用"扫码导入"或"文件导入"',
         );
       }
       return RssSourceImportResult(
@@ -427,7 +332,7 @@ class RssSourceImportExportService {
   }
 
   RssSourceImportResult importFromJson(String jsonString) {
-    final raw = _sanitizeJsonInput(jsonString);
+    final raw = sanitizeJsonInput(jsonString);
     if (raw.isEmpty) {
       return const RssSourceImportResult(
         success: false,
@@ -438,7 +343,7 @@ class RssSourceImportExportService {
     dynamic decoded;
     try {
       decoded = json.decode(raw);
-      decoded = _decodeNestedJsonValue(decoded);
+      decoded = decodeNestedJsonValue(decoded);
     } catch (e) {
       return RssSourceImportResult(
         success: false,
@@ -535,33 +440,6 @@ class RssSourceImportExportService {
     );
   }
 
-  String _sanitizeJsonInput(String raw) {
-    var normalized = raw.trim();
-    if (normalized.startsWith('\uFEFF')) {
-      normalized = normalized.substring(1);
-    }
-    return normalized;
-  }
-
-  dynamic _decodeNestedJsonValue(dynamic value, {int depth = 0}) {
-    if (depth >= _maxImportDepth) return value;
-    if (value is String) {
-      final text = _sanitizeJsonInput(value);
-      if (text.isEmpty) return value;
-      final first = text[0];
-      if (first != '{' && first != '[' && first != '"') {
-        return value;
-      }
-      try {
-        final decoded = json.decode(text);
-        return _decodeNestedJsonValue(decoded, depth: depth + 1);
-      } catch (_) {
-        return value;
-      }
-    }
-    return value;
-  }
-
   /// 导出订阅源为 JSON
   String exportToJson(List<RssSource> sources) {
     final jsonList =
@@ -617,73 +495,5 @@ class RssSourceImportExportService {
     } catch (_) {
       return null;
     }
-  }
-}
-
-class RssSourceExportFileResult {
-  const RssSourceExportFileResult({
-    this.success = false,
-    this.cancelled = false,
-    this.outputPath,
-    this.errorMessage,
-  });
-
-  final bool success;
-  final bool cancelled;
-  final String? outputPath;
-  final String? errorMessage;
-}
-
-class RssSourceImportResult {
-  const RssSourceImportResult({
-    this.success = false,
-    this.cancelled = false,
-    this.errorMessage,
-    this.sources = const <RssSource>[],
-    this.importCount = 0,
-    this.totalInputCount = 0,
-    this.invalidCount = 0,
-    this.duplicateCount = 0,
-    this.warnings = const <String>[],
-    this.sourceRawJsonByUrl = const <String, String>{},
-  });
-
-  final bool success;
-  final bool cancelled;
-  final String? errorMessage;
-  final List<RssSource> sources;
-  final int importCount;
-  final int totalInputCount;
-  final int invalidCount;
-  final int duplicateCount;
-  final List<String> warnings;
-  final Map<String, String> sourceRawJsonByUrl;
-
-  bool get hasWarnings => warnings.isNotEmpty;
-
-  String? rawJsonForSourceUrl(String url) {
-    final key = url.trim();
-    if (key.isEmpty) return null;
-    return sourceRawJsonByUrl[key];
-  }
-
-  RssSourceImportResult copyWithMergedWarnings(List<String> extraWarnings) {
-    if (extraWarnings.isEmpty) return this;
-    final merged = <String>[
-      ...warnings,
-      ...extraWarnings.where((item) => item.trim().isNotEmpty),
-    ];
-    return RssSourceImportResult(
-      success: success,
-      cancelled: cancelled,
-      errorMessage: errorMessage,
-      sources: sources,
-      importCount: importCount,
-      totalInputCount: totalInputCount,
-      invalidCount: invalidCount,
-      duplicateCount: duplicateCount,
-      warnings: merged,
-      sourceRawJsonByUrl: sourceRawJsonByUrl,
-    );
   }
 }

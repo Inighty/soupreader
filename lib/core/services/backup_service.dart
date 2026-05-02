@@ -15,9 +15,14 @@ import '../database/repositories/replace_rule_repository.dart';
 import '../models/backup_restore_ignore_config.dart';
 import '../database/repositories/source_repository.dart';
 import 'backup_restore_ignore_service.dart';
+import 'backup_service_legacy_parsers.dart';
+import 'backup_service_models.dart';
+import 'backup_service_serialization.dart';
 import 'settings_service.dart';
 import '../models/app_settings.dart';
 import '../utils/file_picker_save_compat.dart';
+
+export 'backup_service_models.dart';
 
 /// 备份/恢复服务
 ///
@@ -449,279 +454,46 @@ class BackupService {
     }
   }
 
-  Book? _parseOldBook(Map<String, dynamic> map) {
-    String readText(dynamic raw) {
-      if (raw == null) return '';
-      return raw.toString().trim();
-    }
+  Book? _parseOldBook(Map<String, dynamic> map) =>
+      parseLegacyBackupBook(map);
 
-    int readInt(dynamic raw) {
-      if (raw is int) return raw;
-      if (raw is num) return raw.toInt();
-      if (raw is String) return int.tryParse(raw.trim()) ?? 0;
-      return 0;
-    }
-
-    double readDouble(dynamic raw) {
-      if (raw is double) return raw;
-      if (raw is num) return raw.toDouble();
-      if (raw is String) return double.tryParse(raw.trim()) ?? 0.0;
-      return 0.0;
-    }
-
-    DateTime? readDate(dynamic raw) {
-      final ms = readInt(raw);
-      if (ms <= 0) return null;
-      return DateTime.fromMillisecondsSinceEpoch(ms);
-    }
-
-    final infoRaw = map['bookInfoBean'];
-    final info = infoRaw is Map
-        ? infoRaw.map((k, v) => MapEntry('$k', v))
-        : const <String, dynamic>{};
-
-    var title = readText(map['title']);
-    if (title.isEmpty) title = readText(info['name']);
-    var author = readText(map['author']);
-    if (author.isEmpty) author = readText(info['author']);
-    final bookUrl = readText(map['bookUrl']).isNotEmpty
-        ? readText(map['bookUrl'])
-        : readText(map['noteUrl']);
-    if (title.isEmpty && bookUrl.isEmpty) return null;
-    final idCandidate = readText(map['id']);
-    final resolvedId = idCandidate.isNotEmpty
-        ? idCandidate
-        : (bookUrl.isNotEmpty
-            ? bookUrl
-            : '${title}_${author}_${DateTime.now().millisecondsSinceEpoch}');
-    final totalChapters = readInt(map['totalChapters']) > 0
-        ? readInt(map['totalChapters'])
-        : readInt(map['chapterListSize']);
-    final currentChapter = readInt(map['currentChapter']) > 0
-        ? readInt(map['currentChapter'])
-        : readInt(map['durChapter']);
-
-    final explicitProgress = readDouble(map['readProgress']);
-    final readProgress = explicitProgress > 0
-        ? explicitProgress.clamp(0.0, 1.0)
-        : (totalChapters > 0 ? (currentChapter / totalChapters) : 0.0)
-            .clamp(0.0, 1.0);
-
-    final origin = readText(map['origin']);
-    final isLocal = map['isLocal'] == true || origin == 'loc_book';
-    final coverUrl = readText(map['coverUrl']).isNotEmpty
-        ? readText(map['coverUrl'])
-        : readText(info['coverUrl']);
-    final latestChapter = readText(map['latestChapter']).isNotEmpty
-        ? readText(map['latestChapter'])
-        : readText(map['lastChapterName']);
-    final intro = readText(map['intro']).isNotEmpty
-        ? readText(map['intro'])
-        : readText(info['introduce']);
-
-    return Book(
-      id: resolvedId,
-      title: title.isEmpty ? '未命名书籍' : title,
-      author: author.isEmpty ? '未知' : author,
-      coverUrl: coverUrl.isEmpty ? null : coverUrl,
-      intro: intro.isEmpty ? null : intro,
-      sourceUrl: readText(map['sourceUrl']).isEmpty
-          ? null
-          : readText(map['sourceUrl']),
-      bookUrl: bookUrl.isEmpty ? null : bookUrl,
-      latestChapter: latestChapter.isEmpty ? null : latestChapter,
-      totalChapters: totalChapters < 0 ? 0 : totalChapters,
-      currentChapter: currentChapter < 0 ? 0 : currentChapter,
-      readProgress: readProgress,
-      lastReadTime:
-          readDate(map['lastReadTime']) ?? readDate(map['durChapterTime']),
-      addedTime: readDate(map['addedTime']) ?? readDate(map['finalDate']),
-      isLocal: isLocal,
-      localPath: readText(map['localPath']).isEmpty
-          ? null
-          : readText(map['localPath']),
-    );
-  }
-
-  BookSource? _parseOldSource(Map<String, dynamic> map) {
-    try {
-      final source = BookSource.fromJson(map);
-      if (source.bookSourceUrl.trim().isEmpty) {
-        return null;
-      }
-      return source;
-    } catch (_) {
-      return null;
-    }
-  }
+  BookSource? _parseOldSource(Map<String, dynamic> map) =>
+      parseLegacyBackupSource(map);
 
   ReplaceRule? _parseOldReplaceRule(
     Map<String, dynamic> map, {
     required int fallbackIdSeed,
-  }) {
-    try {
-      final withId = Map<String, dynamic>.from(map);
-      final rawId = withId['id'];
-      final hasValidId = rawId is num ||
-          (rawId is String && int.tryParse(rawId.trim()) != null);
-      if (!hasValidId) {
-        withId['id'] = DateTime.now().millisecondsSinceEpoch + fallbackIdSeed;
-      }
-      return ReplaceRule.fromJson(withId);
-    } catch (_) {
-      return null;
-    }
-  }
+  }) =>
+      parseLegacyBackupReplaceRule(map, fallbackIdSeed: fallbackIdSeed);
 
   AppSettings _mergeAppSettingsByIgnore({
     required AppSettings current,
     required AppSettings incoming,
     required BackupRestoreIgnoreConfig ignoreConfig,
-  }) {
-    var merged = incoming.copyWith(
-      backupPath: current.backupPath,
-      webDavDeviceName: current.webDavDeviceName,
-    );
-    if (ignoreConfig.ignoreThemeMode) {
-      merged = merged.copyWith(appearanceMode: current.appearanceMode);
-    }
-    if (ignoreConfig.ignoreBookshelfLayout) {
-      merged = merged.copyWith(
-        bookshelfViewMode: current.bookshelfViewMode,
-        bookshelfLayoutIndex: current.bookshelfLayoutIndex,
+  }) =>
+      mergeAppSettingsByIgnore(
+        current: current,
+        incoming: incoming,
+        ignoreConfig: ignoreConfig,
       );
-    }
-    if (ignoreConfig.ignoreShowRss) {
-      merged = merged.copyWith(showRss: current.showRss);
-    }
-    return merged;
-  }
 
   String _buildBackupFileName({
     required bool onlyLatestBackup,
     required String deviceName,
-  }) {
-    if (onlyLatestBackup) {
-      return 'backup.json';
-    }
-    final now = DateTime.now();
-    String two(int value) => value.toString().padLeft(2, '0');
-    var baseName = 'backup${now.year}-${two(now.month)}-${two(now.day)}';
-    final normalizedDevice = _normalizeFileNameSegment(deviceName);
-    if (normalizedDevice.isNotEmpty) {
-      baseName = '$baseName-$normalizedDevice';
-    }
-    return '$baseName.json';
-  }
-
-  String _normalizeFileNameSegment(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return '';
-    final sanitized = trimmed.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
-    if (sanitized.isEmpty) return '';
-    return sanitized;
-  }
-
-  Map<String, dynamic> _buildBackupData({required bool includeOnlineCache}) {
-    final books = _bookRepo.getAllBooks();
-    final sources = _sourceRepo.getAllSources();
-
-    final localBookIds = books.where((b) => b.isLocal).map((b) => b.id).toSet();
-    final allChapters = <Chapter>[];
-    for (final chapter in _chapterRepo.getAllChapters()) {
-      final isLocalBook = localBookIds.contains(chapter.bookId);
-      if (!isLocalBook && !includeOnlineCache) continue;
-
-      allChapters.add(
-        Chapter(
-          id: chapter.id,
-          bookId: chapter.bookId,
-          title: chapter.title,
-          url: chapter.url,
-          index: chapter.index,
-          isDownloaded: chapter.isDownloaded,
-          content: chapter.content,
-        ),
+  }) =>
+      buildBackupFileName(
+        onlyLatestBackup: onlyLatestBackup,
+        deviceName: deviceName,
       );
-    }
 
-    return {
-      'version': backupVersion,
-      'exportedAt': DateTime.now().toIso8601String(),
-      'settings': {
-        'appSettings': _settingsService.appSettings.toJson(),
-        'readingSettings': _settingsService.readingSettings.toJson(),
-      },
-      'sources': sources.map((s) => s.toJson()).toList(),
-      'books': books.map((b) => b.toJson()).toList(),
-      'chapters': allChapters.map((c) => c.toJson()).toList(),
-      'meta': {
-        'includeOnlineCache': includeOnlineCache,
-      },
-    };
-  }
+  Map<String, dynamic> _buildBackupData({required bool includeOnlineCache}) =>
+      buildBackupData(
+        includeOnlineCache: includeOnlineCache,
+        settingsService: _settingsService,
+        bookRepo: _bookRepo,
+        chapterRepo: _chapterRepo,
+        sourceRepo: _sourceRepo,
+        replaceRuleRepo: _replaceRuleRepo,
+      );
 }
 
-class BackupExportResult {
-  final bool success;
-  final bool cancelled;
-  final String? filePath;
-  final String? fileName;
-  final String? errorMessage;
-
-  const BackupExportResult({
-    this.success = false,
-    this.cancelled = false,
-    this.filePath,
-    this.fileName,
-    this.errorMessage,
-  });
-}
-
-class BackupUploadPayload {
-  final String fileName;
-  final List<int> bytes;
-
-  const BackupUploadPayload({
-    required this.fileName,
-    required this.bytes,
-  });
-}
-
-class BackupImportResult {
-  final bool success;
-  final bool cancelled;
-  final String? errorMessage;
-  final int sourcesImported;
-  final int booksImported;
-  final int chaptersImported;
-  final int ignoredLocalBooks;
-  final List<String> ignoredOptions;
-
-  const BackupImportResult({
-    this.success = false,
-    this.cancelled = false,
-    this.errorMessage,
-    this.sourcesImported = 0,
-    this.booksImported = 0,
-    this.chaptersImported = 0,
-    this.ignoredLocalBooks = 0,
-    this.ignoredOptions = const <String>[],
-  });
-}
-
-class LegacyImportResult {
-  final bool success;
-  final String? errorMessage;
-  final int booksImported;
-  final int sourcesImported;
-  final int replaceRulesImported;
-
-  const LegacyImportResult({
-    this.success = false,
-    this.errorMessage,
-    this.booksImported = 0,
-    this.sourcesImported = 0,
-    this.replaceRulesImported = 0,
-  });
-}

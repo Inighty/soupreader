@@ -1,39 +1,9 @@
 import 'package:flutter/widgets.dart';
-import 'legacy_justified_text.dart';
+import 'page_factory_models.dart';
 import 'reader_page_agent.dart';
+import 'reader_page_position_resolver.dart';
 
-/// 一页的数据，包含文本内容和可选的预排版行缓存。
-///
-/// [precomposedLines] 不为 null 时表示纯文本页，绘制时可直接复用，
-/// 跳过二次排版；为 null 时表示含图片页，走原有逻辑。
-class PageData {
-  final String text;
-  final List<LegacyComposedLine>? precomposedLines;
-
-  const PageData(this.text, {this.precomposedLines});
-
-  /// 纯文本页（携带预排版行）
-  const PageData.text(this.text, this.precomposedLines);
-
-  /// 含图片页（无预排版行）
-  const PageData.image(this.text) : precomposedLines = null;
-}
-
-enum PageRenderSlot { prev, current, next }
-
-class PageRenderPosition {
-  final int chapterIndex;
-  final int pageIndex;
-  final int totalPages;
-  final String chapterTitle;
-
-  const PageRenderPosition({
-    required this.chapterIndex,
-    required this.pageIndex,
-    required this.totalPages,
-    required this.chapterTitle,
-  });
-}
+export 'page_factory_models.dart';
 
 /// 页面工厂（对标 Legado TextPageFactory）
 /// 管理三章节页面数据，支持跨章节翻页
@@ -430,152 +400,21 @@ class PageFactory {
           ? _chapters[_currentChapterIndex].title
           : '';
 
-  PageRenderPosition resolveRenderPosition(PageRenderSlot slot) {
-    switch (slot) {
-      case PageRenderSlot.current:
-        return _resolveCurrentRenderPosition();
-      case PageRenderSlot.prev:
-        return _resolvePrevRenderPosition();
-      case PageRenderSlot.next:
-        return _resolveNextRenderPosition();
-    }
-  }
+  PageRenderPosition resolveRenderPosition(PageRenderSlot slot) =>
+      _resolver.resolveRenderPosition(slot);
 
   /// 双页模式：按逻辑页偏移量取 position（offset=1 为当前页的下一逻辑页，以此类推）
-  PageRenderPosition resolveRenderPositionByOffset(int offset) {
-    final targetIndex = _currentPageIndex + offset;
-    if (targetIndex >= 0 && targetIndex < _currentChapterPages.length) {
-      final safeChapter = _chapters.isEmpty
-          ? 0
-          : _currentChapterIndex.clamp(0, _chapters.length - 1);
-      return PageRenderPosition(
-        chapterIndex: safeChapter,
-        pageIndex: targetIndex,
-        totalPages: _currentChapterPages.length,
-        chapterTitle: currentChapterTitle,
-      );
-    }
-    if (targetIndex < 0 && _prevChapterPages.isNotEmpty) {
-      final chapterIndex = _chapters.isEmpty
-          ? 0
-          : (_currentChapterIndex - 1).clamp(0, _chapters.length - 1);
-      final title = _chapters.isNotEmpty
-          ? _chapters[chapterIndex].title
-          : currentChapterTitle;
-      final pageIndex = (_prevChapterPages.length + targetIndex)
-          .clamp(0, _prevChapterPages.length - 1);
-      return PageRenderPosition(
-        chapterIndex: chapterIndex,
-        pageIndex: pageIndex,
-        totalPages: _prevChapterPages.length,
-        chapterTitle: title,
-      );
-    }
-    if (targetIndex >= _currentChapterPages.length &&
-        _nextChapterPages.isNotEmpty) {
-      final chapterIndex = _chapters.isEmpty
-          ? 0
-          : (_currentChapterIndex + 1).clamp(0, _chapters.length - 1);
-      final title = _chapters.isNotEmpty
-          ? _chapters[chapterIndex].title
-          : currentChapterTitle;
-      final pageIndex =
-          (targetIndex - _currentChapterPages.length)
-              .clamp(0, _nextChapterPages.length - 1);
-      return PageRenderPosition(
-        chapterIndex: chapterIndex,
-        pageIndex: pageIndex,
-        totalPages: _nextChapterPages.length,
-        chapterTitle: title,
-      );
-    }
-    return _resolveCurrentRenderPosition();
-  }
+  PageRenderPosition resolveRenderPositionByOffset(int offset) =>
+      _resolver.resolveRenderPositionByOffset(offset);
 
-  PageRenderPosition _resolveCurrentRenderPosition() {
-    final total = _currentChapterPages.length;
-    final safePage = total <= 0 ? 0 : _currentPageIndex.clamp(0, total - 1);
-    final safeChapter = _chapters.isEmpty
-        ? 0
-        : _currentChapterIndex.clamp(0, _chapters.length - 1);
-    return PageRenderPosition(
-      chapterIndex: safeChapter,
-      pageIndex: safePage,
-      totalPages: total,
-      chapterTitle: currentChapterTitle,
-    );
-  }
-
-  PageRenderPosition _resolvePrevRenderPosition() {
-    if (_currentPageIndex > 0 && _currentChapterPages.isNotEmpty) {
-      final safeChapter = _chapters.isEmpty
-          ? 0
-          : _currentChapterIndex.clamp(0, _chapters.length - 1);
-      return PageRenderPosition(
-        chapterIndex: safeChapter,
-        pageIndex: _currentPageIndex - 1,
-        totalPages: _currentChapterPages.length,
-        chapterTitle: currentChapterTitle,
+  ReaderPagePositionResolver get _resolver => ReaderPagePositionResolver(
+        chapters: _chapters,
+        currentChapterIndex: _currentChapterIndex,
+        currentPageIndex: _currentPageIndex,
+        prevChapterPages: _prevChapterPages,
+        currentChapterPages: _currentChapterPages,
+        nextChapterPages: _nextChapterPages,
       );
-    }
-
-    if (_prevChapterPages.isNotEmpty) {
-      final chapterIndex = _chapters.isEmpty
-          ? 0
-          : (_currentChapterIndex - 1).clamp(0, _chapters.length - 1);
-      final title = _chapters.isNotEmpty
-          ? _chapters[chapterIndex].title
-          : currentChapterTitle;
-      return PageRenderPosition(
-        chapterIndex: chapterIndex,
-        pageIndex: _prevChapterPages.length - 1,
-        totalPages: _prevChapterPages.length,
-        chapterTitle: title,
-      );
-    }
-
-    return _resolveCurrentRenderPosition();
-  }
-
-  PageRenderPosition _resolveNextRenderPosition() {
-    if (_currentPageIndex < _currentChapterPages.length - 1 &&
-        _currentChapterPages.isNotEmpty) {
-      final safeChapter = _chapters.isEmpty
-          ? 0
-          : _currentChapterIndex.clamp(0, _chapters.length - 1);
-      return PageRenderPosition(
-        chapterIndex: safeChapter,
-        pageIndex: _currentPageIndex + 1,
-        totalPages: _currentChapterPages.length,
-        chapterTitle: currentChapterTitle,
-      );
-    }
-
-    if (_nextChapterPages.isNotEmpty) {
-      final chapterIndex = _chapters.isEmpty
-          ? 0
-          : (_currentChapterIndex + 1).clamp(0, _chapters.length - 1);
-      final title = _chapters.isNotEmpty
-          ? _chapters[chapterIndex].title
-          : currentChapterTitle;
-      return PageRenderPosition(
-        chapterIndex: chapterIndex,
-        pageIndex: 0,
-        totalPages: _nextChapterPages.length,
-        chapterTitle: title,
-      );
-    }
-
-    return _resolveCurrentRenderPosition();
-  }
 
   List<PageData> get currentPages => _currentChapterPages;
-}
-
-/// 章节数据
-class ChapterData {
-  final String title;
-  final String content;
-
-  ChapterData({required this.title, required this.content});
 }

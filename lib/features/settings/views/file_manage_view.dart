@@ -10,6 +10,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
+import 'file_manage_delete_error.dart';
+import 'file_manage_helpers.dart';
 
 class FileManageView extends StatefulWidget {
   const FileManageView({super.key});
@@ -19,14 +21,6 @@ class FileManageView extends StatefulWidget {
 }
 
 class _FileManageViewState extends State<FileManageView> {
-  static const int _osErrorOperationNotPermitted = 1;
-  static const int _osErrorNotFound = 2;
-  static const int _osErrorPathNotFound = 3;
-  static const int _osErrorAccessDenied = 5;
-  static const int _osErrorPermissionDenied = 13;
-  static const int _osErrorDirectoryNotEmpty = 39;
-  static const int _osErrorDirectoryNotEmptyWin = 145;
-
   Directory? _rootDir;
   List<Directory> _subDirs = <Directory>[];
   List<FileSystemEntity> _entities = <FileSystemEntity>[];
@@ -82,7 +76,7 @@ class _FileManageViewState extends State<FileManageView> {
     }
     try {
       final children = current.listSync(followLinks: false);
-      children.sort(_compareEntity);
+      children.sort(compareFileEntity);
       if (!mounted) return;
       setState(() {
         _entities = children;
@@ -95,43 +89,20 @@ class _FileManageViewState extends State<FileManageView> {
     }
   }
 
-  int _compareEntity(FileSystemEntity a, FileSystemEntity b) {
-    final aIsFile = a is File;
-    final bIsFile = b is File;
-    if (aIsFile != bIsFile) {
-      return aIsFile ? 1 : -1;
-    }
-    final aName = _entityName(a).toLowerCase();
-    final bName = _entityName(b).toLowerCase();
-    return aName.compareTo(bName);
-  }
-
-  String _entityName(FileSystemEntity entity) {
-    final normalized = entity.path.replaceAll('\\', '/');
-    final index = normalized.lastIndexOf('/');
-    if (index < 0 || index + 1 >= normalized.length) return normalized;
-    return normalized.substring(index + 1);
-  }
-
-  String _displayName(FileSystemEntity entity) {
-    final name = _entityName(entity).trim();
-    return name.isEmpty ? entity.path : name;
-  }
-
   bool get _atRoot => _subDirs.isEmpty;
 
-  List<_FileListEntry> _buildVisibleEntries() {
+  List<FileManageListEntry> _buildVisibleEntries() {
     final query = _searchQuery.trim().toLowerCase();
-    final result = <_FileListEntry>[];
+    final result = <FileManageListEntry>[];
     if (!_atRoot && _currentDir != null) {
-      result.add(_FileListEntry.parent(_currentDir!));
+      result.add(FileManageListEntry.parent(_currentDir!));
     }
     for (final entity in _entities) {
-      final name = _displayName(entity).toLowerCase();
+      final name = entityDisplayName(entity).toLowerCase();
       if (query.isNotEmpty && !name.contains(query)) {
         continue;
       }
-      result.add(_FileListEntry.entity(entity));
+      result.add(FileManageListEntry.entity(entity));
     }
     return result;
   }
@@ -179,7 +150,7 @@ class _FileManageViewState extends State<FileManageView> {
   Future<void> _showEntityMenu(FileSystemEntity entity) async {
     final selected = await showAppActionListSheet<_FileEntityAction>(
       context: context,
-      title: _displayName(entity),
+      title: entityDisplayName(entity),
       showCancel: true,
       items: const [
         AppActionListItem<_FileEntityAction>(
@@ -197,17 +168,17 @@ class _FileManageViewState extends State<FileManageView> {
 
   Future<void> _deleteEntity(FileSystemEntity entity) async {
     final entityPath = entity.path;
-    final displayName = _displayName(entity);
+    final displayName = entityDisplayName(entity);
     try {
       final currentType = await FileSystemEntity.type(
         entityPath,
         followLinks: false,
       );
       if (currentType == FileSystemEntityType.notFound) {
-        await _showDeleteFailureMessage(
-          type: _DeleteFailureType.targetNotFound,
+        await _showMessage(buildFileDeleteFailureMessage(
+          type: FileDeleteFailureType.targetNotFound,
           displayName: displayName,
-        );
+        ));
         return;
       }
       if (entity is Directory) {
@@ -217,125 +188,18 @@ class _FileManageViewState extends State<FileManageView> {
       }
       await _reloadCurrentDirectory();
     } on FileSystemException catch (error) {
-      await _showDeleteFailureMessage(
-        type: _resolveDeleteFailureType(error),
+      await _showMessage(buildFileDeleteFailureMessage(
+        type: resolveFileDeleteFailureType(error),
         displayName: displayName,
-        detail: _buildDeleteErrorDetail(error),
-      );
+        detail: buildFileDeleteErrorDetail(error),
+      ));
     } catch (error) {
-      await _showDeleteFailureMessage(
-        type: _DeleteFailureType.otherIo,
+      await _showMessage(buildFileDeleteFailureMessage(
+        type: FileDeleteFailureType.otherIo,
         displayName: displayName,
         detail: error.toString(),
-      );
+      ));
     }
-  }
-
-  _DeleteFailureType _resolveDeleteFailureType(FileSystemException error) {
-    final osCode = error.osError?.errorCode;
-    final mergedMessage =
-        '${error.message} ${error.osError?.message ?? ''}'.toLowerCase();
-
-    if (osCode == _osErrorDirectoryNotEmpty ||
-        osCode == _osErrorDirectoryNotEmptyWin ||
-        mergedMessage.contains('directory not empty') ||
-        mergedMessage.contains('not empty') ||
-        mergedMessage.contains('目录非空')) {
-      return _DeleteFailureType.directoryNotEmpty;
-    }
-    if (osCode == _osErrorPermissionDenied ||
-        osCode == _osErrorOperationNotPermitted ||
-        osCode == _osErrorAccessDenied ||
-        mergedMessage.contains('permission denied') ||
-        mergedMessage.contains('operation not permitted') ||
-        mergedMessage.contains('access is denied') ||
-        mergedMessage.contains('权限')) {
-      return _DeleteFailureType.permissionDenied;
-    }
-    if (osCode == _osErrorNotFound ||
-        osCode == _osErrorPathNotFound ||
-        mergedMessage.contains('no such file') ||
-        mergedMessage.contains('cannot find the file') ||
-        mergedMessage.contains('not found') ||
-        mergedMessage.contains('不存在')) {
-      return _DeleteFailureType.targetNotFound;
-    }
-    return _DeleteFailureType.otherIo;
-  }
-
-  String _buildDeleteErrorDetail(FileSystemException error) {
-    final osError = error.osError;
-    final errorCode = osError?.errorCode;
-    final osMessage = osError?.message.trim() ?? '';
-    final message = error.message.trim();
-    final details = <String>[
-      if (errorCode != null) '错误码：$errorCode',
-      if (osMessage.isNotEmpty) osMessage,
-      if (message.isNotEmpty && message != osMessage) message,
-    ];
-    return details.join(' | ');
-  }
-
-  Future<void> _showDeleteFailureMessage({
-    required _DeleteFailureType type,
-    required String displayName,
-    String? detail,
-  }) async {
-    final baseMessage = switch (type) {
-      _DeleteFailureType.directoryNotEmpty => '删除失败（目录非空）：请先清空目录后再删除',
-      _DeleteFailureType.permissionDenied => '删除失败（权限不足）：当前没有权限删除该项目',
-      _DeleteFailureType.targetNotFound => '删除失败（目标不存在）：文件或目录已不存在',
-      _DeleteFailureType.otherIo => '删除失败（IO 异常）：请稍后重试',
-    };
-    final hasDetail = detail != null && detail.trim().isNotEmpty;
-    final fullMessage = hasDetail
-        ? '$baseMessage\n目标：$displayName\n错误详情：${detail.trim()}'
-        : '$baseMessage\n目标：$displayName';
-    await _showMessage(fullMessage);
-  }
-
-  String _joinPath(String parent, String child) {
-    if (parent.endsWith(Platform.pathSeparator)) {
-      return '$parent$child';
-    }
-    return '$parent${Platform.pathSeparator}$child';
-  }
-
-  String _normalizePath(String path) {
-    var normalized = path.replaceAll('\\', '/');
-    while (normalized.endsWith('/') && normalized.length > 1) {
-      normalized = normalized.substring(0, normalized.length - 1);
-    }
-    return normalized;
-  }
-
-  bool _isChildPath({
-    required String parentPath,
-    required String childPath,
-  }) {
-    final parent = _normalizePath(parentPath);
-    final child = _normalizePath(childPath);
-    if (child == parent) return false;
-    if (parent == '/') {
-      return child.startsWith('/') && child.length > 1;
-    }
-    return child.startsWith('$parent/');
-  }
-
-  String? _validateFolderName(String name) {
-    if (name == '.' || name == '..') {
-      return '文件夹名非法';
-    }
-    if (name.contains('/') || name.contains('\\')) {
-      return '文件夹名非法';
-    }
-    if (RegExp(r'[\x00-\x1F]').hasMatch(name)) {
-      return '文件夹名非法';
-    }
-    if (RegExp(r'[:*?"<>|]').hasMatch(name)) {
-      return '文件夹名非法';
-    }
-    return null;
   }
 
   Future<void> _showCreateFolderDialog() async {
@@ -388,7 +252,7 @@ class _FileManageViewState extends State<FileManageView> {
       await _showMessage('文件夹名不能为空');
       return;
     }
-    final invalidReason = _validateFolderName(name);
+    final invalidReason = validateFolderName(name);
     if (invalidReason != null) {
       await _showMessage(invalidReason);
       return;
@@ -397,8 +261,8 @@ class _FileManageViewState extends State<FileManageView> {
     setState(() => _creatingFolder = true);
     try {
       final currentPath = current.absolute.path;
-      final targetPath = _joinPath(currentPath, name);
-      if (!_isChildPath(parentPath: currentPath, childPath: targetPath)) {
+      final targetPath = joinFilePath(currentPath, name);
+      if (!isChildPath(parentPath: currentPath, childPath: targetPath)) {
         await _showMessage('文件夹名非法');
         return;
       }
@@ -428,7 +292,7 @@ class _FileManageViewState extends State<FileManageView> {
     }
   }
 
-  Future<void> _onTapEntry(_FileListEntry entry) async {
+  Future<void> _onTapEntry(FileManageListEntry entry) async {
     if (entry.isParentEntry) {
       await _goParent();
       return;
@@ -482,7 +346,7 @@ class _FileManageViewState extends State<FileManageView> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           onPressed: () => _openPathAt(i),
           child: Text(
-            _displayName(dir),
+            entityDisplayName(dir),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -524,9 +388,9 @@ class _FileManageViewState extends State<FileManageView> {
         final icon = isParent
             ? CupertinoIcons.arrow_uturn_left
             : (isDir ? CupertinoIcons.folder : CupertinoIcons.doc);
-        final name = isParent ? '..' : _displayName(entity);
+        final name = isParent ? '..' : entityDisplayName(entity);
         final sizeText = (!isParent && entity is File)
-            ? _formatBytes(entity.lengthSync())
+            ? formatFileBytes(entity.lengthSync())
             : '';
 
         return GestureDetector(
@@ -571,21 +435,6 @@ class _FileManageViewState extends State<FileManageView> {
     );
   }
 
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '${bytes}B';
-    const units = <String>['KB', 'MB', 'GB', 'TB'];
-    var value = bytes.toDouble();
-    var unitIndex = -1;
-    while (value >= 1024 && unitIndex + 1 < units.length) {
-      value /= 1024;
-      unitIndex++;
-    }
-    if (unitIndex < 0) return '${bytes}B';
-    final fixed =
-        value >= 100 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
-    return '$fixed${units[unitIndex]}';
-  }
-
   @override
   Widget build(BuildContext context) {
     return AppCupertinoPageScaffold(
@@ -623,37 +472,4 @@ class _FileManageViewState extends State<FileManageView> {
   }
 }
 
-enum _FileEntityAction {
-  delete,
-}
-
-enum _DeleteFailureType {
-  directoryNotEmpty,
-  permissionDenied,
-  targetNotFound,
-  otherIo,
-}
-
-class _FileListEntry {
-  final FileSystemEntity entity;
-  final bool isParentEntry;
-
-  const _FileListEntry._({
-    required this.entity,
-    required this.isParentEntry,
-  });
-
-  factory _FileListEntry.entity(FileSystemEntity entity) {
-    return _FileListEntry._(
-      entity: entity,
-      isParentEntry: false,
-    );
-  }
-
-  factory _FileListEntry.parent(Directory current) {
-    return _FileListEntry._(
-      entity: current,
-      isParentEntry: true,
-    );
-  }
-}
+enum _FileEntityAction { delete }

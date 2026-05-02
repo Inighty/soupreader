@@ -4,15 +4,14 @@ import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/source_ui_tokens.dart';
-import '../../../app/widgets/app_cover_image.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
-import '../../../app/widgets/source_consistent_card.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../bookshelf/services/book_add_service.dart';
 import '../../../core/models/book_source.dart';
 import '../../source/services/rule_parser/rule_parser_engine.dart';
 import '../../search/views/search_book_info_view.dart';
+import 'discovery_explore_results_widgets.dart';
 
 /// 发现二级页：单书源 + 单发现入口结果（对标 legado ExploreShowActivity）
 class DiscoveryExploreResultsView extends StatefulWidget {
@@ -35,7 +34,6 @@ class DiscoveryExploreResultsView extends StatefulWidget {
 class _DiscoveryExploreResultsViewState
     extends State<DiscoveryExploreResultsView> {
   static const double _scrollLoadThreshold = 220;
-  static const double _minTapSize = SourceUiTokens.minTapSize;
   static const double _footerTapMinHeight = SourceUiTokens.minTapSize;
 
   late final RuleParserEngine _engine;
@@ -342,114 +340,14 @@ class _DiscoveryExploreResultsViewState
   }
 
   Widget _buildResultItem(SearchResult result) {
-    final textStyle = CupertinoTheme.of(context).textTheme.textStyle;
-    final primaryTextColor = CupertinoColors.label.resolveFrom(context);
-    final secondaryTextColor =
-        SourceUiTokens.resolveSecondaryTextColor(context);
-    final tertiaryTextColor =
-        CupertinoColors.tertiaryLabel.resolveFrom(context);
-    final inShelfColor = CupertinoColors.activeBlue.resolveFrom(context);
     final inBookshelf = _addService.isInBookshelf(
       result,
       bookshelfKeys: _bookshelfKeys,
     );
-    final author = result.author.trim().isEmpty ? '未知作者' : result.author.trim();
-    final lastChapter = result.lastChapter.trim();
-    final intro = result.intro.trim();
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _openBookInfo(result),
-        child: SourceConsistentCard(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: _minTapSize),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppCoverImage(
-                  urlOrPath: result.coverUrl,
-                  title: result.name,
-                  author: result.author,
-                  width: SourceUiTokens.discoveryResultCoverWidth,
-                  height: SourceUiTokens.discoveryResultCoverHeight,
-                  borderRadius: 7,
-                  fit: BoxFit.cover,
-                  showTextOnPlaceholder: false,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        result.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textStyle.copyWith(
-                          fontSize: SourceUiTokens.itemTitleSize,
-                          fontWeight: FontWeight.w600,
-                          color: primaryTextColor,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        author,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textStyle.copyWith(
-                          fontSize: SourceUiTokens.itemMetaSize,
-                          color: secondaryTextColor,
-                        ),
-                      ),
-                      if (lastChapter.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          '最新：$lastChapter',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textStyle.copyWith(
-                            fontSize: SourceUiTokens.itemSubMetaSize,
-                            color: tertiaryTextColor,
-                          ),
-                        ),
-                      ],
-                      if (intro.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          intro,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textStyle.copyWith(
-                            fontSize: SourceUiTokens.itemSubMetaSize,
-                            color: tertiaryTextColor,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: _minTapSize,
-                  height: _minTapSize,
-                  child: Center(
-                    child: Icon(
-                      inBookshelf
-                          ? CupertinoIcons.book_fill
-                          : CupertinoIcons.chevron_right,
-                      size: inBookshelf ? 17 : 16,
-                      color: inBookshelf ? inShelfColor : secondaryTextColor,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return DiscoveryExploreResultItem(
+      result: result,
+      inBookshelf: inBookshelf,
+      onTap: () => _openBookInfo(result),
     );
   }
 
@@ -559,13 +457,6 @@ class _FooterLoadingBox extends StatelessWidget {
   const _FooterLoadingBox();
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 12),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: SourceUiTokens.minTapSize),
-        child: const Center(child: CupertinoActivityIndicator()),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      const DiscoveryExploreFooterLoadingBox();
 }

@@ -1,71 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:dio/dio.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/exception_log_service.dart';
+import 'remote_books_archive_helpers.dart';
+import 'remote_books_archive_models.dart';
 
-/// 压缩包内部可导入候选条目。
-class RemoteBooksArchiveCandidate {
-  final String fileName;
-  final int sizeInBytes;
-  final String extension;
-
-  const RemoteBooksArchiveCandidate({
-    required this.fileName,
-    required this.sizeInBytes,
-    required this.extension,
-  });
-}
-
-/// 下载 + 解析压缩包后的结果（用于 UI 决策：提示/选择/继续导入）。
-class RemoteBooksArchiveOpenResult {
-  final bool success;
-  final bool fromCache;
-  final String? localArchivePath;
-  final List<RemoteBooksArchiveCandidate> candidates;
-  final String? warning;
-  final String? errorMessage;
-
-  const RemoteBooksArchiveOpenResult({
-    required this.success,
-    required this.fromCache,
-    required this.localArchivePath,
-    required this.candidates,
-    this.warning,
-    this.errorMessage,
-  });
-
-  factory RemoteBooksArchiveOpenResult.ok({
-    required bool fromCache,
-    required String localArchivePath,
-    required List<RemoteBooksArchiveCandidate> candidates,
-    String? warning,
-  }) {
-    return RemoteBooksArchiveOpenResult(
-      success: true,
-      fromCache: fromCache,
-      localArchivePath: localArchivePath,
-      candidates: candidates,
-      warning: warning,
-    );
-  }
-
-  factory RemoteBooksArchiveOpenResult.error(String message) {
-    return RemoteBooksArchiveOpenResult(
-      success: false,
-      fromCache: false,
-      localArchivePath: null,
-      candidates: const <RemoteBooksArchiveCandidate>[],
-      errorMessage: message,
-    );
-  }
-}
+export 'remote_books_archive_models.dart';
 
 /// RemoteBooks 压缩包下载与解析服务：
 /// - 对齐 legado `RemoteBookActivity.startRead` + `BaseImportBookActivity.onArchiveFileClick` 的核心语义；
@@ -96,17 +41,6 @@ class RemoteBooksArchiveService {
     'epub',
   };
 
-  /// legado 压缩包内“书籍文件”候选格式（用于给出明确的“差异提示”）。
-  static const Set<String> _legacyBookExtensions = <String>{
-    'txt',
-    'epub',
-    'umd',
-    'pdf',
-    'mobi',
-    'azw3',
-    'azw',
-  };
-
   static final RegExp _archiveFileRegex = RegExp(
     r'.*\.(zip|rar|7z)$',
     caseSensitive: false,
@@ -116,14 +50,14 @@ class RemoteBooksArchiveService {
     return _archiveFileRegex.hasMatch(fileName.trim());
   }
 
-  /// 解析/下载前：解析出“稳定缓存路径”，用于 UI 判断本地是否已有缓存文件。
+  /// 解析/下载前：解析出"稳定缓存路径"，用于 UI 判断本地是否已有缓存文件。
   Future<String> resolveCachedArchivePath({
     required String remoteUrl,
     required String fileName,
   }) async {
-    final directory = await _ensureArchiveDirectory();
-    final safeName = _sanitizeFileName(fileName);
-    final hash = _fnv1aHex(remoteUrl);
+    final directory = await RemoteBooksArchiveHelpers.ensureArchiveDirectory();
+    final safeName = RemoteBooksArchiveHelpers.sanitizeFileName(fileName);
+    final hash = RemoteBooksArchiveHelpers.fnv1aHex(remoteUrl);
     final ext = p.extension(safeName);
     final base = p.basenameWithoutExtension(safeName);
     final cachedName = ext.isEmpty ? '${base}__$hash' : '${base}__$hash$ext';
@@ -177,7 +111,7 @@ class RemoteBooksArchiveService {
           },
         );
         return RemoteBooksArchiveOpenResult.error(
-          '下载失败：${_compactReason(error.toString())}',
+          '下载失败：${RemoteBooksArchiveHelpers.compactReason(error.toString())}',
         );
       }
     }
@@ -210,7 +144,7 @@ class RemoteBooksArchiveService {
       return RemoteBooksArchiveOpenResult.error('压缩包文件不存在');
     }
 
-    final ext = _normalizeExtension(p.extension(path));
+    final ext = RemoteBooksArchiveHelpers.normalizeExtension(p.extension(path));
     if (ext != 'zip') {
       // 说明：legado 支持 zip/rar/7z，但当前 Flutter 侧暂仅实现 zip 解析。
       if (ext == 'rar' || ext == '7z') {
@@ -237,14 +171,15 @@ class RemoteBooksArchiveService {
         final name = archiveFile.name.trim();
         if (name.isEmpty) continue;
 
-        // 对齐 legado：使用“文件名”作为候选展示与导入锚点（不包含目录层级）。
+        // 对齐 legado：使用"文件名"作为候选展示与导入锚点（不包含目录层级）。
         final baseName = p.basename(name);
         if (baseName.trim().isEmpty) continue;
 
-        final entryExt = _normalizeExtension(p.extension(baseName));
+        final entryExt =
+            RemoteBooksArchiveHelpers.normalizeExtension(p.extension(baseName));
         if (entryExt.isEmpty) continue;
 
-        if (_legacyBookExtensions.contains(entryExt) &&
+        if (RemoteBooksArchiveHelpers.legacyBookExtensions.contains(entryExt) &&
             !allowedBookExtensions.contains(entryExt)) {
           unsupportedLegacyExts.add(entryExt);
         }
@@ -288,7 +223,7 @@ class RemoteBooksArchiveService {
         },
       );
       return RemoteBooksArchiveOpenResult.error(
-        '解析失败：${_compactReason(error.toString())}',
+        '解析失败：${RemoteBooksArchiveHelpers.compactReason(error.toString())}',
       );
     }
   }
@@ -305,7 +240,7 @@ class RemoteBooksArchiveService {
       throw Exception('远程地址无效，请检查 WebDav 列表返回的链接');
     }
 
-    if (_sanitizeFileName(fileName).isEmpty) {
+    if (RemoteBooksArchiveHelpers.sanitizeFileName(fileName).isEmpty) {
       throw Exception('无法识别下载文件名');
     }
 
@@ -329,24 +264,25 @@ class RemoteBooksArchiveService {
 
     final code = response.statusCode ?? 0;
     if (code < 200 || code >= 300) {
-      throw Exception(_formatDownloadHttpError(code));
+      throw Exception(RemoteBooksArchiveHelpers.formatDownloadHttpError(code));
     }
 
-    final bytes = _responseBytes(response.data);
+    final bytes = RemoteBooksArchiveHelpers.responseBytes(response.data);
     if (bytes == null || bytes.isEmpty) {
       throw Exception('下载内容为空');
     }
 
-    await _atomicWriteBytes(
+    await RemoteBooksArchiveHelpers.atomicWriteBytes(
       targetFile: targetFile,
       tempPath: tempPath,
       bytes: bytes,
+      exceptionLogService: _exceptionLogService,
     );
   }
 
   /// 从 zip 压缩包中提取指定条目到本地文件，并返回提取后的路径。
   ///
-  /// 注意：此处只负责“提取”，不做 ImportService 的导入；导入由上层服务协调，
+  /// 注意：此处只负责"提取"，不做 ImportService 的导入；导入由上层服务协调，
   /// 以便复用现有导入聚合/错误提示逻辑。
   Future<String> extractZipEntryToLocalFile({
     required String localArchivePath,
@@ -363,63 +299,38 @@ class RemoteBooksArchiveService {
       throw Exception('压缩包文件不存在');
     }
 
-    final ext = _normalizeExtension(p.extension(archivePath));
+    final ext =
+        RemoteBooksArchiveHelpers.normalizeExtension(p.extension(archivePath));
     if (ext != 'zip') {
       throw Exception('仅支持从 zip 提取条目');
     }
 
     final bytes = await file.readAsBytes();
     final archive = ZipDecoder().decodeBytes(bytes, verify: true);
-    final target = _findArchiveFileByBaseName(archive, name);
+    final target =
+        RemoteBooksArchiveHelpers.findArchiveFileByBaseName(archive, name);
     if (target == null) {
       throw Exception('未找到压缩包条目：$name');
     }
 
-    final payload = _archiveFileBytes(target);
+    final payload = RemoteBooksArchiveHelpers.archiveFileBytes(target);
     if (payload == null || payload.isEmpty) {
       throw Exception('压缩包条目内容为空：$name');
     }
 
-    final outDir = await _ensureArchiveEntryDirectory(
-      archiveKey: _fnv1aHex(archivePath),
+    final outDir = await RemoteBooksArchiveHelpers.ensureArchiveEntryDirectory(
+      archiveKey: RemoteBooksArchiveHelpers.fnv1aHex(archivePath),
     );
-    final safeName = _sanitizeFileName(name);
+    final safeName = RemoteBooksArchiveHelpers.sanitizeFileName(name);
     final outputPath = p.join(outDir.path, safeName);
     final tempPath = '$outputPath.extracting';
-    await _atomicWriteBytes(
+    await RemoteBooksArchiveHelpers.atomicWriteBytes(
       targetFile: File(outputPath),
       tempPath: tempPath,
       bytes: payload,
+      exceptionLogService: _exceptionLogService,
     );
     return outputPath;
-  }
-
-  Future<Directory> _ensureArchiveDirectory() async {
-    final docs = await getApplicationDocumentsDirectory();
-    final target = Directory(p.join(docs.path, '.remote_books', 'archives'));
-    if (!await target.exists()) {
-      await target.create(recursive: true);
-    }
-    if (!await target.exists()) {
-      throw Exception('创建本地压缩包缓存目录失败');
-    }
-    return target;
-  }
-
-  Future<Directory> _ensureArchiveEntryDirectory({
-    required String archiveKey,
-  }) async {
-    final docs = await getApplicationDocumentsDirectory();
-    final target = Directory(
-      p.join(docs.path, '.remote_books', 'archive_entries', archiveKey),
-    );
-    if (!await target.exists()) {
-      await target.create(recursive: true);
-    }
-    if (!await target.exists()) {
-      throw Exception('创建本地压缩包条目缓存目录失败');
-    }
-    return target;
   }
 
   Map<String, String> _buildAuthHeaders(AppSettings settings) {
@@ -429,123 +340,5 @@ class RemoteBooksArchiveService {
     return <String, String>{
       'Authorization': 'Basic $payload',
     };
-  }
-
-  String _formatDownloadHttpError(int statusCode) {
-    switch (statusCode) {
-      case 401:
-      case 403:
-        return '无权限（HTTP $statusCode），请检查 WebDav 账号密码';
-      case 404:
-        return '文件不存在（HTTP 404）';
-      default:
-        return 'HTTP $statusCode';
-    }
-  }
-
-  List<int>? _responseBytes(dynamic raw) {
-    if (raw is Uint8List) return raw;
-    if (raw is List<int>) return raw;
-    return null;
-  }
-
-  String _sanitizeFileName(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return '';
-    final ext = p.extension(trimmed);
-    final name = p.basenameWithoutExtension(trimmed);
-    final normalizedName = name
-        .replaceAll(RegExp(r'[\\\\/\\u0000-\\u001F]'), '_')
-        .replaceAll(RegExp(r'[:*?\"<>|]'), '_')
-        .trim();
-    final normalizedExt = ext
-        .replaceAll(RegExp(r'[\\\\/\\u0000-\\u001F]'), '')
-        .replaceAll(RegExp(r'[:*?\"<>|]'), '')
-        .trim();
-    final safeName = normalizedName.isEmpty ? 'remote_archive' : normalizedName;
-    final safeExt = normalizedExt.toLowerCase();
-    return safeExt.isEmpty ? safeName : '$safeName$safeExt';
-  }
-
-  String _normalizeExtension(String rawExtension) {
-    var ext = rawExtension.trim().toLowerCase();
-    if (ext.startsWith('.')) ext = ext.substring(1);
-    return ext;
-  }
-
-  Future<void> _atomicWriteBytes({
-    required File targetFile,
-    required String tempPath,
-    required List<int> bytes,
-  }) async {
-    final tempFile = File(tempPath);
-    if (await tempFile.exists()) {
-      await _tryDeleteFile(tempFile);
-    }
-
-    await tempFile.writeAsBytes(bytes, flush: true);
-
-    if (await targetFile.exists()) {
-      await _tryDeleteFile(targetFile);
-    }
-
-    await tempFile.rename(targetFile.path);
-  }
-
-  Future<void> _tryDeleteFile(File file) async {
-    try {
-      if (await file.exists()) {
-        await file.delete();
-      }
-    } catch (error, stackTrace) {
-      _exceptionLogService.record(
-        node: 'remote_books.archive.cleanup.failed',
-        message: '清理远程书籍压缩包临时文件失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'filePath': file.path,
-        },
-      );
-    }
-  }
-
-  ArchiveFile? _findArchiveFileByBaseName(Archive archive, String fileName) {
-    final normalized = fileName.trim().toLowerCase();
-    if (normalized.isEmpty) return null;
-    for (final file in archive.files) {
-      if (!file.isFile) continue;
-      final base = p.basename(file.name).trim().toLowerCase();
-      if (base == normalized) return file;
-    }
-    return null;
-  }
-
-  Uint8List? _archiveFileBytes(ArchiveFile file) {
-    final content = file.content;
-    if (content is Uint8List) return content;
-    if (content is List<int>) return Uint8List.fromList(content);
-    if (content is String) return Uint8List.fromList(utf8.encode(content));
-    return null;
-  }
-
-  String _compactReason(String text, {int maxLength = 120}) {
-    final normalized = text.replaceAll(RegExp(r'\\s+'), ' ').trim();
-    if (normalized.length <= maxLength) return normalized;
-    return '${normalized.substring(0, maxLength)}…';
-  }
-
-  /// 生成短 hash（用于避免不同目录同名压缩包缓存互相覆盖）。
-  ///
-  /// 使用 FNV-1a 32-bit，避免引入额外依赖。
-  String _fnv1aHex(String input) {
-    const int fnvOffsetBasis = 0x811c9dc5;
-    const int fnvPrime = 0x01000193;
-    var hash = fnvOffsetBasis;
-    for (final unit in input.codeUnits) {
-      hash ^= unit;
-      hash = (hash * fnvPrime) & 0xffffffff;
-    }
-    return hash.toRadixString(16).padLeft(8, '0');
   }
 }

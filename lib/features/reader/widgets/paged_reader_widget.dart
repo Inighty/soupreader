@@ -643,7 +643,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
             columnWidth,
             contentHeight,
           ));
-          LegacyJustifyComposer.paintContentOnCanvas(
+          LegacyJustifyPainter.paintContentOnCanvas(
             canvas: canvas,
             origin: Offset(originX, bodyOriginY),
             content: col,
@@ -1799,7 +1799,7 @@ class _PagedReaderWidgetState extends State<PagedReaderWidget>
     final contentHeight = size.height -
         (systemPadding.top + _topOffset + widget.padding.top) -
         (systemPadding.bottom + _bottomOffset + widget.padding.bottom);
-    final rects = LegacyJustifyComposer.resolveSelectionRects(
+    final rects = LegacyJustifyPainter.resolveSelectionRects(
       lines: lines,
       startLineIndex: sel.startLineIndex,
       startCharIndex: sel.startCharIndex,

@@ -1,15 +1,11 @@
 import 'dart:async';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 
 import '../../../app/widgets/app_ui_kit.dart';
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
-import '../../../app/widgets/option_picker_sheet.dart';
 import '../../../core/config/migration_exclusions.dart';
 import '../../../core/models/app_settings.dart';
 import '../../../core/services/settings_service.dart';
@@ -18,6 +14,7 @@ import '../services/direct_link_upload_config_service.dart';
 import '../services/other_source_settings_service.dart';
 import 'check_source_settings_view.dart';
 import 'direct_link_upload_config_view.dart';
+import 'other_settings_dialogs.dart';
 import 'read_aloud_settings_view.dart';
 import 'storage_settings_view.dart';
 
@@ -113,92 +110,6 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     await _loadDirectLinkUploadSummary();
   }
 
-  Future<void> _editUserAgent() async {
-    final controller = TextEditingController(
-      text: _otherSourceSettingsService.getUserAgent(),
-    );
-    final value = await showCupertinoBottomSheetDialog<String>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('用户代理'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            placeholder: '用户代理',
-            maxLines: 5,
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext, controller.text),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (value == null) return;
-    await _otherSourceSettingsService.saveUserAgent(value);
-    await _reloadSourceSettingsSummaries();
-  }
-
-  Future<void> _selectDefaultBookTreeUri() async {
-    try {
-      final selected = await FilePicker.platform.getDirectoryPath(
-        dialogTitle: '选择保存书籍的文件夹',
-      );
-      if (selected == null || selected.trim().isEmpty) return;
-      await _otherSourceSettingsService.saveDefaultBookTreeUri(selected);
-      await _reloadSourceSettingsSummaries();
-    } catch (error) {
-      _showMessage('选择保存书籍的文件夹失败：$error');
-    }
-  }
-
-  Future<void> _editSourceEditMaxLine() async {
-    final controller = TextEditingController(
-      text: _otherSourceSettingsService.getSourceEditMaxLine().toString(),
-    );
-    final value = await showCupertinoBottomSheetDialog<String>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('源编辑框最大行数'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            placeholder: '请输入大于等于 10 的整数',
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext, controller.text),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (value == null) return;
-    final parsed = int.tryParse(value.trim()) ?? 0;
-    if (parsed < OtherSourceSettingsService.minSourceEditMaxLine) {
-      _showMessage('源编辑框最大行数不能小于 10');
-      return;
-    }
-    await _otherSourceSettingsService.saveSourceEditMaxLine(parsed);
-    await _reloadSourceSettingsSummaries();
-  }
-
   Future<void> _openCheckSourceSettings() async {
     final updated = await Navigator.of(context).push<bool>(
       CupertinoPageRoute<bool>(
@@ -209,162 +120,52 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
     await _reloadSourceSettingsSummaries();
   }
 
-  Future<void> _pickDefaultHomePage() async {
-    final pickerItems = <OptionPickerItem<MainDefaultHomePage>>[
-      const OptionPickerItem<MainDefaultHomePage>(
-        value: MainDefaultHomePage.bookshelf,
-        label: '书架',
-      ),
-      const OptionPickerItem<MainDefaultHomePage>(
-        value: MainDefaultHomePage.explore,
-        label: '发现',
-      ),
-      if (!_excludeRss)
-        const OptionPickerItem<MainDefaultHomePage>(
-          value: MainDefaultHomePage.rss,
-          label: '订阅',
-        ),
-      const OptionPickerItem<MainDefaultHomePage>(
-        value: MainDefaultHomePage.my,
-        label: '我的',
-      ),
-    ];
-    final selected = await showOptionPickerSheet<MainDefaultHomePage>(
-      context: context,
-      title: '默认主页',
-      currentValue: _effectiveDefaultHomePageForUi(
-        _appSettings.defaultHomePage,
-      ),
-      accentColor: AppDesignTokens.brandPrimary,
-      items: pickerItems,
-    );
-    if (selected == null) return;
-    await _settingsService.saveDefaultHomePage(selected);
-  }
+  void _showMessage(String message) =>
+      showOtherSettingsMessage(context, message);
 
-  MainDefaultHomePage _effectiveDefaultHomePageForUi(
-    MainDefaultHomePage page,
-  ) {
-    // 迁移排除策略：RSS 入口隐藏时，默认主页不应继续显示为“订阅”。
-    if (_excludeRss && page == MainDefaultHomePage.rss) {
-      return MainDefaultHomePage.bookshelf;
-    }
-    return page;
-  }
+  Future<void> _editPreDownloadNum() => showOtherSettingsBoundedIntDialog(
+        context: context,
+        title: '预下载',
+        currentValue: _appSettings.preDownloadNum,
+        min: 0,
+        max: 9999,
+        placeholder: '请输入 0 到 9999 之间的整数',
+        save: _settingsService.savePreDownloadNum,
+        onValidationFail: _showMessage,
+      );
 
-  Future<void> _pickUpdateToVariant() async {
-    final current = _appSettings.updateToVariant;
-    final variants = <String>[
-      AppSettings.defaultUpdateToVariant,
-      AppSettings.officialUpdateToVariant,
-      AppSettings.betaReleaseUpdateToVariant,
-      AppSettings.betaReleaseAUpdateToVariant,
-    ];
-    final selected = await showOptionPickerSheet<String>(
-      context: context,
-      title: '检查更新查找版本',
-      currentValue: current,
-      accentColor: AppDesignTokens.brandPrimary,
-      items: variants
-          .map(
-            (variant) => OptionPickerItem<String>(
-              value: variant,
-              label: AppSettings.updateToVariantLabel(variant),
-            ),
-          )
-          .toList(growable: false),
-    );
-    if (selected == null || selected == current) return;
-    await _settingsService.saveUpdateToVariant(selected);
-  }
+  Future<void> _editThreadCount() => showOtherSettingsBoundedIntDialog(
+        context: context,
+        title: '线程数量',
+        currentValue: _appSettings.threadCount,
+        min: 1,
+        max: 999,
+        placeholder: '请输入 1 到 999 之间的整数',
+        save: _settingsService.saveThreadCount,
+        onValidationFail: _showMessage,
+      );
 
-  Future<void> _editPreDownloadNum() async {
-    await _editBoundedIntSetting(
-      title: '预下载',
-      currentValue: _appSettings.preDownloadNum,
-      min: 0,
-      max: 9999,
-      placeholder: '请输入 0 到 9999 之间的整数',
-      save: _settingsService.savePreDownloadNum,
-    );
-  }
+  Future<void> _editBitmapCacheSize() => showOtherSettingsBoundedIntDialog(
+        context: context,
+        title: '图片绘制缓存',
+        currentValue: _appSettings.bitmapCacheSize,
+        min: 1,
+        max: 2047,
+        placeholder: '请输入 1 到 2047 之间的整数（MB）',
+        save: _settingsService.saveBitmapCacheSize,
+        onValidationFail: _showMessage,
+      );
 
-  Future<void> _editThreadCount() async {
-    await _editBoundedIntSetting(
-      title: '线程数量',
-      currentValue: _appSettings.threadCount,
-      min: 1,
-      max: 999,
-      placeholder: '请输入 1 到 999 之间的整数',
-      save: _settingsService.saveThreadCount,
-    );
-  }
-
-  Future<void> _editBitmapCacheSize() async {
-    await _editBoundedIntSetting(
-      title: '图片绘制缓存',
-      currentValue: _appSettings.bitmapCacheSize,
-      min: 1,
-      max: 2047,
-      placeholder: '请输入 1 到 2047 之间的整数（MB）',
-      save: _settingsService.saveBitmapCacheSize,
-    );
-  }
-
-  Future<void> _editImageRetainNum() async {
-    await _editBoundedIntSetting(
-      title: '漫画保留数量',
-      currentValue: _appSettings.imageRetainNum,
-      min: 0,
-      max: 999,
-      placeholder: '请输入 0 到 999 之间的整数',
-      save: _settingsService.saveImageRetainNum,
-    );
-  }
-
-  Future<void> _editBoundedIntSetting({
-    required String title,
-    required int currentValue,
-    required int min,
-    required int max,
-    required String placeholder,
-    required Future<void> Function(int value) save,
-  }) async {
-    final controller = TextEditingController(text: currentValue.toString());
-    final value = await showCupertinoBottomSheetDialog<String>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            placeholder: placeholder,
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext, controller.text),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (value == null) return;
-
-    final parsed = int.tryParse(value.trim());
-    if (parsed == null || parsed < min || parsed > max) {
-      _showMessage('$title 需要在 $min 到 $max 之间');
-      return;
-    }
-    await save(parsed);
-  }
+  Future<void> _editImageRetainNum() => showOtherSettingsBoundedIntDialog(
+        context: context,
+        title: '漫画保留数量',
+        currentValue: _appSettings.imageRetainNum,
+        min: 0,
+        max: 999,
+        placeholder: '请输入 0 到 999 之间的整数',
+        save: _settingsService.saveImageRetainNum,
+        onValidationFail: _showMessage,
+      );
 
   Widget _buildBooleanTile({
     required String title,
@@ -403,15 +204,18 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                   ),
                 ),
                 _buildBooleanTile(
-                  title: '退出时释放媒体按钮',                  value: _appSettings.mediaButtonOnExit,
+                  title: '退出时释放媒体按钮',
+                  value: _appSettings.mediaButtonOnExit,
                   save: _settingsService.saveMediaButtonOnExit,
                 ),
                 _buildBooleanTile(
-                  title: '媒体按钮朗读',                  value: _appSettings.readAloudByMediaButton,
+                  title: '媒体按钮朗读',
+                  value: _appSettings.readAloudByMediaButton,
                   save: _settingsService.saveReadAloudByMediaButton,
                 ),
                 _buildBooleanTile(
-                  title: '忽略音频焦点',                  value: _appSettings.ignoreAudioFocus,
+                  title: '忽略音频焦点',
+                  value: _appSettings.ignoreAudioFocus,
                   save: _settingsService.saveIgnoreAudioFocus,
                 ),
               ],
@@ -421,7 +225,8 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             hasLeading: false,
             children: [
               AppListTile(
-                title: const Text('自动刷新'),                trailing: CupertinoSwitch(
+                title: const Text('自动刷新'),
+                trailing: CupertinoSwitch(
                   value: _appSettings.autoRefresh,
                   onChanged: _settingsService.saveAutoRefresh,
                 ),
@@ -430,7 +235,8 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                 ),
               ),
               AppListTile(
-                title: const Text('自动跳转最近阅读'),                trailing: CupertinoSwitch(
+                title: const Text('自动跳转最近阅读'),
+                trailing: CupertinoSwitch(
                   value: _appSettings.defaultToRead,
                   onChanged: _settingsService.saveDefaultToRead,
                 ),
@@ -462,9 +268,13 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               AppListTile(
                 title: const Text('默认主页'),
                 additionalInfo: Text(
-                  _defaultHomePageLabel(_appSettings.defaultHomePage),
+                  defaultHomePageLabel(_appSettings.defaultHomePage),
                 ),
-                onTap: _pickDefaultHomePage,
+                onTap: () => pickOtherSettingsDefaultHomePage(
+                  context: context,
+                  appSettings: _appSettings,
+                  settingsService: _settingsService,
+                ),
               ),
             ],
           ),
@@ -474,32 +284,47 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             children: [
               AppListTile(
                 title: const Text('用户代理'),
-                additionalInfo: Text(_brief(_userAgentSummary)),
-                onTap: _editUserAgent,
+                additionalInfo: Text(briefSettingsSummary(_userAgentSummary)),
+                onTap: () => showOtherSettingsUserAgentDialog(
+                  context: context,
+                  service: _otherSourceSettingsService,
+                  onSaved: _reloadSourceSettingsSummaries,
+                ),
               ),
               AppListTile(
                 title: const Text('书籍保存位置'),
                 additionalInfo: Text(
-                  _brief(
+                  briefSettingsSummary(
                     _defaultBookTreeUriSummary,
                     fallback: '从其它应用打开的书籍保存位置',
                   ),
                 ),
-                onTap: _selectDefaultBookTreeUri,
+                onTap: () => pickOtherSettingsDefaultBookTreeUri(
+                  service: _otherSourceSettingsService,
+                  onError: _showMessage,
+                  onSaved: _reloadSourceSettingsSummaries,
+                ),
               ),
               AppListTile(
                 title: const Text('源编辑框最大行数'),
-                additionalInfo: Text(_brief(_sourceEditMaxLineSummary)),
-                onTap: _editSourceEditMaxLine,
+                additionalInfo:
+                    Text(briefSettingsSummary(_sourceEditMaxLineSummary)),
+                onTap: () => showOtherSettingsSourceEditMaxLineDialog(
+                  context: context,
+                  service: _otherSourceSettingsService,
+                  onValidationFail: _showMessage,
+                  onSaved: _reloadSourceSettingsSummaries,
+                ),
               ),
               AppListTile(
                 title: const Text('校验设置'),
-                additionalInfo: Text(_brief(_checkSourceSummary)),
+                additionalInfo: Text(briefSettingsSummary(_checkSourceSummary)),
                 onTap: _openCheckSourceSettings,
               ),
               AppListTile(
                 title: const Text('直链上传规则'),
-                additionalInfo: Text(_brief(_directLinkUploadSummary)),
+                additionalInfo:
+                    Text(briefSettingsSummary(_directLinkUploadSummary)),
                 onTap: _openDirectLinkUploadConfig,
               ),
             ],
@@ -532,7 +357,8 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                   onTap: _editImageRetainNum,
                 ),
               AppListTile(
-                title: const Text('默认启用替换净化'),                trailing: CupertinoSwitch(
+                title: const Text('默认启用替换净化'),
+                trailing: CupertinoSwitch(
                   value: _appSettings.replaceEnableDefault,
                   onChanged: _settingsService.saveReplaceEnableDefault,
                 ),
@@ -541,7 +367,8 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                 ),
               ),
               AppListTile(
-                title: const Text('下载与缓存'),                onTap: () => Navigator.of(context).push(
+                title: const Text('下载与缓存'),
+                onTap: () => Navigator.of(context).push(
                   CupertinoPageRoute<void>(
                     builder: (context) => const StorageSettingsView(),
                   ),
@@ -554,7 +381,8 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
             hasLeading: false,
             children: [
               AppListTile(
-                title: const Text('文字操作显示搜索'),                trailing: CupertinoSwitch(
+                title: const Text('文字操作显示搜索'),
+                trailing: CupertinoSwitch(
                   value: _appSettings.processText,
                   onChanged: _settingsService.saveProcessText,
                 ),
@@ -563,7 +391,8 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                 ),
               ),
               AppListTile(
-                title: const Text('记录日志'),                trailing: CupertinoSwitch(
+                title: const Text('记录日志'),
+                trailing: CupertinoSwitch(
                   value: _appSettings.recordLog,
                   onChanged: _settingsService.saveRecordLog,
                 ),
@@ -571,7 +400,8 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                     _settingsService.saveRecordLog(!_appSettings.recordLog),
               ),
               AppListTile(
-                title: const Text('记录堆转储'),                trailing: CupertinoSwitch(
+                title: const Text('记录堆转储'),
+                trailing: CupertinoSwitch(
                   value: _appSettings.recordHeapDump,
                   onChanged: _settingsService.saveRecordHeapDump,
                 ),
@@ -587,20 +417,23 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               hasLeading: false,
               children: [
                 _buildBooleanTile(
-                  title: 'Cronet',                  value: _appSettings.cronet,
+                  title: 'Cronet',
+                  value: _appSettings.cronet,
                   save: _settingsService.saveCronet,
                 ),
                 _buildBooleanTile(
-                  title: '抗锯齿',                  value: _appSettings.antiAlias,
+                  title: '抗锯齿',
+                  value: _appSettings.antiAlias,
                   save: _settingsService.saveAntiAlias,
                 ),
-
                 _buildBooleanTile(
-                  title: '自动清除过期搜索数据',                  value: _appSettings.autoClearExpired,
+                  title: '自动清除过期搜索数据',
+                  value: _appSettings.autoClearExpired,
                   save: _settingsService.saveAutoClearExpired,
                 ),
                 _buildBooleanTile(
-                  title: '返回时提示放入书架',                  value: _appSettings.showAddToShelfAlert,
+                  title: '返回时提示放入书架',
+                  value: _appSettings.showAddToShelfAlert,
                   save: _settingsService.saveShowAddToShelfAlert,
                 ),
                 AppListTile(
@@ -610,7 +443,11 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
                       _appSettings.updateToVariant,
                     ),
                   ),
-                  onTap: _pickUpdateToVariant,
+                  onTap: () => pickOtherSettingsUpdateToVariant(
+                    context: context,
+                    appSettings: _appSettings,
+                    settingsService: _settingsService,
+                  ),
                 ),
                 if (!_excludeManga)
                   _buildBooleanTile(
@@ -638,42 +475,6 @@ class _OtherSettingsViewState extends State<OtherSettingsView> {
               ],
             ),
           const SizedBox(height: 24),
-        ],
-      ),
-    );
-  }
-
-  String _defaultHomePageLabel(MainDefaultHomePage page) {
-    switch (_effectiveDefaultHomePageForUi(page)) {
-      case MainDefaultHomePage.bookshelf:
-        return '书架';
-      case MainDefaultHomePage.explore:
-        return '发现';
-      case MainDefaultHomePage.rss:
-        return '订阅';
-      case MainDefaultHomePage.my:
-        return '我的';
-    }
-  }
-
-  String _brief(String value, {String fallback = '未设置'}) {
-    final normalized = value.trim();
-    if (normalized.isEmpty) return fallback;
-    final singleLine = normalized.replaceAll('\n', ' ').replaceAll('\r', ' ');
-    if (singleLine.length <= 24) return singleLine;
-    return '${singleLine.substring(0, 24)}…';
-  }
-
-  void _showMessage(String message) {
-    showCupertinoBottomSheetDialog<void>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('好'),
-          ),
         ],
       ),
     );

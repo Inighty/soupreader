@@ -8,6 +8,7 @@ import '../../../features/rss/services/rss_source_filter_helper.dart';
 import '../../utils/legado_json.dart';
 import '../database_service.dart';
 import '../drift/source_drift_database.dart';
+import 'rss_source_repository_helpers.dart';
 
 /// RSS 源仓库（对齐 legado `RssSourceDao` 核心语义）
 class RssSourceRepository {
@@ -28,46 +29,6 @@ class RssSourceRepository {
     final repo = RssSourceRepository(db);
     await repo._reloadCacheFromDb();
     repo._ensureWatchStarted();
-  }
-
-  static String _normalizeUrlKey(String? raw) {
-    return (raw ?? '').trim();
-  }
-
-  static RssSource _normalizeSource(RssSource source) {
-    final normalizedUrl = _normalizeUrlKey(source.sourceUrl);
-    if (normalizedUrl == source.sourceUrl) return source;
-    return source.copyWith(sourceUrl: normalizedUrl);
-  }
-
-  static Map<String, dynamic> _decodeRawJsonToMap(String? rawJson) {
-    final raw = rawJson?.trim() ?? '';
-    if (raw.isEmpty) return <String, dynamic>{};
-    try {
-      final decoded = json.decode(raw);
-      if (decoded is Map<String, dynamic>) {
-        return Map<String, dynamic>.of(decoded);
-      }
-      if (decoded is Map) {
-        return decoded.map(
-          (key, value) => MapEntry(key.toString(), value),
-        );
-      }
-    } catch (_) {
-      // ignore and fallback to empty map
-    }
-    return <String, dynamic>{};
-  }
-
-  static String _buildMergedRawJson({
-    required RssSource source,
-    String? existingRawJson,
-  }) {
-    final normalized = _normalizeSource(source);
-    final merged = _decodeRawJsonToMap(existingRawJson);
-    merged.addAll(normalized.toJson());
-    merged['sourceUrl'] = normalized.sourceUrl;
-    return LegadoJson.encode(merged);
   }
 
   void _ensureWatchStarted() {
@@ -94,7 +55,7 @@ class RssSourceRepository {
     _cacheByUrl
       ..clear()
       ..addEntries(rows.map((row) {
-        final source = _rowToModel(row);
+        final source = RssSourceRepositoryHelpers.rowToModel(row);
         return MapEntry(source.sourceUrl, source);
       }));
 
@@ -138,7 +99,7 @@ class RssSourceRepository {
     if (!_cacheReady) {
       unawaited(_reloadCacheFromDb());
     }
-    final normalized = _normalizeUrlKey(key);
+    final normalized = RssSourceRepositoryHelpers.normalizeUrlKey(key);
     if (normalized.isEmpty) return null;
     return _cacheByUrl[normalized];
   }
@@ -147,7 +108,7 @@ class RssSourceRepository {
     if (!_cacheReady) {
       unawaited(_reloadCacheFromDb());
     }
-    final normalized = _normalizeUrlKey(sourceUrl);
+    final normalized = RssSourceRepositoryHelpers.normalizeUrlKey(sourceUrl);
     if (normalized.isEmpty) return null;
     return _rawJsonByUrl[normalized];
   }
@@ -169,23 +130,24 @@ class RssSourceRepository {
   }
 
   bool has(String key) {
-    final normalized = _normalizeUrlKey(key);
+    final normalized = RssSourceRepositoryHelpers.normalizeUrlKey(key);
     if (normalized.isEmpty) return false;
     return _cacheByUrl.containsKey(normalized);
   }
 
   Future<void> addSource(RssSource source) async {
-    final normalizedSource = _normalizeSource(source);
-    final url = _normalizeUrlKey(normalizedSource.sourceUrl);
+    final normalizedSource = RssSourceRepositoryHelpers.normalizeSource(source);
+    final url =
+        RssSourceRepositoryHelpers.normalizeUrlKey(normalizedSource.sourceUrl);
     if (url.isEmpty) {
       throw const FormatException('sourceUrl 不能为空');
     }
-    final mergedRawJson = _buildMergedRawJson(
+    final mergedRawJson = RssSourceRepositoryHelpers.buildMergedRawJson(
       source: normalizedSource,
       existingRawJson: _rawJsonByUrl[url],
     );
     await _driftDb.into(_driftDb.rssSourceRecords).insertOnConflictUpdate(
-          _modelToCompanion(
+          RssSourceRepositoryHelpers.modelToCompanion(
             normalizedSource,
             rawJsonOverride: mergedRawJson,
           ),
@@ -198,20 +160,22 @@ class RssSourceRepository {
   Future<void> addSources(List<RssSource> sources) async {
     if (sources.isEmpty) return;
     final normalizedSources = sources
-        .map(_normalizeSource)
-        .where((source) => _normalizeUrlKey(source.sourceUrl).isNotEmpty)
+        .map(RssSourceRepositoryHelpers.normalizeSource)
+        .where((source) =>
+            RssSourceRepositoryHelpers.normalizeUrlKey(source.sourceUrl)
+                .isNotEmpty)
         .toList(growable: false);
     if (normalizedSources.isEmpty) return;
 
     final mergedRawByUrl = <String, String>{};
     final companions = normalizedSources.map((source) {
-      final url = _normalizeUrlKey(source.sourceUrl);
-      final mergedRaw = _buildMergedRawJson(
+      final url = RssSourceRepositoryHelpers.normalizeUrlKey(source.sourceUrl);
+      final mergedRaw = RssSourceRepositoryHelpers.buildMergedRawJson(
         source: source,
         existingRawJson: _rawJsonByUrl[url],
       );
       mergedRawByUrl[url] = mergedRaw;
-      return _modelToCompanion(
+      return RssSourceRepositoryHelpers.modelToCompanion(
         source,
         rawJsonOverride: mergedRaw,
       );
@@ -221,7 +185,7 @@ class RssSourceRepository {
     });
 
     for (final source in normalizedSources) {
-      final url = _normalizeUrlKey(source.sourceUrl);
+      final url = RssSourceRepositoryHelpers.normalizeUrlKey(source.sourceUrl);
       _cacheByUrl[url] = source;
       _rawJsonByUrl[url] = mergedRawByUrl[url]!;
     }
@@ -248,19 +212,22 @@ class RssSourceRepository {
         ? decoded
         : decoded.map((key, value) => MapEntry('$key', value));
 
-    final source = _normalizeSource(RssSource.fromJson(map));
-    final url = _normalizeUrlKey(source.sourceUrl);
+    final source = RssSourceRepositoryHelpers.normalizeSource(
+      RssSource.fromJson(map),
+    );
+    final url = RssSourceRepositoryHelpers.normalizeUrlKey(source.sourceUrl);
     if (url.isEmpty) {
       throw const FormatException('sourceUrl 不能为空');
     }
 
     map['sourceUrl'] = url;
     final normalizedRawJson = LegadoJson.encode(map);
-    final companion = _modelToCompanion(
+    final companion = RssSourceRepositoryHelpers.modelToCompanion(
       source,
       rawJsonOverride: normalizedRawJson,
     );
-    final normalizedOriginalUrl = _normalizeUrlKey(originalUrl);
+    final normalizedOriginalUrl =
+        RssSourceRepositoryHelpers.normalizeUrlKey(originalUrl);
 
     await _driftDb.transaction(() async {
       if (normalizedOriginalUrl.isNotEmpty && normalizedOriginalUrl != url) {
@@ -283,7 +250,7 @@ class RssSourceRepository {
   }
 
   Future<void> deleteSource(String sourceUrl) async {
-    final normalized = _normalizeUrlKey(sourceUrl);
+    final normalized = RssSourceRepositoryHelpers.normalizeUrlKey(sourceUrl);
     if (normalized.isEmpty) return;
     await (_driftDb.delete(_driftDb.rssSourceRecords)
           ..where((tbl) => tbl.sourceUrl.equals(normalized)))
@@ -295,7 +262,7 @@ class RssSourceRepository {
 
   /// 删除 RSS 源并同步清理该源文章（对齐 legado `SourceHelp.deleteRssSourceInternal`）
   Future<void> deleteSourceWithArticles(String sourceUrl) async {
-    final normalized = _normalizeUrlKey(sourceUrl);
+    final normalized = RssSourceRepositoryHelpers.normalizeUrlKey(sourceUrl);
     if (normalized.isEmpty) return;
     await _driftDb.transaction(() async {
       await (_driftDb.delete(_driftDb.rssSourceRecords)
@@ -311,8 +278,10 @@ class RssSourceRepository {
   }
 
   Future<void> deleteSources(Iterable<String> sourceUrls) async {
-    final normalized =
-        sourceUrls.map(_normalizeUrlKey).where((url) => url.isNotEmpty).toSet();
+    final normalized = sourceUrls
+        .map(RssSourceRepositoryHelpers.normalizeUrlKey)
+        .where((url) => url.isNotEmpty)
+        .toSet();
     if (normalized.isEmpty) return;
     await (_driftDb.delete(_driftDb.rssSourceRecords)
           ..where((tbl) => tbl.sourceUrl.isIn(normalized)))
@@ -333,17 +302,17 @@ class RssSourceRepository {
   }
 
   Future<void> enable(String sourceUrl, bool enabled) async {
-    final normalized = _normalizeUrlKey(sourceUrl);
+    final normalized = RssSourceRepositoryHelpers.normalizeUrlKey(sourceUrl);
     if (normalized.isEmpty) return;
     final existing = _cacheByUrl[normalized];
     if (existing == null) return;
     final updated = existing.copyWith(enabled: enabled);
-    final mergedRawJson = _buildMergedRawJson(
+    final mergedRawJson = RssSourceRepositoryHelpers.buildMergedRawJson(
       source: updated,
       existingRawJson: _rawJsonByUrl[normalized],
     );
     await _driftDb.into(_driftDb.rssSourceRecords).insertOnConflictUpdate(
-          _modelToCompanion(
+          RssSourceRepositoryHelpers.modelToCompanion(
             updated,
             rawJsonOverride: mergedRawJson,
           ),
@@ -463,66 +432,5 @@ class RssSourceRepository {
       if (raw == null || raw.isEmpty) return false;
       return raw.contains(key);
     }).toList(growable: false);
-  }
-
-  RssSourceRecordsCompanion _modelToCompanion(
-    RssSource source, {
-    String? rawJsonOverride,
-  }) {
-    final normalized = _normalizeSource(source);
-    final url = _normalizeUrlKey(normalized.sourceUrl);
-    if (url.isEmpty) {
-      throw const FormatException('sourceUrl 不能为空');
-    }
-    final rawJson = rawJsonOverride ?? LegadoJson.encode(normalized.toJson());
-    final now = DateTime.now().millisecondsSinceEpoch;
-    return RssSourceRecordsCompanion.insert(
-      sourceUrl: url,
-      sourceName: Value(normalized.sourceName),
-      sourceIcon: Value(normalized.sourceIcon),
-      sourceGroup: Value(normalized.sourceGroup),
-      sourceComment: Value(normalized.sourceComment),
-      enabled: Value(normalized.enabled),
-      loginUrl: Value(normalized.loginUrl),
-      sortUrl: Value(normalized.sortUrl),
-      singleUrl: Value(normalized.singleUrl),
-      customOrder: Value(normalized.customOrder),
-      lastUpdateTime: Value(normalized.lastUpdateTime),
-      rawJson: Value(rawJson),
-      updatedAt: Value(now),
-    );
-  }
-
-  static RssSource _rowToModel(RssSourceRecord row) {
-    final raw = row.rawJson;
-    if (raw != null && raw.trim().isNotEmpty) {
-      try {
-        final decoded = json.decode(raw);
-        if (decoded is Map<String, dynamic>) {
-          return RssSource.fromJson(decoded);
-        }
-        if (decoded is Map) {
-          return RssSource.fromJson(
-            decoded.map((key, value) => MapEntry('$key', value)),
-          );
-        }
-      } catch (_) {
-        // ignore and fallback
-      }
-    }
-
-    return RssSource(
-      sourceUrl: row.sourceUrl,
-      sourceName: row.sourceName,
-      sourceIcon: row.sourceIcon ?? '',
-      sourceGroup: row.sourceGroup,
-      sourceComment: row.sourceComment,
-      enabled: row.enabled,
-      loginUrl: row.loginUrl,
-      sortUrl: row.sortUrl,
-      singleUrl: row.singleUrl,
-      customOrder: row.customOrder,
-      lastUpdateTime: row.lastUpdateTime,
-    );
   }
 }

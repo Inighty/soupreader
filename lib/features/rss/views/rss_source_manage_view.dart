@@ -27,46 +27,9 @@ import '../services/rss_source_import_export_service.dart';
 import '../services/rss_source_import_selection_helper.dart';
 import '../services/rss_source_manage_helper.dart';
 import 'rss_group_manage_view.dart';
+import 'rss_source_manage_types.dart';
 import 'rss_subscription_view.dart';
 import 'rss_source_edit_view.dart';
-
-class _RssImportSelectionDecision {
-  const _RssImportSelectionDecision({
-    required this.candidates,
-    required this.policy,
-  });
-
-  final List<RssSourceImportCandidate> candidates;
-  final RssSourceImportSelectionPolicy policy;
-}
-
-enum _RssSourceMainMenuAction {
-  create,
-  importFile,
-  importUrl,
-  importQr,
-  importDefault,
-}
-
-enum _RssSourceSelectionAction {
-  enableSelection,
-  disableSelection,
-  addGroup,
-  removeGroup,
-  moveToTop,
-  moveToBottom,
-  exportSelection,
-  shareSelection,
-  checkSelectedInterval,
-}
-
-enum _RssSourceItemAction {
-  moveToTop,
-  moveToBottom,
-  delete,
-}
-
-typedef _RssGroupMenuDecision = ({bool openManage, String? query});
 
 class RssSourceManageView extends StatefulWidget {
   const RssSourceManageView({
@@ -431,53 +394,53 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
 
   Future<void> _showSelectionMoreActions(List<RssSource> visibleSources) async {
     if (!mounted) return;
-    final selected = await showAppActionListSheet<_RssSourceSelectionAction>(
+    final selected = await showAppActionListSheet<RssSourceSelectionAction>(
       context: context,
       title: '批量操作',
       showCancel: true,
       items: const [
-        AppActionListItem<_RssSourceSelectionAction>(
-          value: _RssSourceSelectionAction.enableSelection,
+        AppActionListItem<RssSourceSelectionAction>(
+          value: RssSourceSelectionAction.enableSelection,
           icon: CupertinoIcons.check_mark_circled_solid,
           label: '启用所选',
         ),
-        AppActionListItem<_RssSourceSelectionAction>(
-          value: _RssSourceSelectionAction.disableSelection,
+        AppActionListItem<RssSourceSelectionAction>(
+          value: RssSourceSelectionAction.disableSelection,
           icon: CupertinoIcons.clear_circled_solid,
           label: '禁用所选',
         ),
-        AppActionListItem<_RssSourceSelectionAction>(
-          value: _RssSourceSelectionAction.addGroup,
+        AppActionListItem<RssSourceSelectionAction>(
+          value: RssSourceSelectionAction.addGroup,
           icon: CupertinoIcons.add_circled_solid,
           label: '添加分组',
         ),
-        AppActionListItem<_RssSourceSelectionAction>(
-          value: _RssSourceSelectionAction.removeGroup,
+        AppActionListItem<RssSourceSelectionAction>(
+          value: RssSourceSelectionAction.removeGroup,
           icon: CupertinoIcons.minus_circle,
           label: '移除分组',
         ),
-        AppActionListItem<_RssSourceSelectionAction>(
-          value: _RssSourceSelectionAction.moveToTop,
+        AppActionListItem<RssSourceSelectionAction>(
+          value: RssSourceSelectionAction.moveToTop,
           icon: CupertinoIcons.arrow_up_circle,
           label: '置顶所选',
         ),
-        AppActionListItem<_RssSourceSelectionAction>(
-          value: _RssSourceSelectionAction.moveToBottom,
+        AppActionListItem<RssSourceSelectionAction>(
+          value: RssSourceSelectionAction.moveToBottom,
           icon: CupertinoIcons.arrow_down_circle,
           label: '置底所选',
         ),
-        AppActionListItem<_RssSourceSelectionAction>(
-          value: _RssSourceSelectionAction.exportSelection,
+        AppActionListItem<RssSourceSelectionAction>(
+          value: RssSourceSelectionAction.exportSelection,
           icon: CupertinoIcons.square_arrow_up,
           label: '导出所选',
         ),
-        AppActionListItem<_RssSourceSelectionAction>(
-          value: _RssSourceSelectionAction.shareSelection,
+        AppActionListItem<RssSourceSelectionAction>(
+          value: RssSourceSelectionAction.shareSelection,
           icon: CupertinoIcons.share,
           label: '分享选中源',
         ),
-        AppActionListItem<_RssSourceSelectionAction>(
-          value: _RssSourceSelectionAction.checkSelectedInterval,
+        AppActionListItem<RssSourceSelectionAction>(
+          value: RssSourceSelectionAction.checkSelectedInterval,
           icon: CupertinoIcons.scope,
           label: '选中所选区间',
         ),
@@ -485,31 +448,31 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
     );
     if (selected == null || !mounted) return;
     switch (selected) {
-      case _RssSourceSelectionAction.enableSelection:
+      case RssSourceSelectionAction.enableSelection:
         await _enableSelection(visibleSources);
         return;
-      case _RssSourceSelectionAction.disableSelection:
+      case RssSourceSelectionAction.disableSelection:
         await _disableSelection(visibleSources);
         return;
-      case _RssSourceSelectionAction.addGroup:
+      case RssSourceSelectionAction.addGroup:
         await _addGroupToSelection(visibleSources);
         return;
-      case _RssSourceSelectionAction.removeGroup:
+      case RssSourceSelectionAction.removeGroup:
         await _removeGroupFromSelection(visibleSources);
         return;
-      case _RssSourceSelectionAction.moveToTop:
+      case RssSourceSelectionAction.moveToTop:
         await _moveSelectionToTop(visibleSources);
         return;
-      case _RssSourceSelectionAction.moveToBottom:
+      case RssSourceSelectionAction.moveToBottom:
         await _moveSelectionToBottom(visibleSources);
         return;
-      case _RssSourceSelectionAction.exportSelection:
+      case RssSourceSelectionAction.exportSelection:
         await _exportSelection(visibleSources);
         return;
-      case _RssSourceSelectionAction.shareSelection:
+      case RssSourceSelectionAction.shareSelection:
         await _shareSelection(visibleSources);
         return;
-      case _RssSourceSelectionAction.checkSelectedInterval:
+      case RssSourceSelectionAction.checkSelectedInterval:
         _checkSelectedInterval(visibleSources);
         return;
     }
@@ -939,7 +902,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
   Future<void> _openGroupMenuSheet() async {
     final groups = _repo.allGroups();
     if (!mounted) return;
-    final selected = await showAppPopoverMenu<_RssGroupMenuDecision>(
+    final selected = await showAppPopoverMenu<RssGroupMenuDecision>(
       context: context,
       anchorKey: _groupMenuKey,
       items: [
@@ -1008,32 +971,32 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
 
   Future<void> _openMainOptions() async {
     if (!mounted) return;
-    final selected = await showAppPopoverMenu<_RssSourceMainMenuAction>(
+    final selected = await showAppPopoverMenu<RssSourceMainMenuAction>(
       context: context,
       anchorKey: _mainMenuKey,
       items: const [
         AppPopoverMenuItem(
-          value: _RssSourceMainMenuAction.create,
+          value: RssSourceMainMenuAction.create,
           icon: CupertinoIcons.add_circled,
           label: '新建订阅源',
         ),
         AppPopoverMenuItem(
-          value: _RssSourceMainMenuAction.importFile,
+          value: RssSourceMainMenuAction.importFile,
           icon: CupertinoIcons.doc,
           label: '本地导入',
         ),
         AppPopoverMenuItem(
-          value: _RssSourceMainMenuAction.importUrl,
+          value: RssSourceMainMenuAction.importUrl,
           icon: CupertinoIcons.globe,
           label: '网络导入',
         ),
         AppPopoverMenuItem(
-          value: _RssSourceMainMenuAction.importQr,
+          value: RssSourceMainMenuAction.importQr,
           icon: CupertinoIcons.qrcode,
           label: '二维码导入',
         ),
         AppPopoverMenuItem(
-          value: _RssSourceMainMenuAction.importDefault,
+          value: RssSourceMainMenuAction.importDefault,
           icon: CupertinoIcons.wand_rays,
           label: '导入默认规则',
         ),
@@ -1041,19 +1004,19 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
     );
     if (!mounted || selected == null) return;
     switch (selected) {
-      case _RssSourceMainMenuAction.create:
+      case RssSourceMainMenuAction.create:
         _openAddSource();
         break;
-      case _RssSourceMainMenuAction.importFile:
+      case RssSourceMainMenuAction.importFile:
         _importFromLocalFile();
         break;
-      case _RssSourceMainMenuAction.importUrl:
+      case RssSourceMainMenuAction.importUrl:
         _importFromOnlineInput();
         break;
-      case _RssSourceMainMenuAction.importQr:
+      case RssSourceMainMenuAction.importQr:
         _importFromQrCode();
         break;
-      case _RssSourceMainMenuAction.importDefault:
+      case RssSourceMainMenuAction.importDefault:
         _importDefaultSources();
         break;
     }
@@ -1325,7 +1288,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
     return {for (final source in allSources) source.sourceUrl: source};
   }
 
-  Future<_RssImportSelectionDecision?> _showImportSelectionDialog(
+  Future<RssImportSelectionDecision?> _showImportSelectionDialog(
     List<RssSourceImportCandidate> candidates,
   ) async {
     final dialogCandidates = candidates.toList(growable: false);
@@ -1339,7 +1302,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
     var keepEnabled = true;
     var appendCustomGroup = false;
     try {
-      return await showCupertinoBottomSheetDialog<_RssImportSelectionDecision>(
+      return await showCupertinoBottomSheetDialog<RssImportSelectionDecision>(
         context: context,
         builder: (popupContext) {
           return CupertinoPopupSurface(
@@ -1385,7 +1348,7 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
                               onPressed: () {
                                 Navigator.pop(
                                   context,
-                                  _RssImportSelectionDecision(
+                                  RssImportSelectionDecision(
                                     candidates: dialogCandidates,
                                     policy: RssSourceImportSelectionPolicy(
                                       selectedUrls: selectedUrls.toSet(),
@@ -1715,23 +1678,23 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
 
   Future<void> _showSourceActions(RssSource source) async {
     if (!mounted) return;
-    final selected = await showAppActionListSheet<_RssSourceItemAction>(
+    final selected = await showAppActionListSheet<RssSourceItemAction>(
       context: context,
       title: source.sourceName,
       showCancel: true,
       items: const [
-        AppActionListItem<_RssSourceItemAction>(
-          value: _RssSourceItemAction.moveToTop,
+        AppActionListItem<RssSourceItemAction>(
+          value: RssSourceItemAction.moveToTop,
           icon: CupertinoIcons.arrow_up_circle,
           label: '置顶',
         ),
-        AppActionListItem<_RssSourceItemAction>(
-          value: _RssSourceItemAction.moveToBottom,
+        AppActionListItem<RssSourceItemAction>(
+          value: RssSourceItemAction.moveToBottom,
           icon: CupertinoIcons.arrow_down_circle,
           label: '置底',
         ),
-        AppActionListItem<_RssSourceItemAction>(
-          value: _RssSourceItemAction.delete,
+        AppActionListItem<RssSourceItemAction>(
+          value: RssSourceItemAction.delete,
           icon: CupertinoIcons.delete,
           label: '删除',
           isDestructiveAction: true,
@@ -1740,13 +1703,13 @@ class _RssSourceManageViewState extends State<RssSourceManageView> {
     );
     if (selected == null || !mounted) return;
     switch (selected) {
-      case _RssSourceItemAction.moveToTop:
+      case RssSourceItemAction.moveToTop:
         await _moveToTop(source);
         return;
-      case _RssSourceItemAction.moveToBottom:
+      case RssSourceItemAction.moveToBottom:
         await _moveToBottom(source);
         return;
-      case _RssSourceItemAction.delete:
+      case RssSourceItemAction.delete:
         await _deleteSource(source);
         return;
     }

@@ -7,120 +7,10 @@ import 'package:path/path.dart' as p;
 import '../models/book.dart';
 import '../models/app_settings.dart';
 
-class WebDavOperationException implements Exception {
-  final String message;
+import 'webdav_service_helpers.dart';
+import 'webdav_service_models.dart';
 
-  const WebDavOperationException(this.message);
-
-  @override
-  String toString() => message;
-}
-
-class WebDavUploadResult {
-  final String remoteUrl;
-
-  const WebDavUploadResult({required this.remoteUrl});
-}
-
-class WebDavRemoteEntry {
-  final String displayName;
-  final String path;
-  final bool isDirectory;
-  final int size;
-  final int lastModify;
-
-  const WebDavRemoteEntry({
-    required this.displayName,
-    required this.path,
-    required this.isDirectory,
-    required this.size,
-    required this.lastModify,
-  });
-}
-
-/// 与 legado `BookProgress` 字段保持兼容，并补充 soupreader 侧进度字段。
-class WebDavBookProgress {
-  final String name;
-  final String author;
-  final int durChapterIndex;
-  final int durChapterPos;
-  final int durChapterTime;
-  final String? durChapterTitle;
-  final double? chapterProgress;
-  final double? readProgress;
-  final int? totalChapters;
-
-  const WebDavBookProgress({
-    required this.name,
-    required this.author,
-    required this.durChapterIndex,
-    required this.durChapterPos,
-    required this.durChapterTime,
-    this.durChapterTitle,
-    this.chapterProgress,
-    this.readProgress,
-    this.totalChapters,
-  });
-
-  factory WebDavBookProgress.fromJson(Map<String, dynamic> json) {
-    int parseInt(dynamic raw, {int fallback = 0}) {
-      if (raw is int) return raw;
-      if (raw is num) return raw.toInt();
-      if (raw is String) return int.tryParse(raw.trim()) ?? fallback;
-      return fallback;
-    }
-
-    double? parseDouble(dynamic raw) {
-      if (raw == null) return null;
-      if (raw is double) return raw;
-      if (raw is num) return raw.toDouble();
-      if (raw is String) return double.tryParse(raw.trim());
-      return null;
-    }
-
-    String parseString(dynamic raw, {String fallback = ''}) {
-      if (raw == null) return fallback;
-      return raw.toString().trim();
-    }
-
-    final normalizedChapterProgress =
-        parseDouble(json['chapterProgress'])?.clamp(0.0, 1.0).toDouble();
-    final normalizedReadProgress =
-        parseDouble(json['readProgress'])?.clamp(0.0, 1.0).toDouble();
-
-    return WebDavBookProgress(
-      name: parseString(json['name']),
-      author: parseString(json['author']),
-      durChapterIndex: parseInt(json['durChapterIndex']),
-      durChapterPos: parseInt(json['durChapterPos']),
-      durChapterTime: parseInt(json['durChapterTime']),
-      durChapterTitle: parseString(json['durChapterTitle']).isEmpty
-          ? null
-          : parseString(json['durChapterTitle']),
-      chapterProgress: normalizedChapterProgress,
-      readProgress: normalizedReadProgress,
-      totalChapters: json.containsKey('totalChapters')
-          ? parseInt(json['totalChapters'], fallback: 0)
-          : null,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'name': name,
-      'author': author,
-      'durChapterIndex': durChapterIndex,
-      'durChapterPos': durChapterPos,
-      'durChapterTime': durChapterTime,
-      'durChapterTitle': durChapterTitle,
-      if (chapterProgress != null)
-        'chapterProgress': chapterProgress!.clamp(0.0, 1.0).toDouble(),
-      if (readProgress != null)
-        'readProgress': readProgress!.clamp(0.0, 1.0).toDouble(),
-      if (totalChapters != null) 'totalChapters': totalChapters,
-    };
-  }
-}
+export 'webdav_service_models.dart';
 
 class WebDavService {
   WebDavService({Dio? dio})
@@ -200,7 +90,7 @@ class WebDavService {
   }) {
     final merged = '${bookTitle}_${bookAuthor}'.trim();
     final normalized =
-        _normalizeProgressFileNameSegment(merged.isEmpty ? 'unknown' : merged);
+        normalizeProgressFileNameSegment(merged.isEmpty ? 'unknown' : merged);
     final encodedName = Uri.encodeComponent(normalized);
     return '${buildBookProgressRootUrl(settings)}$encodedName.json';
   }
@@ -271,11 +161,11 @@ class WebDavService {
       },
     );
 
-    if (_isSuccessStatus(response.statusCode)) {
+    if (isSuccessStatus(response.statusCode)) {
       return WebDavUploadResult(remoteUrl: uploadUri.toString());
     }
 
-    throw _buildStatusException(
+    throw buildStatusException(
       action: '上传',
       uri: uploadUri,
       response: response,
@@ -304,10 +194,10 @@ class WebDavService {
         'Content-Type': 'application/json',
       },
     );
-    if (_isSuccessStatus(response.statusCode)) {
+    if (isSuccessStatus(response.statusCode)) {
       return;
     }
-    throw _buildStatusException(
+    throw buildStatusException(
       action: '上传进度',
       uri: uploadUri,
       response: response,
@@ -336,14 +226,14 @@ class WebDavService {
     if (code == 404) {
       return null;
     }
-    if (!_isSuccessStatus(code)) {
-      throw _buildStatusException(
+    if (!isSuccessStatus(code)) {
+      throw buildStatusException(
         action: '获取进度',
         uri: progressUri,
         response: response,
       );
     }
-    final bytes = _responseBytes(response.data);
+    final bytes = responseBytes(response.data);
     if (bytes == null || bytes.isEmpty) {
       return null;
     }
@@ -389,14 +279,14 @@ class WebDavService {
       },
     );
     final code = response.statusCode ?? 0;
-    if (!_isSuccessStatus(code) && code != 207) {
-      throw _buildStatusException(
+    if (!isSuccessStatus(code) && code != 207) {
+      throw buildStatusException(
         action: '读取目录',
         uri: requestUri,
         response: response,
       );
     }
-    final xml = utf8.decode(_responseBytes(response.data) ?? const <int>[]);
+    final xml = utf8.decode(responseBytes(response.data) ?? const <int>[]);
     final entries = _parseDirectoryEntries(
       body: xml,
       requestUri: requestUri,
@@ -451,10 +341,10 @@ class WebDavService {
         'Content-Type': 'application/json',
       },
     );
-    if (_isSuccessStatus(response.statusCode)) {
+    if (isSuccessStatus(response.statusCode)) {
       return uploadUri.toString();
     }
-    throw _buildStatusException(
+    throw buildStatusException(
       action: '上传备份',
       uri: uploadUri,
       response: response,
@@ -476,14 +366,14 @@ class WebDavService {
       settings: settings,
     );
     final code = response.statusCode ?? 0;
-    if (!_isSuccessStatus(code)) {
-      throw _buildStatusException(
+    if (!isSuccessStatus(code)) {
+      throw buildStatusException(
         action: '下载备份',
         uri: uri,
         response: response,
       );
     }
-    final bytes = _responseBytes(response.data);
+    final bytes = responseBytes(response.data);
     if (bytes == null || bytes.isEmpty) {
       throw const WebDavOperationException('备份文件为空');
     }
@@ -507,7 +397,7 @@ class WebDavService {
       return;
     }
 
-    throw _buildStatusException(
+    throw buildStatusException(
       action: '创建远程目录',
       uri: uri,
       response: response,
@@ -522,7 +412,7 @@ class WebDavService {
     Map<String, String>? extraHeaders,
   }) async {
     final headers = <String, String>{
-      ..._buildAuthHeaders(settings),
+      ...buildAuthHeaders(settings),
       if (extraHeaders != null) ...extraHeaders,
     };
 
@@ -539,7 +429,7 @@ class WebDavService {
       );
     } on DioException catch (e) {
       throw WebDavOperationException(
-          _formatDioError(method: method, uri: uri, error: e));
+          formatDioError(method: method, uri: uri, error: e));
     }
   }
 
@@ -548,43 +438,43 @@ class WebDavService {
     required Uri requestUri,
     required String currentDirectoryUrl,
   }) {
-    final normalizedCurrent = _normalizeUrl(currentDirectoryUrl);
+    final normalizedCurrent = normalizeUrl(currentDirectoryUrl);
     final entries = <WebDavRemoteEntry>[];
     for (final match in _responseRegex.allMatches(body)) {
       final responseXml = match.group(0) ?? '';
       if (responseXml.trim().isEmpty) continue;
-      final href = _extractTagText(responseXml, 'href');
+      final href = extractTagText(responseXml, 'href');
       if (href.isEmpty) continue;
-      final hrefDecoded = Uri.decodeFull(_decodeXmlText(href));
-      final fullUrl = _resolveHref(requestUri, hrefDecoded);
+      final hrefDecoded = Uri.decodeFull(decodeXmlText(href));
+      final fullUrl = resolveHref(requestUri, hrefDecoded);
       if (fullUrl == null) continue;
-      final resourceType = _extractTagInnerXml(responseXml, 'resourcetype');
-      final contentType = _extractTagText(responseXml, 'getcontenttype');
-      final isDirectory = _isDirectory(
+      final resourceType = extractTagInnerXml(responseXml, 'resourcetype');
+      final contentType = extractTagText(responseXml, 'getcontenttype');
+      final isDir = isDirectory(
         contentType: contentType,
         resourceTypeXml: resourceType,
       );
       final normalizedPath =
-          isDirectory && !fullUrl.endsWith('/') ? '$fullUrl/' : fullUrl;
-      if (_normalizeUrl(normalizedPath) == normalizedCurrent) {
+          isDir && !fullUrl.endsWith('/') ? '$fullUrl/' : fullUrl;
+      if (normalizeUrl(normalizedPath) == normalizedCurrent) {
         continue;
       }
-      final displayNameRaw = _extractTagText(responseXml, 'displayname').trim();
-      final fallbackName = _extractFileName(hrefDecoded);
-      final displayName = _decodeXmlText(
+      final displayNameRaw = extractTagText(responseXml, 'displayname').trim();
+      final fallbackName = extractFileName(hrefDecoded);
+      final displayName = decodeXmlText(
         displayNameRaw.isEmpty ? fallbackName : displayNameRaw,
       );
       final size = int.tryParse(
-            _extractTagText(responseXml, 'getcontentlength').trim(),
+            extractTagText(responseXml, 'getcontentlength').trim(),
           ) ??
           0;
       final lastModify =
-          _parseLastModify(_extractTagText(responseXml, 'getlastmodified'));
+          parseLastModify(extractTagText(responseXml, 'getlastmodified'));
       entries.add(
         WebDavRemoteEntry(
           displayName: displayName,
           path: normalizedPath,
-          isDirectory: isDirectory,
+          isDirectory: isDir,
           size: size,
           lastModify: lastModify,
         ),
@@ -593,211 +483,4 @@ class WebDavService {
     return entries;
   }
 
-  bool _isDirectory({
-    required String contentType,
-    required String resourceTypeXml,
-  }) {
-    final normalizedType = contentType.trim().toLowerCase();
-    if (normalizedType == 'httpd/unix-directory') return true;
-    return resourceTypeXml.toLowerCase().contains('collection');
-  }
-
-  String _extractTagText(String source, String tag) {
-    final exp = RegExp(
-      '<(?:\\w+:)?$tag\\b[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?$tag>',
-      caseSensitive: false,
-    );
-    final raw = exp.firstMatch(source)?.group(1) ?? '';
-    return raw.replaceAll(RegExp(r'<[^>]+>'), '').trim();
-  }
-
-  String _extractTagInnerXml(String source, String tag) {
-    final exp = RegExp(
-      '<(?:\\w+:)?$tag\\b[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?$tag>',
-      caseSensitive: false,
-    );
-    return exp.firstMatch(source)?.group(1)?.trim() ?? '';
-  }
-
-  String _decodeXmlText(String value) {
-    return value
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&apos;', "'")
-        .trim();
-  }
-
-  String _normalizeUrl(String value) {
-    var normalized = value.trim();
-    while (normalized.length > 1 && normalized.endsWith('/')) {
-      normalized = normalized.substring(0, normalized.length - 1);
-    }
-    return normalized;
-  }
-
-  String _extractFileName(String decodedHref) {
-    final trimmed = decodedHref.trim();
-    if (trimmed.isEmpty) return '';
-    final clean = trimmed.endsWith('/')
-        ? trimmed.substring(0, trimmed.length - 1)
-        : trimmed;
-    final slashIndex = clean.lastIndexOf('/');
-    if (slashIndex < 0 || slashIndex == clean.length - 1) {
-      return clean;
-    }
-    return clean.substring(slashIndex + 1);
-  }
-
-  String? _resolveHref(Uri requestUri, String href) {
-    final raw = href.trim();
-    if (raw.isEmpty) return null;
-    final uri = Uri.tryParse(raw);
-    if (uri != null && uri.hasScheme) {
-      if (uri.scheme == 'http' || uri.scheme == 'https') {
-        return uri.toString();
-      }
-      if (uri.scheme == 'dav') {
-        return uri.replace(scheme: 'http').toString();
-      }
-      if (uri.scheme == 'davs') {
-        return uri.replace(scheme: 'https').toString();
-      }
-    }
-    if (raw.startsWith('/')) {
-      return '${requestUri.scheme}://${requestUri.authority}$raw';
-    }
-    return requestUri.resolve(raw).toString();
-  }
-
-  int _parseLastModify(String rawValue) {
-    final value = rawValue.trim();
-    if (value.isEmpty) return 0;
-    try {
-      return HttpDate.parse(value).millisecondsSinceEpoch;
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  Map<String, String> _buildAuthHeaders(AppSettings settings) {
-    final account = settings.webDavAccount.trim();
-    final password = settings.webDavPassword.trim();
-    final token = base64Encode(utf8.encode('$account:$password'));
-    return <String, String>{
-      'Authorization': 'Basic $token',
-    };
-  }
-
-  bool _isSuccessStatus(int? statusCode) {
-    if (statusCode == null) return false;
-    return statusCode >= 200 && statusCode < 300;
-  }
-
-  WebDavOperationException _buildStatusException({
-    required String action,
-    required Uri uri,
-    required Response<dynamic> response,
-  }) {
-    final status = response.statusCode ?? -1;
-    final reason = _firstNonEmpty(<String?>[
-      response.statusMessage,
-      _compactBodySnippet(response.data),
-    ]);
-    final headerHint = _importantHeaders(response.headers.map);
-    final tail = reason == null ? '' : '，$reason';
-    return WebDavOperationException(
-      '$action失败（HTTP $status）$tail$headerHint\n$urlLabel: ${uri.toString()}',
-    );
-  }
-
-  String _formatDioError({
-    required String method,
-    required Uri uri,
-    required DioException error,
-  }) {
-    final response = error.response;
-    if (response != null) {
-      final status = response.statusCode ?? -1;
-      final reason = _firstNonEmpty(<String?>[
-        response.statusMessage,
-        _compactBodySnippet(response.data),
-      ]);
-      final headerHint = _importantHeaders(response.headers.map);
-      final tail = reason == null ? '' : '，$reason';
-      return '$method 请求失败（HTTP $status）$tail$headerHint\n$urlLabel: ${uri.toString()}';
-    }
-
-    switch (error.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
-        return '$method 请求超时：${uri.toString()}';
-      case DioExceptionType.connectionError:
-        return '$method 连接失败：${error.message ?? '网络异常'}';
-      case DioExceptionType.badCertificate:
-        return '$method 证书校验失败：${uri.toString()}';
-      case DioExceptionType.cancel:
-        return '$method 请求已取消：${uri.toString()}';
-      case DioExceptionType.badResponse:
-      case DioExceptionType.unknown:
-        return '$method 请求异常：${error.message ?? '未知错误'}';
-    }
-  }
-
-  String _importantHeaders(Map<String, List<String>> headers) {
-    const keys = <String>['www-authenticate', 'dav', 'allow', 'content-type'];
-    final parts = <String>[];
-    for (final key in keys) {
-      final values = headers[key];
-      if (values == null || values.isEmpty) continue;
-      parts.add('$key=${values.join(',')}');
-    }
-    if (parts.isEmpty) return '';
-    return '，关键响应头：${parts.join('; ')}';
-  }
-
-  String? _compactBodySnippet(Object? data) {
-    if (data == null) return null;
-    if (data is List<int>) {
-      if (data.isEmpty) return null;
-      final text = utf8.decode(data, allowMalformed: true).trim();
-      if (text.isEmpty) return null;
-      return _trimLength(text);
-    }
-    final text = data.toString().trim();
-    if (text.isEmpty) return null;
-    return _trimLength(text);
-  }
-
-  List<int>? _responseBytes(Object? data) {
-    if (data == null) return null;
-    if (data is List<int>) return data;
-    if (data is String) return utf8.encode(data);
-    return utf8.encode(data.toString());
-  }
-
-  String _normalizeProgressFileNameSegment(String input) {
-    var normalized = input.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
-    normalized = normalized.replaceAll(RegExp(r'\s+'), ' ');
-    if (normalized.isEmpty) return 'unknown';
-    return normalized;
-  }
-
-  String _trimLength(String text, {int max = 120}) {
-    final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (normalized.length <= max) return normalized;
-    return '${normalized.substring(0, max)}…';
-  }
-
-  String? _firstNonEmpty(List<String?> values) {
-    for (final raw in values) {
-      final text = raw?.trim() ?? '';
-      if (text.isNotEmpty) return text;
-    }
-    return null;
-  }
 }
-
-const String urlLabel = 'URL';

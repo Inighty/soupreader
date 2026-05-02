@@ -4,9 +4,9 @@ import 'package:flutter/material.dart'
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_sheet_panel.dart';
-import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
 import '../models/reading_settings.dart';
+import 'reader_style_config_list_widgets.dart';
 import 'reader_style_edit_sheet.dart';
 
 /// 背景文字样式完整列表管理页，类似书源管理。
@@ -228,30 +228,30 @@ class _ReaderStyleConfigListSheetState
   }
 
   void _showMoreMenu() {
-    showAppPopoverMenu<_MenuAction>(
+    showAppPopoverMenu<ReaderStyleListMenuAction>(
       context: context,
       anchorKey: _moreMenuKey,
       items: [
         const AppPopoverMenuItem(
-          value: _MenuAction.addNew,
+          value: ReaderStyleListMenuAction.addNew,
           icon: CupertinoIcons.plus,
           label: '新建样式',
         ),
         if (widget.onImport != null)
           const AppPopoverMenuItem(
-            value: _MenuAction.import_,
+            value: ReaderStyleListMenuAction.import_,
             icon: CupertinoIcons.tray_arrow_down,
             label: '导入',
           ),
         if (widget.onExport != null)
           const AppPopoverMenuItem(
-            value: _MenuAction.export_,
+            value: ReaderStyleListMenuAction.export_,
             icon: CupertinoIcons.tray_arrow_up,
             label: '导出',
           ),
         if (widget.onShare != null)
           const AppPopoverMenuItem(
-            value: _MenuAction.share,
+            value: ReaderStyleListMenuAction.share,
             icon: CupertinoIcons.share,
             label: '分享',
           ),
@@ -259,13 +259,13 @@ class _ReaderStyleConfigListSheetState
     ).then((action) {
       if (!mounted || action == null) return;
       switch (action) {
-        case _MenuAction.addNew:
+        case ReaderStyleListMenuAction.addNew:
           _addNew();
-        case _MenuAction.import_:
+        case ReaderStyleListMenuAction.import_:
           widget.onImport?.call();
-        case _MenuAction.export_:
+        case ReaderStyleListMenuAction.export_:
           widget.onExport?.call();
-        case _MenuAction.share:
+        case ReaderStyleListMenuAction.share:
           widget.onShare?.call();
       }
     });
@@ -322,67 +322,21 @@ class _ReaderStyleConfigListSheetState
   }
 
   Widget _buildHeader(Color labelColor, Color sep) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Center(
-          child: Container(
-            margin: const EdgeInsets.only(top: 8, bottom: 4),
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: sep,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Row(
-            children: [
-              AppNavBarButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Icon(CupertinoIcons.back, color: _accent, size: 22),
-              ),
-              Expanded(
-                child: Center(
-                  child: Text(
-                    '背景文字样式',
-                    style: TextStyle(
-                      color: labelColor,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-              AppNavBarButton(
-                onPressed: _configs.isEmpty && !_isSelecting
-                    ? null
-                    : () => setState(() {
-                          _isSelecting = !_isSelecting;
-                          if (!_isSelecting) _checkedIndices.clear();
-                        }),
-                child: Text(
-                  _isSelecting ? '完成' : '多选',
-                  style: TextStyle(color: _accent, fontSize: 13),
-                ),
-              ),
-              AppNavBarButton(
-                key: _moreMenuKey,
-                onPressed: _isSelecting ? null : _showMoreMenu,
-                child: Icon(
-                  CupertinoIcons.ellipsis,
-                  color:
-                      _isSelecting ? CupertinoColors.inactiveGray : _accent,
-                  size: 22,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Container(height: 0.5, color: sep),
-      ],
+    return ReaderStyleListHeader(
+      labelColor: labelColor,
+      sep: sep,
+      accent: _accent,
+      isSelecting: _isSelecting,
+      hasConfigs: _configs.isNotEmpty,
+      onBack: () => Navigator.of(context).pop(),
+      onToggleSelecting: _configs.isEmpty && !_isSelecting
+          ? null
+          : () => setState(() {
+                _isSelecting = !_isSelecting;
+                if (!_isSelecting) _checkedIndices.clear();
+              }),
+      onShowMoreMenu: _isSelecting ? null : _showMoreMenu,
+      moreMenuKey: _moreMenuKey,
     );
   }
 
@@ -457,10 +411,17 @@ class _ReaderStyleConfigListSheetState
                     ),
                   ),
                 ),
-                if (isBuiltin) _buildBuiltinBadge(secondaryLabel),
-                _buildColorDot(Color(config.backgroundColor), sep),
+                if (isBuiltin)
+                  ReaderStyleBuiltinBadge(secondaryLabel: secondaryLabel),
+                ReaderStyleColorDot(
+                  color: Color(config.backgroundColor),
+                  border: sep,
+                ),
                 const SizedBox(width: 4),
-                _buildColorDot(Color(config.textColor), sep),
+                ReaderStyleColorDot(
+                  color: Color(config.textColor),
+                  border: sep,
+                ),
                 const SizedBox(width: 8),
                 if (!_isSelecting)
                   ReorderableDragStartListener(
@@ -484,99 +445,19 @@ class _ReaderStyleConfigListSheetState
     );
   }
 
-  Widget _buildBuiltinBadge(Color secondaryLabel) {
-    return Container(
-      margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: secondaryLabel.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        '内置',
-        style: TextStyle(color: secondaryLabel, fontSize: 11),
-      ),
-    );
-  }
-
-  Widget _buildColorDot(Color color, Color border) {
-    return Container(
-      width: 16,
-      height: 16,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: border, width: 0.5),
-      ),
-    );
-  }
-
   Widget _buildBatchBar(Color sep) {
     final deletable = _deletableIndices;
     final allSelected =
         deletable.isNotEmpty && _checkedIndices.containsAll(deletable);
     final hasChecked = _checkedIndices.isNotEmpty;
-    final barBg =
-        CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context);
-    final enabledColor = _accent;
-    const disabledColor = CupertinoColors.inactiveGray;
-
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: sep, width: 0.5)),
-        color: barBg,
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: Row(
-            children: [
-              CupertinoButton(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 6),
-                minimumSize: const Size(30, 30),
-                onPressed: _toggleSelectAll,
-                child: Text(
-                  allSelected ? '取消全选' : '全选',
-                  style: TextStyle(color: enabledColor, fontSize: 13),
-                ),
-              ),
-              CupertinoButton(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 6),
-                minimumSize: const Size(30, 30),
-                onPressed: hasChecked ? _invertSelection : null,
-                child: Text(
-                  '反选',
-                  style: TextStyle(
-                    color: hasChecked ? enabledColor : disabledColor,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              CupertinoButton(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 6),
-                minimumSize: const Size(30, 30),
-                onPressed: hasChecked ? _deleteChecked : null,
-                child: Text(
-                  '删除',
-                  style: TextStyle(
-                    color: hasChecked
-                        ? CupertinoColors.destructiveRed
-                        : disabledColor,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return ReaderStyleBatchBar(
+      sep: sep,
+      accent: _accent,
+      allSelected: allSelected,
+      hasChecked: hasChecked,
+      onToggleSelectAll: _toggleSelectAll,
+      onInvertSelection: hasChecked ? _invertSelection : null,
+      onDeleteChecked: hasChecked ? _deleteChecked : null,
     );
   }
 }
-
-enum _MenuAction { addNew, import_, export_, share }

@@ -13,26 +13,21 @@ import '../../bookshelf/services/bookshelf_catalog_update_service.dart';
 import '../../source/services/rule_parser/rule_parser_engine.dart';
 import '../models/reader_view_models.dart';
 import '../models/reading_settings.dart';
-import '../services/reader_charset_service.dart';
-import '../widgets/auto_pager.dart';
-import '../widgets/page_factory.dart';
-import '../services/reader_content_processor.dart';
 import '../utils/chapter_progress_utils.dart';
+import '../widgets/auto_pager.dart';
 import 'actions_coordinator.dart';
 import 'image_coordinator.dart';
 import 'input_coordinator.dart';
 import 'reader_bookmark_controller.dart';
+import 'reader_coordinator_helpers.dart';
+import 'reader_sub_coordinator_builder.dart';
 import 'scroll_coordinator.dart';
 import 'source_switch_coordinator.dart';
 import 'reader_read_aloud_controller.dart';
 import 'reader_settings_controller.dart';
 import 'reader_state.dart';
 
-/// 阅读器逻辑委托。
-///
-/// 接收 UI 事件 → 操作状态分组（ChangeNotifier）→ UI 自动刷新。
-/// 不持有任何 Widget/BuildContext 引用。需要 UI 操作时通过
-/// [postFrameCallback] 回调。
+/// 阅读器逻辑委托。接收 UI 事件 → 操作状态分组（ChangeNotifier）→ UI 自动刷新。
 class ReaderCoordinator {
   ReaderCoordinator({
     required this.bookId,
@@ -71,18 +66,14 @@ class ReaderCoordinator {
   ReaderReadAloudController get readAloudController => readAloudCtrl;
   final ReaderBookmarkController bookmarkCtrl;
 
-  /// 安全地在下一帧执行 UI 操作（替代 WidgetsBinding.addPostFrameCallback）
   final void Function(VoidCallback callback) postFrameCallback;
 
   /// 由 View 层提供，返回分页模式内容区域的实际尺寸。
-  /// 如果为 null 则使用默认尺寸估算。
   final Size? Function()? getPagedContentSize;
 
   // ── Services ──
   late final ChapterRepository _chapterRepo;
   late final BookRepository _bookRepo;
-
-  /// 公开 BookRepository 以供 View 层导航使用。
   BookRepository get bookRepo => _bookRepo;
   late final SourceRepository _sourceRepo;
   late final SettingsService _settingsService;
@@ -98,10 +89,6 @@ class ReaderCoordinator {
   late final ImageCoordinator imageCoordinator;
   SourceSwitchCoordinator? sourceSwitchCoordinator;
   late final ScrollCoordinator scrollCoordinator;
-
-  // ═══════════════════════════════════════════════════════════════════
-  // 初始化
-  // ═══════════════════════════════════════════════════════════════════
 
   Future<void> init({
     required int initialChapter,
@@ -151,10 +138,6 @@ class ReaderCoordinator {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // 初始化工厂方法
-  // ═══════════════════════════════════════════════════════════════════
-
   void _initServices() {
     final db = DatabaseService();
     _chapterRepo = ChapterRepository(db);
@@ -171,19 +154,24 @@ class ReaderCoordinator {
   }
 
   void _initSubCoordinators() {
-    actionsCoordinator = ActionsCoordinator(
+    final bundle = buildReaderSubCoordinators(
       bookId: bookId,
       bookTitle: bookTitle,
       isEphemeral: isEphemeral,
       chapter: chapter,
+      ui: ui,
       settings: settings,
+      scroll: scroll,
+      paged: paged,
       image: image,
+      readAloudCtrl: readAloudCtrl,
+      bookmarkCtrl: bookmarkCtrl,
+      settingsCtrl: settingsCtrl,
       bookRepo: _bookRepo,
       chapterRepo: _chapterRepo,
       sourceRepo: _sourceRepo,
       settingsService: _settingsService,
       webDavService: _webDavService,
-      charsetService: ReaderCharsetService(),
       catalogUpdateService: _catalogUpdateService,
       ruleEngine: _ruleEngine,
       onLoadChapter: (index, {
@@ -195,101 +183,21 @@ class ReaderCoordinator {
             restoreOffset: restoreOffset,
             targetChapterProgress: targetChapterProgress,
           ),
-      onShowToast: ui.showToast,
-      getChapterProgress: getChapterProgress,
-      getBookProgress: getBookProgress,
-    );
-
-    scrollCoordinator = ScrollCoordinator(
-      scroll: scroll,
-      chapter: chapter,
-      settings: settings,
-      buildSegment: _buildScrollSegment,
-      onChapterChanged: () =>
-          bookmarkCtrl.updateStatus(chapter.currentIndex),
-      onSaveProgress: _saveProgress,
-      getBookProgress: getBookProgress,
-      getCurrentTime: getCurrentTime,
-    );
-
-    inputCoordinator = InputCoordinator(
-      chapter: chapter,
-      ui: ui,
-      settings: settings,
-      paged: paged,
-      scroll: scroll,
       onToggleMenu: toggleMenu,
-      onShowAutoReadPanel: () => ui.toggleAutoReadPanel(true),
       onNextChapter: nextChapter,
       onPreviousChapter: previousChapter,
-      onScrollPage: ({required bool up}) =>
-          scrollCoordinator.scrollPage(up: up),
-      onShowToast: ui.showToast,
-      onAddBookmark: () {
-        unawaited(bookmarkCtrl.addAtCurrentPosition(
-          bookAuthor: image.bookAuthor,
-          chapterIndex: chapter.currentIndex,
-          chapterTitle: chapter.currentTitle,
-          chapterProgress: getChapterProgress(),
-          currentContent: chapter.currentContent,
-        ));
-      },
-      onShowChapterList: () => ui.toggleMenu(false),
-      onSearchContent: () {
-        ui.toggleMenu(false);
-        ui.toggleSearchMenu(true);
-      },
-      onEditContent: () => ui.toggleMenu(false),
-      onToggleReplaceRule: () =>
-          unawaited(actionsCoordinator.toggleReplaceRule()),
-      onSyncProgress: () =>
-          unawaited(actionsCoordinator.pullProgressFromWebDav()),
-      onReadAloudPrev: () =>
-          unawaited(readAloudCtrl.previousParagraph()),
-      onReadAloudNext: () =>
-          unawaited(readAloudCtrl.nextParagraph()),
-      onReadAloudToggle: () =>
-          unawaited(readAloudCtrl.togglePauseResume()),
-      onScreenOffTimerStart: () =>
-          settingsCtrl.screenOffTimerStart(settings.settings),
-      isAutoPagerRunning: () => ui.autoPager.isRunning,
-      clickActions: ClickAction.defaultZoneConfig,
+      getChapterProgress: getChapterProgress,
+      getBookProgress: getBookProgress,
+      getCurrentTime: getCurrentTime,
+      buildSegment: _buildScrollSegment,
+      onSaveProgress: _saveProgress,
     );
-
-    imageCoordinator = ImageCoordinator(
-      bookId: bookId,
-      isEphemeral: isEphemeral,
-      image: image,
-      settingsService: _settingsService,
-      ruleEngine: _ruleEngine,
-      resolveCurrentSource: () {
-        final url = (image.sourceUrl ?? '').trim();
-        if (url.isEmpty) return null;
-        return _sourceRepo.getSourceByUrl(url);
-      },
-      recentFetchDuration: () => chapter.recentFetchDuration,
-    );
-
-    if (!isEphemeral) {
-      sourceSwitchCoordinator = SourceSwitchCoordinator(
-        bookId: bookId,
-        chapter: chapter,
-        image: image,
-        sourceRepo: _sourceRepo,
-        ruleEngine: _ruleEngine,
-        settingsService: _settingsService,
-        onSourceSwitched: (newSourceUrl) async {
-          chapter.chapters =
-              _chapterRepo.getChaptersForBook(bookId);
-          chapter.notify();
-        },
-      );
-    }
+    actionsCoordinator = bundle.actions;
+    scrollCoordinator = bundle.scroll;
+    inputCoordinator = bundle.input;
+    imageCoordinator = bundle.image;
+    sourceSwitchCoordinator = bundle.sourceSwitch;
   }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // 章节加载
-  // ═══════════════════════════════════════════════════════════════════
 
   /// 加载指定章节。核心流程，从旧 _loadChapter 迁移。
   Future<void> loadChapter(
@@ -394,69 +302,25 @@ class ReaderCoordinator {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // 内容处理
-  // ═══════════════════════════════════════════════════════════════════
-
   ({String title, String content}) _processChapterContent({
     required String chapterId,
     required String rawTitle,
     required String rawContent,
-  }) {
-    var title = _convertChinese(rawTitle);
-    var content = rawContent;
+  }) =>
+      processReaderChapterContent(
+        settings: settings,
+        chineseConverter: _chineseConverter,
+        chapterId: chapterId,
+        rawTitle: rawTitle,
+        rawContent: rawContent,
+      );
 
-    if (settings.settings.cleanChapterTitle) {
-      content = ReaderContentProcessor.removeDuplicateTitle(content, title)
-          .content;
-    }
-    if (settings.delRubyTag) {
-      content = ReaderContentProcessor.removeRubyTags(content);
-    }
-    if (settings.delHTag) {
-      content = ReaderContentProcessor.removeHtmlHeaderTags(content);
-    }
-    content = _convertChinese(content);
-    content = ReaderContentProcessor.formatContentLikeLegado(content);
-
-    return (title: title, content: content);
-  }
-
-  String _convertChinese(String text) {
-    switch (settings.settings.chineseConverterType) {
-      case ChineseConverterType.traditionalToSimplified:
-        return _chineseConverter.traditionalToSimplified(text);
-      case ChineseConverterType.simplifiedToTraditional:
-        return _chineseConverter.simplifiedToTraditional(text);
-      default:
-        return text;
-    }
-  }
-
-  Future<String> _fetchContent(Chapter ch) async {
-    final existing = ch.content;
-    if (existing != null && existing.isNotEmpty) return existing;
-
-    final url = (ch.url ?? '').trim();
-    if (url.isEmpty) return '';
-
-    final sourceUrl = image.sourceUrl ?? '';
-    if (sourceUrl.isEmpty) return '';
-
-    try {
-      final source = _sourceRepo.getSourceByUrl(sourceUrl);
-      if (source == null) return '';
-      final content = await _ruleEngine.getContent(source, url);
-      return content;
-    } catch (e) {
-      debugPrint('[coordinator] fetchContent error: $e');
-      return '';
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // 分页
-  // ═══════════════════════════════════════════════════════════════════
+  Future<String> _fetchContent(Chapter ch) => fetchReaderChapterContent(
+        chapter: ch,
+        sourceUrlHint: image.sourceUrl,
+        sourceRepo: _sourceRepo,
+        ruleEngine: _ruleEngine,
+      );
 
   void _paginateAndJump({
     required int chapterIndex,
@@ -464,10 +328,6 @@ class ReaderCoordinator {
     required bool restoreOffset,
     double? targetProgress,
   }) {
-    // 设置布局参数（依赖 PagedReaderWidget 已 mount + layout）。
-    // 如 RenderBox 尚未就绪（首次进入阅读器时 chapter.update(initialized=true)
-    // 与 postFrameCallback 触发时序竞速），延迟一帧重试，避免分页用 fallback
-    // 尺寸算出的页数与最终布局不一致。
     final contentSize = getPagedContentSize?.call();
     if (contentSize == null) {
       postFrameCallback(() {
@@ -480,64 +340,21 @@ class ReaderCoordinator {
       });
       return;
     }
-
-    // 构建 ChapterData 并注入 PageFactory。
-    // 当前章节优先使用 chapter.currentContent（已经过处理的内容），
-    // 避免 Chapter.content 尚未回写时出现空白页。
-    final chapterDataList = List.generate(chapter.chapters.length, (i) {
-      final ch = chapter.chapters[i];
-      final content = (i == chapterIndex)
-          ? chapter.currentContent        // 当前章：用处理后内容
-          : (ch.content ?? '');           // 邻章：用缓存内容（或空）
-      return ChapterData(title: ch.title, content: content);
-    });
-    paged.pageFactory.setChapters(chapterDataList, chapterIndex);
-
-    final s = settings.settings;
-    final contentW = contentSize.width - s.paddingLeft - s.paddingRight;
-    final contentH = contentSize.height - s.paddingTop - s.paddingBottom;
-    if (contentW > 50 && contentH > 100) {
-      paged.pageFactory.setLayoutParams(
-        contentHeight: contentH,
-        contentWidth: contentW,
-        fontSize: s.fontSize,
-        lineHeight: s.lineHeight,
-        letterSpacing: s.letterSpacing,
-        paragraphSpacing: s.paragraphSpacing,
-        fontFamily: settings.customFontFamily,
-        paragraphIndent: s.paragraphIndent,
-        underline: s.underline,
-        showTitle: s.titleMode != 2,
-        legacyImageStyle: settings.imageStyle,
-      );
-    }
-
-    // 触发分页
-    paged.pageFactory.paginateAll();
-    paged.pageFactory.jumpToChapter(chapterIndex, goToLastPage: goToLastPage);
-
-    if ((restoreOffset || targetProgress != null) && !goToLastPage) {
-      final progress = targetProgress ??
-          _settingsService.getChapterPageProgress(
-            bookId,
-            chapterIndex: chapterIndex,
-          );
-      final total = paged.pageFactory.totalPages;
-      if (total > 0) {
-        final target = ChapterProgressUtils.pageIndexFromProgress(
-          progress: progress,
-          totalPages: total,
-        );
-        if (target != paged.pageFactory.currentPageIndex) {
-          paged.pageFactory.jumpToPage(target);
-        }
-      }
-    }
+    paginateAndJumpReaderPages(
+      pageFactory: paged.pageFactory,
+      contentSize: contentSize,
+      settings: settings,
+      chapter: chapter,
+      chapterIndex: chapterIndex,
+      goToLastPage: goToLastPage,
+      restoreOffset: restoreOffset,
+      targetProgress: targetProgress,
+      readChapterPageProgress: () => _settingsService.getChapterPageProgress(
+        bookId,
+        chapterIndex: chapterIndex,
+      ),
+    );
   }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // 设置
-  // ═══════════════════════════════════════════════════════════════════
 
   void updateSettings(ReadingSettings newSettings, {bool persist = true}) {
     final old = settings.settings;
@@ -555,19 +372,11 @@ class ReaderCoordinator {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // 菜单
-  // ═══════════════════════════════════════════════════════════════════
-
   void toggleMenu() => ui.toggleMenu(!ui.showMenu);
   void closeMenu() {
     if (ui.showMenu) ui.toggleMenu(false);
     if (ui.showSearchMenu) ui.toggleSearchMenu(false);
   }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // 进度
-  // ═══════════════════════════════════════════════════════════════════
 
   double getChapterProgress() {
     if (settings.settings.pageTurnMode != PageTurnMode.scroll) {
@@ -592,10 +401,6 @@ class ReaderCoordinator {
         '${now.minute.toString().padLeft(2, '0')}';
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // 内部
-  // ═══════════════════════════════════════════════════════════════════
-
   Future<ScrollSegment> _buildScrollSegment(
     int chapterIndex, {
     bool showLoading = false,
@@ -617,46 +422,28 @@ class ReaderCoordinator {
       rawTitle: ch.title,
       rawContent: rawContent,
     );
-
-    // 粗略估算高度：每行约 20px，每行约 30 个字符
-    final lineCount = processed.content.length / 30;
-    final estimated = (lineCount * 20).clamp(100.0, 50000.0);
-
     return ScrollSegment(
       chapterIndex: chapterIndex,
       chapterId: ch.id,
       title: processed.title,
       content: processed.content,
-      estimatedHeight: estimated,
+      estimatedHeight: estimateScrollSegmentHeight(processed.content),
     );
   }
 
-  Future<void> _prefetchNeighbors(int centerIndex) async {
-    // 预取前后各一章
-    for (final offset in [-1, 1]) {
-      final idx = centerIndex + offset;
-      if (idx < 0 || idx >= chapter.readableCount) continue;
-      final ch = chapter.chapters[idx];
-      if (ch.content != null && ch.content!.isNotEmpty) continue;
-      try {
-        await _fetchContent(ch);
-      } catch (_) {}
-    }
-  }
-
-  Future<void> _saveProgress() async {
-    try {
-      await _bookRepo.updateReadProgress(
-        bookId,
-        currentChapter: chapter.currentIndex,
-        readProgress: getChapterProgress(),
+  Future<void> _prefetchNeighbors(int centerIndex) =>
+      prefetchReaderNeighborChapters(
+        chapter: chapter,
+        fetch: _fetchContent,
+        centerIndex: centerIndex,
       );
-    } catch (_) {}
-  }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // 自动翻页
-  // ═══════════════════════════════════════════════════════════════════
+  Future<void> _saveProgress() => saveReaderBookProgress(
+        bookRepo: _bookRepo,
+        bookId: bookId,
+        chapterIndex: chapter.currentIndex,
+        chapterProgress: getChapterProgress(),
+      );
 
   void _initAutoPager() {
     final autoPager = ui.autoPager;
