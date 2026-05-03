@@ -1,38 +1,27 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import '../../../app/theme/design_tokens.dart';
-import '../../../app/theme/source_ui_tokens.dart';
-import '../../../app/theme/ui_tokens.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
-import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
-import '../../../app/widgets/source_consistent_card.dart';
-import '../../../app/widgets/source_group_badge.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/app_settings.dart';
+import '../../../core/models/book_source.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
-import '../../../core/services/source_variable_store.dart';
-import '../../search/models/search_scope.dart';
-import '../../search/models/search_scope_group_helper.dart';
-import '../../search/views/search_view.dart';
-import '../../../core/models/book_source.dart';
 import '../../source/services/source/explore_kinds_service.dart';
-import '../../source/services/source_login/url_resolver.dart';
-import '../../source/views/edit/source_edit_view.dart';
-import '../../source/views/login/login_form_view.dart';
-import '../../source/views/login/login_webview_view.dart';
 import '../services/discovery_filter_helper.dart';
-import 'discovery_search_header.dart';
 import 'discovery_explore_results_view.dart';
+import 'discovery_search_header.dart';
+import 'discovery_source_actions.dart';
+import 'discovery_source_item_card.dart';
+import 'discovery_source_menu.dart';
+import 'discovery_view_helpers.dart';
 
 /// 发现页（对标 legado ExploreFragment）：
 /// - 展示支持发现的书源列表
@@ -50,19 +39,7 @@ class DiscoveryView extends StatefulWidget {
   State<DiscoveryView> createState() => _DiscoveryViewState();
 }
 
-enum _DiscoverySourceMenuAction {
-  edit,
-  moveToTop,
-  login,
-  search,
-  refresh,
-  delete,
-}
-
 class _DiscoveryViewState extends State<DiscoveryView> {
-  static const double _minTapSize = SourceUiTokens.minTapSize;
-  static const Duration _expandCollapseDuration = AppDesignTokens.motionNormal;
-
   late final SourceRepository _sourceRepo;
   late final SourceExploreKindsService _exploreKindsService;
   final SettingsService _settingsService = SettingsService();
@@ -158,34 +135,11 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     setState(() {});
   }
 
-  List<BookSource> _eligibleSources(List<BookSource> input) {
-    // 对齐 legado BookSourceDao.flowExplore：
-    // 仅以 enabledExplore + hasExploreUrl 作为发现页可见条件，并按 customOrder 升序。
-    final indexed = input.asMap().entries.where((entry) {
-      final source = entry.value;
-      final hasExploreUrl = (source.exploreUrl ?? '').trim().isNotEmpty;
-      return source.enabledExplore && hasExploreUrl;
-    }).toList(growable: false);
+  List<BookSource> _eligibleSources(List<BookSource> input) =>
+      filterDiscoveryEligibleSources(input);
 
-    indexed.sort((a, b) {
-      final byOrder = a.value.customOrder.compareTo(b.value.customOrder);
-      if (byOrder != 0) return byOrder;
-      // customOrder 相同时保持原输入顺序，避免非 legacy 语义下的额外排序。
-      return a.key.compareTo(b.key);
-    });
-    return indexed.map((entry) => entry.value).toList(growable: false);
-  }
-
-  List<String> _buildGroups(List<BookSource> sources) {
-    final groups = <String>{};
-    for (final source in sources) {
-      groups
-          .addAll(DiscoveryFilterHelper.extractGroups(source.bookSourceGroup));
-    }
-    final sorted = groups.toList(growable: false)
-      ..sort(SearchScopeGroupHelper.cnCompareLikeLegado);
-    return sorted;
-  }
+  List<String> _buildGroups(List<BookSource> sources) =>
+      collectDiscoveryGroups(sources);
 
   void _setQuery(String query) {
     _searchController.text = query;
@@ -197,14 +151,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   void _clearQuery() {
     _searchController.clear();
     _searchFocusNode.unfocus();
-  }
-
-  String? _activeGroupFilter(String query) {
-    final raw = query.trim();
-    if (!raw.startsWith('group:')) return null;
-    final group = raw.substring(6).trim();
-    if (group.isEmpty) return null;
-    return group;
   }
 
   Future<void> _showGroupFilterMenu() async {
@@ -219,14 +165,14 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       ...groups.map(
         (group) => AppActionListItem<String>(
           value: group,
-          icon: CupertinoIcons.folder,
+          icon: CupertinoIcons.tag,
           label: group,
         ),
       ),
     ];
     final selected = await showAppActionListSheet<String>(
       context: context,
-      title: '分组',
+      title: '选择分组',
       showCancel: true,
       items: items,
     );
@@ -244,7 +190,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       return;
     }
     if (!_scrollController.hasClients) return;
-    // 与 legado 保持一致：E-Ink 模式避免平滑动画，直接回到顶部。
     if (_settingsService.appSettings.appearanceMode == AppAppearanceMode.eInk) {
       _scrollController.jumpTo(0);
       return;
@@ -339,190 +284,54 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   }
 
   Future<void> _showSourceActions(BookSource source) async {
-    final hasLogin = (source.loginUrl ?? '').trim().isNotEmpty;
-    final items = <AppActionListItem<_DiscoverySourceMenuAction>>[
-      const AppActionListItem<_DiscoverySourceMenuAction>(
-        value: _DiscoverySourceMenuAction.edit,
-        icon: CupertinoIcons.pencil,
-        label: '编辑',
-      ),
-      const AppActionListItem<_DiscoverySourceMenuAction>(
-        value: _DiscoverySourceMenuAction.moveToTop,
-        icon: CupertinoIcons.arrow_up_circle,
-        label: '置顶',
-      ),
-      if (hasLogin)
-        const AppActionListItem<_DiscoverySourceMenuAction>(
-          value: _DiscoverySourceMenuAction.login,
-          icon: CupertinoIcons.person_crop_circle,
-          label: '登录',
-        ),
-      const AppActionListItem<_DiscoverySourceMenuAction>(
-        value: _DiscoverySourceMenuAction.search,
-        icon: CupertinoIcons.search,
-        label: '搜索',
-      ),
-      const AppActionListItem<_DiscoverySourceMenuAction>(
-        value: _DiscoverySourceMenuAction.refresh,
-        icon: CupertinoIcons.refresh,
-        label: '刷新',
-      ),
-      const AppActionListItem<_DiscoverySourceMenuAction>(
-        value: _DiscoverySourceMenuAction.delete,
-        icon: CupertinoIcons.delete,
-        label: '删除',
-        isDestructiveAction: true,
-      ),
-    ];
-    final selected = await showAppActionListSheet<_DiscoverySourceMenuAction>(
+    final selected = await showDiscoverySourceActionsMenu(
       context: context,
-      title: source.bookSourceName,
-      message: source.bookSourceUrl,
-      showCancel: true,
-      items: items,
+      source: source,
     );
     if (selected == null || !mounted) return;
     switch (selected) {
-      case _DiscoverySourceMenuAction.edit:
-        await _openEditor(source.bookSourceUrl);
-        return;
-      case _DiscoverySourceMenuAction.moveToTop:
-        await _toTop(source.bookSourceUrl);
-        return;
-      case _DiscoverySourceMenuAction.login:
-        await _openSourceLogin(source);
-        return;
-      case _DiscoverySourceMenuAction.search:
-        await _searchInSource(source);
-        return;
-      case _DiscoverySourceMenuAction.refresh:
+      case DiscoverySourceMenuAction.edit:
+        await openDiscoverySourceEditor(
+          context: context,
+          sourceRepo: _sourceRepo,
+          sourceUrl: source.bookSourceUrl,
+        );
+      case DiscoverySourceMenuAction.moveToTop:
+        await moveDiscoverySourceToTop(
+          sourceRepo: _sourceRepo,
+          sourceUrl: source.bookSourceUrl,
+        );
+      case DiscoverySourceMenuAction.login:
+        await openDiscoverySourceLogin(
+          context: context,
+          sourceRepo: _sourceRepo,
+          source: source,
+          showMessage: _showMessage,
+        );
+      case DiscoverySourceMenuAction.search:
+        await searchInDiscoverySource(
+          context: context,
+          settingsService: _settingsService,
+          source: source,
+        );
+      case DiscoverySourceMenuAction.refresh:
         await _refreshSourceKinds(source);
-        return;
-      case _DiscoverySourceMenuAction.delete:
-        await _confirmDeleteSource(source);
-        return;
+      case DiscoverySourceMenuAction.delete:
+        await confirmDeleteDiscoverySource(
+          context: context,
+          sourceRepo: _sourceRepo,
+          source: source,
+        );
     }
-  }
-
-  Future<void> _openEditor(String sourceUrl) async {
-    final key = sourceUrl.trim();
-    if (key.isEmpty || !mounted) return;
-    final current = _sourceRepo.getSourceByUrl(key);
-    if (current == null) {
-      await Navigator.of(context).push(
-        CupertinoPageRoute<void>(
-          builder: (_) => const SourceEditView(initialRawJson: '{}'),
-        ),
-      );
-      return;
-    }
-
-    await Navigator.of(context).push(
-      CupertinoPageRoute<void>(
-        builder: (_) => SourceEditView.fromSource(
-          current,
-          rawJson: _sourceRepo.getRawJsonByUrl(current.bookSourceUrl),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _toTop(String sourceUrl) async {
-    final key = sourceUrl.trim();
-    if (key.isEmpty) return;
-
-    final currentSource = _sourceRepo.getSourceByUrl(key);
-    if (currentSource == null) return;
-
-    final all = _sourceRepo.getAllSources();
-    final minOrder = all.isEmpty
-        ? currentSource.customOrder
-        : all.map((item) => item.customOrder).reduce(math.min);
-
-    await _sourceRepo.updateSource(
-      currentSource.copyWith(customOrder: minOrder - 1),
-    );
-  }
-
-  Future<void> _openSourceLogin(BookSource source) async {
-    final currentSource = _sourceRepo.getSourceByUrl(source.bookSourceUrl);
-    if (currentSource == null) {
-      _showMessage('未找到书源');
-      return;
-    }
-
-    final hasLoginUi = (currentSource.loginUi ?? '').trim().isNotEmpty;
-    if (hasLoginUi) {
-      await Navigator.of(context).push(
-        CupertinoPageRoute<void>(
-          builder: (_) => SourceLoginFormView(source: currentSource),
-        ),
-      );
-      return;
-    }
-
-    final resolvedUrl = SourceLoginUrlResolver.resolve(
-      baseUrl: currentSource.bookSourceUrl,
-      loginUrl: currentSource.loginUrl ?? '',
-    );
-    if (resolvedUrl.isEmpty) {
-      _showMessage('当前书源未配置登录地址');
-      return;
-    }
-    final uri = Uri.tryParse(resolvedUrl);
-    final scheme = uri?.scheme.toLowerCase();
-    if (scheme != 'http' && scheme != 'https') {
-      _showMessage('登录地址不是有效网页地址');
-      return;
-    }
-
-    await Navigator.of(context).push(
-      CupertinoPageRoute<void>(
-        builder: (_) => SourceLoginWebViewView(
-          source: currentSource,
-          initialUrl: resolvedUrl,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _searchInSource(BookSource source) async {
-    final nextScope = SearchScope.fromSource(source);
-    final currentSettings = _settingsService.appSettings;
-    if (currentSettings.searchScope != nextScope) {
-      await _settingsService.saveAppSettings(
-        currentSettings.copyWith(searchScope: nextScope),
-      );
-    }
-    if (!mounted) return;
-
-    await Navigator.of(context).push(
-      CupertinoPageRoute<void>(
-        builder: (_) => const SearchView(),
-      ),
-    );
   }
 
   Future<void> _refreshSourceKinds(BookSource source) async {
-    try {
-      await _exploreKindsService.clearExploreKindsCache(source);
-    } catch (e, st) {
-      ExceptionLogService().record(
-        node: 'discovery.refresh_kinds',
-        message: '刷新发现入口缓存失败',
-        error: e,
-        stackTrace: st,
-        context: <String, dynamic>{
-          'sourceUrl': source.bookSourceUrl,
-          'sourceName': source.bookSourceName,
-        },
-      );
-      if (mounted) {
-        _showMessage('刷新发现入口失败，请稍后重试');
-      }
-      return;
-    }
-    if (!mounted) return;
+    final ok = await clearDiscoverySourceKindsCache(
+      exploreKindsService: _exploreKindsService,
+      source: source,
+      showMessage: _showMessage,
+    );
+    if (!ok || !mounted) return;
 
     setState(() {
       _sourceKindsCache.remove(source.bookSourceUrl);
@@ -530,52 +339,6 @@ class _DiscoveryViewState extends State<DiscoveryView> {
 
     if (_expandedSourceUrl == source.bookSourceUrl) {
       await _loadKinds(source, forceRefresh: true);
-    }
-  }
-
-  Future<void> _confirmDeleteSource(BookSource source) async {
-    final ok = await showCupertinoBottomSheetDialog<bool>(
-          context: context,
-          builder: (ctx) => CupertinoAlertDialog(
-            title: const Text('提醒'),
-            content: Text('是否确认删除？\n${source.bookSourceName}'),
-            actions: [
-              CupertinoDialogAction(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('取消'),
-              ),
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('确定'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-
-    if (!ok) return;
-    await _deleteSourceByLegacyRule(source);
-  }
-
-  Future<void> _deleteSourceByLegacyRule(BookSource source) async {
-    final sourceUrl = source.bookSourceUrl.trim();
-    if (sourceUrl.isEmpty) return;
-
-    try {
-      await _sourceRepo.deleteSource(sourceUrl);
-      await SourceVariableStore.removeVariable(sourceUrl);
-    } catch (error, stackTrace) {
-      ExceptionLogService().record(
-        node: 'explore_item.menu_del',
-        message: '删除书源失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'sourceKey': sourceUrl,
-          'sourceName': source.bookSourceName,
-        },
-      );
     }
   }
 
@@ -644,12 +407,9 @@ class _DiscoveryViewState extends State<DiscoveryView> {
     required String query,
     required bool showEmptyMessage,
   }) {
-    final uiTokens = AppUiTokens.resolve(context);
-
     final header = _buildSearchHeader(
       visibleCount: visible.length,
       query: query,
-      uiTokens: uiTokens,
     );
 
     return Column(
@@ -664,15 +424,25 @@ class _DiscoveryViewState extends State<DiscoveryView> {
                 itemCount: visible.length,
                 itemBuilder: (context, index) {
                   final source = visible[index];
+                  final url = source.bookSourceUrl;
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: _buildSourceItem(source),
+                    child: DiscoverySourceItemCard(
+                      source: source,
+                      expanded: _expandedSourceUrl == url,
+                      loadingKinds: _loadingKindsSources.contains(url),
+                      kinds: _sourceKindsCache[url] ??
+                          const <SourceExploreKind>[],
+                      onToggle: () => _toggleSource(source),
+                      onLongPress: () => _showSourceActions(source),
+                      onOpenKind: (kind) => _openExploreKind(source, kind),
+                    ),
                   );
                 },
               ),
               if (showEmptyMessage)
                 Positioned.fill(
-                  child: _buildEmptyState(
+                  child: DiscoveryEmptyState(
                     eligibleCount: eligible.length,
                     query: query,
                   ),
@@ -687,9 +457,8 @@ class _DiscoveryViewState extends State<DiscoveryView> {
   Widget _buildSearchHeader({
     required int visibleCount,
     required String query,
-    required AppUiTokens uiTokens,
   }) {
-    final activeGroup = _activeGroupFilter(query);
+    final activeGroup = resolveDiscoveryActiveGroup(query);
 
     return DiscoverySearchHeader(
       controller: _searchController,
@@ -699,440 +468,7 @@ class _DiscoveryViewState extends State<DiscoveryView> {
       onClear: _clearQuery,
       activeFilterChip: activeGroup == null
           ? null
-          : _buildGroupFilterChip(
-              uiTokens: uiTokens,
-              theme: CupertinoTheme.of(context),
-              activeGroup: activeGroup,
-            ),
+          : DiscoveryGroupFilterChip(activeGroup: activeGroup),
     );
   }
-
-  Widget _buildGroupFilterChip({
-    required AppUiTokens uiTokens,
-    required CupertinoThemeData theme,
-    required String activeGroup,
-  }) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: uiTokens.colors.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(uiTokens.radii.control),
-        border: Border.all(
-          color: uiTokens.colors.accent.withValues(alpha: 0.28),
-          width: SourceUiTokens.borderWidth,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-        child: Text(
-          '分组：$activeGroup',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.textStyle.copyWith(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.2,
-            color: uiTokens.colors.accent,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState({
-    required int eligibleCount,
-    required String query,
-  }) {
-    String subtitle;
-    if (eligibleCount == 0) {
-      subtitle = '请在书源管理导入书源';
-    } else if (query.isNotEmpty) {
-      subtitle = '当前筛选条件下无书源';
-    } else {
-      subtitle = '请在书源管理导入书源';
-    }
-    return AppEmptyState(
-      illustration: const AppEmptyPlanetIllustration(),
-      title: '没有发现任何内容',
-      message: subtitle,
-    );
-  }
-
-  Widget _buildSourceItem(BookSource source) {
-    final theme = CupertinoTheme.of(context);
-    final uiTokens = AppUiTokens.resolve(context);
-    final model = _buildSourceItemModel(source, uiTokens);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: SourceConsistentCard(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSourceItemHeader(
-              source: source,
-              expanded: model.expanded,
-              groupText: model.groupText,
-              theme: theme,
-              uiTokens: uiTokens,
-              secondaryLabel: model.secondaryLabel,
-            ),
-            AnimatedSize(
-              duration: _expandCollapseDuration,
-              curve: Curves.easeOutQuart,
-              alignment: Alignment.topCenter,
-              clipBehavior: Clip.hardEdge,
-              child: model.expanded
-                  ? _buildExpandedKindsSection(
-                      source: source,
-                      sourceUrl: model.sourceUrl,
-                      loadingKinds: model.loadingKinds,
-                      kinds: model.kinds,
-                      theme: theme,
-                      uiTokens: uiTokens,
-                      secondaryLabel: model.secondaryLabel,
-                    )
-                  : const SizedBox.shrink(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  _DiscoverySourceItemModel _buildSourceItemModel(
-    BookSource source,
-    AppUiTokens uiTokens,
-  ) {
-    final secondaryLabel = uiTokens.colors.secondaryLabel;
-    final sourceUrl = source.bookSourceUrl;
-    final kinds = _sourceKindsCache[sourceUrl] ?? const <SourceExploreKind>[];
-    final expanded = _expandedSourceUrl == sourceUrl;
-    return _DiscoverySourceItemModel(
-      sourceUrl: sourceUrl,
-      expanded: expanded,
-      loadingKinds: _loadingKindsSources.contains(sourceUrl),
-      kinds: kinds,
-      groupText: (source.bookSourceGroup ?? '').trim(),
-      secondaryLabel: secondaryLabel,
-    );
-  }
-
-  Widget _buildSourceItemHeader({
-    required BookSource source,
-    required bool expanded,
-    required String groupText,
-    required CupertinoThemeData theme,
-    required AppUiTokens uiTokens,
-    required Color secondaryLabel,
-  }) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _toggleSource(source),
-      onLongPress: () => _showSourceActions(source),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: _minTapSize),
-        child: Row(
-          children: [
-            Expanded(
-              child: _buildSourceInfoBlock(
-                source: source,
-                groupText: groupText,
-                theme: theme,
-                uiTokens: uiTokens,
-                secondaryLabel: secondaryLabel,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              expanded
-                  ? CupertinoIcons.chevron_down
-                  : CupertinoIcons.chevron_forward,
-              size: 15,
-              color: uiTokens.colors.tertiaryLabel,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSourceInfoBlock({
-    required BookSource source,
-    required String groupText,
-    required CupertinoThemeData theme,
-    required AppUiTokens uiTokens,
-    required Color secondaryLabel,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                source.bookSourceName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.textStyle.copyWith(
-                  fontSize: SourceUiTokens.itemTitleSize,
-                  fontWeight: FontWeight.w600,
-                  color: uiTokens.colors.foreground,
-                ),
-              ),
-            ),
-            if (groupText.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              SourceGroupBadge(
-                text: groupText,
-                textColor: secondaryLabel.withValues(alpha: 0.9),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 2),
-        Text(
-          source.bookSourceUrl,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.textStyle.copyWith(
-            fontSize: SourceUiTokens.itemMetaSize,
-            color: uiTokens.colors.tertiaryLabel,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildExpandedKindsSection({
-    required BookSource source,
-    required String sourceUrl,
-    required bool loadingKinds,
-    required List<SourceExploreKind> kinds,
-    required CupertinoThemeData theme,
-    required AppUiTokens uiTokens,
-    required Color secondaryLabel,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 8),
-        Container(
-          height: AppDesignTokens.hairlineBorderWidth,
-          color: uiTokens.colors.separator,
-        ),
-        const SizedBox(height: 8),
-        _buildExpandedKindsBody(
-          source: source,
-          sourceUrl: sourceUrl,
-          loadingKinds: loadingKinds,
-          kinds: kinds,
-          theme: theme,
-          uiTokens: uiTokens,
-          secondaryLabel: secondaryLabel,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildExpandedKindsBody({
-    required BookSource source,
-    required String sourceUrl,
-    required bool loadingKinds,
-    required List<SourceExploreKind> kinds,
-    required CupertinoThemeData theme,
-    required AppUiTokens uiTokens,
-    required Color secondaryLabel,
-  }) {
-    if (loadingKinds) {
-      return _buildLoadingKindsRow(
-          theme: theme, secondaryLabel: secondaryLabel);
-    }
-    if (kinds.isEmpty) {
-      return Text(
-        '暂无发现入口',
-        style: theme.textTheme.textStyle.copyWith(
-          fontSize: SourceUiTokens.discoveryMetaTextSize,
-          color: secondaryLabel,
-        ),
-      );
-    }
-    return _buildKindsWrap(
-      source: source,
-      sourceUrl: sourceUrl,
-      kinds: kinds,
-      theme: theme,
-      uiTokens: uiTokens,
-    );
-  }
-
-  Widget _buildLoadingKindsRow({
-    required CupertinoThemeData theme,
-    required Color secondaryLabel,
-  }) {
-    return Row(
-      children: [
-        const CupertinoActivityIndicator(),
-        const SizedBox(width: 8),
-        Text(
-          '正在加载发现入口…',
-          style: theme.textTheme.textStyle.copyWith(
-            fontSize: SourceUiTokens.discoveryMetaTextSize,
-            color: secondaryLabel,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildKindsWrap({
-    required BookSource source,
-    required String sourceUrl,
-    required List<SourceExploreKind> kinds,
-    required CupertinoThemeData theme,
-    required AppUiTokens uiTokens,
-  }) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth;
-        final chips = <Widget>[];
-        for (final kind in kinds) {
-          if (kind.style?.layoutWrapBefore == true) {
-            chips.add(SizedBox(width: maxWidth, height: 0));
-          }
-          final width = _kindWidth(kind.style, maxWidth);
-          final chip = _buildKindChip(
-            source,
-            kind,
-            theme: theme,
-            uiTokens: uiTokens,
-          );
-          chips.add(
-              width == null ? chip : SizedBox(width: width, child: chip));
-        }
-        return Wrap(
-          spacing: SourceUiTokens.discoveryHeaderGap,
-          runSpacing: SourceUiTokens.discoveryHeaderGap,
-          children: chips,
-        );
-      },
-    );
-  }
-
-  Widget _buildKindPill({
-    required Widget child,
-    required Color backgroundColor,
-    required Color borderColor,
-    required AppUiTokens uiTokens,
-    required VoidCallback? onTap,
-  }) {
-    final tapHandler = onTap == null
-        ? null
-        : () {
-            HapticFeedback.lightImpact();
-            onTap();
-          };
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: tapHandler,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(uiTokens.radii.control),
-          border: Border.all(
-            color: borderColor,
-            width: SourceUiTokens.borderWidth,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: SourceUiTokens.discoveryChipHorizontalPadding,
-            vertical: SourceUiTokens.discoveryChipVerticalPadding,
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-
-  double? _kindWidth(SourceExploreKindStyle? style, double maxWidth) {
-    if (style == null) return null;
-    var basis = style.layoutFlexBasisPercent;
-    if (basis > 1 && basis <= 100) {
-      basis = basis / 100;
-    }
-    if (basis > 0 && basis <= 1) {
-      return (maxWidth * basis).clamp(64.0, maxWidth).toDouble();
-    }
-    if (style.layoutFlexGrow > 0) {
-      return maxWidth;
-    }
-    return null;
-  }
-
-  Widget _buildKindChip(
-    BookSource source,
-    SourceExploreKind kind, {
-    required CupertinoThemeData theme,
-    required AppUiTokens uiTokens,
-  }) {
-    final title = kind.title.trim().isEmpty ? '发现' : kind.title.trim();
-    final url = kind.url?.trim() ?? '';
-    final isEnabled = url.isNotEmpty;
-    final isError = title.startsWith('ERROR:');
-    final normalBackground =
-        CupertinoColors.tertiarySystemFill.resolveFrom(context);
-    final enabledBackground =
-        CupertinoColors.secondarySystemFill.resolveFrom(context);
-
-    final backgroundColor = isError
-        ? uiTokens.colors.destructive.withValues(alpha: 0.1)
-        : isEnabled
-            ? enabledBackground
-            : normalBackground;
-    final textColor = isError
-        ? uiTokens.colors.destructive
-        : isEnabled
-            ? uiTokens.colors.foreground
-            : uiTokens.colors.tertiaryLabel;
-    final resolvedBorderColor = isError
-        ? uiTokens.colors.destructive.withValues(alpha: 0.4)
-        : uiTokens.colors.separator.withValues(alpha: 0.55);
-
-    return _buildKindPill(
-      onTap: isEnabled ? () => _openExploreKind(source, kind) : null,
-      uiTokens: uiTokens,
-      backgroundColor: backgroundColor,
-      borderColor: resolvedBorderColor,
-      child: Text(
-        title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.textStyle.copyWith(
-          fontSize: SourceUiTokens.actionTextSize,
-          color: textColor,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-@immutable
-class _DiscoverySourceItemModel {
-  const _DiscoverySourceItemModel({
-    required this.sourceUrl,
-    required this.expanded,
-    required this.loadingKinds,
-    required this.kinds,
-    required this.groupText,
-    required this.secondaryLabel,
-  });
-
-  final String sourceUrl;
-  final bool expanded;
-  final bool loadingKinds;
-  final List<SourceExploreKind> kinds;
-  final String groupText;
-  final Color secondaryLabel;
 }
