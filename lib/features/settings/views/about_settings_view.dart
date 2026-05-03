@@ -1,26 +1,18 @@
-import 'dart:convert';
-import 'dart:io';
-import 'dart:math' as math;
-
-import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
-
-import '../../../app/theme/ui_tokens.dart';
-import '../../../app/widgets/app_sheet_panel.dart';
-import '../../../app/widgets/app_ui_kit.dart';
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
-import '../../../app/widgets/app_toast.dart';
-import '../../../core/build/build_info.dart';
+import '../../../app/widgets/app_ui_kit.dart';
+import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
+import 'about_app_update.dart';
+import 'about_hero_card.dart';
+import 'about_log_exporter.dart';
 import 'app_help_dialog.dart';
 import 'exception_logs_view.dart';
 
@@ -85,12 +77,18 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
         builder: (context, logs, _) {
           return AppListView(
             children: [
-              _buildAboutHeroCard(),
+              AboutHeroCard(
+                appName: _appName,
+                version: _version,
+                versionSummary: _versionSummary,
+                packageName: _packageName,
+              ),
               AppListSection(
                 hasLeading: false,
                 children: [
                   AppListTile(
-                    title: const Text('开发人员'),                    onTap: _openContributors,
+                    title: const Text('开发人员'),
+                    onTap: _openContributors,
                   ),
                   AppListTile(
                     title: const Text('更新日志'),
@@ -158,94 +156,10 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
     );
   }
 
-  Widget _buildAboutHeroCard() {
-    final tokens = AppUiTokens.resolve(context);
-    final theme = CupertinoTheme.of(context);
-    final packageName = _packageName.trim();
-    final packageText = packageName.isEmpty ? '包名未读取' : packageName;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-      child: AppCard(
-        padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-        borderColor: tokens.colors.separator.withValues(alpha: 0.72),
-        child: Row(
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: tokens.colors.accent,
-              ),
-              child: const SizedBox(
-                width: 42,
-                height: 42,
-                child: Icon(
-                  CupertinoIcons.info_circle_fill,
-                  color: CupertinoColors.white,
-                  size: 22,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _appName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.textStyle.copyWith(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.24,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _versionSummary,
-                    style: theme.textTheme.textStyle.copyWith(
-                      fontSize: 12,
-                      color: tokens.colors.secondaryLabel,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    packageText,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.textStyle.copyWith(
-                      fontSize: 11,
-                      color: tokens.colors.tertiaryLabel,
-                      letterSpacing: -0.16,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Text(
-              'v$_version',
-              style: theme.textTheme.textStyle.copyWith(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: tokens.colors.accent,
-                letterSpacing: -0.16,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<void> _handleShare() async {
     try {
       await SharePlus.instance.share(
-        ShareParams(
-          text: _appShareDescription,
-          subject: _appName,
-        ),
+        ShareParams(text: _appShareDescription, subject: _appName),
       );
     } catch (error, stackTrace) {
       _exceptionLogService.record(
@@ -255,7 +169,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
         stackTrace: stackTrace,
       );
       if (!mounted) return;
-      await _showMessage('分享失败：${_errorSummary(error)}');
+      await _showMessage('分享失败：${summarizeError(error)}');
     }
   }
 
@@ -267,22 +181,17 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
     }
 
     final marketUri = Uri.parse('market://details?id=$packageName');
-    final webUri =
-        Uri.parse('https://play.google.com/store/apps/details?id=$packageName');
+    final webUri = Uri.parse(
+      'https://play.google.com/store/apps/details?id=$packageName',
+    );
 
     try {
-      final marketStarted = await launchUrl(
-        marketUri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (marketStarted) return;
-
-      final webStarted = await launchUrl(
-        webUri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (webStarted) return;
-
+      if (await launchUrl(marketUri, mode: LaunchMode.externalApplication)) {
+        return;
+      }
+      if (await launchUrl(webUri, mode: LaunchMode.externalApplication)) {
+        return;
+      }
       await _showMessage('未找到可用的评分入口');
     } catch (error, stackTrace) {
       _exceptionLogService.record(
@@ -290,12 +199,10 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
         message: '评分入口打开失败',
         error: error,
         stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'packageName': packageName,
-        },
+        context: <String, dynamic>{'packageName': packageName},
       );
       if (!mounted) return;
-      await _showMessage('评分入口打开失败：${_errorSummary(error)}');
+      await _showMessage('评分入口打开失败：${summarizeError(error)}');
     }
   }
 
@@ -318,37 +225,29 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
     );
   }
 
-  Future<void> _openUpdateLog() async {
-    await _openDoc(
-      title: '更新日志',
-      assetPath: 'assets/docs/update_log.md',
-      node: 'about.update_log',
-    );
-  }
+  Future<void> _openUpdateLog() => _openDoc(
+        title: '更新日志',
+        assetPath: 'assets/docs/update_log.md',
+        node: 'about.update_log',
+      );
 
-  Future<void> _openPrivacyPolicy() async {
-    await _openDoc(
-      title: '用户隐私与协议',
-      assetPath: 'assets/docs/privacy_policy.md',
-      node: 'about.privacy_policy',
-    );
-  }
+  Future<void> _openPrivacyPolicy() => _openDoc(
+        title: '用户隐私与协议',
+        assetPath: 'assets/docs/privacy_policy.md',
+        node: 'about.privacy_policy',
+      );
 
-  Future<void> _openLicense() async {
-    await _openDoc(
-      title: '开源许可',
-      assetPath: 'assets/docs/LICENSE.md',
-      node: 'about.license',
-    );
-  }
+  Future<void> _openLicense() => _openDoc(
+        title: '开源许可',
+        assetPath: 'assets/docs/LICENSE.md',
+        node: 'about.license',
+      );
 
-  Future<void> _openDisclaimer() async {
-    await _openDoc(
-      title: '免责声明',
-      assetPath: 'assets/docs/disclaimer.md',
-      node: 'about.disclaimer',
-    );
-  }
+  Future<void> _openDisclaimer() => _openDoc(
+        title: '免责声明',
+        assetPath: 'assets/docs/disclaimer.md',
+        node: 'about.disclaimer',
+      );
 
   Future<void> _openDoc({
     required String title,
@@ -372,7 +271,7 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
         context: <String, dynamic>{'assetPath': assetPath},
       );
       if (!mounted) return;
-      await _showMessage('文档加载失败：${_errorSummary(error)}');
+      await _showMessage('文档加载失败：${summarizeError(error)}');
     }
   }
 
@@ -393,8 +292,9 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
       if (!shouldContinue) return;
     }
 
+    final exporter = _buildExporter(backupPath);
     try {
-      final filePath = await _writeLogsToBackup(backupPath);
+      final filePath = await exporter.writeLogs();
       _exceptionLogService.record(
         node: 'about.save_log',
         message: '日志保存成功',
@@ -410,12 +310,10 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
         message: '日志保存失败',
         error: error,
         stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'backupPath': backupPath,
-        },
+        context: <String, dynamic>{'backupPath': backupPath},
       );
       if (!mounted) return;
-      await _showMessage('保存日志失败：${_errorSummary(error)}');
+      await _showMessage('保存日志失败：${summarizeError(error)}');
     }
   }
 
@@ -436,14 +334,13 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
       if (!shouldContinue) return;
     }
 
+    final exporter = _buildExporter(backupPath);
     try {
-      final filePath = await _writeHeapDumpToBackup(backupPath);
+      final filePath = await exporter.writeHeapDump();
       _exceptionLogService.record(
         node: 'about.create_heap_dump',
         message: '堆转储保存成功',
-        context: <String, dynamic>{
-          'filePath': filePath,
-        },
+        context: <String, dynamic>{'filePath': filePath},
       );
       await _showMessage('已保存至备份目录\n$filePath');
     } catch (error, stackTrace) {
@@ -452,82 +349,20 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
         message: '创建堆转储失败',
         error: error,
         stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'backupPath': backupPath,
-        },
+        context: <String, dynamic>{'backupPath': backupPath},
       );
       if (!mounted) return;
-      await _showMessage('创建堆转储失败：${_errorSummary(error)}');
+      await _showMessage('创建堆转储失败：${summarizeError(error)}');
     }
   }
 
-  Future<String> _writeLogsToBackup(String backupPath) async {
-    final backupDir = Directory(backupPath);
-    if (!await backupDir.exists()) {
-      await backupDir.create(recursive: true);
-    }
-
-    final logsDir = Directory(p.join(backupDir.path, 'logs'));
-    if (!await logsDir.exists()) {
-      await logsDir.create(recursive: true);
-    }
-
-    final fileName = 'soupreader_logs_${_fileTimestamp()}.json';
-    final file = File(p.join(logsDir.path, fileName));
-
-    final payload = <String, dynamic>{
-      'generatedAt': DateTime.now().toIso8601String(),
-      'appName': _appName,
-      'packageName': _packageName,
-      'version': _version,
-      'entries': _exceptionLogService.entries
-          .map((entry) => entry.toJson())
-          .toList(growable: false),
-    };
-
-    final content = const JsonEncoder.withIndent('  ').convert(payload);
-    await file.writeAsString(content, flush: true);
-    return file.path;
-  }
-
-  Future<String> _writeHeapDumpToBackup(String backupPath) async {
-    final backupDir = Directory(backupPath);
-    if (!await backupDir.exists()) {
-      await backupDir.create(recursive: true);
-    }
-
-    final dumpDir = Directory(p.join(backupDir.path, 'heapDump'));
-    if (!await dumpDir.exists()) {
-      await dumpDir.create(recursive: true);
-    }
-
-    final fileName = 'soupreader_heap_dump_${_fileTimestamp()}.json';
-    final file = File(p.join(dumpDir.path, fileName));
-
-    final payload = <String, dynamic>{
-      'generatedAt': DateTime.now().toIso8601String(),
-      'note': 'Flutter 暂不支持原生 HPROF，本文件为运行时堆快照信息。',
-      'currentRssBytes': ProcessInfo.currentRss,
-      'maxRssBytes': ProcessInfo.maxRss,
-      'logCount': _exceptionLogService.count,
-      'recentLogNodes': _exceptionLogService.entries
-          .take(20)
-          .map((entry) => entry.node)
-          .toList(growable: false),
-    };
-
-    final content = const JsonEncoder.withIndent('  ').convert(payload);
-    await file.writeAsString(content, flush: true);
-    return file.path;
-  }
-
-  String _fileTimestamp() {
-    final now = DateTime.now();
-    String two(int v) => v.toString().padLeft(2, '0');
-    String three(int v) => v.toString().padLeft(3, '0');
-    return '${now.year}${two(now.month)}${two(now.day)}_'
-        '${two(now.hour)}${two(now.minute)}${two(now.second)}${three(now.millisecond)}';
-  }
+  AboutLogExporter _buildExporter(String backupPath) => AboutLogExporter(
+        backupPath: backupPath,
+        appName: _appName,
+        packageName: _packageName,
+        version: _version,
+        exceptionLogService: _exceptionLogService,
+      );
 
   Future<bool> _confirmAction({
     required String title,
@@ -568,10 +403,8 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
     }
 
     try {
-      final started = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
+      final started =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (started) return;
       await _showMessage('$failureMessage：未找到可处理的应用');
     } catch (error, stackTrace) {
@@ -583,113 +416,23 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
         context: <String, dynamic>{'url': url},
       );
       if (!mounted) return;
-      await _showMessage('$failureMessage：${_errorSummary(error)}');
+      await _showMessage('$failureMessage：${summarizeError(error)}');
     }
   }
 
   Future<void> _checkUpdate() async {
     if (!mounted) return;
-    showCupertinoDialog<void>(
+    await checkAppUpdateAndPrompt(
       context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CupertinoActivityIndicator()),
-    );
-
-    _AppUpdateInfo? updateInfo;
-    String? errorMessage;
-    bool alreadyLatest = false;
-
-    try {
-      final response = await Dio().get(
-        'https://github-action-cf.mcshr.workers.dev/latest',
-      );
-      if (response.statusCode != 200) {
-        errorMessage = '检查更新失败：HTTP ${response.statusCode ?? '-'}';
-      } else {
-        final parsed = _parseUpdateInfo(response.data);
-        if (parsed == null) {
-          errorMessage = '检查更新失败：响应解析失败';
-        } else if (parsed.downloadUrl.trim().isEmpty) {
-          errorMessage = '检查更新失败：未找到安装包';
-        } else if (parsed.updateBody.trim().isEmpty) {
-          errorMessage = '检查更新失败：更新说明为空';
-        } else if (_isAlreadyLatest(parsed)) {
-          alreadyLatest = true;
-        } else {
-          updateInfo = parsed;
+      exceptionLogService: _exceptionLogService,
+      version: _version,
+      showMessage: _showMessage,
+      dismissLoading: () {
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
         }
-      }
-    } catch (error, stackTrace) {
-      _exceptionLogService.record(
-        node: 'app_update.check_update',
-        message: '检查更新失败',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      errorMessage = '检查更新失败：${_errorSummary(error)}';
-    }
-
-    if (mounted) {
-      Navigator.of(context, rootNavigator: true).pop();
-    }
-    if (!mounted) return;
-
-    if (updateInfo != null) {
-      _showUpdateInfo(updateInfo);
-      return;
-    }
-    if (alreadyLatest) {
-      await _showAlreadyLatestDialog();
-      return;
-    }
-    await _showMessage(errorMessage ?? '检查更新失败');
-  }
-
-  Future<void> _showAlreadyLatestDialog() async {
-    if (!mounted) return;
-    final shaShort = BuildInfo.gitShaShort.trim();
-    final showSha = shaShort.isNotEmpty && shaShort != 'unknown';
-    final lines = <String>[
-      '当前已是最新版本，无需下载安装。',
-      '',
-      '版本：$_version',
-      if (showSha) '构建：$shaShort',
-    ];
-    await showCupertinoBottomSheetDialog<void>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('已是最新版本'),
-        content: Text('\n${lines.join('\n')}'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('好'),
-          ),
-        ],
-      ),
+      },
     );
-  }
-
-  /// 比较远端发布与当前构建的 commit SHA，相同视为已是最新。
-  bool _isAlreadyLatest(_AppUpdateInfo info) {
-    final currentSha = BuildInfo.gitSha.trim().toLowerCase();
-    if (currentSha.isEmpty || currentSha == 'unknown') return false;
-    final remoteSha = _extractRemoteSha(info)?.toLowerCase();
-    if (remoteSha == null || remoteSha.isEmpty) return false;
-    final shorter = currentSha.length < remoteSha.length
-        ? currentSha.length
-        : remoteSha.length;
-    if (shorter < 7) return false;
-    return currentSha.substring(0, shorter) ==
-        remoteSha.substring(0, shorter);
-  }
-
-  /// 从更新说明或文件名中提取最新构建的 commit SHA。
-  String? _extractRemoteSha(_AppUpdateInfo info) {
-    final shaPattern = RegExp(r'\b([0-9a-fA-F]{7,40})\b');
-    final bodyMatch = shaPattern.firstMatch(info.updateBody);
-    if (bodyMatch != null) return bodyMatch.group(1);
-    return _extractShaFromFileName(info.fileName);
   }
 
   Future<void> _showMessage(String message) async {
@@ -705,391 +448,6 @@ class _AboutSettingsViewState extends State<AboutSettingsView> {
             child: const Text('好'),
           ),
         ],
-      ),
-    );
-  }
-
-  String _errorSummary(Object error) {
-    if (error is DioException) {
-      final statusCode = error.response?.statusCode;
-      if (statusCode != null) {
-        return 'HTTP $statusCode';
-      }
-      final message = error.message?.trim();
-      if (message != null && message.isNotEmpty) {
-        return message;
-      }
-    }
-    final text = error.toString().trim();
-    if (text.isEmpty) return '未知错误';
-    if (text.length <= 120) return text;
-    return '${text.substring(0, 120)}...';
-  }
-
-  _AppUpdateInfo? _parseUpdateInfo(dynamic rawData) {
-    Map<String, dynamic>? map;
-    if (rawData is Map) {
-      map = rawData.map(
-        (key, value) => MapEntry(key.toString(), value),
-      );
-    } else if (rawData is String) {
-      final rawText = rawData.trim();
-      if (rawText.isEmpty) return null;
-      try {
-        final decoded = jsonDecode(rawText);
-        if (decoded is Map) {
-          map = decoded.map(
-            (key, value) => MapEntry(key.toString(), value),
-          );
-        }
-      } catch (_) {
-        return null;
-      }
-    }
-    if (map == null) return null;
-
-    final tagName = _firstNonEmptyString([
-          _readString(map, 'tag'),
-          _readString(map, 'tagName'),
-          _readString(map, 'version'),
-        ]) ??
-        'nightly';
-    final name = _readString(map, 'name') ?? 'Nightly Build';
-    final publishedAtText = _formatPublishedAt(_readString(map, 'publishedAt'));
-    final downloadUrl = _firstNonEmptyString([
-          _readString(map, 'downloadUrl'),
-          _readString(map, 'apkUrl'),
-          _readString(map, 'url'),
-          _readString(map, 'browser_download_url'),
-        ]) ??
-        '';
-    final fileName = _firstNonEmptyString([
-          _readString(map, 'fileName'),
-          _readString(map, 'name'),
-        ]) ??
-        _fallbackApkName(tagName);
-    final remoteShaPrefix = _extractShaFromFileName(fileName) ??
-        _firstNonEmptyString([
-          _readString(map, 'commit'),
-          _readString(map, 'sha'),
-          _readString(map, 'commitSha'),
-        ]);
-    final updateBody = _firstNonEmptyString([
-          _readString(map, 'updateLog'),
-          _readString(map, 'body'),
-          _readString(map, 'note'),
-          _readString(map, 'description'),
-          _readString(map, 'info'),
-        ]) ??
-        _buildFallbackBody(
-          name: name,
-          tagName: tagName,
-          fileName: fileName,
-          publishedAtText: publishedAtText,
-          remoteSha: remoteShaPrefix,
-          downloadUrl: downloadUrl,
-        );
-    return _AppUpdateInfo(
-      tagName: tagName,
-      updateBody: updateBody,
-      downloadUrl: downloadUrl,
-      fileName: fileName,
-    );
-  }
-
-  String _buildFallbackBody({
-    required String name,
-    required String tagName,
-    required String fileName,
-    required String? publishedAtText,
-    required String? remoteSha,
-    required String downloadUrl,
-  }) {
-    final lines = <String>[];
-    if (name.isNotEmpty) lines.add(name);
-    if (tagName.isNotEmpty) lines.add('Tag：$tagName');
-    if (fileName.isNotEmpty) lines.add('文件：$fileName');
-    if (remoteSha != null && remoteSha.isNotEmpty) {
-      final shortSha = remoteSha.length >= 7 ? remoteSha.substring(0, 7) : remoteSha;
-      lines.add('Commit：$shortSha');
-    }
-    if (publishedAtText != null && publishedAtText.isNotEmpty) {
-      lines.add('发布时间：$publishedAtText');
-    }
-    if (downloadUrl.isNotEmpty) {
-      lines.add('');
-      lines.add('下载地址：');
-      lines.add(downloadUrl);
-    }
-    return lines.join('\n');
-  }
-
-  String? _extractShaFromFileName(String fileName) {
-    final match = RegExp(r'-([0-9a-fA-F]{7,40})\.ipa$', caseSensitive: false)
-        .firstMatch(fileName);
-    return match?.group(1);
-  }
-
-  String? _readString(Map<String, dynamic> map, String key) {
-    final value = map[key];
-    if (value == null) return null;
-    final text = value.toString().trim();
-    return text.isEmpty ? null : text;
-  }
-
-  String? _firstNonEmptyString(List<String?> values) {
-    for (final value in values) {
-      final text = value?.trim() ?? '';
-      if (text.isNotEmpty) return text;
-    }
-    return null;
-  }
-
-  String? _formatPublishedAt(String? publishedAt) {
-    final text = publishedAt?.trim() ?? '';
-    if (text.isEmpty) return null;
-    try {
-      final date = DateTime.parse(text).toLocal();
-      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} '
-          '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return text;
-    }
-  }
-
-  String _fallbackApkName(String tagName) {
-    final normalized = tagName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-    return 'soupreader_$normalized.apk';
-  }
-
-  void _showUpdateInfo(_AppUpdateInfo updateInfo) {
-    showCupertinoBottomSheetDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => _AppUpdateDialog(
-        updateInfo: updateInfo,
-        onDownload: () => _handleDownloadAction(updateInfo),
-      ),
-    );
-  }
-
-  Future<void> _handleDownloadAction(_AppUpdateInfo updateInfo) async {
-    final downloadUrl = updateInfo.downloadUrl.trim();
-    final fileName = updateInfo.fileName.trim();
-    if (downloadUrl.isEmpty || fileName.isEmpty) {
-      return;
-    }
-
-    final uri = Uri.tryParse(downloadUrl);
-    if (uri == null) {
-      _exceptionLogService.record(
-        node: 'app_update.menu_download',
-        message: '更新下载链接无效',
-        context: {
-          'downloadUrl': downloadUrl,
-          'fileName': fileName,
-        },
-      );
-      await _showMessage('下载启动失败');
-      return;
-    }
-
-    if (await _launchTrollStoreInstall(downloadUrl, fileName)) {
-      if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).maybePop();
-      showAppToast(context, message: '已交给巨魔下载安装');
-      return;
-    }
-
-    try {
-      final started = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!started) {
-        _exceptionLogService.record(
-          node: 'app_update.menu_download',
-          message: '更新下载未能启动',
-          context: {
-            'downloadUrl': downloadUrl,
-            'fileName': fileName,
-          },
-        );
-        await _showMessage('未检测到巨魔，且浏览器下载也启动失败');
-        return;
-      }
-      if (!mounted) return;
-      await _showMessage('未检测到巨魔，已用浏览器打开下载链接');
-    } catch (error, stackTrace) {
-      _exceptionLogService.record(
-        node: 'app_update.menu_download',
-        message: '更新下载触发失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: {
-          'downloadUrl': downloadUrl,
-          'fileName': fileName,
-        },
-      );
-      if (!mounted) return;
-      await _showMessage('下载启动失败');
-    }
-  }
-
-  /// 优先尝试唤起巨魔（TrollStore）直接下载并安装 IPA。
-  ///
-  /// TrollStore 注册了 `apple-magnifier://install?url=<ipa-url>` URL Scheme，
-  /// 由其自身完成下载与安装，无需我们写入沙盒。注意需要在 TrollStore
-  /// 设置中开启 “URL Scheme”（默认关闭，未开启时此 scheme 会被系统
-  /// 放大镜抢走）。
-  Future<bool> _launchTrollStoreInstall(
-    String ipaUrl,
-    String fileName,
-  ) async {
-    final encoded = Uri.encodeComponent(ipaUrl);
-    final candidates = <Uri>[
-      Uri.parse('apple-magnifier://install?url=$encoded'),
-      Uri.parse('tsinstall://install?url=$encoded'),
-    ];
-    for (final uri in candidates) {
-      try {
-        final launched = await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
-        if (launched) return true;
-      } catch (error, stackTrace) {
-        _exceptionLogService.record(
-          node: 'app_update.trollstore_launch',
-          message: '巨魔安装跳转失败',
-          error: error,
-          stackTrace: stackTrace,
-          context: {
-            'scheme': uri.scheme,
-            'fileName': fileName,
-          },
-        );
-      }
-    }
-    return false;
-  }
-}
-
-class _AppUpdateInfo {
-  final String tagName;
-  final String updateBody;
-  final String downloadUrl;
-  final String fileName;
-
-  const _AppUpdateInfo({
-    required this.tagName,
-    required this.updateBody,
-    required this.downloadUrl,
-    required this.fileName,
-  });
-}
-
-class _AppUpdateDialog extends StatefulWidget {
-  final _AppUpdateInfo updateInfo;
-  final Future<void> Function() onDownload;
-
-  const _AppUpdateDialog({
-    required this.updateInfo,
-    required this.onDownload,
-  });
-
-  @override
-  State<_AppUpdateDialog> createState() => _AppUpdateDialogState();
-}
-
-class _AppUpdateDialogState extends State<_AppUpdateDialog> {
-  late final FocusNode _focusNode;
-
-  @override
-  void initState() {
-    super.initState();
-    _focusNode = FocusNode();
-  }
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenSize = MediaQuery.sizeOf(context);
-    final width = math.min(screenSize.width * 0.92, 680.0);
-    final height = math.min(screenSize.height * 0.82, 760.0);
-    final ui = AppUiTokens.resolve(context);
-    final separator = ui.colors.separator.withValues(alpha: 0.78);
-
-    return Center(
-      child: SizedBox(
-        width: width,
-        height: height,
-        child: AppSheetPanel(
-          contentPadding: EdgeInsets.zero,
-          radius: ui.radii.sheet,
-          child: SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
-                  child: Row(
-                    children: [
-                      CupertinoButton(
-                        padding: const EdgeInsets.all(4),
-                        onPressed: () => Navigator.of(context).pop(),
-                        minimumSize: const Size(30, 30),
-                        child: const Icon(CupertinoIcons.xmark),
-                      ),
-                      Expanded(
-                        child: Text(
-                          widget.updateInfo.tagName,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      CupertinoButton(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        onPressed: widget.onDownload,
-                        minimumSize: const Size(30, 30),
-                        child: const Text('巨魔安装'),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(height: ui.sizes.dividerThickness, color: separator),
-                Expanded(
-                  child: CupertinoScrollbar(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 18),
-                      child: SelectableRegion(
-                        focusNode: _focusNode,
-                        selectionControls: cupertinoTextSelectionControls,
-                        child: Text(
-                          widget.updateInfo.updateBody,
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 1.48,
-                            color: ui.colors.label,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
