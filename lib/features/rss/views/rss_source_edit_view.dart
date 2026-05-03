@@ -10,7 +10,7 @@ import '../../../core/database/repositories/rss_source_repository.dart';
 import '../../../core/utils/legado_json.dart';
 import '../models/rss_source.dart';
 import 'rss_source_debug_view.dart';
-import 'rss_source_edit_form.dart';
+import 'rss_source_edit_tabs.dart';
 
 class RssSourceEditView extends StatefulWidget {
   const RssSourceEditView({

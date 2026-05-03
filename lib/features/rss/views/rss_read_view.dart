@@ -1,15 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_toast.dart';
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_article_repository.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
@@ -18,18 +15,13 @@ import '../../../core/services/exception_log_service.dart';
 import '../models/rss_article.dart';
 import '../models/rss_source.dart';
 import '../models/rss_star.dart';
+import 'rss_read_aloud_controller.dart';
+import 'rss_read_favorite_dialog.dart';
+import 'rss_read_more_menu.dart';
+import 'rss_read_trailing_actions.dart';
+import 'rss_read_web_view.dart';
 import 'rss_view_helpers.dart';
 
-enum _RssReadMenuAction {
-  login,
-  browserOpen,
-}
-
-enum _RssFavoriteDialogAction {
-  cancel,
-  confirm,
-  delete,
-}
 class RssReadPlaceholderView extends StatefulWidget {
   const RssReadPlaceholderView({
     super.key,
@@ -57,9 +49,7 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
   RssStar? _rssStar;
   int _favoriteLoadVersion = 0;
   bool _favoriteActionRunning = false;
-  FlutterTts? _readAloudTts;
-  bool _readAloudTtsReady = false;
-  bool _readAloudPlaying = false;
+  final RssReadAloudController _readAloudController = RssReadAloudController();
 
   @override
   void initState() {
@@ -100,10 +90,6 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
       }
     }
     return _repo.getByKey(key);
-  }
-
-  bool _canOpenLogin(RssSource? source) {
-    return (source?.loginUrl ?? '').trim().isNotEmpty;
   }
 
   bool get _canShowFavoriteAction => _rssArticle != null;
@@ -297,123 +283,13 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
     }
   }
 
-  Future<FlutterTts> _ensureReadAloudTtsReady() async {
-    final existing = _readAloudTts;
-    if (existing != null && _readAloudTtsReady) {
-      return existing;
-    }
-    final tts = existing ?? FlutterTts();
-    _readAloudTts ??= tts;
-    if (!_readAloudTtsReady) {
-      tts.setStartHandler(() {
-        if (!mounted) return;
-        setState(() {
-          _readAloudPlaying = true;
-        });
-      });
-      tts.setCompletionHandler(() {
-        if (!mounted) return;
-        setState(() {
-          _readAloudPlaying = false;
-        });
-      });
-      tts.setCancelHandler(() {
-        if (!mounted) return;
-        setState(() {
-          _readAloudPlaying = false;
-        });
-      });
-      tts.setErrorHandler((_) {
-        if (!mounted) return;
-        setState(() {
-          _readAloudPlaying = false;
-        });
-      });
-      await tts.awaitSpeakCompletion(true);
-      _readAloudTtsReady = true;
-    }
-    return tts;
-  }
-
-  Future<void> _stopReadAloud() async {
-    final tts = _readAloudTts;
-    if (tts == null) return;
-    try {
-      await tts.stop();
-    } catch (error, stackTrace) {
-      ExceptionLogService().record(
-        node: 'rss_read.menu_aloud',
-        message: '停止 RSS 朗读失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'origin': _originKey,
-          'link': _linkKey,
-        },
+  Future<void> _handleReadAloud() => _readAloudController.toggle(
+        text: _resolveReadAloudText(),
+        originKey: _originKey,
+        linkKey: _linkKey,
       );
-    }
-    if (!mounted) return;
-    setState(() {
-      _readAloudPlaying = false;
-    });
-  }
 
-  Future<void> _handleReadAloud() async {
-    if (_readAloudPlaying) {
-      await _stopReadAloud();
-      return;
-    }
-    final text = _resolveReadAloudText();
-    if (text.isEmpty) {
-      return;
-    }
-    try {
-      final tts = await _ensureReadAloudTtsReady();
-      await tts.stop();
-      final result = await tts.speak(text);
-      final success = result == null || result == 1 || result == true;
-      if (!success) {
-        ExceptionLogService().record(
-          node: 'rss_read.menu_aloud',
-          message: '启动 RSS 朗读失败',
-          context: <String, dynamic>{
-            'origin': _originKey,
-            'link': _linkKey,
-            'ttsResult': result.toString(),
-          },
-        );
-        return;
-      }
-      if (!mounted) return;
-      setState(() {
-        _readAloudPlaying = true;
-      });
-    } catch (error, stackTrace) {
-      ExceptionLogService().record(
-        node: 'rss_read.menu_aloud',
-        message: '启动 RSS 朗读失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'origin': _originKey,
-          'link': _linkKey,
-        },
-      );
-    }
-  }
-
-  Future<void> _disposeReadAloudTts() async {
-    final tts = _readAloudTts;
-    _readAloudTts = null;
-    _readAloudTtsReady = false;
-    _readAloudPlaying = false;
-    if (tts == null) return;
-    try {
-      await tts.stop();
-    } catch (_) {
-      // 页面销毁阶段与 legado 同义静默清理，不额外提示。
-    }
-  }
+  Future<void> _disposeReadAloudTts() => _readAloudController.disposeAsync();
 
   Future<void> _handleFavoriteAction() async {
     final article = _rssArticle;
@@ -460,80 +336,28 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
   Future<void> _openFavoriteDialog() async {
     final article = _rssArticle;
     if (article == null || !mounted) return;
-    final titleController = TextEditingController(text: article.title);
-    final groupController = TextEditingController(text: article.group);
-    try {
-      final action = await showCupertinoBottomSheetDialog<_RssFavoriteDialogAction>(
-        context: context,
-        builder: (dialogContext) => CupertinoAlertDialog(
-          title: const Text('收藏设置'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 10),
-              CupertinoTextField(
-                controller: titleController,
-                placeholder: '标题',
-              ),
-              const SizedBox(height: 8),
-              CupertinoTextField(
-                controller: groupController,
-                placeholder: '分组',
-              ),
-            ],
-          ),
-          actions: [
-            CupertinoDialogAction(
-              isDestructiveAction: true,
-              onPressed: () {
-                Navigator.of(dialogContext)
-                    .pop(_RssFavoriteDialogAction.delete);
-              },
-              child: const Text('删除收藏'),
-            ),
-            CupertinoDialogAction(
-              onPressed: () {
-                Navigator.of(dialogContext)
-                    .pop(_RssFavoriteDialogAction.cancel);
-              },
-              child: const Text('取消'),
-            ),
-            CupertinoDialogAction(
-              onPressed: () {
-                Navigator.of(dialogContext)
-                    .pop(_RssFavoriteDialogAction.confirm);
-              },
-              child: const Text('确定'),
-            ),
-          ],
-        ),
-      );
-      switch (action) {
-        case _RssFavoriteDialogAction.delete:
-          await _deleteFavorite();
-          break;
-        case _RssFavoriteDialogAction.confirm:
-          final current = _rssArticle;
-          if (current == null) return;
-          var nextTitle = current.title;
-          final editedTitle = titleController.text;
-          if (editedTitle.trim().isNotEmpty) {
-            nextTitle = editedTitle;
-          }
-          var nextGroup = current.group;
-          final editedGroup = groupController.text;
-          if (editedGroup.trim().isNotEmpty) {
-            nextGroup = editedGroup;
-          }
-          await _updateFavorite(title: nextTitle, group: nextGroup);
-          break;
-        case _RssFavoriteDialogAction.cancel:
-        case null:
-          break;
-      }
-    } finally {
-      titleController.dispose();
-      groupController.dispose();
+    final result = await showRssFavoriteDialog(
+      context: context,
+      initialTitle: article.title,
+      initialGroup: article.group,
+    );
+    switch (result.action) {
+      case RssFavoriteDialogAction.delete:
+        await _deleteFavorite();
+      case RssFavoriteDialogAction.confirm:
+        final current = _rssArticle;
+        if (current == null) return;
+        var nextTitle = current.title;
+        if (result.title.trim().isNotEmpty) {
+          nextTitle = result.title;
+        }
+        var nextGroup = current.group;
+        if (result.group.trim().isNotEmpty) {
+          nextGroup = result.group;
+        }
+        await _updateFavorite(title: nextTitle, group: nextGroup);
+      case RssFavoriteDialogAction.cancel:
+        break;
     }
   }
 
@@ -592,56 +416,17 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
     }
   }
 
-  String _readMenuActionText(_RssReadMenuAction action) {
-    switch (action) {
-      case _RssReadMenuAction.login:
-        return '登录';
-      case _RssReadMenuAction.browserOpen:
-        return '浏览器打开';
-    }
-  }
-
-  List<_RssReadMenuAction> _buildReadMenuActions(RssSource? source) {
-    final actions = <_RssReadMenuAction>[];
-    if (_canOpenLogin(source)) {
-      actions.add(_RssReadMenuAction.login);
-    }
-    actions.add(_RssReadMenuAction.browserOpen);
-    return actions;
-  }
-
   Future<void> _showMoreMenu(RssSource? source) async {
     if (!mounted) return;
-    final actions = _buildReadMenuActions(source);
-    final selected = await showCupertinoBottomSheetDialog<_RssReadMenuAction>(
-      context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        actions: actions
-            .map(
-              (action) => CupertinoActionSheetAction(
-                onPressed: () {
-                  Navigator.pop(sheetContext, action);
-                },
-                child: Text(_readMenuActionText(action)),
-              ),
-            )
-            .toList(growable: false),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
-        ),
-      ),
-    );
-    if (selected == null) return;
+    final selected =
+        await showRssReadMoreMenu(context: context, source: source);
+    if (!mounted || selected == null) return;
     switch (selected) {
-      case _RssReadMenuAction.login:
+      case RssReadMenuAction.login:
         if (source == null) return;
         await _openSourceLogin(source);
-        break;
-      case _RssReadMenuAction.browserOpen:
+      case RssReadMenuAction.browserOpen:
         await _handleBrowserOpen();
-        break;
     }
   }
 
@@ -655,61 +440,16 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
   }
 
   Widget _buildTrailingAction(RssSource? source) {
-    final showFavorite = _canShowFavoriteAction;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CupertinoButton(
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(28, 28),
-          onPressed: _handleRefresh,
-          child: const Icon(
-            CupertinoIcons.refresh,
-            size: 19,
-          ),
-        ),
-        if (showFavorite) ...[
-          const SizedBox(width: 6),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(28, 28),
-            onPressed: _favoriteActionRunning ? null : _handleFavoriteAction,
-            child: Icon(
-              _isInFavorites ? CupertinoIcons.star_fill : CupertinoIcons.star,
-              size: 19,
-            ),
-          ),
-        ],
-        const SizedBox(width: 6),
-        CupertinoButton(
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(28, 28),
-          onPressed: _handleShare,
-          child: const Icon(
-            CupertinoIcons.share,
-            size: 19,
-          ),
-        ),
-        const SizedBox(width: 6),
-        CupertinoButton(
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(28, 28),
-          onPressed: _handleReadAloud,
-          child: Icon(
-            _readAloudPlaying
-                ? CupertinoIcons.stop_circle
-                : CupertinoIcons.volume_up,
-            size: 19,
-          ),
-        ),
-        const SizedBox(width: 6),
-        CupertinoButton(
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(28, 28),
-          onPressed: () => _showMoreMenu(source),
-          child: const Icon(CupertinoIcons.ellipsis_circle, size: 20),
-        ),
-      ],
+    return RssReadTrailingActions(
+      showFavorite: _canShowFavoriteAction,
+      isInFavorites: _isInFavorites,
+      favoriteActionRunning: _favoriteActionRunning,
+      readAloudPlaying: _readAloudController.isPlaying,
+      onRefresh: _handleRefresh,
+      onFavorite: _handleFavoriteAction,
+      onShare: _handleShare,
+      onReadAloud: _handleReadAloud,
+      onMore: () => _showMoreMenu(source),
     );
   }
 
@@ -722,7 +462,7 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
         return AppCupertinoPageScaffold(
           title: widget.title.isEmpty ? 'RSS 阅读' : widget.title,
           trailing: _buildTrailingAction(source),
-          child: _RssReadContentView(
+          child: RssReadWebView(
             refreshVersion: _refreshVersion,
             article: _rssArticle,
             link: _linkKey,
@@ -730,128 +470,6 @@ class _RssReadPlaceholderViewState extends State<RssReadPlaceholderView> {
           ),
         );
       },
-    );
-  }
-}
-
-/// RSS 阅读内容视图：优先用 WebView 加载 link；无 link 时渲染 HTML 内容。
-class _RssReadContentView extends StatefulWidget {
-  const _RssReadContentView({
-    required this.refreshVersion,
-    required this.article,
-    required this.link,
-    required this.origin,
-  });
-
-  final int refreshVersion;
-  final RssArticle? article;
-  final String link;
-  final String origin;
-
-  @override
-  State<_RssReadContentView> createState() => _RssReadContentViewState();
-}
-
-class _RssReadContentViewState extends State<_RssReadContentView> {
-  late final WebViewController _controller;
-  bool _isLoading = true;
-  String? _lastLoadedKey;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(NavigationDelegate(
-        onPageStarted: (_) {
-          if (mounted) setState(() => _isLoading = true);
-        },
-        onPageFinished: (_) {
-          if (mounted) setState(() => _isLoading = false);
-        },
-        onWebResourceError: (_) {
-          if (mounted) setState(() => _isLoading = false);
-        },
-      ));
-    _loadContent();
-  }
-
-  @override
-  void didUpdateWidget(covariant _RssReadContentView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final newKey =
-        '${widget.refreshVersion}::${widget.link}::${widget.article?.link}';
-    if (_lastLoadedKey != newKey) _loadContent();
-  }
-
-  void _loadContent() {
-    final key =
-        '${widget.refreshVersion}::${widget.link}::${widget.article?.link}';
-    _lastLoadedKey = key;
-    final link = widget.link.trim();
-    if (link.isNotEmpty) {
-      _controller.loadRequest(Uri.parse(link));
-      return;
-    }
-    final article = widget.article;
-    if (article == null) {
-      _controller.loadHtmlString('<html><body></body></html>');
-      return;
-    }
-    final content = (article.content?.trim().isNotEmpty == true
-            ? article.content!
-            : article.description) ??
-        '';
-    final html = _buildHtml(
-      title: article.title,
-      content: content,
-      baseUrl: widget.origin,
-    );
-    _controller.loadHtmlString(
-      html,
-      baseUrl: widget.origin.isNotEmpty ? widget.origin : null,
-    );
-  }
-
-  String _buildHtml({
-    required String title,
-    required String content,
-    required String baseUrl,
-  }) {
-    final escapedTitle = title
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;');
-    return '''
-<!DOCTYPE html><html><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=yes">
-<style>
-body{font-family:-apple-system,sans-serif;font-size:16px;line-height:1.6;color:#1c1c1e;padding:16px;margin:0;word-wrap:break-word;}
-h1{font-size:20px;font-weight:700;margin-bottom:12px;}
-img{max-width:100%;height:auto;border-radius:6px;}
-a{color:#007aff;}
-@media(prefers-color-scheme:dark){body{background:#1c1c1e;color:#e5e5ea;}a{color:#0a84ff;}}
-</style></head><body>
-${title.isNotEmpty ? '<h1>$escapedTitle</h1>' : ''}
-$content
-</body></html>''';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        WebViewWidget(controller: _controller),
-        if (_isLoading)
-          const Positioned(
-            top: 12,
-            left: 0,
-            right: 0,
-            child: Center(child: CupertinoActivityIndicator()),
-          ),
-      ],
     );
   }
 }

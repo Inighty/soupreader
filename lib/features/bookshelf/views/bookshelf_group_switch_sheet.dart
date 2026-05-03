@@ -7,7 +7,7 @@ import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../models/bookshelf_book_group.dart';
 import '../services/bookshelf_book_group_store.dart';
-import 'bookshelf_group_manage_placeholder_dialog.dart';
+import 'bookshelf_group_edit_dialog.dart';
 
 /// 分组切换底部 sheet（style2 专用）。
 ///
