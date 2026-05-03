@@ -3,17 +3,18 @@ import 'dart:async';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/book.dart';
-import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/services/webdav_service.dart';
 import '../../bookshelf/services/bookshelf_catalog_update_service.dart';
-import '../../import/txt_parser.dart';
-import '../../search/services/search_book_info_refresh_helper.dart';
 import '../../source/services/rule_parser/rule_parser_engine.dart';
 import '../services/reader_charset_service.dart';
 import '../services/reader_content_processor.dart';
-import '../services/reader_source_switch_helper.dart';
+import 'actions_catalog_refresh_engine.dart';
+import 'actions_webdav_progress_engine.dart';
 import 'reader_state.dart';
+
+export 'actions_webdav_progress_engine.dart'
+    show WebDavSyncResult, WebDavPullResult;
 
 /// 阅读菜单操作纯逻辑委托。
 ///
@@ -47,7 +48,32 @@ class ActionsCoordinator {
     required this.onShowToast,
     required this.getChapterProgress,
     required this.getBookProgress,
-  });
+  })  : _webDavEngine = WebDavProgressEngine(
+          bookId: bookId,
+          bookTitle: bookTitle,
+          chapter: chapter,
+          image: image,
+          bookRepo: bookRepo,
+          settingsService: settingsService,
+          webDavService: webDavService,
+          onLoadChapter: onLoadChapter,
+          getChapterProgress: getChapterProgress,
+          getBookProgress: getBookProgress,
+        ),
+        _catalogEngine = CatalogRefreshEngine(
+          bookId: bookId,
+          bookTitle: bookTitle,
+          isEphemeral: isEphemeral,
+          chapter: chapter,
+          image: image,
+          bookRepo: bookRepo,
+          chapterRepo: chapterRepo,
+          settingsService: settingsService,
+          charsetService: charsetService,
+          catalogUpdateService: catalogUpdateService,
+          onLoadChapter: onLoadChapter,
+          onClearContentCaches: () => chapter.cache.clear(),
+        );
 
   final String bookId;
   final String bookTitle;
@@ -67,6 +93,10 @@ class ActionsCoordinator {
   final ReaderCharsetService charsetService;
   final BookshelfCatalogUpdateService catalogUpdateService;
   final RuleParserEngine ruleEngine;
+
+  // ── 引擎 ──
+  final WebDavProgressEngine _webDavEngine;
+  final CatalogRefreshEngine _catalogEngine;
 
   // ── 回调 ──
   /// 加载指定章节，与 [ReaderCoordinator.loadChapter] 对应。
@@ -112,116 +142,24 @@ class ActionsCoordinator {
   bool defaultUseReplaceRule() => !isCurrentBookEpub();
 
   /// WebDAV 是否配置了有效的进度同步。
-  bool hasWebDavProgressConfig() {
-    final appSettings = settingsService.appSettings;
-    final rootUrl = webDavService.buildRootUrl(appSettings).trim();
-    final rootUri = Uri.tryParse(rootUrl);
-    if (rootUri == null) return false;
-    final scheme = rootUri.scheme.toLowerCase();
-    if (scheme != 'http' && scheme != 'https') return false;
-    return webDavService.hasValidConfig(appSettings);
-  }
+  bool hasWebDavProgressConfig() => _webDavEngine.hasValidConfig();
 
   /// 是否启用了书籍进度同步。
-  bool isSyncBookProgressEnabled() {
-    return settingsService.appSettings.syncBookProgress;
-  }
+  bool isSyncBookProgressEnabled() => _webDavEngine.isSyncEnabled();
 
   // ═══════════════════════════════════════════════════════════════════
   // WebDAV 进度同步
   // ═══════════════════════════════════════════════════════════════════
 
   /// 上传当前阅读进度到 WebDAV。
-  Future<WebDavSyncResult> pushProgressToWebDav() async {
-    if (!isSyncBookProgressEnabled() ||
-        !hasWebDavProgressConfig() ||
-        chapter.chapters.isEmpty) {
-      return const WebDavSyncResult(success: false, skipped: true);
-    }
-
-    final title = _progressSyncBookTitle();
-    final author = _progressSyncBookAuthor();
-    try {
-      final progress = _buildLocalProgressPayload();
-      await webDavService.uploadBookProgress(
-        progress: progress,
-        settings: settingsService.appSettings,
-      );
-      return const WebDavSyncResult(success: true);
-    } catch (error, stackTrace) {
-      final reason = _normalizeErrorMessage(error);
-      ExceptionLogService().record(
-        node: 'reader.menu.cover_progress.failed',
-        message: '上传阅读进度失败《$title》\n$reason',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'bookId': bookId,
-          'bookTitle': title,
-          'bookAuthor': author,
-          'sourceUrl': image.sourceUrl,
-        },
-      );
-      return WebDavSyncResult(
-        success: false,
-        errorMessage: '上传进度失败\n$reason',
-      );
-    }
-  }
+  Future<WebDavSyncResult> pushProgressToWebDav() => _webDavEngine.push();
 
   /// 从 WebDAV 拉取阅读进度，返回需要跳转的信息。
-  ///
-  /// 若远端进度落后于本地，返回 [WebDavPullResult] 并标记
-  /// [WebDavPullResult.needsConfirmation] 以让 View 层弹窗确认。
-  Future<WebDavPullResult> pullProgressFromWebDav() async {
-    if (!isSyncBookProgressEnabled() ||
-        !hasWebDavProgressConfig() ||
-        chapter.chapters.isEmpty) {
-      return const WebDavPullResult(hasData: false);
-    }
-
-    final title = _progressSyncBookTitle();
-    final author = _progressSyncBookAuthor();
-    try {
-      final remote = await webDavService.getBookProgress(
-        bookTitle: title,
-        bookAuthor: author,
-        settings: settingsService.appSettings,
-      );
-      if (remote == null) {
-        return const WebDavPullResult(hasData: false);
-      }
-      return _analyzeRemoteProgress(remote, title: title, author: author);
-    } catch (error, stackTrace) {
-      final reason = _normalizeErrorMessage(error);
-      ExceptionLogService().record(
-        node: 'reader.menu.get_progress.failed',
-        message: '拉取阅读进度失败《$title》\n$reason',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'bookId': bookId,
-          'bookTitle': bookTitle,
-          'bookAuthor': image.bookAuthor,
-          'sourceUrl': image.sourceUrl,
-        },
-      );
-      return WebDavPullResult(
-        hasData: false,
-        errorMessage: '拉取进度失败\n$reason',
-      );
-    }
-  }
+  Future<WebDavPullResult> pullProgressFromWebDav() => _webDavEngine.pull();
 
   /// 确认应用远端进度后调用。
-  Future<void> applyRemoteProgress(WebDavPullResult result) async {
-    if (!result.hasData) return;
-    await onLoadChapter(
-      result.targetChapterIndex,
-      restoreOffset: true,
-      targetChapterProgress: result.targetChapterProgress,
-    );
-  }
+  Future<void> applyRemoteProgress(WebDavPullResult result) =>
+      _webDavEngine.applyRemote(result);
 
   // ═══════════════════════════════════════════════════════════════════
   // 内容开关
@@ -319,7 +257,7 @@ class ActionsCoordinator {
       await chapterRepo.cacheChapterContent(ch.id, reversed);
     }
 
-    _clearContentCacheForChapter(ch.id);
+    chapter.cache.clearForChapter(ch.id);
     chapter.chapters[idx] = ch.copyWith(
       content: reversed,
       isDownloaded: true,
@@ -338,8 +276,7 @@ class ActionsCoordinator {
       return false;
     }
     final ch = chapter.chapters[chapterIndex];
-    final nextTitle =
-        newTitle.trim().isEmpty ? ch.title : newTitle.trim();
+    final nextTitle = newTitle.trim().isEmpty ? ch.title : newTitle.trim();
     final shouldPersist = newContent.isNotEmpty;
     final nextStoredContent = shouldPersist ? newContent : ch.content;
     final nextIsDownloaded = shouldPersist ? true : ch.isDownloaded;
@@ -357,7 +294,7 @@ class ActionsCoordinator {
       await chapterRepo.addChapters(<Chapter>[updated]);
     }
 
-    _clearContentCacheForChapter(ch.id);
+    chapter.cache.clearForChapter(ch.id);
     chapter.chapters[chapterIndex] = updated;
     chapter.notify();
     await onLoadChapter(chapterIndex, restoreOffset: true);
@@ -369,49 +306,11 @@ class ActionsCoordinator {
   // ═══════════════════════════════════════════════════════════════════
 
   /// 刷新在线书籍的目录。
-  ///
-  /// 返回更新后的章节列表；出错时抛出异常。
-  Future<List<Chapter>> refreshCatalogFromSource() async {
-    final book = bookRepo.getBookById(bookId);
-    if (book == null) throw StateError('书籍信息不存在');
-
-    if (book.isLocal) {
-      return _refreshLocalCatalog(book);
-    }
-    return _refreshOnlineCatalog(book);
-  }
+  Future<List<Chapter>> refreshCatalogFromSource() => _catalogEngine.refresh();
 
   /// 应用编码设置后重新解析本地书籍。
-  Future<void> applyCharsetSetting({
-    required String charset,
-  }) async {
-    final book = bookRepo.getBookById(bookId);
-    if (book == null || !book.isLocal) return;
-
-    final normalized =
-        ReaderCharsetService.normalizeCharset(charset) ??
-            charset.trim();
-    await charsetService.setBookCharset(bookId, normalized);
-
-    if (!isCurrentBookLocal()) return;
-
-    chapter.update(loading: true);
-    try {
-      if (isCurrentBookLocalTxt()) {
-        final splitLongChapter =
-            settingsService.getBookSplitLongChapter(bookId);
-        await _reparseLocalTxt(
-          book: book,
-          charset: normalized,
-          splitLongChapter: splitLongChapter,
-        );
-      } else {
-        await _reloadLocalCatalogAfterCharset(book: book);
-      }
-    } finally {
-      chapter.update(loading: false);
-    }
-  }
+  Future<void> applyCharsetSetting({required String charset}) =>
+      _catalogEngine.applyCharset(charset: charset);
 
   // ═══════════════════════════════════════════════════════════════════
   // 模拟阅读
@@ -429,7 +328,7 @@ class ActionsCoordinator {
       enabled: enabled,
       startChapter: startChapter,
       dailyChapters: dailyChapters,
-      startDate: _normalizeDateOnly(startDate),
+      startDate: DateTime(startDate.year, startDate.month, startDate.day),
     );
 
     _clearContentCaches();
@@ -478,308 +377,21 @@ class ActionsCoordinator {
   }
 
   /// 应用书籍翻页动画覆盖。
-  Future<void> applyBookPageAnim(int animIndex) async {
-    await _applyBookPageAnim(animIndex);
-  }
+  Future<void> applyBookPageAnim(int animIndex) => _applyBookPageAnim(animIndex);
 
   // ═══════════════════════════════════════════════════════════════════
   // 书签导出
   // ═══════════════════════════════════════════════════════════════════
 
   /// 构建进度同步用的书名。
-  String progressSyncBookTitle() => _progressSyncBookTitle();
+  String progressSyncBookTitle() => _webDavEngine.bookTitleForSync();
 
   /// 构建进度同步用的作者名。
-  String progressSyncBookAuthor() => _progressSyncBookAuthor();
+  String progressSyncBookAuthor() => _webDavEngine.bookAuthorForSync();
 
   // ═══════════════════════════════════════════════════════════════════
   // 私有方法
   // ═══════════════════════════════════════════════════════════════════
-
-  String _progressSyncBookTitle() {
-    final titleFromRepo =
-        bookRepo.getBookById(bookId)?.title.trim() ?? '';
-    if (titleFromRepo.isNotEmpty) return titleFromRepo;
-    final title = bookTitle.trim();
-    if (title.isNotEmpty) return title;
-    return '未知书名';
-  }
-
-  String _progressSyncBookAuthor() {
-    final authorFromRepo =
-        bookRepo.getBookById(bookId)?.author.trim() ?? '';
-    if (authorFromRepo.isNotEmpty) return authorFromRepo;
-    final author = image.bookAuthor.trim();
-    if (author.isNotEmpty) return author;
-    return '未知作者';
-  }
-
-  WebDavBookProgress _buildLocalProgressPayload() {
-    final chapterProgress =
-        getChapterProgress().clamp(0.0, 1.0).toDouble();
-    final readableCount = chapter.readableCount;
-    final safeIndex = readableCount > 0
-        ? chapter.currentIndex.clamp(0, readableCount - 1)
-        : 0;
-    return WebDavBookProgress(
-      name: _progressSyncBookTitle(),
-      author: _progressSyncBookAuthor(),
-      durChapterIndex: safeIndex,
-      durChapterPos: (chapterProgress * 10000).round(),
-      durChapterTime: DateTime.now().millisecondsSinceEpoch,
-      durChapterTitle: chapter.currentTitle,
-      chapterProgress: chapterProgress,
-      readProgress: getBookProgress().clamp(0.0, 1.0).toDouble(),
-      totalChapters: readableCount,
-    );
-  }
-
-  double _decodeRemoteChapterProgress(WebDavBookProgress remote) {
-    final explicit = remote.chapterProgress;
-    if (explicit != null) {
-      return explicit.clamp(0.0, 1.0).toDouble();
-    }
-    final pos = remote.durChapterPos;
-    if (pos <= 0) return 0.0;
-    if (pos <= 10000) {
-      return (pos / 10000.0).clamp(0.0, 1.0).toDouble();
-    }
-    return 0.0;
-  }
-
-  WebDavPullResult _analyzeRemoteProgress(
-    WebDavBookProgress remote, {
-    required String title,
-    required String author,
-  }) {
-    final readableCount = chapter.readableCount;
-    if (readableCount <= 0) {
-      return const WebDavPullResult(hasData: false);
-    }
-    final maxIndex = readableCount - 1;
-    final targetIndex = remote.durChapterIndex;
-    if (targetIndex < 0 || targetIndex > maxIndex) {
-      return const WebDavPullResult(hasData: false);
-    }
-
-    var targetProgress = _decodeRemoteChapterProgress(remote);
-    final remotePos = remote.durChapterPos;
-    final hasLegacyRawPos =
-        remote.chapterProgress == null && remotePos > 10000;
-    if (hasLegacyRawPos && targetProgress <= 0) {
-      final content =
-          (chapter.chapters[targetIndex].content ?? '').trim();
-      if (content.isNotEmpty) {
-        targetProgress =
-            (remotePos / content.length).clamp(0.0, 1.0).toDouble();
-      }
-    }
-
-    final localIndex =
-        chapter.currentIndex.clamp(0, maxIndex);
-    final localProgress =
-        getChapterProgress().clamp(0.0, 1.0).toDouble();
-
-    final remoteBehind = targetIndex < localIndex ||
-        (targetIndex == localIndex && targetProgress < localProgress);
-
-    final delta = (targetProgress - localProgress).abs();
-    final isSame =
-        targetIndex == localIndex && delta <= 0.0001;
-
-    if (isSame) {
-      if (!remoteBehind) {
-        _logProgressSynced(remote, title: title, author: author);
-      }
-      return const WebDavPullResult(hasData: false);
-    }
-
-    return WebDavPullResult(
-      hasData: true,
-      targetChapterIndex: targetIndex,
-      targetChapterProgress: targetProgress,
-      needsConfirmation: remoteBehind,
-      remoteChapterTitle: remote.durChapterTitle,
-    );
-  }
-
-  void _logProgressSynced(
-    WebDavBookProgress remote, {
-    required String title,
-    required String author,
-  }) {
-    final syncedTitle = (remote.durChapterTitle ?? '').trim();
-    final suffix = syncedTitle.isEmpty ? '' : ' $syncedTitle';
-    ExceptionLogService().record(
-      node: 'reader.menu.get_progress.synced',
-      message: '自动同步阅读进度成功《$title》$suffix',
-      context: <String, dynamic>{
-        'bookId': bookId,
-        'bookTitle': title,
-        'bookAuthor': author,
-        'chapterIndex': remote.durChapterIndex,
-        'chapterTitle': remote.durChapterTitle,
-        'sourceUrl': image.sourceUrl,
-      },
-    );
-  }
-
-  Future<List<Chapter>> _refreshOnlineCatalog(Book book) async {
-    final summary =
-        await catalogUpdateService.updateBooks([book]);
-    if (summary.failedCount > 0) {
-      final reason =
-          _extractCatalogFailureReason(summary.failedDetails);
-      ExceptionLogService().record(
-        node: 'reader.menu.update_toc.online_failed',
-        message: '阅读页在线更新目录失败',
-        error: reason,
-        context: <String, dynamic>{
-          'bookId': bookId,
-          'bookTitle': bookTitle,
-          'sourceUrl': image.sourceUrl,
-          'failedDetails': summary.failedDetails,
-        },
-      );
-      throw StateError('加载目录失败');
-    }
-    if (summary.updateCandidateCount <= 0) {
-      throw StateError('加载目录失败');
-    }
-
-    final updated = chapterRepo.getChaptersForBook(bookId);
-    if (updated.isEmpty) throw StateError('加载目录失败');
-
-    final maxChapter = updated.length - 1;
-    final refreshedBook = bookRepo.getBookById(bookId);
-
-    chapter.chapters = updated;
-    chapter.currentIndex =
-        chapter.currentIndex.clamp(0, maxChapter);
-    chapter.currentTitle = updated[chapter.currentIndex].title;
-    if (refreshedBook != null) {
-      image.bookAuthor = refreshedBook.author;
-      image.bookCoverUrl = refreshedBook.coverUrl;
-      image.sourceUrl =
-          (refreshedBook.sourceUrl ?? refreshedBook.sourceId ?? '')
-              .trim();
-    }
-    chapter.notify();
-    return updated;
-  }
-
-  Future<List<Chapter>> _refreshLocalCatalog(Book book) async {
-    final refreshed =
-        await SearchBookInfoRefreshHelper.refreshLocalBook(
-      book: book,
-      preferredTxtCharset: isCurrentBookLocalTxt()
-          ? (charsetService.getBookCharset(bookId) ??
-              ReaderCharsetService.defaultCharset)
-          : null,
-      splitLongChapter:
-          settingsService.getBookSplitLongChapter(bookId),
-      txtTocRuleRegex: settingsService.getBookTxtTocRule(bookId),
-    );
-    return _replaceChaptersAndReload(
-      refreshed.chapters,
-      updatedBook: refreshed.book,
-    );
-  }
-
-  Future<void> _reparseLocalTxt({
-    required Book book,
-    required String charset,
-    required bool splitLongChapter,
-  }) async {
-    final localPath =
-        (book.localPath ?? book.bookUrl ?? '').trim();
-    if (localPath.isEmpty) {
-      throw StateError('缺少本地 TXT 文件路径');
-    }
-
-    final parsed = await TxtParser.reparseFromFile(
-      filePath: localPath,
-      bookId: bookId,
-      bookName: book.title,
-      forcedCharset: charset,
-      splitLongChapter: splitLongChapter,
-      tocRuleRegex: settingsService.getBookTxtTocRule(bookId),
-    );
-    await _replaceChaptersAndReload(
-      parsed.chapters,
-      persistBook: book,
-    );
-  }
-
-  Future<void> _reloadLocalCatalogAfterCharset({
-    required Book book,
-  }) async {
-    final refreshed =
-        await SearchBookInfoRefreshHelper.refreshLocalBook(
-      book: book,
-    );
-    await _replaceChaptersAndReload(
-      refreshed.chapters,
-      updatedBook: refreshed.book,
-    );
-  }
-
-  /// 替换章节列表并重新加载。
-  ///
-  /// 三个目录刷新方法共用的核心逻辑：
-  /// 1. 定位当前阅读位置
-  /// 2. 持久化新章节
-  /// 3. 更新状态
-  /// 4. 重新加载目标章节
-  Future<List<Chapter>> _replaceChaptersAndReload(
-    List<Chapter> newChapters, {
-    Book? updatedBook,
-    Book? persistBook,
-  }) async {
-    if (newChapters.isEmpty) {
-      throw StateError('重解析后章节为空');
-    }
-
-    final previousTitle = chapter.chapters.isEmpty
-        ? chapter.currentTitle
-        : chapter.chapters[
-                chapter.currentIndex.clamp(0, chapter.maxIndex)]
-            .title;
-    final targetIndex =
-        ReaderSourceSwitchHelper.resolveTargetChapterIndex(
-      newChapters: newChapters,
-      currentChapterTitle: previousTitle,
-      currentChapterIndex: chapter.currentIndex,
-      oldChapterCount: chapter.chapters.length,
-    );
-
-    final bookToUpdate = updatedBook ?? persistBook;
-    if (!isEphemeral && bookToUpdate != null) {
-      await chapterRepo.clearChaptersForBook(bookId);
-      await chapterRepo.addChapters(newChapters);
-      await bookRepo.updateBook(
-        bookToUpdate.copyWith(
-          totalChapters: newChapters.length,
-          latestChapter: newChapters.last.title,
-          currentChapter: targetIndex,
-        ),
-      );
-    }
-
-    if (updatedBook != null) {
-      image.bookAuthor = updatedBook.author;
-      image.bookCoverUrl = updatedBook.coverUrl;
-    }
-    _clearContentCaches();
-    chapter.chapters = newChapters;
-    chapter.notify();
-
-    await onLoadChapter(
-      targetIndex.clamp(0, newChapters.length - 1),
-      restoreOffset: true,
-    );
-    return newChapters;
-  }
 
   Future<void> _applyBookPageAnim(int animIndex) async {
     if (!isEphemeral) {
@@ -795,66 +407,5 @@ class ActionsCoordinator {
     return legacyImageStyles.first;
   }
 
-  DateTime _normalizeDateOnly(DateTime dt) {
-    return DateTime(dt.year, dt.month, dt.day);
-  }
-
-  void _clearContentCaches() {
-    chapter.cache.clear();
-  }
-
-  void _clearContentCacheForChapter(String chapterId) {
-    chapter.cache.clearForChapter(chapterId);
-  }
-
-  String _normalizeErrorMessage(Object error) {
-    final msg = error.toString();
-    if (msg.length > 200) return '${msg.substring(0, 200)}…';
-    return msg;
-  }
-
-  String _extractCatalogFailureReason(
-    List<dynamic> failedDetails,
-  ) {
-    if (failedDetails.isEmpty) return '未知原因';
-    return failedDetails.first.toString();
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// WebDAV 同步结果数据类
-// ═══════════════════════════════════════════════════════════════════════
-
-/// WebDAV 上传结果。
-class WebDavSyncResult {
-  const WebDavSyncResult({
-    required this.success,
-    this.skipped = false,
-    this.errorMessage,
-  });
-
-  final bool success;
-  final bool skipped;
-  final String? errorMessage;
-}
-
-/// WebDAV 拉取结果。
-class WebDavPullResult {
-  const WebDavPullResult({
-    required this.hasData,
-    this.targetChapterIndex = 0,
-    this.targetChapterProgress = 0.0,
-    this.needsConfirmation = false,
-    this.remoteChapterTitle,
-    this.errorMessage,
-  });
-
-  final bool hasData;
-  final int targetChapterIndex;
-  final double targetChapterProgress;
-
-  /// 远端进度落后于本地，需要用户确认是否覆盖。
-  final bool needsConfirmation;
-  final String? remoteChapterTitle;
-  final String? errorMessage;
+  void _clearContentCaches() => chapter.cache.clear();
 }
