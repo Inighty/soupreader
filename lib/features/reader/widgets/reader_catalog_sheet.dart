@@ -4,13 +4,15 @@ import 'package:flutter/cupertino.dart';
 
 import '../../../app/theme/design_tokens.dart';
 import '../../../app/widgets/app_toast.dart';
-import '../../../app/widgets/app_cover_image.dart';
-import '../../../app/widgets/app_empty_state.dart';
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/entities/bookmark_entity.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/models/book.dart';
 import '../services/reader_legacy_menu_helper.dart';
+import 'reader_catalog_actions.dart';
+import 'reader_catalog_bookmark_list.dart';
+import 'reader_catalog_chapter_list.dart';
+import 'reader_catalog_header.dart';
+import 'reader_catalog_state_helpers.dart';
 
 /// 阅读器目录/书签面板（对标 legado 目录抽屉交互）
 ///
@@ -88,47 +90,33 @@ class ReaderCatalogSheet extends StatefulWidget {
 }
 
 class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
-  static const double _chapterListItemExtent = 60;
-  static const double _currentChapterAlignment = 0.08;
-
   int _selectedTab = 0; // 0=目录, 1=书签
   bool _isReversed = false;
   bool _busy = false;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final Map<int, GlobalKey> _chapterItemKeys = <int, GlobalKey>{};
-  final Map<int, String> _displayTitlesByChapterIndex = <int, String>{};
+
+  late final ReaderCatalogTitleResolver _titleResolver;
+  late final ReaderCatalogScrollPositioner _scroller;
 
   late List<Chapter> _chapters;
   late List<BookmarkEntity> _bookmarks;
-  int? _lastAutoScrollTargetChapterIndex;
-  bool _pendingPreciseScroll = false;
-  int _displayTitleResolverToken = 0;
   bool _useReplace = false;
   bool _loadWordCount = false;
   bool _splitLongChapter = false;
 
   bool get _isDark => CupertinoTheme.of(context).brightness == Brightness.dark;
-
   Color get _accent =>
       _isDark ? AppDesignTokens.brandSecondary : AppDesignTokens.brandPrimary;
-
   Color get _panelBg =>
       CupertinoColors.systemGroupedBackground.resolveFrom(context);
-
-  Color get _textStrong =>
-      CupertinoColors.label.resolveFrom(context);
-
+  Color get _textStrong => CupertinoColors.label.resolveFrom(context);
   Color get _textNormal =>
       CupertinoColors.secondaryLabel.resolveFrom(context);
-
   Color get _textSubtle =>
       CupertinoColors.tertiaryLabel.resolveFrom(context);
-
-  Color get _lineColor =>
-      CupertinoColors.separator.resolveFrom(context);
-
+  Color get _lineColor => CupertinoColors.separator.resolveFrom(context);
   Color get _cardMutedBg =>
       CupertinoColors.tertiarySystemFill.resolveFrom(context);
 
@@ -140,14 +128,22 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     _useReplace = widget.initialUseReplace;
     _loadWordCount = widget.initialLoadWordCount;
     _splitLongChapter = widget.initialSplitLongChapter;
-    _primeDisplayTitles(reset: true);
-
-    _scheduleScrollToCurrentChapter();
+    _titleResolver = ReaderCatalogTitleResolver(
+      scheduleSetState: (fn) {
+        if (mounted) setState(fn);
+      },
+      isStillMounted: () => mounted,
+    );
+    _scroller = ReaderCatalogScrollPositioner(
+      scrollController: _scrollController,
+    );
+    _primeTitles(reset: true);
+    _scheduleScroll();
   }
 
   @override
   void dispose() {
-    _displayTitleResolverToken++;
+    _titleResolver.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -162,8 +158,8 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         oldWidget.currentChapterIndex != widget.currentChapterIndex;
     if (chapterListChanged || currentChapterChanged) {
       _chapters = List<Chapter>.from(widget.chapters);
-      _resetAutoScrollState();
-      _scheduleScrollToCurrentChapter();
+      _scroller.reset();
+      _scheduleScroll();
     }
     if (!identical(oldWidget.bookmarks, widget.bookmarks)) {
       _bookmarks = List<BookmarkEntity>.from(widget.bookmarks);
@@ -185,214 +181,45 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       widget.initialDisplayTitlesByIndex,
     );
     if (chapterListChanged || resolverChanged || initialTitlesChanged) {
-      _primeDisplayTitles(reset: true);
+      _primeTitles(reset: true);
     } else if (currentChapterChanged) {
-      _resolveDisplayTitlesAroundCurrent();
-    }
-  }
-
-  Map<int, String> _sanitizeInitialDisplayTitles() {
-    if (widget.initialDisplayTitlesByIndex.isEmpty || _chapters.isEmpty) {
-      return const <int, String>{};
-    }
-    final validIndexes = _chapters.map((chapter) => chapter.index).toSet();
-    final sanitized = <int, String>{};
-    for (final entry in widget.initialDisplayTitlesByIndex.entries) {
-      if (!validIndexes.contains(entry.key)) continue;
-      if (entry.value.trim().isEmpty) continue;
-      sanitized[entry.key] = entry.value;
-    }
-    return sanitized;
-  }
-
-  void _primeDisplayTitles({required bool reset}) {
-    final seeded = _sanitizeInitialDisplayTitles();
-    if (reset) {
-      _displayTitlesByChapterIndex
-        ..clear()
-        ..addAll(seeded);
-    } else {
-      _displayTitlesByChapterIndex.addAll(seeded);
-    }
-    _resolveDisplayTitlesAroundCurrent();
-  }
-
-  int _resolveCurrentChapterListPosition() {
-    for (var i = 0; i < _chapters.length; i++) {
-      if (_chapters[i].index == widget.currentChapterIndex) {
-        return i;
-      }
-    }
-    return 0;
-  }
-
-  void _resolveDisplayTitlesAroundCurrent() {
-    final resolver = widget.resolveDisplayTitle;
-    if (resolver == null || _chapters.isEmpty) {
-      _displayTitleResolverToken++;
-      return;
-    }
-    final token = ++_displayTitleResolverToken;
-    final start = _resolveCurrentChapterListPosition();
-    unawaited(
-      _resolveDisplayTitlesInDirection(
-        resolver: resolver,
-        token: token,
-        start: start,
-        step: 1,
-      ),
-    );
-    unawaited(
-      _resolveDisplayTitlesInDirection(
-        resolver: resolver,
-        token: token,
-        start: start - 1,
-        step: -1,
-      ),
-    );
-  }
-
-  void _refreshDisplayTitlesAfterReplaceToggle() {
-    _displayTitleResolverToken++;
-    setState(() {
-      _displayTitlesByChapterIndex.clear();
-    });
-    _resolveDisplayTitlesAroundCurrent();
-  }
-
-  Future<void> _resolveDisplayTitlesInDirection({
-    required Future<String> Function(Chapter chapter) resolver,
-    required int token,
-    required int start,
-    required int step,
-  }) async {
-    if (step == 0) return;
-    for (var i = start; i >= 0 && i < _chapters.length; i += step) {
-      if (!mounted || token != _displayTitleResolverToken) return;
-      final chapter = _chapters[i];
-      if (_displayTitlesByChapterIndex.containsKey(chapter.index)) continue;
-      var resolved = chapter.title;
-      try {
-        final title = await resolver(chapter);
-        if (title.trim().isNotEmpty) {
-          resolved = title;
-        }
-      } catch (_) {
-        // 保持目录可用：单条解析失败时回退原始标题。
-      }
-      if (!mounted || token != _displayTitleResolverToken) return;
-      if (_displayTitlesByChapterIndex[chapter.index] == resolved) continue;
-      setState(() {
-        _displayTitlesByChapterIndex[chapter.index] = resolved;
-      });
-    }
-  }
-
-  String _displayTitleForChapter(Chapter chapter) {
-    return _displayTitlesByChapterIndex[chapter.index] ?? chapter.title;
-  }
-
-  GlobalKey _chapterKeyFor(int chapterIndex) {
-    return _chapterItemKeys.putIfAbsent(
-      chapterIndex,
-      () => GlobalKey(debugLabel: 'catalog_chapter_$chapterIndex'),
-    );
-  }
-
-  int? _findCurrentVisibleListIndex() {
-    final chapters = _filteredChapters;
-    for (var i = 0; i < chapters.length; i++) {
-      if (chapters[i].index == widget.currentChapterIndex) {
-        return i;
-      }
-    }
-    return null;
-  }
-
-  void _resetAutoScrollState() {
-    _lastAutoScrollTargetChapterIndex = null;
-    _pendingPreciseScroll = false;
-  }
-
-  double _clampTargetOffset(double rawOffset) {
-    final position = _scrollController.position;
-    return rawOffset
-        .clamp(position.minScrollExtent, position.maxScrollExtent)
-        .toDouble();
-  }
-
-  void _scheduleScrollToCurrentChapter() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _scrollToCurrentChapter();
-    });
-  }
-
-  void _scrollToCurrentChapter() {
-    if (_selectedTab != 0) return;
-    if (!_scrollController.hasClients) return;
-
-    final chapters = _filteredChapters;
-    if (chapters.isEmpty) return;
-
-    final currentVisibleIndex = _findCurrentVisibleListIndex();
-    if (currentVisibleIndex == null) return;
-
-    // 对齐 legado：将当前章前一项滚动到可视区顶部，避免当前章贴边显示。
-    final targetVisibleIndex =
-        currentVisibleIndex > 0 ? currentVisibleIndex - 1 : 0;
-    if (targetVisibleIndex < 0 || targetVisibleIndex >= chapters.length) return;
-
-    final targetChapterIndex = chapters[targetVisibleIndex].index;
-    if (_lastAutoScrollTargetChapterIndex != targetChapterIndex) {
-      final estimatedOffset = targetVisibleIndex * _chapterListItemExtent;
-      _scrollController.jumpTo(_clampTargetOffset(estimatedOffset));
-      _lastAutoScrollTargetChapterIndex = targetChapterIndex;
-    }
-    if (_pendingPreciseScroll) return;
-
-    _pendingPreciseScroll = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _pendingPreciseScroll = false;
-      if (!mounted || _selectedTab != 0 || !_scrollController.hasClients) {
-        return;
-      }
-      final targetContext = _chapterKeyFor(targetChapterIndex).currentContext;
-      if (targetContext == null) return;
-      Scrollable.ensureVisible(
-        targetContext,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutCubic,
-        alignment: _currentChapterAlignment,
-        alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+      _titleResolver.resolveAroundCurrent(
+        chapters: _chapters,
+        currentChapterIndex: widget.currentChapterIndex,
+        resolveDisplayTitle: widget.resolveDisplayTitle,
       );
-    });
+    }
   }
 
-  List<Chapter> get _filteredChapters {
+  void _primeTitles({required bool reset}) {
+    _titleResolver.prime(
+      chapters: _chapters,
+      currentChapterIndex: widget.currentChapterIndex,
+      initialDisplayTitlesByIndex: widget.initialDisplayTitlesByIndex,
+      resolveDisplayTitle: widget.resolveDisplayTitle,
+      reset: reset,
+    );
+  }
+
+  void _scheduleScroll() {
+    _scroller.schedule(
+      filteredChapters: _filterChapters(),
+      currentIndex: widget.currentChapterIndex,
+      isMounted: mounted,
+      isChapterTab: _selectedTab == 0,
+    );
+  }
+
+  List<Chapter> _filterChapters() {
     var list = _chapters;
     final q = _searchQuery.trim().toLowerCase();
     if (q.isNotEmpty) {
-      // 对齐 legado：目录检索仍基于章节原始标题字段（BookChapter.title）。
       list = list
           .where((c) => c.title.toLowerCase().contains(q))
           .toList(growable: false);
     }
     if (_isReversed) {
       list = list.reversed.toList(growable: false);
-    }
-    return list;
-  }
-
-  List<BookmarkEntity> get _filteredBookmarks {
-    var list = _bookmarks;
-    final q = _searchQuery.trim().toLowerCase();
-    if (q.isNotEmpty) {
-      list = list
-          .where((b) =>
-              b.chapterTitle.toLowerCase().contains(q) ||
-              b.content.toLowerCase().contains(q))
-          .toList(growable: false);
     }
     return list;
   }
@@ -411,10 +238,42 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         top: false,
         child: Column(
           children: [
-            _buildGrabber(),
-            _buildHeader(),
-            _buildTabBar(),
-            _buildSearchAndSort(),
+            const ReaderCatalogGrabber(),
+            ReaderCatalogHeader(
+              bookTitle: widget.bookTitle,
+              bookAuthor: widget.bookAuthor,
+              coverUrl: widget.coverUrl,
+              chapterCount: _chapters.length,
+              textStrong: _textStrong,
+              textSubtle: _textSubtle,
+            ),
+            ReaderCatalogTabBar(
+              selectedTab: _selectedTab,
+              chapterCount: _chapters.length,
+              bookmarkCount: _bookmarks.length,
+              busy: _busy,
+              accent: _accent,
+              textNormal: _textNormal,
+              lineColor: _lineColor,
+              onSelectTab: _selectTab,
+              onShowMoreActions: _showTocActionsMenu,
+              onClearCache: _confirmClearCache,
+              onRefreshCatalog: _refreshCatalog,
+            ),
+            ReaderCatalogSearchAndSort(
+              controller: _searchController,
+              selectedTab: _selectedTab,
+              searchQuery: _searchQuery,
+              totalChapterCount: _chapters.length,
+              matchedChapterCount: _filterChapters().length,
+              isReversed: _isReversed,
+              textStrong: _textStrong,
+              textNormal: _textNormal,
+              textSubtle: _textSubtle,
+              cardMutedBg: _cardMutedBg,
+              onQueryChanged: _onSearchChanged,
+              onToggleReverse: _toggleReverse,
+            ),
             Expanded(child: _buildBody()),
           ],
         ),
@@ -422,288 +281,99 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     );
   }
 
-  Widget _buildGrabber() {
-    final color = CupertinoColors.separator.resolveFrom(context);
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.only(top: 8, bottom: 2),
-        width: 36,
-        height: 4,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
-    );
+  void _selectTab(int index) {
+    setState(() {
+      _selectedTab = index;
+      _searchQuery = '';
+      _searchController.text = '';
+      _scroller.reset();
+    });
+    _scheduleScroll();
   }
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      child: Row(
-        children: [
-          _BookCover(
-            title: widget.bookTitle,
-            coverUrl: widget.coverUrl,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.bookTitle,
-                  style: TextStyle(
-                    color: _textStrong,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  widget.bookAuthor.trim().isNotEmpty
-                      ? widget.bookAuthor.trim()
-                      : '未知作者',
-                  style: TextStyle(
-                    color: _textSubtle,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '共${_chapters.length}章',
-                  style: TextStyle(
-                    color: _textSubtle,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+  void _onSearchChanged(String value) {
+    setState(() {
+      _searchQuery = value;
+      _scroller.reset();
+    });
+    _scheduleScroll();
   }
 
-  Widget _buildTabBar() {
-    final chapterCount = _chapters.length;
-    final bookmarkCount = _bookmarks.length;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-        children: [
-          _buildTab(0, '目录', count: chapterCount),
-          _buildTab(1, '书签', count: bookmarkCount),
-          const Spacer(),
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            onPressed: _busy ? null : _showTocActionsMenu,
-            child: Icon(
-              CupertinoIcons.ellipsis_circle,
-              size: 20,
-              color: _busy
-                  ? CupertinoColors.tertiaryLabel.resolveFrom(context)
-                  : _textNormal,
-            ),
-          ),
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            onPressed: _busy ? null : _confirmClearCache,
-            child: Icon(
-              CupertinoIcons.trash,
-              size: 20,
-              color: _busy
-                  ? CupertinoColors.tertiaryLabel.resolveFrom(context)
-                  : _textNormal,
-            ),
-          ),
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            onPressed: _busy ? null : _refreshCatalog,
-            child: Icon(
-              CupertinoIcons.arrow_clockwise,
-              size: 20,
-              color: _busy
-                  ? CupertinoColors.tertiaryLabel.resolveFrom(context)
-                  : _textNormal,
-            ),
-          ),
-        ],
-      ),
-        Container(height: 0.5, color: _lineColor),
-      ],
-    );
-  }
-
-  Widget _buildTab(int index, String label, {int? count}) {
-    final isSelected = _selectedTab == index;
-    final title = count == null ? label : '$label ($count)';
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
-      onPressed: () {
-        setState(() {
-          _selectedTab = index;
-          _searchQuery = '';
-          _searchController.text = '';
-          _resetAutoScrollState();
-        });
-        _scheduleScrollToCurrentChapter();
-      },
-      child: AnimatedContainer(
-        duration: AppDesignTokens.motionQuick,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: isSelected ? _accent : CupertinoColors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
-        child: Text(
-          title,
-          style: TextStyle(
-            color: isSelected ? _accent : _textNormal,
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSearchAndSort() {
-    final showSort = _selectedTab == 0;
-    final placeholder = _selectedTab == 0 ? '输入关键字搜索目录' : '搜索书签';
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: CupertinoSearchTextField(
-                  controller: _searchController,
-                  placeholder: placeholder,
-                  style: TextStyle(color: _textStrong, fontSize: 14),
-                  backgroundColor: _cardMutedBg,
-                  borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                      _resetAutoScrollState();
-                    });
-                    _scheduleScrollToCurrentChapter();
-                  },
-                ),
-              ),
-              if (showSort) ...[
-                CupertinoButton(
-                  padding: const EdgeInsets.only(left: 12),
-                  onPressed: () {
-                    setState(() {
-                      _isReversed = !_isReversed;
-                      _resetAutoScrollState();
-                    });
-                    _scheduleScrollToCurrentChapter();
-                  },
-                  child: Icon(
-                    _isReversed
-                        ? CupertinoIcons.sort_up
-                        : CupertinoIcons.sort_down,
-                    size: 22,
-                    color: _textNormal,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          if (_selectedTab == 0)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _searchQuery.trim().isEmpty
-                      ? '共 ${_chapters.length} 章'
-                      : '匹配 ${_filteredChapters.length} 章',
-                  style: TextStyle(
-                    color: _textSubtle,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
+  void _toggleReverse() {
+    setState(() {
+      _isReversed = !_isReversed;
+      _scroller.reset();
+    });
+    _scheduleScroll();
   }
 
   Widget _buildBody() {
-    if (_selectedTab == 0) return _buildChapterList();
-    return _buildBookmarkList();
+    if (_selectedTab == 0) {
+      return ReaderCatalogChapterList(
+        chapters: _chapters,
+        currentChapterIndex: widget.currentChapterIndex,
+        searchQuery: _searchQuery,
+        isReversed: _isReversed,
+        loadWordCount: _loadWordCount,
+        scrollController: _scrollController,
+        chapterKeyFor: _scroller.keyFor,
+        displayTitleFor: _titleResolver.displayTitleFor,
+        accent: _accent,
+        textStrong: _textStrong,
+        textSubtle: _textSubtle,
+        lineColor: _lineColor,
+        cardMutedBg: _cardMutedBg,
+        isDark: _isDark,
+        onChapterSelected: widget.onChapterSelected,
+      );
+    }
+    return ReaderCatalogBookmarkList(
+      bookmarks: _bookmarks,
+      searchQuery: _searchQuery,
+      accent: _accent,
+      textStrong: _textStrong,
+      textSubtle: _textSubtle,
+      lineColor: _lineColor,
+      onBookmarkSelected: widget.onBookmarkSelected,
+      onDeleteBookmark: (bookmark) async {
+        await widget.onDeleteBookmark(bookmark);
+        if (!mounted) return;
+        setState(() {
+          _bookmarks.removeWhere((b) => b.id == bookmark.id);
+        });
+      },
+      onEditBookmark: widget.onEditBookmark,
+    );
   }
 
   void _showTocActionsMenu() {
-    final actions = ReaderLegacyMenuHelper.buildTocMenuActions(
+    showReaderCatalogTocActionsMenu(
+      context: context,
       bookmarkTab: _selectedTab == 1,
       isLocalTxt: widget.isLocalTxtBook,
-    );
-    showCupertinoBottomSheetDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: const Text('目录操作'),
-        actions: actions
-            .map(
-              (action) => CupertinoActionSheetAction(
-                onPressed: () async {
-                  Navigator.pop(sheetContext);
-                  await _runTocAction(action);
-                },
-                child: Text(_tocActionLabel(action)),
-              ),
-            )
-            .toList(growable: false),
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
-        ),
+      flags: ReaderCatalogTocFlags(
+        isReversed: _isReversed,
+        useReplace: _useReplace,
+        loadWordCount: _loadWordCount,
+        splitLongChapter: _splitLongChapter,
       ),
+      onAction: _runTocAction,
     );
-  }
-
-  String _tocActionLabel(ReaderLegacyTocMenuAction action) {
-    final raw = ReaderLegacyMenuHelper.tocMenuLabel(action);
-    final checked = switch (action) {
-      ReaderLegacyTocMenuAction.reverseToc => _isReversed,
-      ReaderLegacyTocMenuAction.useReplace => _useReplace,
-      ReaderLegacyTocMenuAction.loadWordCount => _loadWordCount,
-      ReaderLegacyTocMenuAction.splitLongChapter => _splitLongChapter,
-      _ => false,
-    };
-    return checked ? '✓ $raw' : raw;
   }
 
   Future<void> _runTocAction(ReaderLegacyTocMenuAction action) async {
     switch (action) {
       case ReaderLegacyTocMenuAction.reverseToc:
-        setState(() {
-          _isReversed = !_isReversed;
-          _resetAutoScrollState();
-        });
-        _scheduleScrollToCurrentChapter();
+        _toggleReverse();
         return;
       case ReaderLegacyTocMenuAction.useReplace:
         setState(() => _useReplace = !_useReplace);
         widget.onUseReplaceChanged?.call(_useReplace);
-        _refreshDisplayTitlesAfterReplaceToggle();
+        _titleResolver.resetAfterReplaceToggle(
+          chapters: _chapters,
+          currentChapterIndex: widget.currentChapterIndex,
+          resolveDisplayTitle: widget.resolveDisplayTitle,
+        );
         _showToast(_useReplace ? '已开启目录替换规则' : '已关闭目录替换规则');
         return;
       case ReaderLegacyTocMenuAction.loadWordCount:
@@ -711,319 +381,54 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
         widget.onLoadWordCountChanged?.call(_loadWordCount);
         return;
       case ReaderLegacyTocMenuAction.tocRule:
-        if (widget.onEditTocRule != null) {
-          widget.onEditTocRule!.call();
-        } else {
-          _showToast('当前书籍未接入 TXT 目录规则配置');
-        }
+        widget.onEditTocRule != null
+            ? widget.onEditTocRule!.call()
+            : _showToast('当前书籍未接入 TXT 目录规则配置');
         return;
       case ReaderLegacyTocMenuAction.splitLongChapter:
-        final next = !_splitLongChapter;
-        setState(() => _busy = true);
-        try {
-          if (widget.onApplySplitLongChapter != null) {
-            await widget.onApplySplitLongChapter!.call(next);
-          }
-          widget.onSplitLongChapterChanged?.call(next);
-          if (!mounted) return;
-          setState(() => _splitLongChapter = next);
-          if (next) {
-            _showToast('已开启“分割长章节”');
-          } else {
-            _showToast('已关闭“分割长章节”，重新加载正文可能需要更长时间');
-          }
-        } catch (error) {
-          if (mounted) {
-            _showToast('切换分割长章节失败：$error');
-          }
-        } finally {
-          if (mounted) {
-            setState(() => _busy = false);
-          }
-        }
+        await _toggleSplitLongChapter();
         return;
       case ReaderLegacyTocMenuAction.exportBookmark:
-        if (widget.onExportBookmark != null) {
-          await widget.onExportBookmark!.call();
-        } else {
-          _showToast('当前书籍不支持导出书签');
-        }
+        await _runOptionalCallback(
+            widget.onExportBookmark, '当前书籍不支持导出书签');
         return;
       case ReaderLegacyTocMenuAction.exportMarkdown:
-        if (widget.onExportBookmarkMarkdown != null) {
-          await widget.onExportBookmarkMarkdown!.call();
-        } else {
-          _showToast('当前书籍不支持导出 Markdown');
-        }
+        await _runOptionalCallback(
+            widget.onExportBookmarkMarkdown, '当前书籍不支持导出 Markdown');
         return;
       case ReaderLegacyTocMenuAction.log:
-        if (widget.onOpenLogs != null) {
-          await widget.onOpenLogs!.call();
-        } else {
-          _showToast('日志入口不可用');
-        }
+        await _runOptionalCallback(widget.onOpenLogs, '日志入口不可用');
         return;
     }
   }
 
-  Widget _buildChapterList() {
-    final chapters = _filteredChapters;
-    if (chapters.isEmpty) {
-      return _buildEmptyTab(_searchQuery.trim().isNotEmpty ? '无匹配章节' : '暂无章节');
+  Future<void> _runOptionalCallback(
+    Future<void> Function()? cb,
+    String fallback,
+  ) async {
+    if (cb != null) {
+      await cb();
+    } else {
+      _showToast(fallback);
     }
-
-    return ListView.separated(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      itemCount: chapters.length,
-      separatorBuilder: (context, index) => Container(
-        height: 0.5,
-        margin: const EdgeInsets.only(left: 42),
-        color: _lineColor.withValues(alpha: 0.6),
-      ),
-      itemBuilder: (context, index) {
-        final chapter = chapters[index];
-        final originalIndex = chapter.index;
-        final isCurrent = originalIndex == widget.currentChapterIndex;
-        final hasCache =
-            chapter.isDownloaded && (chapter.content?.isNotEmpty ?? false);
-        final wordCount = _resolveChapterWordCountLabel(chapter);
-
-        return CupertinoButton(
-          key: _chapterKeyFor(originalIndex),
-          padding: EdgeInsets.zero,
-          minimumSize: Size.zero,
-          onPressed: () => widget.onChapterSelected(originalIndex),
-          child: Container(
-            constraints:
-                const BoxConstraints(minHeight: _chapterListItemExtent),
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-            decoration: isCurrent
-                ? BoxDecoration(
-                    color: _accent.withValues(alpha: _isDark ? 0.12 : 0.1),
-                    borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
-                  )
-                : null,
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 34,
-                  child: Text(
-                    '${originalIndex + 1}',
-                    style: TextStyle(
-                      color: isCurrent ? _accent : _textSubtle,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    _displayTitleForChapter(chapter),
-                    style: TextStyle(
-                      color: isCurrent ? _accent : _textStrong,
-                      fontSize: 14,
-                      fontWeight:
-                          isCurrent ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (wordCount != null)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Text(
-                      wordCount,
-                      style: TextStyle(
-                        color: _textSubtle,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                if (hasCache)
-                  Padding(
-                    padding: EdgeInsets.only(right: 8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _cardMutedBg,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '已缓存',
-                        style: TextStyle(
-                          color: _textSubtle,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ),
-                if (isCurrent)
-                  Icon(
-                    CupertinoIcons.checkmark_circle_fill,
-                    color: _accent,
-                    size: 18,
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
-  String? _resolveChapterWordCountLabel(Chapter chapter) {
-    if (!_loadWordCount) return null;
-    final content = chapter.content;
-    if (content == null || content.isEmpty) return null;
-    final words = content.length;
-    if (words <= 0) return null;
-    if (words > 10000) {
-      final value = (words / 10000.0)
-          .toStringAsFixed(1)
-          .replaceFirst(RegExp(r'\.0$'), '');
-      return '$value万字';
+  Future<void> _toggleSplitLongChapter() async {
+    final next = !_splitLongChapter;
+    setState(() => _busy = true);
+    try {
+      if (widget.onApplySplitLongChapter != null) {
+        await widget.onApplySplitLongChapter!.call(next);
+      }
+      widget.onSplitLongChapterChanged?.call(next);
+      if (!mounted) return;
+      setState(() => _splitLongChapter = next);
+      _showToast(next ? '已开启“分割长章节”' : '已关闭“分割长章节”，重新加载正文可能需要更长时间');
+    } catch (error) {
+      if (mounted) _showToast('切换分割长章节失败：$error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    return '$words字';
-  }
-
-  Widget _buildBookmarkList() {
-    final bookmarks = _filteredBookmarks;
-    if (bookmarks.isEmpty) {
-      final message = _searchQuery.trim().isNotEmpty ? '无匹配书签' : '暂无书签';
-      return _buildEmptyTab(message);
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      itemCount: bookmarks.length,
-      separatorBuilder: (_, __) => Container(
-        height: 0.5,
-        color: _lineColor,
-      ),
-      itemBuilder: (context, index) {
-        final bookmark = bookmarks[index];
-        return Dismissible(
-          key: ValueKey(bookmark.id),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 18),
-            color: CupertinoColors.destructiveRed
-                .resolveFrom(context)
-                .withValues(alpha: 0.18),
-            child: Icon(
-              CupertinoIcons.delete,
-              color: CupertinoColors.destructiveRed.resolveFrom(context),
-              size: 20,
-            ),
-          ),
-          confirmDismiss: (_) async {
-            return await _confirmDeleteBookmark(bookmark);
-          },
-          onDismissed: (_) async {
-            await widget.onDeleteBookmark(bookmark);
-            if (!mounted) return;
-            setState(() {
-              _bookmarks.removeWhere((b) => b.id == bookmark.id);
-            });
-          },
-          child: GestureDetector(
-            onLongPress: widget.onEditBookmark != null
-                ? () => widget.onEditBookmark!(bookmark)
-                : null,
-            child: CupertinoButton(
-              padding: EdgeInsets.zero,
-              minimumSize: Size.zero,
-              onPressed: () => widget.onBookmarkSelected(bookmark),
-              child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: _accent,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          bookmark.chapterTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: _textStrong,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          bookmark.content.trim().isNotEmpty
-                              ? bookmark.content.trim()
-                              : '（无预览内容）',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: _textSubtle,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    CupertinoIcons.chevron_forward,
-                    color: _textSubtle,
-                    size: 18,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEmptyTab(String message) {
-    return AppEmptyState(
-      illustration: const AppEmptyPlanetIllustration(size: 82),
-      title: message,
-    );
-  }
-
-  Future<bool> _confirmDeleteBookmark(BookmarkEntity bookmark) async {
-    return await showCupertinoBottomSheetDialog<bool>(
-          context: context,
-          builder: (context) => CupertinoAlertDialog(
-            title: const Text('删除书签'),
-            content: Text('\n确定删除该书签吗？\n\n${bookmark.chapterTitle}'),
-            actions: [
-              CupertinoDialogAction(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('取消'),
-              ),
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('删除'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
   }
 
   void _showToast(String message) {
@@ -1031,26 +436,9 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
     unawaited(showAppToast(context, message: message));
   }
 
-  int _estimateCachedChapters() {
-    var count = 0;
-    for (final chapter in _chapters) {
-      if (chapter.isDownloaded && (chapter.content?.isNotEmpty ?? false)) {
-        count++;
-      }
-    }
-    return count;
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes <= 0) return '0B';
-    const k = 1024.0;
-    final kb = bytes / k;
-    if (kb < 1024) return '${kb.toStringAsFixed(1)}KB';
-    final mb = kb / 1024;
-    if (mb < 1024) return '${mb.toStringAsFixed(1)}MB';
-    final gb = mb / 1024;
-    return '${gb.toStringAsFixed(2)}GB';
-  }
+  int _estimateCachedChapters() => _chapters
+      .where((c) => c.isDownloaded && (c.content?.isNotEmpty ?? false))
+      .length;
 
   Future<void> _confirmClearCache() async {
     final cachedCount = _estimateCachedChapters();
@@ -1059,25 +447,10 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       return;
     }
 
-    final ok = await showCupertinoBottomSheetDialog<bool>(
-          context: context,
-          builder: (context) => CupertinoAlertDialog(
-            title: const Text('清理缓存'),
-            content: Text('\n将清理本书已缓存的 $cachedCount 章内容（不删除目录）。'),
-            actions: [
-              CupertinoDialogAction(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('取消'),
-              ),
-              CupertinoDialogAction(
-                isDestructiveAction: true,
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('清理'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    final ok = await confirmReaderCatalogClearCache(
+      context: context,
+      cachedCount: cachedCount,
+    );
     if (!ok) return;
 
     setState(() => _busy = true);
@@ -1091,7 +464,8 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
                 : c)
             .toList(growable: false);
       });
-      _showToast('已清理：${info.chapters}章 / ${_formatBytes(info.bytes)}');
+      _showToast(
+          '已清理：${info.chapters}章 / ${formatReaderCatalogBytes(info.bytes)}');
     } catch (e) {
       if (!mounted) return;
       _showToast('清理失败：$e');
@@ -1108,44 +482,18 @@ class _ReaderCatalogSheetState extends State<ReaderCatalogSheet> {
       if (!mounted) return;
       setState(() {
         _chapters = List<Chapter>.from(updated);
-        _resetAutoScrollState();
+        _scroller.reset();
       });
-      _primeDisplayTitles(reset: true);
-      _scheduleScrollToCurrentChapter();
+      _primeTitles(reset: true);
+      _scheduleScroll();
 
       final diff = _chapters.length - oldCount;
-      if (diff > 0) {
-        _showToast('发现更新：新增 $diff 章');
-      } else {
-        _showToast('暂无更新');
-      }
+      _showToast(diff > 0 ? '发现更新：新增 $diff 章' : '暂无更新');
     } catch (e) {
       if (!mounted) return;
       _showToast('刷新失败：$e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-}
-
-class _BookCover extends StatelessWidget {
-  final String title;
-  final String? coverUrl;
-
-  const _BookCover({
-    required this.title,
-    required this.coverUrl,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCoverImage(
-      urlOrPath: coverUrl,
-      title: title,
-      width: 50,
-      height: 70,
-      borderRadius: 8,
-      showTextOnPlaceholder: false,
-    );
   }
 }
