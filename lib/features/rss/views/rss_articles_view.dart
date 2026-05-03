@@ -1,37 +1,27 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
-import '../../../app/widgets/app_popover_menu.dart';
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/rss_article_repository.dart';
 import '../../../core/database/repositories/rss_source_repository.dart';
 import '../../../core/services/exception_log_service.dart';
-import '../../../core/services/source_variable_store.dart';
 import '../models/rss_article.dart';
 import '../models/rss_source.dart';
-import '../services/rss_article_load_more_helper.dart';
 import '../services/rss_article_style_helper.dart';
 import '../services/rss_article_sync_service.dart';
 import '../services/rss_sort_urls_helper.dart';
+import 'rss_articles_body.dart';
+import 'rss_articles_menu.dart';
+import 'rss_articles_widgets.dart';
 import 'rss_read_record_view.dart';
 import 'rss_read_view.dart';
 import 'rss_source_edit_view.dart';
+import 'rss_source_variable_dialog.dart';
 import 'rss_view_helpers.dart';
 
-enum _RssArticlesMenuAction {
-  login,
-  refreshSort,
-  setSourceVariable,
-  editSource,
-  switchLayout,
-  readRecord,
-  clear,
-}
 class RssArticlesPlaceholderView extends StatefulWidget {
   const RssArticlesPlaceholderView({
     super.key,
@@ -60,7 +50,6 @@ class _RssArticlesPlaceholderViewState
   Future<List<RssSortTab>>? _sortTabsFuture;
   final GlobalKey _moreMenuKey = GlobalKey();
 
-  // 文章列表状态
   int _selectedSortIndex = 0;
   List<RssArticle> _articles = const <RssArticle>[];
   bool _isRefreshing = false;
@@ -76,7 +65,8 @@ class _RssArticlesPlaceholderViewState
     final db = DatabaseService();
     _repo = widget.repository ?? RssSourceRepository(db);
     _articleRepo = RssArticleRepository(db);
-    _syncService = RssArticleSyncService(db: db, articleRepository: _articleRepo);
+    _syncService =
+        RssArticleSyncService(db: db, articleRepository: _articleRepo);
   }
 
   @override
@@ -239,113 +229,49 @@ class _RssArticlesPlaceholderViewState
     return 'RSS 文章列表';
   }
 
-  bool _canOpenLogin(RssSource? source) {
-    return (source?.loginUrl ?? '').trim().isNotEmpty;
-  }
-
   Widget? _buildTrailingAction(RssSource? source) {
     if (source == null) return null;
-    final actions = _buildMenuActions(source);
+    final actions = buildRssArticlesMenuActions(source);
     if (actions.isEmpty) return null;
     return CupertinoButton(
       key: _moreMenuKey,
       padding: EdgeInsets.zero,
       minimumSize: const Size(28, 28),
-      onPressed: () => _showMoreMenu(
-        source: source,
-        actions: actions,
-      ),
+      onPressed: () => _showMoreMenu(source: source, actions: actions),
       child: const Icon(CupertinoIcons.ellipsis_circle, size: 20),
     );
   }
 
-  List<_RssArticlesMenuAction> _buildMenuActions(RssSource source) {
-    final actions = <_RssArticlesMenuAction>[
-      _RssArticlesMenuAction.refreshSort,
-      _RssArticlesMenuAction.setSourceVariable,
-      _RssArticlesMenuAction.editSource,
-      _RssArticlesMenuAction.switchLayout,
-      _RssArticlesMenuAction.readRecord,
-      _RssArticlesMenuAction.clear,
-    ];
-    if (_canOpenLogin(source)) {
-      actions.insert(0, _RssArticlesMenuAction.login);
-    }
-    return actions;
-  }
-
-  String _menuActionText(_RssArticlesMenuAction action) {
-    switch (action) {
-      case _RssArticlesMenuAction.login:
-        return '登录';
-      case _RssArticlesMenuAction.refreshSort:
-        return '刷新分类';
-      case _RssArticlesMenuAction.setSourceVariable:
-        return '设置源变量';
-      case _RssArticlesMenuAction.editSource:
-        return '编辑源';
-      case _RssArticlesMenuAction.switchLayout:
-        return '切换布局';
-      case _RssArticlesMenuAction.readRecord:
-        return '阅读记录';
-      case _RssArticlesMenuAction.clear:
-        return '清除';
-    }
-  }
-
-  IconData _menuActionIcon(_RssArticlesMenuAction action) {
-    switch (action) {
-      case _RssArticlesMenuAction.login:
-        return CupertinoIcons.person;
-      case _RssArticlesMenuAction.refreshSort:
-        return CupertinoIcons.refresh;
-      case _RssArticlesMenuAction.setSourceVariable:
-        return CupertinoIcons.slider_horizontal_3;
-      case _RssArticlesMenuAction.editSource:
-        return CupertinoIcons.pencil;
-      case _RssArticlesMenuAction.switchLayout:
-        return CupertinoIcons.square_grid_2x2;
-      case _RssArticlesMenuAction.readRecord:
-        return CupertinoIcons.clock;
-      case _RssArticlesMenuAction.clear:
-        return CupertinoIcons.delete;
-    }
-  }
-
   Future<void> _showMoreMenu({
     required RssSource source,
-    required List<_RssArticlesMenuAction> actions,
+    required List<RssArticlesMenuAction> actions,
   }) async {
     if (!mounted) return;
-    final selected = await showAppPopoverMenu<_RssArticlesMenuAction>(
+    final selected = await showRssArticlesMoreMenu(
       context: context,
       anchorKey: _moreMenuKey,
-      items: actions
-          .map(
-            (action) => AppPopoverMenuItem(
-              value: action,
-              icon: _menuActionIcon(action),
-              label: _menuActionText(action),
-              isDestructiveAction: action == _RssArticlesMenuAction.clear,
-            ),
-          )
-          .toList(growable: false),
+      actions: actions,
     );
     if (selected == null) return;
     switch (selected) {
-      case _RssArticlesMenuAction.login:
+      case RssArticlesMenuAction.login:
         await _openSourceLogin(source);
-      case _RssArticlesMenuAction.refreshSort:
+      case RssArticlesMenuAction.refreshSort:
         await _refreshSort(source);
-      case _RssArticlesMenuAction.setSourceVariable:
-        await _setSourceVariable(source);
-      case _RssArticlesMenuAction.editSource:
+      case RssArticlesMenuAction.setSourceVariable:
+        if (!mounted) return;
+        await showRssSourceVariableDialog(
+          context: context,
+          source: source,
+          loadCurrentSource: (url) => _repo.getByKey(url) ?? source,
+        );
+      case RssArticlesMenuAction.editSource:
         await _openEditSource(source);
-      case _RssArticlesMenuAction.switchLayout:
+      case RssArticlesMenuAction.switchLayout:
         await _switchLayout(source);
-      case _RssArticlesMenuAction.readRecord:
+      case RssArticlesMenuAction.readRecord:
         await _openReadRecord();
-      case _RssArticlesMenuAction.clear:
+      case RssArticlesMenuAction.clear:
         await _clearArticles(source);
     }
   }
@@ -370,9 +296,7 @@ class _RssArticlesPlaceholderViewState
         message: '清除 RSS 文章缓存失败',
         error: error,
         stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'sourceUrl': sourceUrl,
-        },
+        context: <String, dynamic>{'sourceUrl': sourceUrl},
       );
     }
   }
@@ -397,9 +321,7 @@ class _RssArticlesPlaceholderViewState
       return;
     }
     if (!mounted) return;
-    setState(() {
-      _sortReloadVersion += 1;
-    });
+    setState(() => _sortReloadVersion += 1);
   }
 
   Future<void> _switchLayout(RssSource source) async {
@@ -419,9 +341,7 @@ class _RssArticlesPlaceholderViewState
     }
 
     try {
-      await _repo.updateSource(
-        cached.copyWith(articleStyle: nextStyle),
-      );
+      await _repo.updateSource(cached.copyWith(articleStyle: nextStyle));
     } catch (error, stackTrace) {
       ExceptionLogService().record(
         node: 'rss_articles.menu_switch_layout',
@@ -444,108 +364,6 @@ class _RssArticlesPlaceholderViewState
     });
   }
 
-  String _displaySourceVariableComment(RssSource source) {
-    const defaultComment = '源变量可在js中通过source.getVariable()获取';
-    return source.getDisplayVariableComment(defaultComment);
-  }
-
-  Future<void> _setSourceVariable(RssSource source) async {
-    final sourceUrl = source.sourceUrl.trim();
-    if (sourceUrl.isEmpty) {
-      await showRssLoginMessage(context, '源不存在');
-      return;
-    }
-    final current = _repo.getByKey(sourceUrl) ?? source;
-    final note = _displaySourceVariableComment(current);
-    final initial = await SourceVariableStore.getVariable(sourceUrl) ?? '';
-    if (!mounted) return;
-
-    final controller = TextEditingController(text: initial);
-    final result = await showCupertinoBottomSheetDialog<String>(
-      context: context,
-      builder: (popupContext) => CupertinoPopupSurface(
-        isSurfacePainted: true,
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: MediaQuery.of(popupContext).size.height * 0.78,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
-                  child: Row(
-                    children: [
-                      CupertinoButton(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        onPressed: () => Navigator.pop(popupContext),
-                        child: const Text('取消'),
-                      ),
-                      const Expanded(
-                        child: Text(
-                          '设置源变量',
-                          maxLines: 1,
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      CupertinoButton(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        onPressed: () =>
-                            Navigator.pop(popupContext, controller.text),
-                        child: const Text('保存'),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  height: 0.5,
-                  color: CupertinoColors.separator.resolveFrom(popupContext),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          note,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: CupertinoColors.secondaryLabel.resolveFrom(context)
-                                .resolveFrom(popupContext),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Expanded(
-                          child: CupertinoTextField(
-                            controller: controller,
-                            minLines: null,
-                            maxLines: null,
-                            expands: true,
-                            textAlignVertical: TextAlignVertical.top,
-                            placeholder: '输入变量 JSON 或文本',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    controller.dispose();
-    if (result == null) return;
-
-    await SourceVariableStore.putVariable(sourceUrl, result);
-  }
-
   Future<void> _openSourceLogin(RssSource source) async {
     if (!mounted) return;
     await openRssSourceLogin(
@@ -565,18 +383,14 @@ class _RssArticlesPlaceholderViewState
         ),
       );
       if (!mounted || saved != true) return;
-      setState(() {
-        _sortReloadVersion += 1;
-      });
+      setState(() => _sortReloadVersion += 1);
     } catch (error, stackTrace) {
       ExceptionLogService().record(
         node: 'rss_articles.menu_edit_source',
         message: '打开 RSS 源编辑页失败',
         error: error,
         stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'sourceUrl': sourceUrl,
-        },
+        context: <String, dynamic>{'sourceUrl': sourceUrl},
       );
     }
   }
@@ -598,7 +412,6 @@ class _RssArticlesPlaceholderViewState
             future: _sortTabsFuture,
             builder: (context, sortSnapshot) {
               final tabs = sortSnapshot.data ?? const <RssSortTab>[];
-              // 首次加载完 tabs 后自动触发刷新
               if (sortSnapshot.connectionState == ConnectionState.done &&
                   _session == null &&
                   !_isRefreshing &&
@@ -611,24 +424,19 @@ class _RssArticlesPlaceholderViewState
                     _onSortTabSelected(idx, tabs, menuSource);
                   }
                 });
-                // 初始化流订阅（避免重复）
                 final sourceUrl = menuSource.sourceUrl.trim();
                 if (_articleStreamSub == null && sourceUrl.isNotEmpty) {
                   _subscribeArticles(sourceUrl, tab.name);
                 }
               }
 
-              final isGridView = RssArticleStyleHelper.isGridStyle(
-                menuSource?.articleStyle ?? _fallbackArticleStyle,
-              );
               final separatorColor =
                   CupertinoColors.separator.resolveFrom(context);
 
               return Column(
                 children: [
-                  // 分类 Tab 栏
                   if (tabs.length > 1)
-                    _RssSortTabBar(
+                    RssSortTabBar(
                       tabs: tabs,
                       selectedIndex:
                           _selectedSortIndex.clamp(0, tabs.length - 1),
@@ -637,15 +445,23 @@ class _RssArticlesPlaceholderViewState
                     ),
                   if (tabs.length > 1)
                     Container(height: 0.5, color: separatorColor),
-                  // 文章列表
                   Expanded(
-                    child: _buildArticleBody(
-                      context: context,
+                    child: RssArticlesBody(
                       source: menuSource,
                       tabs: tabs,
-                      isGridView: isGridView,
+                      articles: _articles,
+                      selectedSortIndex: _selectedSortIndex,
+                      scrollController: _scrollController,
+                      isRefreshing: _isRefreshing,
+                      isLoadingMore: _isLoadingMore,
+                      session: _session,
+                      refreshError: _refreshError,
+                      fallbackArticleStyle: _fallbackArticleStyle,
                       isLoadingTabs: sortSnapshot.connectionState ==
                           ConnectionState.waiting,
+                      onRefresh: _doRefresh,
+                      onLoadMore: _doLoadMore,
+                      onOpenArticle: _openArticle,
                     ),
                   ),
                 ],
@@ -654,198 +470,6 @@ class _RssArticlesPlaceholderViewState
           ),
         );
       },
-    );
-  }
-
-  Widget _buildArticleBody({
-    required BuildContext context,
-    required RssSource? source,
-    required List<RssSortTab> tabs,
-    required bool isGridView,
-    required bool isLoadingTabs,
-  }) {
-    if (isLoadingTabs && _articles.isEmpty) {
-      return const Center(child: CupertinoActivityIndicator());
-    }
-
-    final articles = _articles;
-    final hasMore = RssArticleLoadMoreHelper.shouldShowManualLoadMore(
-      isLoading: _isLoadingMore,
-      hasMore: _session?.hasMore ?? false,
-      articleCount: articles.length,
-    );
-
-    if (articles.isEmpty && !_isRefreshing) {
-      return CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          CupertinoSliverRefreshControl(
-            onRefresh: source != null && tabs.isNotEmpty
-                ? () => _doRefresh(
-                      source: source,
-                      tab: tabs[
-                          _selectedSortIndex.clamp(0, tabs.length - 1)],
-                    )
-                : null,
-          ),
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(
-              child: _refreshError != null
-                  ? Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        _refreshError!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: CupertinoColors.secondaryLabel.resolveFrom(context)
-                              .resolveFrom(context),
-                          fontSize: 14,
-                        ),
-                      ),
-                    )
-                  : Text(
-                      '暂无文章',
-                      style: TextStyle(
-                        color: CupertinoColors.secondaryLabel.resolveFrom(context)
-                            .resolveFrom(context),
-                      ),
-                    ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    if (isGridView) {
-      return _buildGridList(
-        context: context,
-        articles: articles,
-        source: source,
-        tabs: tabs,
-        hasMore: hasMore,
-      );
-    }
-    return _buildArticleList(
-      context: context,
-      articles: articles,
-      source: source,
-      tabs: tabs,
-      hasMore: hasMore,
-    );
-  }
-
-  Widget _buildArticleList({
-    required BuildContext context,
-    required List<RssArticle> articles,
-    required RssSource? source,
-    required List<RssSortTab> tabs,
-    required bool hasMore,
-  }) {
-    return CustomScrollView(
-      controller: _scrollController,
-      physics: const AlwaysScrollableScrollPhysics(),
-      slivers: [
-        CupertinoSliverRefreshControl(
-          onRefresh: source != null && tabs.isNotEmpty
-              ? () => _doRefresh(
-                    source: source,
-                    tab: tabs[_selectedSortIndex.clamp(0, tabs.length - 1)],
-                  )
-              : null,
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                if (index == articles.length) {
-                  return hasMore
-                      ? _buildLoadMoreButton(source!)
-                      : _isLoadingMore
-                          ? const Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Center(
-                                  child: CupertinoActivityIndicator()),
-                            )
-                          : const SizedBox.shrink();
-                }
-                final article = articles[index];
-                return _RssArticleListTile(
-                  article: article,
-                  onTap: () => _openArticle(article),
-                );
-              },
-              childCount: articles.length + 1,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGridList({
-    required BuildContext context,
-    required List<RssArticle> articles,
-    required RssSource? source,
-    required List<RssSortTab> tabs,
-    required bool hasMore,
-  }) {
-    return CustomScrollView(
-      controller: _scrollController,
-      physics: const AlwaysScrollableScrollPhysics(),
-      slivers: [
-        CupertinoSliverRefreshControl(
-          onRefresh: source != null && tabs.isNotEmpty
-              ? () => _doRefresh(
-                    source: source,
-                    tab: tabs[_selectedSortIndex.clamp(0, tabs.length - 1)],
-                  )
-              : null,
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.72,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final article = articles[index];
-                return _RssArticleGridCard(
-                  article: article,
-                  onTap: () => _openArticle(article),
-                );
-              },
-              childCount: articles.length,
-            ),
-          ),
-        ),
-        if (hasMore)
-          SliverToBoxAdapter(
-            child: _buildLoadMoreButton(source!),
-          ),
-        if (_isLoadingMore)
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CupertinoActivityIndicator()),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildLoadMoreButton(RssSource source) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: CupertinoButton(
-        onPressed: () => _doLoadMore(source),
-        child: const Text('加载更多'),
-      ),
     );
   }
 
@@ -858,236 +482,6 @@ class _RssArticlesPlaceholderViewState
           origin: article.origin,
           link: article.link,
           repository: _repo,
-        ),
-      ),
-    );
-  }
-}
-
-class _RssSortTabBar extends StatelessWidget {
-  const _RssSortTabBar({
-    required this.tabs,
-    required this.selectedIndex,
-    required this.onTap,
-  });
-
-  final List<RssSortTab> tabs;
-  final int selectedIndex;
-  final ValueChanged<int> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final activeColor = CupertinoTheme.of(context).primaryColor;
-    final separatorColor = CupertinoColors.separator.resolveFrom(context);
-    return SizedBox(
-      height: 38,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: tabs.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 4),
-        itemBuilder: (context, index) {
-          final tab = tabs[index];
-          final selected = index == selectedIndex;
-          final label =
-              tab.name.trim().isEmpty ? '默认' : tab.name.trim();
-          return GestureDetector(
-            onTap: () => onTap(index),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              curve: Curves.easeOut,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: BoxDecoration(
-                color: selected
-                    ? activeColor.withValues(alpha: 0.12)
-                    : CupertinoColors.tertiarySystemGroupedBackground.resolveFrom(context)
-                        .resolveFrom(context),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: selected
-                      ? activeColor.withValues(alpha: 0.4)
-                      : separatorColor.withValues(alpha: 0.6),
-                  width: 0.5,
-                ),
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight:
-                      selected ? FontWeight.w600 : FontWeight.w400,
-                  color: selected
-                      ? activeColor
-                      : CupertinoColors.label.resolveFrom(context),
-                  letterSpacing: -0.2,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _RssArticleListTile extends StatelessWidget {
-  const _RssArticleListTile({
-    required this.article,
-    required this.onTap,
-  });
-
-  final RssArticle article;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final secondaryLabel =
-        CupertinoColors.secondaryLabel.resolveFrom(context);
-    final separatorColor = CupertinoColors.separator.resolveFrom(context);
-    final imageUrl = (article.image ?? '').trim();
-    final hasImage = imageUrl.isNotEmpty;
-    final isRead = article.read;
-    final titleColor = isRead
-        ? CupertinoColors.secondaryLabel.resolveFrom(context)
-        : CupertinoColors.label.resolveFrom(context);
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // 上方大图（全宽 220dp，对应 legado item_rss_article_2.xml）
-          if (hasImage)
-            SizedBox(
-              height: 180,
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => Container(
-                  height: 180,
-                  color: CupertinoColors.systemGrey5.resolveFrom(context),
-                ),
-              ),
-            ),
-          // 标题 + 日期
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  article.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: titleColor,
-                    height: 1.35,
-                  ),
-                ),
-                if ((article.pubDate ?? '').isNotEmpty) ...
-                  [
-                    const SizedBox(height: 6),
-                    Text(
-                      article.pubDate!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: secondaryLabel,
-                      ),
-                    ),
-                  ],
-              ],
-            ),
-          ),
-          Container(height: 0.5, color: separatorColor),
-        ],
-      ),
-    );
-  }
-}
-
-class _RssArticleGridCard extends StatelessWidget {
-  const _RssArticleGridCard({
-    required this.article,
-    required this.onTap,
-  });
-
-  final RssArticle article;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final secondaryLabel =
-        CupertinoColors.secondaryLabel.resolveFrom(context);
-    final cardBg = CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
-        .resolveFrom(context);
-    final imageUrl = (article.image ?? '').trim();
-    final hasImage = imageUrl.isNotEmpty;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          color: cardBg,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (hasImage)
-                Expanded(
-                  child: CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => Container(
-                      color: CupertinoColors.systemGrey5.resolveFrom(context),
-                    ),
-                  ),
-                )
-              else
-                Expanded(
-                  child: Container(
-                    color: CupertinoColors.systemGrey5.resolveFrom(context),
-                    child: Icon(
-                      CupertinoIcons.photo,
-                      size: 32,
-                      color: CupertinoColors.systemGrey.resolveFrom(context),
-                    ),
-                  ),
-                ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                child: Text(
-                  article.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    height: 1.3,
-                  ),
-                ),
-              ),
-              if ((article.pubDate ?? '').isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
-                  child: Text(
-                    article.pubDate!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: secondaryLabel,
-                    ),
-                  ),
-                ),
-            ],
-          ),
         ),
       ),
     );
