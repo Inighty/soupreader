@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 
-import '../../../core/services/settings_service.dart';
-import '../../../core/services/screen_brightness_service.dart';
 import '../../../core/services/keep_screen_on_service.dart';
+import '../../../core/services/screen_brightness_service.dart';
+import '../../../core/services/settings_service.dart';
 import '../../bookshelf/models/book.dart';
 import '../controllers/reader_bookmark_controller.dart';
 import '../controllers/reader_coordinator.dart';
@@ -12,17 +12,10 @@ import '../controllers/reader_read_aloud_controller.dart';
 import '../controllers/reader_settings_controller.dart';
 import '../controllers/reader_state.dart';
 import '../services/read_aloud_service.dart' show ReadAloudChapterDirection;
-import '../models/reader_view_models.dart';
-import '../models/reading_settings.dart';
-import '../widgets/auto_pager.dart';
-import '../widgets/paged_reader_widget.dart';
+import 'reader_content.dart';
 import 'reader_dialog_helpers.dart';
-import 'source_switch_dialogs.dart';
-import '../widgets/reader_bottom_menu.dart';
-import '../widgets/reader_menus.dart';
-import '../widgets/reader_read_aloud_bar.dart';
-import '../widgets/reader_search_overlay.dart';
-import '../widgets/reader_status_bar.dart';
+import 'reader_menu_overlay.dart';
+import 'reader_overlays.dart';
 
 /// 阅读器入口 Widget（新架构）。
 ///
@@ -106,7 +99,6 @@ class _ReaderViewState extends State<ReaderView>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // 1. 创建状态分组
     _chapter = ChapterState();
     _ui = UiState();
     _settings = SettingsState();
@@ -114,7 +106,6 @@ class _ReaderViewState extends State<ReaderView>
     _paged = PagedModeState();
     _image = ImageCacheState();
 
-    // 2. 创建子 Controller
     final settingsCtrl = ReaderSettingsController(
       settingsService: SettingsService(),
       brightnessService: ScreenBrightnessService.instance,
@@ -141,7 +132,6 @@ class _ReaderViewState extends State<ReaderView>
       bookTitle: widget.bookTitle,
     );
 
-    // 3. 创建 Coordinator
     _coordinator = ReaderCoordinator(
       bookId: widget.bookId,
       bookTitle: widget.bookTitle,
@@ -169,7 +159,6 @@ class _ReaderViewState extends State<ReaderView>
       },
     );
 
-    // 4. 动画
     _menuAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 200),
@@ -193,16 +182,10 @@ class _ReaderViewState extends State<ReaderView>
       curve: Curves.easeOutCubic,
     ));
 
-    // 5. 监听菜单状态驱动动画
     _ui.addListener(_syncMenuAnimation);
-
-    // 5b. 监听 toast 消息
     _ui.pendingToast.addListener(_onPendingToast);
-
-    // 5c. 监听 chapter 状态：首次 isInitialized=true 时主动触发首屏分页
     _chapter.addListener(_onChapterStateChanged);
 
-    // 6. 初始化
     unawaited(bookmarkCtrl.init());
     unawaited(readAloudCtrl.init());
     unawaited(_coordinator.init(
@@ -265,13 +248,8 @@ class _ReaderViewState extends State<ReaderView>
     });
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // Build — 纯 UI 组合，监听各状态分组
-  // ═══════════════════════════════════════════════════════════════════
-
   @override
   Widget build(BuildContext context) {
-    // 监听 chapter 状态驱动整体布局
     return ListenableBuilder(
       listenable: _chapter,
       builder: (context, _) {
@@ -322,42 +300,63 @@ class _ReaderViewState extends State<ReaderView>
       height: screenSize.height,
       child: Stack(
         children: [
-          // 背景层
           Positioned.fill(child: _buildBackground()),
-
-          // 内容层
-          Positioned.fill(child: _buildContent()),
-
-          // 状态栏层
-          _buildStatusBars(),
-
-          // 菜单遮罩
+          Positioned.fill(
+            child: ReaderContent(
+              coordinator: _coordinator,
+              chapter: _chapter,
+              settings: _settings,
+              scroll: _scroll,
+              paged: _paged,
+              ui: _ui,
+              bookTitle: widget.bookTitle,
+              pagedContentKey: _pagedContentKey,
+            ),
+          ),
+          ReaderStatusBars(
+            ui: _ui,
+            settings: _settings,
+            scroll: _scroll,
+          ),
           _buildMenuScrim(),
-
-          // 菜单层
-          _buildMenuOverlay(),
-
-          // 搜索覆盖层
-          _buildSearchOverlay(),
-
-          // 自动阅读控制面板
-          _buildAutoReadPanel(),
-
-          // 朗读控制栏
-          _buildReadAloudBar(),
-
-          // 加载指示器
+          ReaderMenuOverlay(
+            coordinator: _coordinator,
+            chapter: _chapter,
+            ui: _ui,
+            settings: _settings,
+            paged: _paged,
+            image: _image,
+            bookTitle: widget.bookTitle,
+            menuFadeAnimation: _menuFadeAnim,
+            topMenuSlideAnimation: _topMenuSlideAnim,
+            bottomMenuSlideAnimation: _bottomMenuSlideAnim,
+          ),
+          ReaderSearchOverlayHost(
+            coordinator: _coordinator,
+            ui: _ui,
+            chapter: _chapter,
+            settings: _settings,
+          ),
+          ReaderAutoReadPanelHost(
+            coordinator: _coordinator,
+            ui: _ui,
+          ),
+          ReaderReadAloudBarHost(
+            coordinator: _coordinator,
+            chapter: _chapter,
+            settings: _settings,
+          ),
           if (_chapter.isLoading)
             const Positioned(
-              top: 0, left: 0, right: 0,
+              top: 0,
+              left: 0,
+              right: 0,
               child: CupertinoActivityIndicator(),
             ),
         ],
       ),
     );
   }
-
-  // ── 背景 ──
 
   Widget _buildBackground() {
     return ListenableBuilder(
@@ -368,200 +367,6 @@ class _ReaderViewState extends State<ReaderView>
       },
     );
   }
-
-  // ── 内容 ──
-
-  Widget _buildContent() {
-    return ListenableBuilder(
-      listenable: Listenable.merge([_chapter, _settings]),
-      builder: (context, _) {
-        final isScroll =
-            _settings.settings.pageTurnMode == PageTurnMode.scroll;
-        if (isScroll) {
-          return _buildScrollContent();
-        }
-        return _buildPagedContent();
-      },
-    );
-  }
-
-  Widget _buildPagedContent() {
-    final theme = _settings.themeResolver;
-    final readingSettings = _settings.settings;
-    return KeyedSubtree(
-      key: _pagedContentKey,
-      child: PagedReaderWidget(
-      pageFactory: _paged.pageFactory,
-      pageTurnMode: readingSettings.pageTurnMode,
-      textStyle: TextStyle(
-        fontSize: readingSettings.fontSize,
-        height: readingSettings.lineHeight,
-        letterSpacing: readingSettings.letterSpacing,
-        color: theme.currentTheme.text,
-        fontFamily: _settings.customFontFamily,
-      ),
-      backgroundColor: theme.backgroundColor,
-      backgroundUiImage: _settings.bgUiImage,
-      padding: EdgeInsets.fromLTRB(
-        readingSettings.paddingLeft,
-        readingSettings.paddingTop,
-        readingSettings.paddingRight,
-        readingSettings.paddingBottom,
-      ),
-      settings: readingSettings,
-      paddingDisplayCutouts: readingSettings.paddingDisplayCutouts,
-      bookTitle: widget.bookTitle,
-      clickActions: ClickAction.defaultZoneConfig,
-      // PagedReaderWidget 内层 GestureDetector 会吃掉外层的 onTapUp，
-      // 必须在这里连接 onTap，否则菜单区域点击事件被丢弃。
-      onTap: () {
-        final size = MediaQuery.sizeOf(context);
-        _coordinator.inputCoordinator.handleTap(
-          Offset(size.width / 2, size.height / 2),
-          size,
-        );
-      },
-      onAction: (action) {
-        _coordinator.inputCoordinator.handleClickAction(action);
-      },
-      legacyImageStyle: _settings.imageStyle,
-      onImageSizeResolved: (src, size) {
-        _coordinator.imageCoordinator
-            .handlePagedImageSizeResolved(src, size);
-      },
-      onImageSizeCacheUpdated: () {
-        _paged.pendingImageRepagination = true;
-      },
-      onImageTap: (src) {
-        ReaderDialogHelpers.openImagePreview(
-          context: context,
-          src: src,
-        );
-      },
-      controller: _paged.pagedController,
-      animDuration: readingSettings.pageAnimDuration,
-      pageDirection: readingSettings.pageDirection,
-      pageTouchSlop: readingSettings.pageTouchSlop,
-      enableGestures: !_ui.showMenu,
-    ),
-    );
-  }
-
-  Widget _buildScrollContent() {
-    // 滚动模式通过 ScrollController 和 ListView 驱动。
-    // 段落数据来自 _scroll.segments，由 ScrollCoordinator 管理。
-    return ValueListenableBuilder<int>(
-      valueListenable: _scroll.segmentsVersion,
-      builder: (context, _, __) {
-        if (_scroll.segments.isEmpty) {
-          return Center(
-            child: Text(
-              _chapter.currentTitle,
-              style: TextStyle(
-                color: _settings.themeResolver.currentTheme.text,
-              ),
-            ),
-          );
-        }
-        return NotificationListener<ScrollNotification>(
-          onNotification: (notification) {
-            // ScrollCoordinator 通过 tick 机制处理，
-            // 此处仅标记需要处理。
-            return false;
-          },
-          child: ListView.builder(
-            key: _scroll.viewportKey,
-            controller: _scroll.controller,
-            itemCount: _scroll.segments.length,
-            itemBuilder: (context, index) {
-              final segment = _scroll.segments[index];
-              return Container(
-                key: _scroll.segmentKeys.putIfAbsent(
-                  segment.chapterIndex,
-                  () => GlobalKey(
-                    debugLabel: 'seg_${segment.chapterIndex}',
-                  ),
-                ),
-                padding: EdgeInsets.symmetric(
-                  horizontal: _settings.settings.paddingLeft,
-                  vertical: 16,
-                ),
-                child: Text(
-                  segment.content,
-                  style: TextStyle(
-                    fontSize: _settings.settings.fontSize,
-                    height: _settings.settings.lineHeight,
-                    letterSpacing: _settings.settings.letterSpacing,
-                    color: _settings.themeResolver.currentTheme.text,
-                    fontFamily: _settings.customFontFamily,
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  // ── 状态栏 ──
-
-  Widget _buildStatusBars() {
-    return ListenableBuilder(
-      listenable: Listenable.merge([_ui, _settings]),
-      builder: (context, _) {
-        if (_ui.showMenu || _ui.showSearchMenu || _ui.showAutoReadPanel) {
-          return const SizedBox.shrink();
-        }
-        final isScroll =
-            _settings.settings.pageTurnMode == PageTurnMode.scroll;
-        if (!isScroll) return const SizedBox.shrink();
-
-        final readingSettings = _settings.settings;
-        final theme = _settings.themeResolver.currentTheme;
-
-        return ValueListenableBuilder<ScrollTipData>(
-          valueListenable: _scroll.tipNotifier,
-          builder: (context, tip, _) {
-            return Stack(
-              children: [
-                // 底部状态栏
-                if (readingSettings.shouldShowFooter())
-                  ReaderStatusBar(
-                    settings: readingSettings,
-                    currentTheme: theme,
-                    currentTime: tip.currentTime,
-                    title: tip.title,
-                    bookTitle: tip.bookTitle,
-                    bookProgress: tip.bookProgress,
-                    chapterProgress: tip.chapterProgress,
-                    currentPage: tip.currentPage,
-                    totalPages: tip.totalPages,
-                  ),
-                // 顶部状态栏
-                if (readingSettings.shouldShowHeader(
-                  showStatusBar: readingSettings.showStatusBar,
-                ))
-                  ReaderHeaderBar(
-                    settings: readingSettings,
-                    currentTheme: theme,
-                    currentTime: tip.currentTime,
-                    title: tip.title,
-                    bookTitle: tip.bookTitle,
-                    bookProgress: tip.bookProgress,
-                    chapterProgress: tip.chapterProgress,
-                    currentPage: tip.currentPage,
-                    totalPages: tip.totalPages,
-                  ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // ── 菜单遮罩 ──
 
   Widget _buildMenuScrim() {
     return ListenableBuilder(
@@ -579,318 +384,6 @@ class _ReaderViewState extends State<ReaderView>
                 color: CupertinoColors.black.withValues(alpha: 0.15),
               ),
             ),
-          ),
-        );
-      },
-    );
-  }
-
-  // ── 菜单 ──
-
-  Widget _buildMenuOverlay() {
-    return ListenableBuilder(
-      listenable: Listenable.merge([_ui, _chapter, _settings]),
-      builder: (context, _) {
-        if (!_ui.showMenu) return const SizedBox.shrink();
-        final theme = _settings.themeResolver;
-        final isLocal =
-            _coordinator.actionsCoordinator.isCurrentBookLocal();
-        final isLocalTxt =
-            _coordinator.actionsCoordinator.isCurrentBookLocalTxt();
-
-        return Stack(
-          children: [
-            // 顶部菜单
-            ReaderTopMenu(
-              onBack: () => Navigator.maybePop(context),
-              bookTitle: widget.bookTitle,
-              chapterTitle: _chapter.currentTitle,
-              sourceName: _image.sourceName,
-              currentTheme: theme.currentTheme,
-              onOpenBookInfo: () {
-                _coordinator.closeMenu();
-                unawaited(ReaderDialogHelpers.openBookInfo(
-                  context: context,
-                  coordinator: _coordinator,
-                ));
-              },
-              onOpenChapterLink: () {
-                _coordinator.closeMenu();
-                unawaited(ReaderDialogHelpers.openChapterLink(
-                  context: context,
-                  coordinator: _coordinator,
-                ));
-              },
-              onToggleChapterLinkOpenMode: () {
-                // 暂不支持 WebView/浏览器切换。
-              },
-              onChangeSource: () {
-                _coordinator.closeMenu();
-                unawaited(SourceSwitchDialogs.showSourceSwitchEntry(
-                  context: context,
-                  coordinator: _coordinator,
-                ));
-              },
-              onRefresh: () {
-                _coordinator.closeMenu();
-                unawaited(_coordinator.loadChapter(
-                  _chapter.currentIndex,
-                ));
-              },
-              onShowSourceActions: () {
-                _coordinator.closeMenu();
-                unawaited(SourceSwitchDialogs.showSourceSwitchEntry(
-                  context: context,
-                  coordinator: _coordinator,
-                ));
-              },
-              onShowMoreMenu: () {
-                _coordinator.closeMenu();
-                ReaderDialogHelpers.showMoreActionsMenu(
-                  context: context,
-                  coordinator: _coordinator,
-                );
-              },
-              showChangeSourceAction: !isLocal,
-              showRefreshAction: !isLocal,
-              showDownloadAction: !isLocal,
-              showTocRuleAction: isLocalTxt,
-              showSetCharsetAction: isLocal,
-              showSourceAction: !isLocal,
-              showChapterLink: !isLocal,
-              showTitleAddition: _settings.settings.showReadTitleAddition,
-              readBarStyleFollowPage: false,
-              menuFadeAnimation: _menuFadeAnim,
-              menuSlideAnimation: _topMenuSlideAnim,
-            ),
-
-            // 底部菜单
-            ReaderBottomMenuNew(
-              currentChapterIndex: _chapter.currentIndex,
-              totalChapters: _chapter.readableCount,
-              currentPageIndex: _paged.pageFactory.currentPageIndex,
-              totalPages:
-                  _paged.pageFactory.totalPages.clamp(1, 999999),
-              settings: _settings.settings,
-              currentTheme: theme.currentTheme,
-              onChapterChanged: (index) {
-                unawaited(_coordinator.loadChapter(index));
-              },
-              onSeekChapterProgress: (progress) {
-                unawaited(_coordinator.loadChapter(
-                  progress,
-                  restoreOffset: true,
-                ));
-              },
-              onSeekPageProgress: (page) {
-                _paged.pageFactory.jumpToPage(page);
-              },
-              onSettingsChanged: (newSettings) {
-                _coordinator.updateSettings(newSettings);
-              },
-              onShowChapterList: () {
-                _coordinator.closeMenu();
-                ReaderDialogHelpers.showChapterList(
-                  context: context,
-                  coordinator: _coordinator,
-                );
-              },
-              onShowReadAloud: () {
-                _coordinator.closeMenu();
-                unawaited(
-                  _coordinator.readAloudController.toggleReadAloud(
-                    chapterIndex: _chapter.currentIndex,
-                    chapterTitle: _chapter.currentTitle,
-                    content: _chapter.currentContent,
-                  ),
-                );
-              },
-              onShowInterfaceSettings: () {
-                _coordinator.closeMenu();
-                ReaderDialogHelpers.showStyleQuickSheet(
-                  context: context,
-                  settings: _settings.settings,
-                  themes: _settings.themeResolver.activeStyles,
-                  styleConfigs: _settings.settings.readStyleConfigs,
-                  onSettingsChanged: (next) {
-                    _coordinator.updateSettings(next);
-                  },
-                );
-              },
-              onShowBehaviorSettings: () {
-                _coordinator.closeMenu();
-                ReaderDialogHelpers.showBehaviorSettings(context);
-              },
-              onToggleAutoPage: () {
-                _coordinator.closeMenu();
-                unawaited(_coordinator.toggleAutoPage());
-              },
-              onSearchContent: () {
-                _coordinator.closeMenu();
-                _ui.toggleSearchMenu(true);
-              },
-              onToggleReplaceRule: () {
-                _coordinator.closeMenu();
-                unawaited(
-                  _coordinator.actionsCoordinator.toggleReplaceRule(),
-                );
-              },
-              onToggleNightMode: () {
-                ReaderDialogHelpers.toggleDayNightTheme(
-                  settings: _settings,
-                  coordinator: _coordinator,
-                );
-              },
-              showReadAloud: true,
-              readBarStyleFollowPage: false,
-              readAloudRunning:
-                  _coordinator.readAloudController.snapshot.isRunning,
-              readAloudPaused:
-                  _coordinator.readAloudController.snapshot.isPaused,
-              autoPageRunning: _ui.autoPager.isRunning,
-              isNightMode: _settings.themeResolver.isDark,
-              menuFadeAnimation: _menuFadeAnim,
-              menuSlideAnimation: _bottomMenuSlideAnim,
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // ── 搜索覆盖层 ──
-
-  Widget _buildSearchOverlay() {
-    return ListenableBuilder(
-      listenable: _ui,
-      builder: (context, _) {
-        if (!_ui.showSearchMenu) return const SizedBox.shrink();
-        final theme = _settings.themeResolver;
-        return ReaderSearchOverlay(
-          visible: _ui.showSearchMenu,
-          chapters: _chapter.chapters,
-          currentChapterIndex: _chapter.currentIndex,
-          currentChapterProgress: _coordinator.getChapterProgress(),
-          isDark: theme.isDark,
-          accentColor: theme.accent,
-          panelBg: theme.panelBg,
-          textStrong: theme.textStrong,
-          textNormal: theme.textNormal,
-          textSubtle: theme.textSubtle,
-          borderColor: theme.border,
-          searchHighlightColor: theme.accent.withValues(
-            alpha: theme.isDark ? 0.28 : 0.2,
-          ),
-          searchHighlightTextColor:
-              CupertinoColors.label.resolveFrom(context),
-          fontFamily: _settings.customFontFamily,
-          fontFamilyFallback: null,
-          loadChapterContent: (index) async {
-            if (index < 0 || index >= _chapter.chapters.length) {
-              return '';
-            }
-            return _chapter.chapters[index].content ?? '';
-          },
-          processContent: (raw) async => raw,
-          navigateToHit: (hit) async {
-            await _coordinator.loadChapter(
-              hit.chapterIndex,
-              restoreOffset: true,
-            );
-          },
-          onClose: () => _ui.toggleSearchMenu(false),
-          onRequestRestoreProgress: () async => true,
-        );
-      },
-    );
-  }
-
-  // ── 自动阅读面板 ──
-
-  Widget _buildAutoReadPanel() {
-    return ListenableBuilder(
-      listenable: _ui,
-      builder: (context, _) {
-        if (!_ui.showAutoReadPanel) return const SizedBox.shrink();
-        return Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: AutoReadPanel(
-            autoPager: _ui.autoPager,
-            onClose: () => _ui.toggleAutoReadPanel(false),
-            onSpeedChanged: (speed) {
-              _ui.autoPager.setSpeed(speed);
-            },
-            onShowMainMenu: () {
-              _ui.toggleAutoReadPanel(false);
-              _ui.autoPagerPausedByMenu = true;
-              _ui.autoPager.pause();
-              _coordinator.toggleMenu();
-            },
-            onOpenChapterList: () {
-              _ui.toggleAutoReadPanel(false);
-              ReaderDialogHelpers.showChapterList(
-                context: context,
-                coordinator: _coordinator,
-              );
-            },
-            onStop: () {
-              _ui.autoPager.stop();
-              _ui.toggleAutoReadPanel(false);
-            },
-            onPause: () => _ui.autoPager.pause(),
-            onResume: () => _ui.autoPager.resume(),
-          ),
-        );
-      },
-    );
-  }
-
-  // ── 朗读控制栏 ──
-
-  Widget _buildReadAloudBar() {
-    return ListenableBuilder(
-      listenable: _coordinator.readAloudController,
-      builder: (context, _) {
-        final snapshot = _coordinator.readAloudController.snapshot;
-        if (!snapshot.isRunning) return const SizedBox.shrink();
-
-        final theme = _settings.themeResolver;
-        return Positioned(
-          top: 0, left: 0, right: 0,
-          child: ReaderReadAloudBar(
-            snapshot: snapshot,
-            speechRate: _coordinator.readAloudController.speechRate,
-            bgColor: theme.panelBg,
-            fgColor: theme.textStrong,
-            accentColor: theme.accent,
-            onPreviousParagraph: () =>
-                unawaited(_coordinator.readAloudController.previousParagraph()),
-            onTogglePauseResume: () =>
-                unawaited(_coordinator.readAloudController.togglePauseResume()),
-            onNextParagraph: () =>
-                unawaited(_coordinator.readAloudController.nextParagraph()),
-            onStop: () =>
-                unawaited(_coordinator.readAloudController.stop()),
-            onSetTimer: () {
-              // 朗读定时器选择对话框待迁移。
-            },
-            onOpenChapterList: () {
-              ReaderDialogHelpers.showChapterList(
-                context: context,
-                coordinator: _coordinator,
-              );
-            },
-            onSpeechRateChanged: (rate) {
-              unawaited(_coordinator.readAloudController.updateSpeechRate(rate));
-            },
-            onPreviousChapter: _chapter.currentIndex > 0
-                ? _coordinator.previousChapter
-                : null,
-            onNextChapter: _chapter.currentIndex < _chapter.maxIndex
-                ? _coordinator.nextChapter
-                : null,
           ),
         );
       },
