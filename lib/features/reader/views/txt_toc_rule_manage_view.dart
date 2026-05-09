@@ -1,26 +1,18 @@
-import '../../../app/theme/design_tokens.dart';
-import 'dart:convert';
-import 'dart:io';
-import 'dart:math' as math;
+import 'dart:async';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show ReorderableListView;
-import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
-import '../../../app/widgets/app_empty_state.dart';
-import '../../../app/widgets/app_nav_bar_button.dart';
-import '../../../app/widgets/app_popover_menu.dart';
-import '../../../app/widgets/cupertino_bottom_dialog.dart';
+import '../../../app/widgets/app_toast.dart';
 import '../../../core/services/online_import_history_store.dart';
-import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
-import '../../settings/views/app_help_dialog.dart';
 import '../models/txt_toc_rule.dart';
 import '../services/txt_toc_rule_store.dart';
 import 'txt_toc_rule_edit_view.dart';
-import 'txt_toc_rule_widgets.dart';
+import 'txt_toc_rule_manage_actions.dart';
+import 'txt_toc_rule_manage_body.dart';
+import 'txt_toc_rule_manage_dialogs.dart';
+import 'txt_toc_rule_manage_menus.dart';
 
 class TxtTocRuleManageView extends StatefulWidget {
   const TxtTocRuleManageView({super.key});
@@ -75,47 +67,47 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
   }
 
   Future<void> _reloadRules() async {
-    if (mounted) {
-      setState(() => _loading = true);
+    if (mounted) setState(() => _loading = true);
+    try {
+      final rules = await _ruleStore.loadRules();
+      if (!mounted) return;
+      final availableIds = rules.map((rule) => rule.id).toSet();
+      setState(() {
+        _rules = rules;
+        _selectedRuleIds.removeWhere((id) => !availableIds.contains(id));
+        if (_rules.isEmpty) {
+          _selectionMode = false;
+          _selectedRuleIds.clear();
+        }
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
     }
-    final rules = await _ruleStore.loadRules();
-    if (!mounted) return;
-    final availableIds = rules.map((rule) => rule.id).toSet();
-    setState(() {
-      _rules = rules;
-      _selectedRuleIds.removeWhere((id) => !availableIds.contains(id));
-      if (_rules.isEmpty) {
-        _selectionMode = false;
-        _selectedRuleIds.clear();
-      }
-      _loading = false;
-    });
   }
 
   void _toggleSelectionMode() {
-    if (_rules.isEmpty) return;
+    if (!mounted) return;
     setState(() {
       _selectionMode = !_selectionMode;
-      _selectedRuleIds.clear();
+      if (!_selectionMode) _selectedRuleIds.clear();
     });
   }
 
   void _toggleRuleSelection(int ruleId) {
+    if (!mounted) return;
     setState(() {
-      if (_selectedRuleIds.contains(ruleId)) {
+      if (!_selectedRuleIds.add(ruleId)) {
         _selectedRuleIds.remove(ruleId);
-      } else {
-        _selectedRuleIds.add(ruleId);
       }
     });
   }
 
   void _toggleSelectAllRules() {
-    final totalCount = _rules.length;
-    if (totalCount == 0) return;
+    if (!mounted) return;
     setState(() {
-      final allSelected = _selectedRuleIds.length == totalCount;
-      if (allSelected) {
+      if (_selectedRuleIds.length == _rules.length) {
         _selectedRuleIds.clear();
       } else {
         _selectedRuleIds
@@ -126,18 +118,13 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
   }
 
   void _revertSelection() {
-    if (_rules.isEmpty) return;
-    final allIds = _rules.map((rule) => rule.id).toSet();
+    if (!mounted) return;
     setState(() {
-      final reverted = <int>{};
-      for (final id in allIds) {
-        if (!_selectedRuleIds.contains(id)) {
-          reverted.add(id);
-        }
-      }
+      final all = _rules.map((rule) => rule.id).toSet();
+      final next = all.difference(_selectedRuleIds);
       _selectedRuleIds
         ..clear()
-        ..addAll(reverted);
+        ..addAll(next);
     });
   }
 
@@ -163,23 +150,14 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
   }
 
   Future<void> _openRuleEditor(TxtTocRule rule) async {
+    if (!mounted) return;
     final savedRule = await Navigator.of(context).push<TxtTocRule>(
       CupertinoPageRoute<TxtTocRule>(
         builder: (_) => TxtTocRuleEditView(initialRule: rule),
       ),
     );
-    if (savedRule == null) return;
-    try {
-      await _ruleStore.upsertRule(savedRule);
+    if (savedRule != null && mounted) {
       await _reloadRules();
-    } catch (error, stackTrace) {
-      debugPrint('SaveTxtTocRuleError:$error');
-      debugPrint('$stackTrace');
-      if (!mounted) return;
-      await _showMessageDialog(
-        title: 'TXT 目录规则',
-        message: '保存失败：$error',
-      );
     }
   }
 
@@ -191,343 +169,133 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
 
   Future<void> _showMoreMenu() async {
     if (_menuBusy) return;
-    final selected = await showAppPopoverMenu<_TxtTocRuleMenuAction>(
+    final selected = await showTxtTocRuleMoreMenu(
       context: context,
       anchorKey: _moreMenuKey,
-      items: const [
-        AppPopoverMenuItem(
-          value: _TxtTocRuleMenuAction.importLocal,
-          icon: CupertinoIcons.doc,
-          label: '本地导入',
-        ),
-        AppPopoverMenuItem(
-          value: _TxtTocRuleMenuAction.importOnline,
-          icon: CupertinoIcons.globe,
-          label: '网络导入',
-        ),
-        AppPopoverMenuItem(
-          value: _TxtTocRuleMenuAction.importQr,
-          icon: CupertinoIcons.qrcode,
-          label: '二维码导入',
-        ),
-        AppPopoverMenuItem(
-          value: _TxtTocRuleMenuAction.importDefault,
-          icon: CupertinoIcons.wand_rays,
-          label: '导入默认规则',
-        ),
-        AppPopoverMenuItem(
-          value: _TxtTocRuleMenuAction.help,
-          icon: CupertinoIcons.question_circle,
-          label: '帮助',
-        ),
-      ],
     );
     if (selected == null) return;
     switch (selected) {
-      case _TxtTocRuleMenuAction.importDefault:
+      case TxtTocRuleMenuAction.importDefault:
         await _importDefaultRules();
-        return;
-      case _TxtTocRuleMenuAction.importLocal:
+      case TxtTocRuleMenuAction.importLocal:
         await _importLocalRules();
-        return;
-      case _TxtTocRuleMenuAction.importOnline:
+      case TxtTocRuleMenuAction.importOnline:
         await _importOnlineRules();
-        return;
-      case _TxtTocRuleMenuAction.importQr:
+      case TxtTocRuleMenuAction.importQr:
         await _importQrRules();
-        return;
-      case _TxtTocRuleMenuAction.help:
-        await _showTxtTocRuleHelp();
-        return;
+      case TxtTocRuleMenuAction.help:
+        if (mounted) await showTxtTocRuleHelpDialog(context);
     }
   }
 
   Future<void> _showSelectionMoreMenu() async {
     if (_menuBusy || _selectedRuleIds.isEmpty) return;
-    final selected = await showAppPopoverMenu<_TxtTocRuleSelectionMenuAction>(
+    final selected = await showTxtTocRuleSelectionMoreMenu(
       context: context,
       anchorKey: _moreMenuKey,
-      items: const [
-        AppPopoverMenuItem(
-          value: _TxtTocRuleSelectionMenuAction.enableSelection,
-          icon: CupertinoIcons.check_mark,
-          label: '启用所选',
-        ),
-        AppPopoverMenuItem(
-          value: _TxtTocRuleSelectionMenuAction.disableSelection,
-          icon: CupertinoIcons.xmark,
-          label: '禁用所选',
-        ),
-        AppPopoverMenuItem(
-          value: _TxtTocRuleSelectionMenuAction.exportSelection,
-          icon: CupertinoIcons.square_arrow_up,
-          label: '导出所选',
-        ),
-      ],
     );
     if (selected == null) return;
     switch (selected) {
-      case _TxtTocRuleSelectionMenuAction.enableSelection:
+      case TxtTocRuleSelectionMenuAction.enableSelection:
         await _enableSelectedRules();
-        return;
-      case _TxtTocRuleSelectionMenuAction.disableSelection:
+      case TxtTocRuleSelectionMenuAction.disableSelection:
         await _disableSelectedRules();
-        return;
-      case _TxtTocRuleSelectionMenuAction.exportSelection:
+      case TxtTocRuleSelectionMenuAction.exportSelection:
         await _exportSelectedRules();
-        return;
     }
   }
 
   Future<void> _showRuleItemMenu(TxtTocRule rule) async {
     if (_menuBusy || _selectionMode) return;
-    final selected = await showCupertinoBottomSheetDialog<_TxtTocRuleItemMenuAction>(
+    final selected = await showTxtTocRuleItemActionSheet(
       context: context,
-      barrierDismissible: true,
-      builder: (sheetContext) => CupertinoActionSheet(
-        title: Text(rule.name.trim().isEmpty ? '未命名规则' : rule.name.trim()),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _TxtTocRuleItemMenuAction.top,
-            ),
-            child: const Text('置顶'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _TxtTocRuleItemMenuAction.bottom,
-            ),
-            child: const Text('置底'),
-          ),
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.pop(
-              sheetContext,
-              _TxtTocRuleItemMenuAction.delete,
-            ),
-            child: const Text('删除'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(sheetContext),
-          child: const Text('取消'),
-        ),
-      ),
+      ruleName: rule.name,
     );
     if (selected == null) return;
     switch (selected) {
-      case _TxtTocRuleItemMenuAction.top:
+      case TxtTocRuleItemMenuAction.top:
         await _moveRuleToTop(rule);
-        return;
-      case _TxtTocRuleItemMenuAction.bottom:
+      case TxtTocRuleItemMenuAction.bottom:
         await _moveRuleToBottom(rule);
-        return;
-      case _TxtTocRuleItemMenuAction.delete:
-        if (_selectedRuleIds.remove(rule.id)) {
-          setState(() {});
-        }
+      case TxtTocRuleItemMenuAction.delete:
+        if (_selectedRuleIds.remove(rule.id)) setState(() {});
         await _confirmDeleteRule(rule);
-        return;
     }
   }
 
   Future<void> _confirmDeleteRule(TxtTocRule rule) async {
-    final confirmed = await showCupertinoBottomSheetDialog<bool>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('提醒'),
-        content: Text('是否确认删除？\n${rule.name}'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+    final confirmed =
+        await confirmTxtTocRuleDelete(context: context, name: rule.name);
+    if (!confirmed) return;
+    await _runRuleStateOp(
+      flag: (v) => _deletingRule = v,
+      op: () => _ruleStore.deleteRule(rule.id),
     );
-    if (confirmed != true) {
-      return;
-    }
-    await _deleteRule(rule);
-  }
-
-  Future<void> _deleteRule(TxtTocRule rule) async {
-    if (_deletingRule) return;
-    setState(() => _deletingRule = true);
-    try {
-      await _ruleStore.deleteRule(rule.id);
-      final rules = await _ruleStore.loadRules();
-      if (!mounted) return;
-      final availableIds = rules.map((item) => item.id).toSet();
-      setState(() {
-        _rules = rules;
-        _selectedRuleIds.removeWhere((id) => !availableIds.contains(id));
-        if (_rules.isEmpty) {
-          _selectionMode = false;
-          _selectedRuleIds.clear();
-        }
-      });
-    } catch (error, stackTrace) {
-      debugPrint('DeleteTxtTocRuleError:$error');
-      debugPrint('$stackTrace');
-    } finally {
-      if (!mounted) return;
-      setState(() => _deletingRule = false);
-    }
   }
 
   Future<void> _confirmDeleteSelectedRules() async {
     final selectedIds = _selectedRuleIds.toSet();
     if (selectedIds.isEmpty) return;
-    final confirmed = await showCupertinoBottomSheetDialog<bool>(
+    final confirmed = await confirmTxtTocRuleDeleteSelected(
       context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('提醒'),
-        content: const Text('是否确认删除？'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+      count: selectedIds.length,
     );
-    if (confirmed != true) {
-      return;
-    }
-    await _deleteSelectedRules(selectedIds);
+    if (!confirmed) return;
+    await _runRuleStateOp(
+      flag: (v) => _deletingRule = v,
+      op: () => _ruleStore.deleteRulesByIds(selectedIds),
+    );
   }
 
-  Future<void> _deleteSelectedRules(Set<int> selectedIds) async {
-    if (_deletingRule || selectedIds.isEmpty) return;
-    setState(() => _deletingRule = true);
-    try {
-      await _ruleStore.deleteRulesByIds(selectedIds);
-      final rules = await _ruleStore.loadRules();
-      if (!mounted) return;
-      final availableIds = rules.map((item) => item.id).toSet();
-      setState(() {
-        _rules = rules;
-        _selectedRuleIds.removeWhere((id) => !availableIds.contains(id));
-        if (_rules.isEmpty) {
-          _selectionMode = false;
-          _selectedRuleIds.clear();
-        }
-      });
-    } catch (error, stackTrace) {
-      debugPrint('DeleteSelectionTxtTocRuleError:$error');
-      debugPrint('$stackTrace');
-    } finally {
-      if (!mounted) return;
-      setState(() => _deletingRule = false);
-    }
-  }
+  Future<void> _moveRuleToTop(TxtTocRule rule) => _runRuleStateOp(
+        flag: (v) => _reorderingRule = v,
+        op: () => _ruleStore.moveRuleToTop(rule),
+      );
 
-  Future<void> _moveRuleToTop(TxtTocRule rule) async {
-    if (_reorderingRule) return;
-    setState(() => _reorderingRule = true);
-    try {
-      await _ruleStore.moveRuleToTop(rule);
-      final rules = await _ruleStore.loadRules();
-      if (!mounted) return;
-      final availableIds = rules.map((item) => item.id).toSet();
-      setState(() {
-        _rules = rules;
-        _selectedRuleIds.removeWhere((id) => !availableIds.contains(id));
-        if (_rules.isEmpty) {
-          _selectionMode = false;
-          _selectedRuleIds.clear();
-        }
-      });
-    } catch (error, stackTrace) {
-      debugPrint('TopTxtTocRuleError:$error');
-      debugPrint('$stackTrace');
-    } finally {
-      if (!mounted) return;
-      setState(() => _reorderingRule = false);
-    }
-  }
-
-  Future<void> _moveRuleToBottom(TxtTocRule rule) async {
-    if (_reorderingRule) return;
-    setState(() => _reorderingRule = true);
-    try {
-      await _ruleStore.moveRuleToBottom(rule);
-      final rules = await _ruleStore.loadRules();
-      if (!mounted) return;
-      final availableIds = rules.map((item) => item.id).toSet();
-      setState(() {
-        _rules = rules;
-        _selectedRuleIds.removeWhere((id) => !availableIds.contains(id));
-        if (_rules.isEmpty) {
-          _selectionMode = false;
-          _selectedRuleIds.clear();
-        }
-      });
-    } catch (error, stackTrace) {
-      debugPrint('BottomTxtTocRuleError:$error');
-      debugPrint('$stackTrace');
-    } finally {
-      if (!mounted) return;
-      setState(() => _reorderingRule = false);
-    }
-  }
-
-  List<TxtTocRule> _selectedRulesByCurrentOrder() {
-    final selectedIds = _selectedRuleIds;
-    if (selectedIds.isEmpty) return const <TxtTocRule>[];
-    return _rules
-        .where((rule) => selectedIds.contains(rule.id))
-        .toList(growable: false);
-  }
+  Future<void> _moveRuleToBottom(TxtTocRule rule) => _runRuleStateOp(
+        flag: (v) => _reorderingRule = v,
+        op: () => _ruleStore.moveRuleToBottom(rule),
+      );
 
   Future<void> _enableSelectedRules() async {
-    if (_selectionUpdating) return;
-    if (_selectedRuleIds.isEmpty) return;
-    setState(() => _enablingSelection = true);
-    try {
-      await _ruleStore.enableRulesByIds(_selectedRuleIds);
-      await _reloadRules();
-    } catch (error, stackTrace) {
-      debugPrint('EnableSelectionTxtTocRuleError:$error');
-      debugPrint('$stackTrace');
-    } finally {
-      if (!mounted) return;
-      setState(() => _enablingSelection = false);
-    }
+    if (_selectionUpdating || _selectedRuleIds.isEmpty) return;
+    await _runRuleStateOp(
+      flag: (v) => _enablingSelection = v,
+      op: () => _ruleStore.enableRulesByIds(_selectedRuleIds),
+    );
   }
 
   Future<void> _disableSelectedRules() async {
-    if (_selectionUpdating) return;
-    if (_selectedRuleIds.isEmpty) return;
-    setState(() => _disablingSelection = true);
+    if (_selectionUpdating || _selectedRuleIds.isEmpty) return;
+    await _runRuleStateOp(
+      flag: (v) => _disablingSelection = v,
+      op: () => _ruleStore.disableRulesByIds(_selectedRuleIds),
+    );
+  }
+
+  /// 通用 wrapper：进入态 → 执行 op → 重载列表 → 离开态。
+  Future<void> _runRuleStateOp({
+    required void Function(bool value) flag,
+    required Future<void> Function() op,
+  }) async {
+    if (!mounted) return;
+    setState(() => flag(true));
     try {
-      await _ruleStore.disableRulesByIds(_selectedRuleIds);
+      await op();
       await _reloadRules();
-    } catch (error, stackTrace) {
-      debugPrint('DisableSelectionTxtTocRuleError:$error');
-      debugPrint('$stackTrace');
+    } catch (_) {
+      // noop：UI 仍可继续操作
     } finally {
       if (!mounted) return;
-      setState(() => _disablingSelection = false);
+      setState(() => flag(false));
     }
   }
 
   Future<void> _exportSelectedRules() async {
     if (_exportingSelection) return;
-    final selectedRules = _selectedRulesByCurrentOrder();
+    final selectedRules = _rules
+        .where((rule) => _selectedRuleIds.contains(rule.id))
+        .toList(growable: false);
     if (selectedRules.isEmpty) return;
     setState(() => _exportingSelection = true);
     try {
@@ -538,17 +306,17 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
         allowedExtensions: const ['json'],
         text: jsonText,
       );
-      if (outputPath == null || outputPath.trim().isEmpty) {
-        return;
-      }
-      final normalizedPath = outputPath.trim();
+      final normalized = outputPath?.trim() ?? '';
+      if (normalized.isEmpty || !mounted) return;
+      await showTxtTocRuleExportPathDialog(
+        context: context,
+        outputPath: normalized,
+        onToast: _toast,
+      );
+    } catch (error) {
       if (!mounted) return;
-      await _showExportPathDialog(normalizedPath);
-    } catch (error, stackTrace) {
-      debugPrint('ExportTxtTocRuleSelectionError:$error');
-      debugPrint('$stackTrace');
-      if (!mounted) return;
-      await _showMessageDialog(
+      await showTxtTocRuleMessageDialog(
+        context: context,
         title: '导出所选',
         message: '导出失败：$error',
       );
@@ -558,47 +326,14 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
     }
   }
 
-  Future<void> _showExportPathDialog(String outputPath) async {
-    final path = outputPath.trim();
-    if (path.isEmpty || !mounted) return;
-    final uri = Uri.tryParse(path);
-    final isHttpPath = uri != null &&
-        (uri.scheme.toLowerCase() == 'http' ||
-            uri.scheme.toLowerCase() == 'https');
-    final lines = <String>[
-      '导出路径：',
-      path,
-      if (isHttpPath) '',
-      if (isHttpPath) '检测到网络链接，可直接复制后分享。',
-    ];
-    await showCupertinoBottomSheetDialog<void>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('导出成功'),
-        content: Text('\n${lines.join('\n')}'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: path));
-              if (!dialogContext.mounted) return;
-              Navigator.pop(dialogContext);
-            },
-            child: const Text('复制路径'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _importDefaultRules() async {
     if (_importingDefault) return;
     setState(() => _importingDefault = true);
     try {
       await _ruleStore.importDefaultRules();
       await _reloadRules();
-    } catch (error, stackTrace) {
-      debugPrint('ImportDefaultTxtTocRuleError:$error');
-      debugPrint('$stackTrace');
+    } catch (_) {
+      // noop
     } finally {
       if (!mounted) return;
       setState(() => _importingDefault = false);
@@ -609,18 +344,20 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
     if (_importingLocal) return;
     setState(() => _importingLocal = true);
     try {
-      final fileText = await _pickLocalImportText();
-      if (fileText == null) {
-        return;
-      }
-      await _importRulesFromInput(fileText);
-    } catch (error, stackTrace) {
-      debugPrint('ImportTxtTocRuleLocalError:$error');
-      debugPrint('$stackTrace');
+      final fileText = await pickTxtTocRuleLocalImportText();
+      if (fileText == null || !mounted) return;
+      await importTxtTocRulesFromInput(
+        context: context,
+        ruleStore: _ruleStore,
+        rawInput: fileText,
+      );
+      await _reloadRules();
+    } catch (error) {
       if (!mounted) return;
-      await _showMessageDialog(
+      await showTxtTocRuleMessageDialog(
+        context: context,
         title: '导入 TXT 目录规则',
-        message: _formatImportError(error),
+        message: formatTxtTocRuleImportError(error),
       );
     } finally {
       if (!mounted) return;
@@ -632,22 +369,39 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
     if (_importingOnline) return;
     setState(() => _importingOnline = true);
     try {
-      final rawInput = await _showOnlineImportInputSheet();
-      final normalizedInput = rawInput?.trim();
-      if (normalizedInput == null || normalizedInput.isEmpty) {
-        return;
-      }
-      if (_isHttpUrl(normalizedInput)) {
-        await _pushOnlineImportHistory(normalizedInput);
-      }
-      await _importRulesFromInput(normalizedInput);
-    } catch (error, stackTrace) {
-      debugPrint('ImportTxtTocRuleOnlineError:$error');
-      debugPrint('$stackTrace');
+      final persistedHistory =
+          await _onlineImportHistoryStore.load(_onlineImportHistoryKey);
+      final history = _onlineImportHistoryStore.normalize(
+        <String>[_defaultOnlineImportUrl, ...persistedHistory],
+      );
       if (!mounted) return;
-      await _showMessageDialog(
+      final rawInput = await showTxtTocRuleOnlineImportInputSheet(
+        context: context,
+        history: history,
+        onPersistHistory: (next) =>
+            _onlineImportHistoryStore.save(_onlineImportHistoryKey, next),
+      );
+      final normalizedInput = rawInput?.trim();
+      if (normalizedInput == null || normalizedInput.isEmpty) return;
+      if (isTxtTocRuleHttpUrl(normalizedInput)) {
+        await _onlineImportHistoryStore.push(
+          _onlineImportHistoryKey,
+          normalizedInput,
+        );
+      }
+      if (!mounted) return;
+      await importTxtTocRulesFromInput(
+        context: context,
+        ruleStore: _ruleStore,
+        rawInput: normalizedInput,
+      );
+      await _reloadRules();
+    } catch (error) {
+      if (!mounted) return;
+      await showTxtTocRuleMessageDialog(
+        context: context,
         title: '导入 TXT 目录规则',
-        message: _formatImportError(error),
+        message: formatTxtTocRuleImportError(error),
       );
     } finally {
       if (!mounted) return;
@@ -659,22 +413,17 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
     if (_importingQr) return;
     setState(() => _importingQr = true);
     try {
-      final text = await QrScanService.scanText(
-        context,
-        title: '二维码导入',
+      await importTxtTocRulesFromQr(
+        context: context,
+        ruleStore: _ruleStore,
       );
-      final normalizedInput = text?.trim();
-      if (normalizedInput == null || normalizedInput.isEmpty) {
-        return;
-      }
-      await _importRulesFromInput(normalizedInput);
-    } catch (error, stackTrace) {
-      debugPrint('ImportTxtTocRuleQrError:$error');
-      debugPrint('$stackTrace');
+      await _reloadRules();
+    } catch (error) {
       if (!mounted) return;
-      await _showMessageDialog(
+      await showTxtTocRuleMessageDialog(
+        context: context,
         title: '导入 TXT 目录规则',
-        message: _formatImportError(error),
+        message: formatTxtTocRuleImportError(error),
       );
     } finally {
       if (!mounted) return;
@@ -682,425 +431,9 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
     }
   }
 
-  Future<void> _importRulesFromInput(String rawInput) async {
-    final candidates = await _ruleStore.previewImportCandidates(rawInput);
-    if (candidates.isEmpty) {
-      await _showMessageDialog(
-        title: '导入 TXT 目录规则',
-        message: '格式不对',
-      );
-      return;
-    }
+  void _toast(String message) {
     if (!mounted) return;
-    final selectedIndexes = await _showImportSelectionSheet(candidates);
-    if (selectedIndexes == null || selectedIndexes.isEmpty) {
-      return;
-    }
-    if (!mounted) return;
-    await _runImportingTask(() async {
-      await _ruleStore.importCandidates(
-        candidates: candidates,
-        selectedIndexes: selectedIndexes,
-      );
-    });
-    await _reloadRules();
-  }
-
-  Future<String?> _pickLocalImportText() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const <String>['txt', 'json'],
-      allowMultiple: false,
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) {
-      return null;
-    }
-    final file = result.files.first;
-    if (file.bytes != null) {
-      return utf8.decode(file.bytes!, allowMalformed: true);
-    }
-    final path = file.path;
-    if (path != null && path.trim().isNotEmpty) {
-      return File(path).readAsString();
-    }
-    throw const FileSystemException('无法读取文件内容');
-  }
-
-  Future<Set<int>?> _showImportSelectionSheet(
-    List<TxtTocRuleImportCandidate> candidates,
-  ) async {
-    final selectedIndexes = <int>{
-      for (var index = 0; index < candidates.length; index++)
-        if (candidates[index].selectedByDefault) index,
-    };
-    return showCupertinoBottomSheetDialog<Set<int>>(
-      context: context,
-      builder: (popupContext) {
-        return CupertinoPopupSurface(
-          isSurfacePainted: true,
-          child: StatefulBuilder(
-            builder: (context, setDialogState) {
-              final selectedCount = selectedIndexes.length;
-              final totalCount = candidates.length;
-              final allSelected = totalCount > 0 && selectedCount == totalCount;
-              final toggleAllLabel = allSelected
-                  ? '取消全选（$selectedCount/$totalCount）'
-                  : '全选（$selectedCount/$totalCount）';
-              return SizedBox(
-                height: math.min(
-                  MediaQuery.sizeOf(context).height * 0.86,
-                  680,
-                ),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
-                      child: Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              '导入 TXT 目录规则',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          CupertinoButton(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            onPressed: () => Navigator.pop(popupContext),
-                            child: const Text('取消'),
-                          ),
-                          CupertinoButton.filled(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            onPressed: selectedCount == 0
-                                ? null
-                                : () => Navigator.pop(
-                                      popupContext,
-                                      selectedIndexes.toSet(),
-                                    ),
-                            child: Text('导入($selectedCount)'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                        child: CupertinoButton(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          color: CupertinoColors.systemGrey5.resolveFrom(context),
-                          onPressed: () {
-                            setDialogState(() {
-                              if (allSelected) {
-                                selectedIndexes.clear();
-                              } else {
-                                selectedIndexes
-                                  ..clear()
-                                  ..addAll(
-                                    List<int>.generate(
-                                      candidates.length,
-                                      (index) => index,
-                                    ),
-                                  );
-                              }
-                            });
-                          },
-                          child: Text(toggleAllLabel),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                        itemCount: candidates.length,
-                        separatorBuilder: (context, _) =>
-                            const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final candidate = candidates[index];
-                          final selected = selectedIndexes.contains(index);
-                          return TxtTocRuleImportCandidateTile(
-                            candidate: candidate,
-                            selected: selected,
-                            onTap: () {
-                              setDialogState(() {
-                                if (selected) {
-                                  selectedIndexes.remove(index);
-                                } else {
-                                  selectedIndexes.add(index);
-                                }
-                              });
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  Future<String?> _showOnlineImportInputSheet() async {
-    final persistedHistory = await _loadOnlineImportHistory();
-    final history = _buildHistoryWithDefaultUrl(persistedHistory);
-    final inputController = TextEditingController();
-    try {
-      return showCupertinoBottomSheetDialog<String>(
-        context: context,
-        builder: (popupContext) {
-          return CupertinoPopupSurface(
-            isSurfacePainted: true,
-            child: SizedBox(
-              height: math.min(MediaQuery.sizeOf(context).height * 0.72, 560),
-              child: StatefulBuilder(
-                builder: (context, setDialogState) {
-                  return Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
-                        child: Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                '网络导入',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            CupertinoButton(
-                              padding: EdgeInsets.zero,
-                              onPressed: () => Navigator.pop(popupContext),
-                              child: const Text('取消'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: CupertinoTextField(
-                                controller: inputController,
-                                placeholder: 'url',
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            CupertinoButton.filled(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
-                              ),
-                              onPressed: () {
-                                Navigator.pop(
-                                  popupContext,
-                                  inputController.text.trim(),
-                                );
-                              },
-                              child: const Text('导入'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                '历史记录',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Expanded(
-                        child: history.isEmpty
-                            ? const AppEmptyState(
-                                illustration:
-                                    AppEmptyPlanetIllustration(size: 76),
-                                title: '暂无历史记录',
-                                message: '输入 URL 并导入后会自动保存',
-                              )
-                            : ListView.separated(
-                                padding:
-                                    const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                                itemCount: history.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 6),
-                                itemBuilder: (context, index) {
-                                  final item = history[index];
-                                  return Container(
-                                    decoration: BoxDecoration(
-                                      color: CupertinoColors.systemGrey6.resolveFrom(context),
-                                      borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
-                                    ),
-                                    padding:
-                                        const EdgeInsets.fromLTRB(10, 8, 8, 8),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: GestureDetector(
-                                            onTap: () {
-                                              inputController.text = item;
-                                            },
-                                            child: Text(
-                                              item,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style:
-                                                  const TextStyle(fontSize: 13),
-                                            ),
-                                          ),
-                                        ),
-                                        CupertinoButton(
-                                          padding: EdgeInsets.zero,
-                                          minimumSize: const Size(28, 28),
-                                          onPressed: () async {
-                                            history.removeAt(index);
-                                            await _saveOnlineImportHistory(
-                                              history,
-                                            );
-                                            if (mounted) {
-                                              setDialogState(() {});
-                                            }
-                                          },
-                                          child: Icon(
-                                            CupertinoIcons.delete,
-                                            size: 18,
-                                            color: CupertinoColors.systemRed.resolveFrom(context)
-                                                .resolveFrom(context),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          );
-        },
-      );
-    } finally {
-      inputController.dispose();
-    }
-  }
-
-  bool _isHttpUrl(String value) {
-    final parsed = Uri.tryParse(value);
-    if (parsed == null) return false;
-    final scheme = parsed.scheme.toLowerCase();
-    return scheme == 'http' || scheme == 'https';
-  }
-
-  Future<List<String>> _loadOnlineImportHistory() async {
-    return _onlineImportHistoryStore.load(_onlineImportHistoryKey);
-  }
-
-  Future<void> _saveOnlineImportHistory(List<String> history) async {
-    await _onlineImportHistoryStore.save(_onlineImportHistoryKey, history);
-  }
-
-  Future<void> _pushOnlineImportHistory(String url) async {
-    await _onlineImportHistoryStore.push(_onlineImportHistoryKey, url);
-  }
-
-  List<String> _buildHistoryWithDefaultUrl(Iterable<String> values) {
-    final merged = <String>[_defaultOnlineImportUrl, ...values];
-    return _onlineImportHistoryStore.normalize(merged);
-  }
-
-  Future<void> _runImportingTask(Future<void> Function() task) async {
-    final navigator = Navigator.of(context, rootNavigator: true);
-    showCupertinoBottomSheetDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => const CupertinoAlertDialog(
-        content: BlockingProgressContent(text: '导入中...'),
-      ),
-    );
-    await Future<void>.delayed(Duration.zero);
-    try {
-      await task();
-    } finally {
-      if (navigator.canPop()) {
-        navigator.pop();
-      }
-    }
-  }
-
-  Future<void> _showMessageDialog({
-    required String title,
-    required String message,
-  }) async {
-    if (!mounted) return;
-    await showCupertinoBottomSheetDialog<void>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showTxtTocRuleHelp() async {
-    try {
-      final markdownText =
-          await rootBundle.loadString('assets/web/help/md/txtTocRuleHelp.md');
-      if (!mounted) return;
-      await showAppHelpDialog(context, markdownText: markdownText);
-    } catch (error) {
-      if (!mounted) return;
-      await _showMessageDialog(
-        title: '帮助',
-        message: '帮助文档加载失败：$error',
-      );
-    }
-  }
-
-  String _formatImportError(Object error) {
-    if (error is FileSystemException) {
-      final message = error.message.trim();
-      if (message.isEmpty) return 'readTextError:ERROR';
-      return 'readTextError:$message';
-    }
-    if (error is FormatException) {
-      final message = error.message.trim();
-      if (message.isEmpty) return 'ImportError:格式不对';
-      return 'ImportError:$message';
-    }
-    final text = '$error'.trim();
-    if (text.isEmpty) return 'ImportError:ERROR';
-    if (text.startsWith('Exception:')) {
-      final stripped = text.substring('Exception:'.length).trim();
-      return stripped.isEmpty ? 'ImportError:ERROR' : 'ImportError:$stripped';
-    }
-    return 'ImportError:$text';
+    unawaited(showAppToast(context, message: message));
   }
 
   @override
@@ -1109,249 +442,52 @@ class _TxtTocRuleManageViewState extends State<TxtTocRuleManageView> {
     final totalCount = _rules.length;
     final hasSelection = selectedCount > 0;
     final allSelected = totalCount > 0 && selectedCount == totalCount;
-    final enabledColor = CupertinoColors.activeBlue.resolveFrom(context);
-    final disabledColor = CupertinoColors.systemGrey.resolveFrom(context);
     return AppCupertinoPageScaffold(
       title: 'TXT 目录规则',
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppNavBarButton(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            minimumSize: const Size(30, 30),
-            onPressed: _menuBusy || _selectionMode ? null : _startAddRule,
-            child: const Text(
-              '添加',
-              style: TextStyle(fontSize: 13),
-            ),
-          ),
-          AppNavBarButton(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            minimumSize: const Size(30, 30),
-            onPressed: _menuBusy || (!_selectionMode && _rules.isEmpty)
-                ? null
-                : _toggleSelectionMode,
-            child: Text(
-              _selectionMode ? '完成' : '多选',
-              style: const TextStyle(fontSize: 13),
-            ),
-          ),
-          AppNavBarButton(
-            key: _moreMenuKey,
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(30, 30),
-            onPressed: _selectionMode
-                ? (hasSelection && !_menuBusy ? _showSelectionMoreMenu : null)
-                : (_menuBusy ? null : _showMoreMenu),
-            child: _selectionMode
-                ? (_selectionActionBusy
-                    ? const CupertinoActivityIndicator(radius: 9)
-                    : Icon(
-                        CupertinoIcons.line_horizontal_3,
-                        size: 20,
-                        color: hasSelection ? enabledColor : disabledColor,
-                      ))
-                : (_menuBusy
-                    ? const CupertinoActivityIndicator(radius: 9)
-                    : const Icon(CupertinoIcons.line_horizontal_3, size: 20)),
-          ),
-        ],
+      trailing: TxtTocRuleNavTrailingActions(
+        moreMenuKey: _moreMenuKey,
+        menuBusy: _menuBusy,
+        selectionMode: _selectionMode,
+        hasRules: _rules.isNotEmpty,
+        hasSelection: hasSelection,
+        selectionActionBusy: _selectionActionBusy,
+        onAdd: _startAddRule,
+        onToggleSelection: _toggleSelectionMode,
+        onShowMoreMenu: _showMoreMenu,
+        onShowSelectionMoreMenu: _showSelectionMoreMenu,
       ),
       child: _loading
           ? const Center(child: CupertinoActivityIndicator())
           : Column(
               children: [
                 Expanded(
-                  child: _rules.isEmpty
-                      ? _empty()
-                      : !_selectionMode
-                          ? ReorderableListView.builder(
-                              padding:
-                                  const EdgeInsets.fromLTRB(12, 12, 12, 24),
-                              itemCount: _rules.length,
-                              buildDefaultDragHandles: false,
-                              onReorder: _onReorderRules,
-                              itemBuilder: (context, index) {
-                                final rule = _rules[index];
-                                return Padding(
-                                  key: ValueKey(rule.id),
-                                  padding:
-                                      const EdgeInsets.only(bottom: 8),
-                                  child: TxtTocRuleListTile(
-                                    rule: rule,
-                                    selectionMode: false,
-                                    selected: false,
-                                    dragIndex: index,
-                                    onTap: () => _openRuleEditor(rule),
-                                    onEditTap: () => _openRuleEditor(rule),
-                                    onToggleEnabled: (v) =>
-                                        _toggleRuleEnabled(rule, v),
-                                    onShowItemMenu: () =>
-                                        _showRuleItemMenu(rule),
-                                  ),
-                                );
-                              },
-                            )
-                          : ListView.separated(
-                              padding:
-                                  const EdgeInsets.fromLTRB(12, 12, 12, 24),
-                              itemCount: _rules.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 8),
-                              itemBuilder: (context, index) {
-                                final rule = _rules[index];
-                                final selected =
-                                    _selectedRuleIds.contains(rule.id);
-                                return TxtTocRuleListTile(
-                                  rule: rule,
-                                  selectionMode: _selectionMode,
-                                  selected: selected,
-                                  onTap: _selectionMode
-                                      ? () => _toggleRuleSelection(rule.id)
-                                      : () => _openRuleEditor(rule),
-                                  onEditTap: () => _openRuleEditor(rule),
-                                  onToggleEnabled: (v) =>
-                                      _toggleRuleEnabled(rule, v),
-                                  onShowItemMenu: _selectionMode
-                                      ? null
-                                      : () => _showRuleItemMenu(rule),
-                                );
-                              },
-                            ),
+                  child: TxtTocRuleManageList(
+                    rules: _rules,
+                    selectionMode: _selectionMode,
+                    selectedRuleIds: _selectedRuleIds,
+                    onReorder: _onReorderRules,
+                    onToggleSelection: _toggleRuleSelection,
+                    onOpenEditor: _openRuleEditor,
+                    onToggleEnabled: _toggleRuleEnabled,
+                    onShowItemMenu: _showRuleItemMenu,
+                  ),
                 ),
                 if (_selectionMode)
-                  SafeArea(
-                    top: false,
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(12, 6, 8, 8),
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.systemGroupedBackground.resolveFrom(context)
-                            .resolveFrom(context),
-                        border: Border(
-                          top: BorderSide(
-                            color: CupertinoColors.systemGrey4.resolveFrom(context),
-                            width: 0.5,
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: CupertinoButton(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 6,
-                              ),
-                              minimumSize: const Size(30, 30),
-                              alignment: Alignment.centerLeft,
-                              onPressed: totalCount == 0
-                                  ? null
-                                  : _toggleSelectAllRules,
-                              child: Text(
-                                allSelected
-                                    ? '取消全选（$selectedCount/$totalCount）'
-                                    : '全选（$selectedCount/$totalCount）',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: totalCount == 0
-                                      ? disabledColor
-                                      : enabledColor,
-                                ),
-                              ),
-                            ),
-                          ),
-                          CupertinoButton(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 6,
-                            ),
-                            minimumSize: const Size(30, 30),
-                            onPressed: hasSelection ? _revertSelection : null,
-                            child: Text(
-                              '反选',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color:
-                                    hasSelection ? enabledColor : disabledColor,
-                              ),
-                            ),
-                          ),
-                          CupertinoButton(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 6,
-                            ),
-                            minimumSize: const Size(30, 30),
-                            onPressed: hasSelection && !_menuBusy
-                                ? _confirmDeleteSelectedRules
-                                : null,
-                            child: _deletingRule
-                                ? const CupertinoActivityIndicator(radius: 9)
-                                : Text(
-                                    '删除',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: hasSelection && !_menuBusy
-                                          ? CupertinoColors.systemRed.resolveFrom(context)
-                                              .resolveFrom(context)
-                                          : disabledColor,
-                                    ),
-                                  ),
-                          ),
-                          CupertinoButton(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 6,
-                            ),
-                            minimumSize: const Size(30, 30),
-                            onPressed: hasSelection && !_menuBusy
-                                ? _showSelectionMoreMenu
-                                : null,
-                            child: _selectionActionBusy
-                                ? const CupertinoActivityIndicator(radius: 9)
-                                : Icon(
-                                    CupertinoIcons.line_horizontal_3,
-                                    size: 19,
-                                    color: hasSelection
-                                        ? enabledColor
-                                        : disabledColor,
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  TxtTocRuleSelectionBottomBar(
+                    selectedCount: selectedCount,
+                    totalCount: totalCount,
+                    hasSelection: hasSelection,
+                    allSelected: allSelected,
+                    menuBusy: _menuBusy,
+                    deletingRule: _deletingRule,
+                    selectionActionBusy: _selectionActionBusy,
+                    onToggleSelectAll: _toggleSelectAllRules,
+                    onRevertSelection: _revertSelection,
+                    onConfirmDeleteSelected: _confirmDeleteSelectedRules,
+                    onShowSelectionMoreMenu: _showSelectionMoreMenu,
                   ),
               ],
             ),
     );
   }
-
-  Widget _empty() {
-    return const AppEmptyState(
-      illustration: AppEmptyPlanetIllustration(size: 86),
-      title: '暂无目录规则',
-      message: '可点击右上角添加，或从本地导入、网络导入、二维码导入。',
-    );
-  }
-}
-
-
-enum _TxtTocRuleMenuAction {
-  importDefault,
-  importLocal,
-  importOnline,
-  importQr,
-  help,
-}
-
-enum _TxtTocRuleItemMenuAction {
-  top,
-  bottom,
-  delete,
-}
-
-enum _TxtTocRuleSelectionMenuAction {
-  enableSelection,
-  disableSelection,
-  exportSelection,
 }
