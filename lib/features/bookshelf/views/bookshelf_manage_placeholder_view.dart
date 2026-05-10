@@ -19,6 +19,7 @@ import '../services/bookshelf_manage_batch_change_source_service.dart';
 import '../services/bookshelf_manage_export_service.dart';
 import 'bookshelf_group_manage_placeholder_dialog.dart';
 import 'bookshelf_manage_actions.dart';
+import 'bookshelf_manage_body.dart';
 import 'bookshelf_manage_dialogs.dart';
 import 'bookshelf_manage_helpers.dart';
 
