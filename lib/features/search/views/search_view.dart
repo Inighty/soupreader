@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 
-import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
@@ -24,11 +23,10 @@ import '../services/search_input_hint_helper.dart';
 import '../services/search_load_more_helper.dart';
 import 'search_book_info_view.dart';
 import '../services/search_aggregator.dart';
-import 'search_result_item.dart';
+import 'search_scope_helpers.dart';
 import 'search_view_actions.dart';
+import 'search_view_body.dart';
 import 'search_view_engine.dart';
-import 'search_view_panels.dart';
-import 'search_view_widgets.dart';
 
 /// 搜索页面（对齐 legado 核心语义：范围、过滤、可停止、历史词）。
 class SearchView extends StatefulWidget {
@@ -46,10 +44,10 @@ class SearchView extends StatefulWidget {
   });
 
   @override
-  State<SearchView> createState() => _SearchViewState();
+  State<SearchView> createState() => SearchViewState();
 }
 
-class _SearchViewState extends State<SearchView> {
+class SearchViewState extends State<SearchView> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   final ScrollController _resultScrollController = ScrollController();
@@ -202,45 +200,23 @@ class _SearchViewState extends State<SearchView> {
     });
   }
 
-  AppSettings _sanitizeSettings(AppSettings settings) {
-    final filterMode = normalizeSearchFilterMode(settings.searchFilterMode);
-    if (filterMode == settings.searchFilterMode) return settings;
-    return settings.copyWith(searchFilterMode: filterMode);
-  }
+  AppSettings _sanitizeSettings(AppSettings settings) =>
+      SearchScopeHelpers.sanitizeSettings(settings);
 
   Future<void> _saveSettings(AppSettings next) async {
     setState(() => _settings = next);
     await _settingsService.saveAppSettings(next);
   }
 
-  Set<String> _normalizeUrlSet(Iterable<String> values) {
-    return values
-        .map((value) => value.trim())
-        .where((value) => value.isNotEmpty)
-        .toSet();
-  }
-
-  List<BookSource> _allSources() {
-    final all = _sourceRepo.getAllSources();
-    final scoped = widget.sourceUrls;
-    if (scoped == null || scoped.isEmpty) return all;
-    final allowed = _normalizeUrlSet(scoped);
-    if (allowed.isEmpty) return const <BookSource>[];
-    return all
-        .where((s) => allowed.contains(s.bookSourceUrl.trim()))
-        .toList(growable: false);
-  }
-
-  List<BookSource> _allEnabledSources(List<BookSource> allSources) {
-    return allSources
-        .where((s) => s.enabled && s.enabledExplore)
-        .toList(growable: false);
-  }
+  List<BookSource> _allSources() => SearchScopeHelpers.allSources(
+        repo: _sourceRepo,
+        scopedUrls: widget.sourceUrls,
+      );
 
   void _applyScopedEntrySearchScope() {
     final scoped = widget.sourceUrls;
     if (scoped == null || scoped.isEmpty) return;
-    final scopedUrls = _normalizeUrlSet(scoped);
+    final scopedUrls = SearchScopeHelpers.normalizeUrlSet(scoped);
     if (scopedUrls.isEmpty || scopedUrls.length != 1) return;
     final sourceUrl = scopedUrls.first;
     final source = _sourceRepo.getSourceByUrl(sourceUrl);
@@ -251,16 +227,11 @@ class _SearchViewState extends State<SearchView> {
   }
 
   ResolvedSearchScope _resolveSearchScope() {
-    final allSources = _allSources();
-    final enabledSources = _allEnabledSources(allSources);
-    final resolved = SearchScope(_settings.searchScope).resolve(
-      enabledSources,
-      allSourcesForSourceMode: allSources,
-    );
-    return ResolvedSearchScope(
-      allSources: allSources,
-      allEnabledSources: enabledSources,
-      resolvedScope: resolved,
+    final all = _allSources();
+    return SearchScopeHelpers.resolveSearchScope(
+      scopeText: _settings.searchScope,
+      allSources: all,
+      enabledSources: SearchScopeHelpers.allEnabledSources(all),
     );
   }
 
@@ -693,119 +664,53 @@ class _SearchViewState extends State<SearchView> {
     final hasQueryText =
         SearchInputHintHelper.normalizeKeyword(_searchController.text)
             .isNotEmpty;
-
-    return PopScope<void>(
-      canPop: !SearchInputHintHelper.shouldConsumeBackToClearFocus(
-        hasInputFocus: _searchHasFocus,
-      ),
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        if (SearchInputHintHelper.shouldConsumeBackToClearFocus(
-          hasInputFocus: _searchHasFocus,
-        )) {
-          _searchFocusNode.unfocus();
+    return SearchViewBody(
+      searchController: _searchController,
+      searchFocusNode: _searchFocusNode,
+      resultScrollController: _resultScrollController,
+      isSearching: _isSearching,
+      hasMore: _hasMore,
+      searchHasFocus: _searchHasFocus,
+      searchingSource: _searchingSource,
+      completedSources: _completedSources,
+      totalSources: totalSources,
+      scopeLabel: scopeState.resolvedScope.display(),
+      sourceIssueCount: _sourceIssues.length,
+      showManualLoadMorePanel: _showManualLoadMorePanel,
+      showInputHelpPanel: _showInputHelpPanel,
+      displayResults: _displayResults,
+      bookshelfHints: _bookshelfHintsForInput(),
+      historyHints: _historyHintsForInput(),
+      hasQueryText: hasQueryText,
+      showCover: _settings.searchShowCover,
+      sourceRepo: _sourceRepo,
+      onTopBarChanged: (_) {
+        if (_isSearching) {
+          _cancelOngoingSearch();
+          return;
         }
+        if (_hasMore) {
+          setState(() => _hasMore = false);
+          return;
+        }
+        setState(() {});
       },
-      child: AppCupertinoPageScaffold(
-        title: '搜索',
-        child: Column(
-          children: [
-            SearchTopBar(
-              searchController: _searchController,
-              searchFocusNode: _searchFocusNode,
-              isSearching: _isSearching,
-              hasMore: _hasMore,
-              scopeLabel: scopeState.resolvedScope.display(),
-              onChangedTyping: (_) {
-                if (_isSearching) {
-                  _cancelOngoingSearch();
-                  return;
-                }
-                if (_hasMore) {
-                  setState(() => _hasMore = false);
-                  return;
-                }
-                setState(() {});
-              },
-              onSubmit: _search,
-              onOpenScopePicker: _openScopePickerLikeLegado,
-              onCancel: () {
-                _searchFocusNode.unfocus();
-                if (_isSearching) _cancelOngoingSearch();
-              },
-            ),
-            SearchTopStatusPanels(
-              isSearching: _isSearching,
-              searchingSource: _searchingSource,
-              completedSources: _completedSources,
-              totalSources: totalSources,
-              sourceIssueCount: _sourceIssues.length,
-              showManualLoadMore: _showManualLoadMorePanel,
-              onCancelSearch: _cancelOngoingSearch,
-              onShowIssueDetails: _showIssueDetailsDialog,
-              onContinueLoadMore: () =>
-                  unawaited(_continueLoadMoreLikeLegado()),
-            ),
-            Expanded(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: _displayResults.isEmpty
-                        ? SearchEmptyBody(
-                            totalSources: totalSources,
-                            isSearching: _isSearching,
-                            hasIssues: _sourceIssues.isNotEmpty,
-                            historyHints: _historyHintsForInput(),
-                            hasQueryText: hasQueryText,
-                            onClearHistory: _clearHistory,
-                            onHistoryTap: (k) =>
-                                unawaited(_handleHistoryKeywordTap(k)),
-                            onHistoryLongPress: _removeHistoryKeyword,
-                          )
-                        : ListView.builder(
-                            controller: _resultScrollController,
-                            padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
-                            itemCount: _displayResults.length,
-                            itemBuilder: (context, index) => SearchResultItem(
-                              item: _displayResults[index],
-                              showCover: _settings.searchShowCover,
-                              sourceRepo: _sourceRepo,
-                              onCoverState: _handleCoverLoadState,
-                              onTap: () =>
-                                  _openBookInfo(_displayResults[index].primary),
-                            ),
-                          ),
-                  ),
-                  if (_showInputHelpPanel)
-                    Positioned.fill(
-                      child: SearchInputHelpPanel(
-                        bookshelfHints: _bookshelfHintsForInput(),
-                        historyHints: _historyHintsForInput(),
-                        hasQueryText: hasQueryText,
-                        onClearHistory: _clearHistory,
-                        onHistoryTap: (k) =>
-                            unawaited(_handleHistoryKeywordTap(k)),
-                        onHistoryLongPress: _removeHistoryKeyword,
-                        onBookshelfTap: (b) =>
-                            unawaited(_openBookshelfBookInfo(b)),
-                      ),
-                    ),
-                  Positioned(
-                    right: 16,
-                    bottom: 16,
-                    child: SafeArea(
-                      top: false,
-                      child: SearchFloatingSettingsButton(
-                        onPressed: _showSearchSettingsSheet,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      onSubmit: _search,
+      onOpenScopePicker: _openScopePickerLikeLegado,
+      onCancelButton: () {
+        _searchFocusNode.unfocus();
+        if (_isSearching) _cancelOngoingSearch();
+      },
+      onCancelSearch: _cancelOngoingSearch,
+      onShowIssueDetails: _showIssueDetailsDialog,
+      onContinueLoadMore: () => unawaited(_continueLoadMoreLikeLegado()),
+      onClearHistory: _clearHistory,
+      onHistoryTap: (k) => unawaited(_handleHistoryKeywordTap(k)),
+      onHistoryLongPress: _removeHistoryKeyword,
+      onBookshelfTap: (b) => unawaited(_openBookshelfBookInfo(b)),
+      onCoverState: _handleCoverLoadState,
+      onOpenBookInfo: _openBookInfo,
+      onShowSettings: _showSearchSettingsSheet,
     );
   }
 }

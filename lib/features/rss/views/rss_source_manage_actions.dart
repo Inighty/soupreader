@@ -10,6 +10,8 @@ import '../../../core/services/source_variable_store.dart';
 import '../models/rss_source.dart';
 import '../services/rss_source_import_export_service.dart';
 import '../services/rss_source_manage_helper.dart';
+import 'rss_source_manage_dialogs.dart';
+import 'rss_source_manage_types.dart';
 
 /// 把所选源 URL 在仓库中映射成最新对象（自动跳过已不存在的项）。
 List<RssSource> _resolveCurrentSources(
@@ -341,4 +343,82 @@ Future<void> deleteRssSource({
 /// 在 [BuildContext] 弹出导出成功 toast（无 outputPath 时）。
 void showRssExportToast(BuildContext context) {
   unawaited(showAppToast(context, message: '导出成功'));
+}
+
+/// 把已选中的 [RssSourceSelectionAction] 派发到对应业务函数。
+Future<void> dispatchRssSelectionAction({
+  required BuildContext context,
+  required RssSourceRepository repo,
+  required RssSourceImportExportService importExportService,
+  required RssSourceSelectionAction action,
+  required List<RssSource> selectedSources,
+  required List<RssSource> visibleSources,
+  required Set<String> selectedSourceUrls,
+  required VoidCallback notifySelectionChanged,
+}) async {
+  switch (action) {
+    case RssSourceSelectionAction.enableSelection:
+      await enableRssSelection(repo: repo, selected: selectedSources);
+    case RssSourceSelectionAction.disableSelection:
+      await disableRssSelection(repo: repo, selected: selectedSources);
+    case RssSourceSelectionAction.addGroup:
+      if (!context.mounted) return;
+      final groupInput = await showRssSelectionGroupInputDialog(
+        context: context,
+        title: '添加分组',
+        allGroups: repo.allGroups(),
+      );
+      if (groupInput == null || groupInput.isEmpty) return;
+      await addGroupToRssSelection(
+        repo: repo,
+        selected: selectedSources,
+        groupInput: groupInput,
+      );
+    case RssSourceSelectionAction.removeGroup:
+      if (!context.mounted) return;
+      final groupInput = await showRssSelectionGroupInputDialog(
+        context: context,
+        title: '移除分组',
+        allGroups: repo.allGroups(),
+      );
+      if (groupInput == null || groupInput.isEmpty) return;
+      await removeGroupFromRssSelection(
+        repo: repo,
+        selected: selectedSources,
+        groupInput: groupInput,
+      );
+    case RssSourceSelectionAction.moveToTop:
+      await moveRssSelectionToTop(repo: repo, selected: selectedSources);
+    case RssSourceSelectionAction.moveToBottom:
+      await moveRssSelectionToBottom(repo: repo, selected: selectedSources);
+    case RssSourceSelectionAction.exportSelection:
+      final result = await exportRssSelection(
+        importExportService: importExportService,
+        selected: selectedSources,
+      );
+      if (result.cancelled || !context.mounted) return;
+      if (result.error != null) {
+        await showRssMessage(context, result.error!);
+        return;
+      }
+      if (result.outputPath == null || result.outputPath!.isEmpty) {
+        showRssExportToast(context);
+        return;
+      }
+      await showRssExportPathDialog(
+        context: context,
+        outputPath: result.outputPath!,
+      );
+    case RssSourceSelectionAction.shareSelection:
+      await shareRssSelection(
+        importExportService: importExportService,
+        selected: selectedSources,
+      );
+    case RssSourceSelectionAction.checkSelectedInterval:
+      checkSelectedInterval(
+        visibleSources: visibleSources,
+        selectedSourceUrls: selectedSourceUrls,
+      );
+      notifySelectionChanged();
+  }
 }
