@@ -8,7 +8,6 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/book_repository.dart';
 import '../../../core/database/repositories/source_repository.dart';
 import '../../../core/models/app_settings.dart';
-import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/models/book.dart';
 import '../../bookshelf/services/book_add_service.dart';
@@ -27,6 +26,7 @@ import 'search_scope_helpers.dart';
 import 'search_view_actions.dart';
 import 'search_view_body.dart';
 import 'search_view_engine.dart';
+import 'search_view_session_helpers.dart';
 
 /// 搜索页面（对齐 legado 核心语义：范围、过滤、可停止、历史词）。
 class SearchView extends StatefulWidget {
@@ -452,12 +452,12 @@ class SearchViewState extends State<SearchView> {
     required int searchSessionId,
     required List<BookSource> sources,
     required int page,
-  }) async {
+  }) {
     return runSearchPage(
       searchSessionId: searchSessionId,
       sources: sources,
       page: page,
-      ctx: SearchRunContext(
+      ctx: buildSearchRunContext(
         aggregator: _aggregator,
         activeCancelTokens: _activeCancelTokens,
         isSessionActive: _isSearchSessionActive,
@@ -475,25 +475,6 @@ class SearchViewState extends State<SearchView> {
             setState(() => _rebuildDisplayResults(keyword: _currentKeyword));
           }
         },
-        recordIssueLog: ({
-          required source,
-          required page,
-          required reason,
-          statusCode,
-          listCount,
-          error,
-          stackTrace,
-        }) =>
-            recordSearchIssueLog(
-          currentKeyword: _currentKeyword,
-          source: source,
-          page: page,
-          reason: reason,
-          statusCode: statusCode,
-          listCount: listCount,
-          error: error,
-          stackTrace: stackTrace,
-        ),
         currentKeyword: _currentKeyword,
         filterMode: normalizeSearchFilterMode(_settings.searchFilterMode),
         concurrency: _settings.searchConcurrency,
@@ -528,29 +509,8 @@ class SearchViewState extends State<SearchView> {
   }
 
   Future<void> _openBookInfo(SearchResult result) async {
-    try {
-      await Navigator.of(context, rootNavigator: true).push(
-        CupertinoPageRoute(
-          builder: (_) => SearchBookInfoView(result: result),
-        ),
-      );
-    } catch (e, st) {
-      ExceptionLogService().record(
-        node: 'search.open_book_info',
-        message: '打开书籍详情失败',
-        error: e,
-        stackTrace: st,
-        context: <String, dynamic>{
-          'bookName': result.name,
-          'bookUrl': result.bookUrl,
-          'sourceUrl': result.sourceUrl,
-          'sourceName': result.sourceName,
-        },
-      );
-      if (mounted) showSearchMessage(context, '打开详情失败，请稍后重试');
-      return;
-    }
-    if (!mounted) return;
+    final ok = await openSearchBookInfo(context: context, result: result);
+    if (!ok || !mounted) return;
     setState(() => _rebuildDisplayResults(keyword: _currentKeyword));
   }
 
