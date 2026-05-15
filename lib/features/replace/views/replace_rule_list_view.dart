@@ -133,7 +133,6 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
         final selectedCount = _selectedCountIn(rules);
         final totalCount = rules.length;
         final hasSelection = selectedCount > 0;
-        final allSelected = totalCount > 0 && selectedCount == totalCount;
         final enabledColor = CupertinoColors.activeBlue.resolveFrom(context);
         final disabledColor = CupertinoColors.systemGrey.resolveFrom(context);
 
@@ -196,110 +195,16 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
                 child: rules.isEmpty ? _empty() : _buildList(rules),
               ),
               if (_selectionMode)
-                SafeArea(
-                  top: false,
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(12, 6, 8, 8),
-                    decoration: BoxDecoration(
-                      color:
-                          CupertinoColors.systemGroupedBackground.resolveFrom(
-                        context,
-                      ),
-                      border: Border(
-                        top: BorderSide(
-                          color: CupertinoColors.systemGrey4.resolveFrom(context),
-                          width: 0.5,
-                        ),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: CupertinoButton(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 6,
-                            ),
-                            minimumSize: const Size(30, 30),
-                            alignment: Alignment.centerLeft,
-                            onPressed: totalCount == 0
-                                ? null
-                                : () => _toggleSelectAllRules(rules),
-                            child: Text(
-                              allSelected
-                                  ? '取消全选（$selectedCount/$totalCount）'
-                                  : '全选（$selectedCount/$totalCount）',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: totalCount == 0
-                                    ? disabledColor
-                                    : enabledColor,
-                              ),
-                            ),
-                          ),
-                        ),
-                        CupertinoButton(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 6,
-                          ),
-                          minimumSize: const Size(30, 30),
-                          onPressed: totalCount == 0
-                              ? null
-                              : () => _revertSelection(rules),
-                          child: Text(
-                            '反选',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: totalCount == 0
-                                  ? disabledColor
-                                  : enabledColor,
-                            ),
-                          ),
-                        ),
-                        CupertinoButton(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 6,
-                          ),
-                          minimumSize: const Size(30, 30),
-                          onPressed: hasSelection && !_menuBusy
-                              ? () => _confirmDeleteSelectedRules(rules)
-                              : null,
-                          child: _deletingSelection
-                              ? const CupertinoActivityIndicator(radius: 9)
-                              : Text(
-                                  '删除',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: hasSelection && !_menuBusy
-                                        ? CupertinoColors.systemRed.resolveFrom(context)
-                                        : disabledColor,
-                                  ),
-                                ),
-                        ),
-                        CupertinoButton(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 6,
-                          ),
-                          minimumSize: const Size(30, 30),
-                          onPressed: hasSelection && !_menuBusy
-                              ? () => _showSelectionMoreMenu(rules)
-                              : null,
-                          child: _selectionActionBusy
-                              ? const CupertinoActivityIndicator(radius: 9)
-                              : Icon(
-                                  CupertinoIcons.ellipsis_circle,
-                                  size: 19,
-                                  color: hasSelection
-                                      ? enabledColor
-                                      : disabledColor,
-                                ),
-                        ),
-                      ],
-                    ),
-                  ),
+                ReplaceRuleSelectionBar(
+                  selectedCount: selectedCount,
+                  totalCount: totalCount,
+                  menuBusy: _menuBusy,
+                  selectionActionBusy: _selectionActionBusy,
+                  deletingSelection: _deletingSelection,
+                  onToggleAll: () => _toggleSelectAllRules(rules),
+                  onInvert: () => _revertSelection(rules),
+                  onConfirmDelete: () => _confirmDeleteSelectedRules(rules),
+                  onShowMore: () => _showSelectionMoreMenu(rules),
                 ),
             ],
           ),

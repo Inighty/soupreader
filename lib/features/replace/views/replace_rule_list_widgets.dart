@@ -3,6 +3,122 @@ import 'package:flutter/cupertino.dart';
 import '../../../app/widgets/app_ui_kit.dart';
 import '../models/replace_rule.dart';
 
+/// 多选模式下的底部操作栏（全选 / 反选 / 删除 / 更多）。
+class ReplaceRuleSelectionBar extends StatelessWidget {
+  const ReplaceRuleSelectionBar({
+    super.key,
+    required this.selectedCount,
+    required this.totalCount,
+    required this.menuBusy,
+    required this.selectionActionBusy,
+    required this.deletingSelection,
+    required this.onToggleAll,
+    required this.onInvert,
+    required this.onConfirmDelete,
+    required this.onShowMore,
+  });
+
+  final int selectedCount;
+  final int totalCount;
+  final bool menuBusy;
+  final bool selectionActionBusy;
+  final bool deletingSelection;
+  final VoidCallback onToggleAll;
+  final VoidCallback onInvert;
+  final VoidCallback onConfirmDelete;
+  final VoidCallback onShowMore;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSelection = selectedCount > 0;
+    final allSelected = totalCount > 0 && selectedCount == totalCount;
+    final enabledColor = CupertinoColors.activeBlue.resolveFrom(context);
+    final disabledColor = CupertinoColors.systemGrey.resolveFrom(context);
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 6, 8, 8),
+        decoration: BoxDecoration(
+          color:
+              CupertinoColors.systemGroupedBackground.resolveFrom(context),
+          border: Border(
+            top: BorderSide(
+              color: CupertinoColors.systemGrey4.resolveFrom(context),
+              width: 0.5,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: CupertinoButton(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                minimumSize: const Size(30, 30),
+                alignment: Alignment.centerLeft,
+                onPressed: totalCount == 0 ? null : onToggleAll,
+                child: Text(
+                  allSelected
+                      ? '取消全选（$selectedCount/$totalCount）'
+                      : '全选（$selectedCount/$totalCount）',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: totalCount == 0 ? disabledColor : enabledColor,
+                  ),
+                ),
+              ),
+            ),
+            CupertinoButton(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              minimumSize: const Size(30, 30),
+              onPressed: totalCount == 0 ? null : onInvert,
+              child: Text(
+                '反选',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: totalCount == 0 ? disabledColor : enabledColor,
+                ),
+              ),
+            ),
+            CupertinoButton(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              minimumSize: const Size(30, 30),
+              onPressed:
+                  hasSelection && !menuBusy ? onConfirmDelete : null,
+              child: deletingSelection
+                  ? const CupertinoActivityIndicator(radius: 9)
+                  : Text(
+                      '删除',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: hasSelection && !menuBusy
+                            ? CupertinoColors.systemRed.resolveFrom(context)
+                            : disabledColor,
+                      ),
+                    ),
+            ),
+            CupertinoButton(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              minimumSize: const Size(30, 30),
+              onPressed: hasSelection && !menuBusy ? onShowMore : null,
+              child: selectionActionBusy
+                  ? const CupertinoActivityIndicator(radius: 9)
+                  : Icon(
+                      CupertinoIcons.ellipsis_circle,
+                      size: 19,
+                      color: hasSelection ? enabledColor : disabledColor,
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// 列表项展示（含勾选 / 启用开关 / 编辑 / 更多）。
 class ReplaceRuleListItems extends StatelessWidget {
   const ReplaceRuleListItems({
