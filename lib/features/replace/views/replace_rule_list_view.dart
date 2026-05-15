@@ -13,7 +13,6 @@ import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
 import '../../../app/widgets/app_popover_menu.dart';
-import '../../../app/widgets/app_ui_kit.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
@@ -28,6 +27,9 @@ import '../models/replace_rule.dart';
 import '../services/replace_rule_import_export_service.dart';
 import 'replace_rule_edit_view.dart';
 import 'replace_rule_import_types.dart';
+import 'replace_rule_list_import_dialog.dart';
+import 'replace_rule_list_online_import.dart';
+import 'replace_rule_list_widgets.dart';
 
 
 
@@ -820,103 +822,14 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   Widget _buildList(List<ReplaceRule> rules) {
-    return AppListView(
-      padding: const EdgeInsets.only(top: 8, bottom: 20),
-      children: [
-        for (var index = 0; index < rules.length; index++) ...[
-          Builder(
-            builder: (context) {
-              final rule = rules[index];
-              final selected = _selectedRuleIds.contains(rule.id);
-              final title = rule.name.isEmpty ? '(未命名)' : rule.name;
-              final patternPreview = rule.pattern.trim().length > 20
-                  ? '${rule.pattern.trim().substring(0, 20)}…'
-                  : rule.pattern.trim();
-              final replacementPreview =
-                  rule.replacement.trim().isEmpty ? '(空)' : (
-                    rule.replacement.trim().length > 15
-                        ? '${rule.replacement.trim().substring(0, 15)}…'
-                        : rule.replacement.trim());
-              final rulePreview = patternPreview.isEmpty
-                  ? ''
-                  : '$patternPreview → $replacementPreview';
-              final subtitle = [
-                if (rulePreview.isNotEmpty) rulePreview,
-                if (rule.group != null && rule.group!.trim().isNotEmpty)
-                  rule.group!,
-                rule.isRegex ? '正则' : '普通',
-                rule.isEnabled ? '启用' : '未启用',
-              ].join(' · ');
-              final tile = CupertinoListTile.notched(
-                title: Text(title),
-                subtitle: Text(subtitle),
-                trailing: _selectionMode
-                    ? Icon(
-                        selected
-                            ? CupertinoIcons.check_mark_circled_solid
-                            : CupertinoIcons.circle,
-                        color: selected
-                            ? CupertinoColors.activeBlue.resolveFrom(context)
-                            : CupertinoColors.secondaryLabel.resolveFrom(context)
-                                .resolveFrom(context),
-                        size: 20,
-                      )
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CupertinoSwitch(
-                            value: rule.isEnabled,
-                            onChanged: (v) =>
-                                _repo.updateRule(rule.copyWith(isEnabled: v)),
-                          ),
-                          CupertinoButton(
-                            padding: const EdgeInsets.only(left: 4, right: 2),
-                            minimumSize: const Size(36, 36),
-                            onPressed: () => _editRule(rule),
-                            child: Icon(
-                              CupertinoIcons.pencil,
-                              size: 18,
-                              color: CupertinoColors.secondaryLabel.resolveFrom(context)
-                                  .resolveFrom(context),
-                            ),
-                          ),
-                          CupertinoButton(
-                            padding: const EdgeInsets.only(left: 2, right: 2),
-                            minimumSize: const Size(36, 36),
-                            onPressed: () => _showRuleItemMenu(rule),
-                            child: Icon(
-                              CupertinoIcons.ellipsis_vertical,
-                              size: 18,
-                              color: CupertinoColors.secondaryLabel.resolveFrom(context)
-                                  .resolveFrom(context),
-                            ),
-                          ),
-                        ],
-                      ),
-                onTap: _selectionMode
-                    ? () => _toggleRuleSelection(rule.id)
-                    : () => _editRule(rule),
-              );
-              final child = (!_selectionMode || !selected)
-                  ? tile
-                  : DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.systemGrey6.resolveFrom(context),
-                      ),
-                      child: tile,
-                    );
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: AppCard(
-                  padding: EdgeInsets.zero,
-                  child: child,
-                ),
-              );
-            },
-          ),
-          if (index < rules.length - 1) const SizedBox(height: 8),
-        ],
-      ],
+    return ReplaceRuleListItems(
+      rules: rules,
+      selectedRuleIds: _selectedRuleIds,
+      selectionMode: _selectionMode,
+      onToggleSelection: _toggleRuleSelection,
+      onUpdateRule: (r) => _repo.updateRule(r),
+      onEditRule: _editRule,
+      onShowRuleItemMenu: _showRuleItemMenu,
     );
   }
 
@@ -1617,155 +1530,12 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     }
   }
 
-  Future<String?> _showOnlineImportInputSheet() async {
-    final history = await _loadOnlineImportHistory();
-    final inputController = TextEditingController();
-    try {
-      return showCupertinoBottomSheetDialog<String>(
-        context: context,
-        builder: (popupContext) {
-          return CupertinoPopupSurface(
-            isSurfacePainted: true,
-            child: SizedBox(
-              height: math.min(MediaQuery.sizeOf(context).height * 0.72, 560),
-              child: StatefulBuilder(
-                builder: (context, setDialogState) {
-                  return Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
-                        child: Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                '网络导入',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            CupertinoButton(
-                              padding: EdgeInsets.zero,
-                              onPressed: () => Navigator.pop(popupContext),
-                              child: const Text('取消'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: CupertinoTextField(
-                                controller: inputController,
-                                placeholder: 'url',
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            CupertinoButton.filled(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
-                              ),
-                              onPressed: () {
-                                Navigator.pop(
-                                  popupContext,
-                                  inputController.text.trim(),
-                                );
-                              },
-                              child: const Text('导入'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                '历史记录',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Expanded(
-                        child: history.isEmpty
-                            ? const AppEmptyState(
-                                illustration:
-                                    AppEmptyPlanetIllustration(size: 76),
-                                title: '暂无历史记录',
-                                message: '输入 URL 并导入后会自动保存',
-                              )
-                            : ListView.separated(
-                                padding:
-                                    const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                                itemCount: history.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 6),
-                                itemBuilder: (context, index) {
-                                  final item = history[index];
-                                  return AppCard(
-                                    backgroundColor: CupertinoColors.systemGrey6.resolveFrom(context),
-                                    padding:
-                                        const EdgeInsets.fromLTRB(10, 8, 8, 8),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: GestureDetector(
-                                            onTap: () {
-                                              inputController.text = item;
-                                            },
-                                            child: Text(
-                                              item,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style:
-                                                  const TextStyle(fontSize: 13),
-                                            ),
-                                          ),
-                                        ),
-                                        CupertinoButton(
-                                          padding: EdgeInsets.zero,
-                                          minimumSize: const Size(28, 28),
-                                          onPressed: () async {
-                                            history.removeAt(index);
-                                            await _saveOnlineImportHistory(
-                                              history,
-                                            );
-                                            if (mounted) {
-                                              setDialogState(() {});
-                                            }
-                                          },
-                                          child: Icon(
-                                            CupertinoIcons.delete,
-                                            size: 18,
-                                            color: CupertinoColors.systemRed.resolveFrom(context)
-                                                .resolveFrom(context),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          );
-        },
-      );
-    } finally {
-      inputController.dispose();
-    }
+  Future<String?> _showOnlineImportInputSheet() {
+    return showReplaceRuleOnlineImportSheet(
+      context: context,
+      loadHistory: _loadOnlineImportHistory,
+      saveHistory: _saveOnlineImportHistory,
+    );
   }
 
   bool _isHttpUrl(String value) {
@@ -1888,165 +1658,11 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
 
   Future<ReplaceRuleImportSelectionDecision?> _showImportSelectionSheet(
     List<ReplaceRuleImportCandidate> candidates,
-  ) async {
-    final selectedIndexes = <int>{
-      for (var index = 0; index < candidates.length; index++)
-        if (candidates[index].selectedByDefault) index,
-    };
-    var customGroupName = '';
-    var appendCustomGroup = false;
-    return showCupertinoBottomSheetDialog<ReplaceRuleImportSelectionDecision>(
-      context: context,
-      builder: (popupContext) {
-        return CupertinoPopupSurface(
-          isSurfacePainted: true,
-          child: StatefulBuilder(
-            builder: (context, setDialogState) {
-              final selectedCount = selectedIndexes.length;
-              final totalCount = candidates.length;
-              final allSelected = totalCount > 0 && selectedCount == totalCount;
-              final toggleAllLabel = allSelected
-                  ? '取消全选（$selectedCount/$totalCount）'
-                  : '全选（$selectedCount/$totalCount）';
-              return SizedBox(
-                height: math.min(
-                  MediaQuery.sizeOf(context).height * 0.86,
-                  680,
-                ),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
-                      child: Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              '导入替换规则',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          CupertinoButton(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            onPressed: () => Navigator.pop(popupContext),
-                            child: const Text('取消'),
-                          ),
-                          CupertinoButton.filled(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            onPressed: selectedCount == 0
-                                ? null
-                                : () => Navigator.pop(
-                                      popupContext,
-                                      ReplaceRuleImportSelectionDecision(
-                                        selectedIndexes:
-                                            selectedIndexes.toSet(),
-                                        groupPolicy:
-                                            ReplaceRuleImportGroupPolicy(
-                                          groupName: customGroupName,
-                                          appendGroup: appendCustomGroup,
-                                        ),
-                                      ),
-                                    ),
-                            child: Text('导入($selectedCount)'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          CupertinoButton(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            color: CupertinoColors.systemGrey5.resolveFrom(context),
-                            onPressed: () {
-                              setDialogState(() {
-                                if (allSelected) {
-                                  selectedIndexes.clear();
-                                } else {
-                                  selectedIndexes
-                                    ..clear()
-                                    ..addAll(
-                                      List<int>.generate(
-                                        candidates.length,
-                                        (index) => index,
-                                      ),
-                                    );
-                                }
-                              });
-                            },
-                            child: Text(toggleAllLabel),
-                          ),
-                          CupertinoButton(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            color: CupertinoColors.systemGrey5.resolveFrom(context),
-                            onPressed: () async {
-                              final input = await _showImportCustomGroupDialog(
-                                initialGroupName: customGroupName,
-                                initialAppendGroup: appendCustomGroup,
-                              );
-                              if (input == null || !popupContext.mounted) {
-                                return;
-                              }
-                              setDialogState(() {
-                                customGroupName = input.groupName;
-                                appendCustomGroup = input.appendGroup;
-                              });
-                            },
-                            child: Text(
-                              _buildImportGroupActionLabel(
-                                groupName: customGroupName,
-                                appendGroup: appendCustomGroup,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                        itemCount: candidates.length,
-                        separatorBuilder: (context, _) =>
-                            const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final candidate = candidates[index];
-                          final selected = selectedIndexes.contains(index);
-                          return ReplaceRuleImportCandidateTile(
-                            candidate: candidate,
-                            selected: selected,
-                            onTap: () {
-                              setDialogState(() {
-                                if (selected) {
-                                  selectedIndexes.remove(index);
-                                } else {
-                                  selectedIndexes.add(index);
-                                }
-                              });
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
+  ) =>
+      showReplaceRuleImportSelectionSheet(
+        context: context,
+        candidates: candidates,
+      );
 
   ReplaceRule _applyImportGroupPolicy({
     required ReplaceRule rule,
@@ -2072,88 +1688,6 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     return rule.copyWith(group: groups.join(','));
   }
 
-  String _buildImportGroupActionLabel({
-    required String groupName,
-    required bool appendGroup,
-  }) {
-    final normalized = groupName.trim();
-    if (normalized.isEmpty) {
-      return '自定义源分组';
-    }
-    final title = '【$normalized】';
-    if (appendGroup) {
-      return '+$title';
-    }
-    return title;
-  }
-
-  Future<ReplaceRuleImportGroupInput?> _showImportCustomGroupDialog({
-    required String initialGroupName,
-    required bool initialAppendGroup,
-  }) async {
-    final controller = TextEditingController(text: initialGroupName.trim());
-    var appendGroup = initialAppendGroup;
-    try {
-      return showCupertinoBottomSheetDialog<ReplaceRuleImportGroupInput>(
-        context: context,
-        builder: (dialogContext) {
-          return StatefulBuilder(
-            builder: (context, setDialogState) {
-              return CupertinoAlertDialog(
-                title: const Text('输入自定义源分组名称'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(height: 12),
-                    CupertinoTextField(
-                      controller: controller,
-                      placeholder: '分组名',
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            '追加分组',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                        ),
-                        CupertinoSwitch(
-                          value: appendGroup,
-                          onChanged: (value) {
-                            setDialogState(() => appendGroup = value);
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                actions: [
-                  CupertinoDialogAction(
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    child: const Text('取消'),
-                  ),
-                  CupertinoDialogAction(
-                    onPressed: () {
-                      Navigator.of(dialogContext).pop(
-                        ReplaceRuleImportGroupInput(
-                          groupName: controller.text.trim(),
-                          appendGroup: appendGroup,
-                        ),
-                      );
-                    },
-                    child: const Text('确定'),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
-    } finally {
-      controller.dispose();
-    }
-  }
 
   Future<void> _runImportingTask(Future<void> Function() task) async {
     final navigator = Navigator.of(context, rootNavigator: true);
