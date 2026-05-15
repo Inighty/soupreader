@@ -4,6 +4,7 @@ import '../database/repositories/source_repository.dart';
 import '../models/app_settings.dart';
 import '../models/backup_restore_ignore_config.dart';
 import '../models/book.dart';
+import '../../features/reader/models/reading_settings_json.dart';
 import 'settings_service.dart';
 
 /// 当前备份格式版本号，写入 JSON 顶层 `version` 字段。

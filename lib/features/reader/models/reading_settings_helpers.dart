@@ -95,4 +95,73 @@ class ReadingSettingsHelpers {
     if (_isValidKeepLightSeconds(fallback)) return fallback;
     return ReadingSettings.keepLightFollowSystem;
   }
+
+  static Map<String, int> parseClickActions(dynamic raw) {
+    if (raw is! Map) {
+      return ClickAction.normalizeConfig(const <String, int>{});
+    }
+    final parsed = <String, int>{};
+    for (final entry in raw.entries) {
+      parsed[entry.key.toString()] = toInt(entry.value, ClickAction.showMenu);
+    }
+    return ClickAction.normalizeConfig(parsed);
+  }
+
+  static List<int> parseKeyCodeList(dynamic raw) {
+    final values = <int>[];
+    if (raw is List) {
+      for (final item in raw) {
+        values.add(toInt(item, -1));
+      }
+      return normalizeKeyCodeList(values);
+    }
+    if (raw is String) {
+      for (final token in raw.split(',')) {
+        final normalized = token.trim();
+        if (normalized.isEmpty) continue;
+        values.add(toInt(normalized, -1));
+      }
+      return normalizeKeyCodeList(values);
+    }
+    if (raw is int) return normalizeKeyCodeList(<int>[raw]);
+    if (raw is num && raw.isFinite) {
+      return normalizeKeyCodeList(<int>[raw.toInt()]);
+    }
+    return const <int>[];
+  }
+
+  static List<ReadStyleConfig> parseReadStyleConfigs(dynamic raw) {
+    if (raw is! List) return const <ReadStyleConfig>[];
+    final parsed = <ReadStyleConfig>[];
+    for (final item in raw) {
+      if (item is Map<String, dynamic>) {
+        parsed.add(ReadStyleConfig.fromJson(item).sanitize());
+        continue;
+      }
+      if (item is Map) {
+        parsed.add(
+          ReadStyleConfig.fromJson(
+            item.map((key, value) => MapEntry('$key', value)),
+          ).sanitize(),
+        );
+      }
+    }
+    return parsed;
+  }
+
+  static ProgressBarBehavior parseProgressBarBehavior(
+    dynamic raw, {
+    ProgressBarBehavior fallback = ProgressBarBehavior.page,
+  }) {
+    if (raw is String) {
+      final normalized = raw.trim().toLowerCase();
+      if (normalized == 'chapter') return ProgressBarBehavior.chapter;
+      if (normalized == 'page') return ProgressBarBehavior.page;
+    }
+    if (raw is num && raw.isFinite) {
+      final index = raw.toInt().clamp(0, ProgressBarBehavior.values.length - 1);
+      return ProgressBarBehavior.values[index];
+    }
+    return fallback;
+  }
 }
