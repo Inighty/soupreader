@@ -1,10 +1,4 @@
-import 'dart:convert';
-import 'dart:io';
-import 'dart:math' as math;
-
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 
 import '../../../app/widgets/app_blocking_progress.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
@@ -12,7 +6,6 @@ import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/app_manage_search_field.dart';
 import '../../../app/widgets/app_nav_bar_button.dart';
-import '../../../app/widgets/app_popover_menu.dart';
 import '../../../app/widgets/cupertino_bottom_dialog.dart';
 import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
@@ -22,13 +15,17 @@ import '../../../core/services/qr_scan_service.dart';
 import '../../../core/utils/file_picker_save_compat.dart';
 import '../../../core/utils/legado_json.dart';
 import '../../search/models/search_scope_group_helper.dart';
-import '../../settings/views/app_help_dialog.dart';
 import '../models/replace_rule.dart';
 import '../services/replace_rule_import_export_service.dart';
 import 'replace_rule_edit_view.dart';
 import 'replace_rule_import_types.dart';
+import 'replace_rule_list_group_sheet.dart';
 import 'replace_rule_list_import_dialog.dart';
+import 'replace_rule_list_import_helpers.dart';
+import 'replace_rule_list_menus.dart';
+import 'replace_rule_list_message_dialogs.dart';
 import 'replace_rule_list_online_import.dart';
+import 'replace_rule_list_selection_actions.dart';
 import 'replace_rule_list_widgets.dart';
 
 
@@ -40,7 +37,7 @@ class ReplaceRuleListView extends StatefulWidget {
   State<ReplaceRuleListView> createState() => _ReplaceRuleListViewState();
 }
 
-enum _ReplaceRuleTopMenuAction {
+enum ReplaceRuleTopMenuAction {
   create,
   importFile,
   importUrl,
@@ -49,8 +46,6 @@ enum _ReplaceRuleTopMenuAction {
 }
 
 class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
-  static const int _maxImportDepth = 5;
-  static const String _requestWithoutUaSuffix = '#requestWithoutUA';
   static const String _onlineImportHistoryKey = 'replaceRuleRecordKey';
   static const String _groupFilterAll = '';
   static const String _groupFilterNoGroup = '__no_group__';
@@ -556,133 +551,17 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     debugPrint('[replace-rule] $node failed: $error');
   }
 
-  Future<void> _showGroupManageSheet() async {
-    await showCupertinoBottomSheetDialog<void>(
+  Future<void> _showGroupManageSheet() {
+    return showReplaceRuleGroupManageSheet(
       context: context,
-      builder: (sheetContext) {
-        return CupertinoPopupSurface(
-          isSurfacePainted: true,
-          child: SizedBox(
-            height:
-                math.min(MediaQuery.of(sheetContext).size.height * 0.78, 560),
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          '分组管理',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(32, 32),
-                        onPressed: () async {
-                          final name = await _showGroupInputDialog(
-                            title: '添加分组',
-                          );
-                          if (name == null) return;
-                          await _addGroupToNoGroupRules(name);
-                        },
-                        child: const Icon(CupertinoIcons.add_circled),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  height: 0.5,
-                  color: CupertinoColors.systemGrey4.resolveFrom(context),
-                ),
-                Expanded(
-                  child: StreamBuilder<List<ReplaceRule>>(
-                    stream: _repo.watchAllRules(),
-                    builder: (context, snapshot) {
-                      final allRules = List<ReplaceRule>.from(
-                        snapshot.data ?? _repo.getAllRules(),
-                      )..sort((a, b) => a.order.compareTo(b.order));
-                      final groups = _buildGroups(allRules);
-                      if (groups.isEmpty) {
-                        return Center(
-                          child: Text(
-                            '暂无分组',
-                            style: TextStyle(
-                              color: CupertinoColors.secondaryLabel.resolveFrom(
-                                context,
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                      return ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                        itemCount: groups.length,
-                        separatorBuilder: (_, __) => Container(
-                          height: 0.5,
-                          color:
-                              CupertinoColors.systemGrey4.resolveFrom(context),
-                        ),
-                        itemBuilder: (context, index) {
-                          final group = groups[index];
-                          return SizedBox(
-                            height: 44,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    group,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                CupertinoButton(
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 6),
-                                  minimumSize: const Size(36, 30),
-                                  onPressed: () async {
-                                    final renamed = await _showGroupInputDialog(
-                                      title: '编辑分组',
-                                      initialValue: group,
-                                    );
-                                    if (renamed == null) return;
-                                    await _renameGroup(
-                                        oldGroup: group, newGroup: renamed);
-                                  },
-                                  child: const Text('编辑'),
-                                ),
-                                CupertinoButton(
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 6),
-                                  minimumSize: const Size(36, 30),
-                                  onPressed: () => _removeGroup(group),
-                                  child: Text(
-                                    '删除',
-                                    style: TextStyle(
-                                      color:
-                                          CupertinoColors.systemRed.resolveFrom(
-                                        context,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      repo: _repo,
+      buildGroups: _buildGroups,
+      showGroupInputDialog: ({required title, initialValue}) =>
+          _showGroupInputDialog(
+              title: title, initialValue: initialValue ?? ''),
+      addGroupToNoGroupRules: _addGroupToNoGroupRules,
+      renameGroup: _renameGroup,
+      removeGroup: _removeGroup,
     );
   }
 
@@ -868,97 +747,37 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   Future<void> _showMoreMenu() async {
-    if (_menuBusy) return;
-    if (!mounted) return;
-    final action = await showAppPopoverMenu<_ReplaceRuleTopMenuAction>(
+    if (_menuBusy || !mounted) return;
+    final action = await showReplaceRuleTopMenu(
       context: context,
       anchorKey: _moreMenuKey,
-      items: const [
-        AppPopoverMenuItem(
-          value: _ReplaceRuleTopMenuAction.create,
-          icon: CupertinoIcons.add_circled,
-          label: '新建替换',
-        ),
-        AppPopoverMenuItem(
-          value: _ReplaceRuleTopMenuAction.importFile,
-          icon: CupertinoIcons.doc,
-          label: '本地导入',
-        ),
-        AppPopoverMenuItem(
-          value: _ReplaceRuleTopMenuAction.importUrl,
-          icon: CupertinoIcons.globe,
-          label: '网络导入',
-        ),
-        AppPopoverMenuItem(
-          value: _ReplaceRuleTopMenuAction.importQr,
-          icon: CupertinoIcons.qrcode,
-          label: '二维码导入',
-        ),
-        AppPopoverMenuItem(
-          value: _ReplaceRuleTopMenuAction.help,
-          icon: CupertinoIcons.question_circle,
-          label: '帮助',
-        ),
-      ],
     );
     if (!mounted || action == null) return;
     switch (action) {
-      case _ReplaceRuleTopMenuAction.create:
+      case ReplaceRuleTopMenuAction.create:
         _createRule();
-        break;
-      case _ReplaceRuleTopMenuAction.importFile:
+      case ReplaceRuleTopMenuAction.importFile:
         _importFromFile();
-        break;
-      case _ReplaceRuleTopMenuAction.importUrl:
+      case ReplaceRuleTopMenuAction.importUrl:
         _importFromUrl();
-        break;
-      case _ReplaceRuleTopMenuAction.importQr:
+      case ReplaceRuleTopMenuAction.importQr:
         _importFromQr();
-        break;
-      case _ReplaceRuleTopMenuAction.help:
+      case ReplaceRuleTopMenuAction.help:
         _showReplaceRuleHelp();
-        break;
     }
   }
 
   Future<void> _showRuleItemMenu(ReplaceRule rule) async {
-    final action = await showAppActionListSheet<ReplaceRuleItemMenuAction>(
-      context: context,
-      title: rule.name.isEmpty ? '未命名规则' : rule.name,
-      showCancel: true,
-      items: const [
-        AppActionListItem<ReplaceRuleItemMenuAction>(
-          value: ReplaceRuleItemMenuAction.top,
-          icon: CupertinoIcons.arrow_up_circle,
-          label: '置顶',
-        ),
-        AppActionListItem<ReplaceRuleItemMenuAction>(
-          value: ReplaceRuleItemMenuAction.bottom,
-          icon: CupertinoIcons.arrow_down_circle,
-          label: '置底',
-        ),
-        AppActionListItem<ReplaceRuleItemMenuAction>(
-          value: ReplaceRuleItemMenuAction.delete,
-          icon: CupertinoIcons.delete,
-          label: '删除',
-          isDestructiveAction: true,
-        ),
-      ],
-    );
+    final action = await showReplaceRuleItemMenu(context: context, rule: rule);
     if (action == null || !mounted) return;
     switch (action) {
       case ReplaceRuleItemMenuAction.top:
         await _moveRuleToTop(rule);
-        return;
       case ReplaceRuleItemMenuAction.bottom:
         await _moveRuleToBottom(rule);
-        return;
       case ReplaceRuleItemMenuAction.delete:
-        if (_selectedRuleIds.remove(rule.id)) {
-          setState(() {});
-        }
+        if (_selectedRuleIds.remove(rule.id)) setState(() {});
         await _confirmDeleteRule(rule);
-        return;
     }
   }
 
@@ -1103,54 +922,22 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
 
   Future<void> _showSelectionMoreMenu(List<ReplaceRule> visibleRules) async {
     if (_menuBusy || _selectedCountIn(visibleRules) == 0) return;
-    final selected = await showAppPopoverMenu<ReplaceRuleSelectionMenuAction>(
+    final selected = await showReplaceRuleSelectionPopoverMenu(
       context: context,
       anchorKey: _moreMenuKey,
-      items: const [
-        AppPopoverMenuItem(
-          value: ReplaceRuleSelectionMenuAction.enableSelection,
-          icon: CupertinoIcons.check_mark,
-          label: '启用所选',
-        ),
-        AppPopoverMenuItem(
-          value: ReplaceRuleSelectionMenuAction.disableSelection,
-          icon: CupertinoIcons.xmark,
-          label: '禁用所选',
-        ),
-        AppPopoverMenuItem(
-          value: ReplaceRuleSelectionMenuAction.topSelection,
-          icon: CupertinoIcons.arrow_up_to_line,
-          label: '置顶所选',
-        ),
-        AppPopoverMenuItem(
-          value: ReplaceRuleSelectionMenuAction.bottomSelection,
-          icon: CupertinoIcons.arrow_down_to_line,
-          label: '置底所选',
-        ),
-        AppPopoverMenuItem(
-          value: ReplaceRuleSelectionMenuAction.exportSelection,
-          icon: CupertinoIcons.square_arrow_up,
-          label: '导出所选',
-        ),
-      ],
     );
     if (selected == null) return;
     switch (selected) {
       case ReplaceRuleSelectionMenuAction.enableSelection:
         await _enableSelectedRules(visibleRules);
-        return;
       case ReplaceRuleSelectionMenuAction.disableSelection:
         await _disableSelectedRules(visibleRules);
-        return;
       case ReplaceRuleSelectionMenuAction.topSelection:
         await _topSelectedRules(visibleRules);
-        return;
       case ReplaceRuleSelectionMenuAction.bottomSelection:
         await _bottomSelectedRules(visibleRules);
-        return;
       case ReplaceRuleSelectionMenuAction.exportSelection:
         await _exportSelectedRules(visibleRules);
-        return;
     }
   }
 
@@ -1210,19 +997,15 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     if (selectedRules.isEmpty) return;
     setState(() => _enablingSelection = true);
     try {
-      final updatedRules = selectedRules
-          .map((rule) => rule.copyWith(isEnabled: true))
-          .toList(growable: false);
-      await _repo.addRules(updatedRules);
+      await enableSelectedReplaceRules(
+          repo: _repo, selectedRules: selectedRules);
     } catch (error, stackTrace) {
       _recordViewError(
         node: 'replace_rule.enable_selection',
         message: '批量启用替换规则失败',
         error: error,
         stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'count': selectedRules.length,
-        },
+        context: <String, dynamic>{'count': selectedRules.length},
       );
     } finally {
       if (!mounted) return;
@@ -1236,19 +1019,15 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     if (selectedRules.isEmpty) return;
     setState(() => _disablingSelection = true);
     try {
-      final updatedRules = selectedRules
-          .map((rule) => rule.copyWith(isEnabled: false))
-          .toList(growable: false);
-      await _repo.addRules(updatedRules);
+      await disableSelectedReplaceRules(
+          repo: _repo, selectedRules: selectedRules);
     } catch (error, stackTrace) {
       _recordViewError(
         node: 'replace_rule.disable_selection',
         message: '批量禁用替换规则失败',
         error: error,
         stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'count': selectedRules.length,
-        },
+        context: <String, dynamic>{'count': selectedRules.length},
       );
     } finally {
       if (!mounted) return;
@@ -1262,29 +1041,15 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     if (selectedRules.isEmpty) return;
     setState(() => _toppingSelection = true);
     try {
-      final allRules = _repo.getAllRules();
-      if (allRules.isEmpty) return;
-      var minOrder = allRules.first.order;
-      for (final rule in allRules.skip(1)) {
-        if (rule.order < minOrder) {
-          minOrder = rule.order;
-        }
-      }
-      var nextOrder = minOrder - selectedRules.length;
-      final updatedRules = selectedRules.map((rule) {
-        nextOrder += 1;
-        return rule.copyWith(order: nextOrder);
-      }).toList(growable: false);
-      await _repo.addRules(updatedRules);
+      await topSelectedReplaceRules(
+          repo: _repo, selectedRules: selectedRules);
     } catch (error, stackTrace) {
       _recordViewError(
         node: 'replace_rule.top_selection',
         message: '批量置顶替换规则失败',
         error: error,
         stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'count': selectedRules.length,
-        },
+        context: <String, dynamic>{'count': selectedRules.length},
       );
     } finally {
       if (!mounted) return;
@@ -1298,29 +1063,15 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     if (selectedRules.isEmpty) return;
     setState(() => _bottomingSelection = true);
     try {
-      final allRules = _repo.getAllRules();
-      if (allRules.isEmpty) return;
-      var maxOrder = allRules.first.order;
-      for (final rule in allRules.skip(1)) {
-        if (rule.order > maxOrder) {
-          maxOrder = rule.order;
-        }
-      }
-      final updatedRules = selectedRules.map((rule) {
-        final currentOrder = maxOrder;
-        maxOrder += 1;
-        return rule.copyWith(order: currentOrder);
-      }).toList(growable: false);
-      await _repo.addRules(updatedRules);
+      await bottomSelectedReplaceRules(
+          repo: _repo, selectedRules: selectedRules);
     } catch (error, stackTrace) {
       _recordViewError(
         node: 'replace_rule.bottom_selection',
         message: '批量置底替换规则失败',
         error: error,
         stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'count': selectedRules.length,
-        },
+        context: <String, dynamic>{'count': selectedRules.length},
       );
     } finally {
       if (!mounted) return;
@@ -1335,7 +1086,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     if (_importingLocal) return;
     setState(() => _importingLocal = true);
     try {
-      final localText = await _pickLocalImportText();
+      final localText = await pickLocalReplaceRuleImportText();
       if (localText == null) {
         return;
       }
@@ -1350,7 +1101,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       if (!mounted) return;
       await _showMessageDialog(
         title: '导入替换规则',
-        message: _formatImportError(error),
+        message: formatReplaceRuleImportError(error),
       );
     } finally {
       if (mounted) {
@@ -1364,11 +1115,11 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     setState(() => _importingOnline = true);
     try {
       final rawInput = await _showOnlineImportInputSheet();
-      final normalizedInput = _sanitizeImportInput(rawInput ?? '');
+      final normalizedInput = sanitizeReplaceRuleImportInput(rawInput ?? '');
       if (normalizedInput.isEmpty) {
         return;
       }
-      if (_isHttpUrl(normalizedInput)) {
+      if (isReplaceRuleHttpUrl(normalizedInput)) {
         await _pushOnlineImportHistory(normalizedInput);
       }
       await _importRulesFromInput(normalizedInput);
@@ -1382,7 +1133,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       if (!mounted) return;
       await _showMessageDialog(
         title: '导入替换规则',
-        message: _formatImportError(error),
+        message: formatReplaceRuleImportError(error),
       );
     } finally {
       if (mounted) {
@@ -1399,7 +1150,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
         context,
         title: '二维码导入',
       );
-      final normalizedInput = _sanitizeImportInput(text ?? '');
+      final normalizedInput = sanitizeReplaceRuleImportInput(text ?? '');
       if (normalizedInput.isEmpty) {
         return;
       }
@@ -1414,7 +1165,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       if (!mounted) return;
       await _showMessageDialog(
         title: '导入替换规则',
-        message: _formatImportError(error),
+        message: formatReplaceRuleImportError(error),
       );
     } finally {
       if (mounted) {
@@ -1424,8 +1175,12 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   }
 
   Future<void> _importRulesFromInput(String rawInput) async {
-    final importedRules = await _parseImportRulesFromInput(rawInput, depth: 0);
-    final candidates = _buildImportCandidates(importedRules);
+    final importedRules = await parseReplaceRuleImportRulesFromInput(
+        io: _io, input: rawInput, depth: 0);
+    final candidates = buildReplaceRuleImportCandidates(
+      importedRules: importedRules,
+      localRules: _repo.getAllRules(),
+    );
     if (candidates.isEmpty) {
       await _showMessageDialog(
         title: '导入替换规则',
@@ -1444,11 +1199,9 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
       final selectedRules = <ReplaceRule>[];
       final sortedIndexes = selectionDecision.selectedIndexes.toList()..sort();
       for (final index in sortedIndexes) {
-        if (index < 0 || index >= candidates.length) {
-          continue;
-        }
+        if (index < 0 || index >= candidates.length) continue;
         selectedRules.add(
-          _applyImportGroupPolicy(
+          applyReplaceRuleImportGroupPolicy(
             rule: candidates[index].rule,
             policy: selectionDecision.groupPolicy,
           ),
@@ -1458,91 +1211,12 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     });
   }
 
-  Future<List<ReplaceRule>> _parseImportRulesFromInput(
-    String input, {
-    required int depth,
-  }) async {
-    if (depth > _ReplaceRuleListViewState._maxImportDepth) {
-      throw const FormatException('导入链接重定向层级过深');
-    }
-    final text = _sanitizeImportInput(input);
-    if (text.isEmpty) {
-      throw const FormatException('格式不对');
-    }
-    if (_looksLikeJson(text)) {
-      final parsed = _io.importFromJson(text);
-      if (parsed.success && parsed.rules.isNotEmpty) {
-        return parsed.rules;
-      }
-      final detail = parsed.errorMessage?.trim();
-      throw FormatException(
-        detail == null || detail.isEmpty ? '格式不对' : detail,
-      );
-    }
-    final parsedUri = Uri.tryParse(text);
-    if (parsedUri != null) {
-      final scheme = parsedUri.scheme.toLowerCase();
-      if (scheme == 'http' || scheme == 'https') {
-        final remoteText = await _loadTextFromUrl(text);
-        return _parseImportRulesFromInput(remoteText, depth: depth + 1);
-      }
-      if (scheme == 'file') {
-        final localText = await File.fromUri(parsedUri).readAsString();
-        return _parseImportRulesFromInput(localText, depth: depth + 1);
-      }
-    }
-    final localFile = File(text);
-    if (await localFile.exists()) {
-      final localText = await localFile.readAsString();
-      return _parseImportRulesFromInput(localText, depth: depth + 1);
-    }
-    throw const FormatException('格式不对');
-  }
-
-  Future<String> _loadTextFromUrl(String rawUrl) async {
-    var requestUrl = rawUrl.trim();
-    var requestWithoutUa = false;
-    if (requestUrl.endsWith(_ReplaceRuleListViewState._requestWithoutUaSuffix)) {
-      requestWithoutUa = true;
-      requestUrl = requestUrl.substring(
-        0,
-        requestUrl.length - _ReplaceRuleListViewState._requestWithoutUaSuffix.length,
-      );
-    }
-    final uri = Uri.parse(requestUrl);
-    final httpClient = HttpClient();
-    try {
-      final request = await httpClient.getUrl(uri);
-      if (requestWithoutUa) {
-        request.headers.set(HttpHeaders.userAgentHeader, 'null');
-      }
-      final response = await request.close();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw HttpException('HTTP ${response.statusCode}', uri: uri);
-      }
-      final text = await response.transform(utf8.decoder).join();
-      if (_sanitizeImportInput(text).isEmpty) {
-        throw const FormatException('格式不对');
-      }
-      return text;
-    } finally {
-      httpClient.close(force: true);
-    }
-  }
-
   Future<String?> _showOnlineImportInputSheet() {
     return showReplaceRuleOnlineImportSheet(
       context: context,
       loadHistory: _loadOnlineImportHistory,
       saveHistory: _saveOnlineImportHistory,
     );
-  }
-
-  bool _isHttpUrl(String value) {
-    final parsed = Uri.tryParse(value);
-    if (parsed == null) return false;
-    final scheme = parsed.scheme.toLowerCase();
-    return scheme == 'http' || scheme == 'https';
   }
 
   Future<List<String>> _loadOnlineImportHistory() async {
@@ -1557,104 +1231,11 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     await _onlineImportHistoryStore.push(_ReplaceRuleListViewState._onlineImportHistoryKey, url);
   }
 
-  bool _looksLikeJson(String value) {
-    return value.startsWith('{') || value.startsWith('[');
-  }
+  Future<void> _showExportPathDialog(String outputPath) =>
+      showReplaceRuleExportPathDialog(
+          context: context, outputPath: outputPath);
 
-  Future<void> _showExportPathDialog(String outputPath) async {
-    final path = outputPath.trim();
-    if (path.isEmpty || !mounted) return;
-    final uri = Uri.tryParse(path);
-    final isHttpPath = uri != null &&
-        (uri.scheme.toLowerCase() == 'http' ||
-            uri.scheme.toLowerCase() == 'https');
-    final lines = <String>[
-      '导出路径：',
-      path,
-      if (isHttpPath) '',
-      if (isHttpPath) '检测到网络链接，可直接复制后分享。',
-    ];
-    await showCupertinoBottomSheetDialog<void>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('导出成功'),
-        content: Text('\n${lines.join('\n')}'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: path));
-              if (!dialogContext.mounted) return;
-              Navigator.pop(dialogContext);
-            },
-            child: const Text('复制路径'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showMessage(String message) {
-    showCupertinoBottomSheetDialog<void>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('提示'),
-        content: Text('\n$message'),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('好'),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showReplaceRuleHelp() async {
-    try {
-      final markdownText =
-          await rootBundle.loadString('assets/web/help/md/replaceRuleHelp.md');
-      if (!mounted) return;
-      await showAppHelpDialog(context, markdownText: markdownText);
-    } catch (error) {
-      if (!mounted) return;
-      _showMessage('帮助文档加载失败：$error');
-    }
-  }
-
-  List<ReplaceRuleImportCandidate> _buildImportCandidates(
-    List<ReplaceRule> importedRules,
-  ) {
-    final localById = <int, ReplaceRule>{
-      for (final rule in _repo.getAllRules()) rule.id: rule,
-    };
-    return importedRules.map((rule) {
-      final localRule = localById[rule.id];
-      return ReplaceRuleImportCandidate(
-        rule: rule,
-        localRule: localRule,
-        state: _resolveCandidateState(
-          importedRule: rule,
-          localRule: localRule,
-        ),
-      );
-    }).toList(growable: false);
-  }
-
-  ReplaceRuleImportCandidateState _resolveCandidateState({
-    required ReplaceRule importedRule,
-    required ReplaceRule? localRule,
-  }) {
-    if (localRule == null) {
-      return ReplaceRuleImportCandidateState.newRule;
-    }
-    if (importedRule.pattern != localRule.pattern ||
-        importedRule.replacement != localRule.replacement ||
-        importedRule.isRegex != localRule.isRegex ||
-        importedRule.scope != localRule.scope) {
-      return ReplaceRuleImportCandidateState.update;
-    }
-    return ReplaceRuleImportCandidateState.existing;
-  }
+  Future<void> _showReplaceRuleHelp() => showReplaceRuleHelp(context);
 
   Future<ReplaceRuleImportSelectionDecision?> _showImportSelectionSheet(
     List<ReplaceRuleImportCandidate> candidates,
@@ -1663,30 +1244,6 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
         context: context,
         candidates: candidates,
       );
-
-  ReplaceRule _applyImportGroupPolicy({
-    required ReplaceRule rule,
-    required ReplaceRuleImportGroupPolicy policy,
-  }) {
-    final groupName = policy.groupName.trim();
-    if (groupName.isEmpty) {
-      return rule;
-    }
-    if (!policy.appendGroup) {
-      return rule.copyWith(group: groupName);
-    }
-    final groups = <String>{};
-    final rawGroup = rule.group;
-    if (rawGroup != null && rawGroup.isNotEmpty) {
-      for (final part in rawGroup.split(_ReplaceRuleListViewState._groupSplitPattern)) {
-        final normalized = part.trim();
-        if (normalized.isEmpty) continue;
-        groups.add(normalized);
-      }
-    }
-    groups.add(groupName);
-    return rule.copyWith(group: groups.join(','));
-  }
 
 
   Future<void> _runImportingTask(Future<void> Function() task) async {
@@ -1708,73 +1265,12 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     }
   }
 
-  Future<String?> _pickLocalImportText() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['txt', 'json'],
-      allowMultiple: false,
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) {
-      return null;
-    }
-    final file = result.files.first;
-    if (file.bytes != null) {
-      return utf8.decode(file.bytes!, allowMalformed: true);
-    }
-    final path = file.path;
-    if (path != null && path.trim().isNotEmpty) {
-      return File(path).readAsString();
-    }
-    throw const FileSystemException('无法读取文件内容');
-  }
-
-  String _sanitizeImportInput(String input) {
-    var value = input.trim();
-    if (value.startsWith('\uFEFF')) {
-      value = value.replaceFirst(RegExp(r'^\uFEFF+'), '');
-    }
-    return value.trim();
-  }
-
-  String _formatImportError(Object error) {
-    if (error is FileSystemException) {
-      final message = error.message.trim();
-      if (message.isEmpty) return 'readTextError:ERROR';
-      return 'readTextError:$message';
-    }
-    if (error is FormatException) {
-      final message = error.message.trim();
-      if (message.isEmpty) return 'ImportError:格式不对';
-      return 'ImportError:$message';
-    }
-    final text = '$error'.trim();
-    if (text.isEmpty) return 'ImportError:ERROR';
-    if (text.startsWith('Exception:')) {
-      final stripped = text.substring('Exception:'.length).trim();
-      return stripped.isEmpty ? 'ImportError:ERROR' : 'ImportError:$stripped';
-    }
-    return 'ImportError:$text';
-  }
 
   Future<void> _showMessageDialog({
     required String title,
     required String message,
-  }) async {
-    if (!mounted) return;
-    await showCupertinoBottomSheetDialog<void>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
-    );
-  }
+  }) =>
+      showReplaceRuleMessageDialog(
+          context: context, title: title, message: message);
 }
 
