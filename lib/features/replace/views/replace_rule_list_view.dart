@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 
-import '../../../app/widgets/app_blocking_progress.dart';
 import '../../../app/widgets/app_action_list_sheet.dart';
 import '../../../app/widgets/app_cupertino_page_scaffold.dart';
 import '../../../app/widgets/app_empty_state.dart';
@@ -11,21 +10,13 @@ import '../../../core/database/database_service.dart';
 import '../../../core/database/repositories/replace_rule_repository.dart';
 import '../../../core/services/exception_log_service.dart';
 import '../../../core/services/online_import_history_store.dart';
-import '../../../core/services/qr_scan_service.dart';
-import '../../../core/utils/file_picker_save_compat.dart';
-import '../../../core/utils/legado_json.dart';
 import '../../search/models/search_scope_group_helper.dart';
 import '../models/replace_rule.dart';
 import '../services/replace_rule_import_export_service.dart';
 import 'replace_rule_edit_view.dart';
-import 'replace_rule_import_types.dart';
+import 'replace_rule_list_actions.dart';
 import 'replace_rule_list_group_sheet.dart';
-import 'replace_rule_list_import_dialog.dart';
-import 'replace_rule_list_import_helpers.dart';
-import 'replace_rule_list_menus.dart';
 import 'replace_rule_list_message_dialogs.dart';
-import 'replace_rule_list_online_import.dart';
-import 'replace_rule_list_selection_actions.dart';
 import 'replace_rule_list_widgets.dart';
 
 
@@ -34,7 +25,7 @@ class ReplaceRuleListView extends StatefulWidget {
   const ReplaceRuleListView({super.key});
 
   @override
-  State<ReplaceRuleListView> createState() => _ReplaceRuleListViewState();
+  State<ReplaceRuleListView> createState() => ReplaceRuleListViewState();
 }
 
 enum ReplaceRuleTopMenuAction {
@@ -45,92 +36,92 @@ enum ReplaceRuleTopMenuAction {
   help,
 }
 
-class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
-  static const String _onlineImportHistoryKey = 'replaceRuleRecordKey';
+class ReplaceRuleListViewState extends State<ReplaceRuleListView> {
+  static const String onlineImportHistoryKey = 'replaceRuleRecordKey';
   static const String _groupFilterAll = '';
   static const String _groupFilterNoGroup = '__no_group__';
   static const String _noGroupLabel = '未分组';
   static final RegExp _groupSplitPattern = RegExp(r'[,;，；]');
 
-  late final ReplaceRuleRepository _repo;
-  final GlobalKey _moreMenuKey = GlobalKey();
-  final ReplaceRuleImportExportService _io = ReplaceRuleImportExportService();
-  final TextEditingController _searchController = TextEditingController();
-  final OnlineImportHistoryStore _onlineImportHistoryStore =
+  late final ReplaceRuleRepository repo;
+  final GlobalKey moreMenuKey = GlobalKey();
+  final ReplaceRuleImportExportService io = ReplaceRuleImportExportService();
+  final TextEditingController searchController = TextEditingController();
+  final OnlineImportHistoryStore onlineImportHistoryStore =
       OnlineImportHistoryStore();
 
-  String _activeGroupQuery = _groupFilterAll;
-  String _searchQuery = '';
-  bool _changed = false;
-  bool _dataInited = false;
-  bool _importingLocal = false;
-  bool _importingOnline = false;
-  bool _importingQr = false;
-  bool _exportingSelection = false;
-  bool _enablingSelection = false;
-  bool _disablingSelection = false;
-  bool _toppingSelection = false;
-  bool _bottomingSelection = false;
-  bool _deletingSelection = false;
-  bool _selectionMode = false;
-  final Set<int> _selectedRuleIds = <int>{};
+  String activeGroupQuery = _groupFilterAll;
+  String searchQuery = '';
+  bool changed = false;
+  bool dataInited = false;
+  bool importingLocal = false;
+  bool importingOnline = false;
+  bool importingQr = false;
+  bool exportingSelection = false;
+  bool enablingSelection = false;
+  bool disablingSelection = false;
+  bool toppingSelection = false;
+  bool bottomingSelection = false;
+  bool deletingSelection = false;
+  bool selectionMode = false;
+  final Set<int> selectedRuleIds = <int>{};
 
-  bool get _selectionUpdating =>
-      _enablingSelection ||
-      _disablingSelection ||
-      _toppingSelection ||
-      _bottomingSelection;
+  bool get selectionUpdating =>
+      enablingSelection ||
+      disablingSelection ||
+      toppingSelection ||
+      bottomingSelection;
 
-  bool get _selectionActionBusy =>
-      _exportingSelection || _selectionUpdating || _deletingSelection;
+  bool get selectionActionBusy =>
+      exportingSelection || selectionUpdating || deletingSelection;
 
-  bool get _menuBusy =>
-      _importingLocal ||
-      _importingOnline ||
-      _importingQr ||
-      _exportingSelection ||
-      _selectionUpdating ||
-      _deletingSelection;
+  bool get menuBusy =>
+      importingLocal ||
+      importingOnline ||
+      importingQr ||
+      exportingSelection ||
+      selectionUpdating ||
+      deletingSelection;
 
   @override
   void initState() {
     super.initState();
-    _repo = ReplaceRuleRepository(DatabaseService());
+    repo = ReplaceRuleRepository(DatabaseService());
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    searchController.dispose();
     super.dispose();
   }
 
-  void _markChanged() {
-    if (!_changed) setState(() => _changed = true);
+  void markChanged() {
+    if (!changed) setState(() => changed = true);
   }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<ReplaceRule>>(
-      stream: _repo.watchAllRules(),
+      stream: repo.watchAllRules(),
       builder: (context, snapshot) {
         final allRules = List<ReplaceRule>.from(
-          snapshot.data ?? _repo.getAllRules(),
+          snapshot.data ?? repo.getAllRules(),
         )..sort((a, b) => a.order.compareTo(b.order));
-        if (_dataInited && snapshot.hasData) _markChanged();
-        _dataInited = true;
-        _syncSelectionWithRules(allRules);
+        if (dataInited && snapshot.hasData) markChanged();
+        dataInited = true;
+        syncSelectionWithRules(allRules);
 
-        final groups = _buildGroups(allRules);
-        final activeGroupQuery = _resolveActiveGroupQuery(groups);
+        final groups = buildGroups(allRules);
+        final activeGroupQuery = resolveActiveGroupQuery(groups);
         // 对齐 legado：当搜索关键字非空时，优先走搜索分支（含 `group:` 与“未分组”语义）。
-        final normalizedSearchQuery = _searchQuery.trim();
+        final normalizedSearchQuery = searchQuery.trim();
         final rules = normalizedSearchQuery.isEmpty
-            ? _filterRulesByGroupQuery(allRules, activeGroupQuery)
-            : _filterRulesBySearchQueryLikeLegado(
+            ? filterRulesByGroupQuery(allRules, activeGroupQuery)
+            : filterRulesBySearchQueryLikeLegado(
                 allRules,
                 normalizedSearchQuery,
               );
-        final selectedCount = _selectedCountIn(rules);
+        final selectedCount = selectedCountIn(rules);
         final totalCount = rules.length;
         final hasSelection = selectedCount > 0;
         final enabledColor = CupertinoColors.activeBlue.resolveFrom(context);
@@ -139,7 +130,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
         return PopScope<bool>(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) {
-            if (!didPop) Navigator.of(context).pop(_changed);
+            if (!didPop) Navigator.of(context).pop(changed);
           },
           child: AppCupertinoPageScaffold(
           title: '文本替换规则',
@@ -148,34 +139,34 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
             children: [
               AppNavBarButton(
                 onPressed:
-                    _menuBusy ? null : () => _showGroupFilterOptions(allRules),
+                    menuBusy ? null : () => showGroupFilterOptions(allRules),
                 child: const Icon(CupertinoIcons.square_grid_2x2),
               ),
               AppNavBarButton(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                onPressed: _menuBusy || (!_selectionMode && allRules.isEmpty)
+                onPressed: menuBusy || (!selectionMode && allRules.isEmpty)
                     ? null
-                    : () => _toggleSelectionMode(allRules),
+                    : () => toggleSelectionMode(allRules),
                 child: Text(
-                  _selectionMode ? '完成' : '多选',
+                  selectionMode ? '完成' : '多选',
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
               AppNavBarButton(
-                key: _moreMenuKey,
-                onPressed: _selectionMode
-                    ? (hasSelection && !_menuBusy
-                        ? () => _showSelectionMoreMenu(rules)
+                key: moreMenuKey,
+                onPressed: selectionMode
+                    ? (hasSelection && !menuBusy
+                        ? () => showSelectionMoreMenu(rules)
                         : null)
-                    : (_menuBusy ? null : _showMoreMenu),
-                child: _selectionMode
-                    ? (_selectionActionBusy
+                    : (menuBusy ? null : showMoreMenu),
+                child: selectionMode
+                    ? (selectionActionBusy
                         ? const CupertinoActivityIndicator(radius: 9)
                         : Icon(
                             CupertinoIcons.ellipsis_circle,
                             color: hasSelection ? enabledColor : disabledColor,
                           ))
-                    : (_menuBusy
+                    : (menuBusy
                         ? const CupertinoActivityIndicator(radius: 9)
                         : const Icon(CupertinoIcons.ellipsis)),
               ),
@@ -186,25 +177,25 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
                 child: AppManageSearchField(
-                  controller: _searchController,
+                  controller: searchController,
                   placeholder: '替换净化搜索',
-                  onChanged: _onSearchQueryChanged,
+                  onChanged: onSearchQueryChanged,
                 ),
               ),
               Expanded(
-                child: rules.isEmpty ? _empty() : _buildList(rules),
+                child: rules.isEmpty ? empty() : buildList(rules),
               ),
-              if (_selectionMode)
+              if (selectionMode)
                 ReplaceRuleSelectionBar(
                   selectedCount: selectedCount,
                   totalCount: totalCount,
-                  menuBusy: _menuBusy,
-                  selectionActionBusy: _selectionActionBusy,
-                  deletingSelection: _deletingSelection,
-                  onToggleAll: () => _toggleSelectAllRules(rules),
-                  onInvert: () => _revertSelection(rules),
-                  onConfirmDelete: () => _confirmDeleteSelectedRules(rules),
-                  onShowMore: () => _showSelectionMoreMenu(rules),
+                  menuBusy: menuBusy,
+                  selectionActionBusy: selectionActionBusy,
+                  deletingSelection: deletingSelection,
+                  onToggleAll: () => toggleSelectAllRules(rules),
+                  onInvert: () => revertSelection(rules),
+                  onConfirmDelete: () => confirmDeleteSelectedRules(rules),
+                  onShowMore: () => showSelectionMoreMenu(rules),
                 ),
             ],
           ),
@@ -214,73 +205,73 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     );
   }
 
-  void _syncSelectionWithRules(List<ReplaceRule> rules) {
+  void syncSelectionWithRules(List<ReplaceRule> rules) {
     final availableIds = rules.map((rule) => rule.id).toSet();
-    _selectedRuleIds.removeWhere((id) => !availableIds.contains(id));
+    selectedRuleIds.removeWhere((id) => !availableIds.contains(id));
   }
 
-  void _toggleSelectionMode(List<ReplaceRule> rules) {
+  void toggleSelectionMode(List<ReplaceRule> rules) {
     if (rules.isEmpty) return;
     setState(() {
-      _selectionMode = !_selectionMode;
-      _selectedRuleIds.clear();
+      selectionMode = !selectionMode;
+      selectedRuleIds.clear();
     });
   }
 
-  int _selectedCountIn(List<ReplaceRule> rules) {
+  int selectedCountIn(List<ReplaceRule> rules) {
     var count = 0;
     for (final rule in rules) {
-      if (_selectedRuleIds.contains(rule.id)) {
+      if (selectedRuleIds.contains(rule.id)) {
         count += 1;
       }
     }
     return count;
   }
 
-  void _toggleRuleSelection(int ruleId) {
+  void toggleRuleSelection(int ruleId) {
     setState(() {
-      if (_selectedRuleIds.contains(ruleId)) {
-        _selectedRuleIds.remove(ruleId);
+      if (selectedRuleIds.contains(ruleId)) {
+        selectedRuleIds.remove(ruleId);
       } else {
-        _selectedRuleIds.add(ruleId);
+        selectedRuleIds.add(ruleId);
       }
     });
   }
 
-  void _toggleSelectAllRules(List<ReplaceRule> rules) {
+  void toggleSelectAllRules(List<ReplaceRule> rules) {
     if (rules.isEmpty) return;
     setState(() {
-      final allSelected = _selectedCountIn(rules) == rules.length;
+      final allSelected = selectedCountIn(rules) == rules.length;
       if (allSelected) {
-        _selectedRuleIds.removeAll(rules.map((rule) => rule.id));
+        selectedRuleIds.removeAll(rules.map((rule) => rule.id));
       } else {
-        _selectedRuleIds.addAll(rules.map((rule) => rule.id));
+        selectedRuleIds.addAll(rules.map((rule) => rule.id));
       }
     });
   }
 
-  void _revertSelection(List<ReplaceRule> rules) {
+  void revertSelection(List<ReplaceRule> rules) {
     if (rules.isEmpty) return;
     setState(() {
       for (final rule in rules) {
-        if (_selectedRuleIds.contains(rule.id)) {
-          _selectedRuleIds.remove(rule.id);
+        if (selectedRuleIds.contains(rule.id)) {
+          selectedRuleIds.remove(rule.id);
         } else {
-          _selectedRuleIds.add(rule.id);
+          selectedRuleIds.add(rule.id);
         }
       }
     });
   }
 
-  void _onSearchQueryChanged(String value) {
+  void onSearchQueryChanged(String value) {
     setState(() {
-      _searchQuery = value;
+      searchQuery = value;
       // 搜索分支与分组分支在 build 中互斥，输入搜索时无需主动改写分组状态。
-      _selectedRuleIds.clear();
+      selectedRuleIds.clear();
     });
   }
 
-  List<String> _buildGroups(List<ReplaceRule> rules) {
+  List<String> buildGroups(List<ReplaceRule> rules) {
     final groups = <String>{};
     for (final rule in rules) {
       final raw = rule.group?.trim();
@@ -300,18 +291,18 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     return sorted;
   }
 
-  String _resolveActiveGroupQuery(List<String> groups) {
-    if (_activeGroupQuery == _groupFilterAll ||
-        _activeGroupQuery == _groupFilterNoGroup) {
-      return _activeGroupQuery;
+  String resolveActiveGroupQuery(List<String> groups) {
+    if (activeGroupQuery == _groupFilterAll ||
+        activeGroupQuery == _groupFilterNoGroup) {
+      return activeGroupQuery;
     }
-    if (groups.contains(_activeGroupQuery)) {
-      return _activeGroupQuery;
+    if (groups.contains(activeGroupQuery)) {
+      return activeGroupQuery;
     }
     return _groupFilterAll;
   }
 
-  List<ReplaceRule> _filterRulesByGroupQuery(
+  List<ReplaceRule> filterRulesByGroupQuery(
     List<ReplaceRule> rules,
     String query,
   ) {
@@ -330,7 +321,7 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
   /// 1) `未分组` -> flowNoGroup
   /// 2) `group:xxx` -> flowGroupSearch("%xxx%")
   /// 3) 其它关键字 -> flowSearch("%key%")（name/group 联合搜索）
-  List<ReplaceRule> _filterRulesBySearchQueryLikeLegado(
+  List<ReplaceRule> filterRulesBySearchQueryLikeLegado(
     List<ReplaceRule> rules,
     String query,
   ) {
@@ -379,9 +370,9 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     return text.contains(_noGroupLabel);
   }
 
-  Future<void> _showGroupFilterOptions(List<ReplaceRule> allRules) async {
-    final groups = _buildGroups(allRules);
-    final activeGroupQuery = _resolveActiveGroupQuery(groups);
+  Future<void> showGroupFilterOptions(List<ReplaceRule> allRules) async {
+    final groups = buildGroups(allRules);
+    final activeGroupQuery = resolveActiveGroupQuery(groups);
     const manageToken = '__group_manage__';
     final items = <AppActionListItem<String>>[
       const AppActionListItem<String>(
@@ -422,24 +413,24 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     );
     if (selected == null || !mounted) return;
     if (selected == manageToken) {
-      _showGroupManageSheet();
+      showGroupManageSheet();
       return;
     }
-    _applyGroupQuery(selected);
+    applyGroupQuery(selected);
   }
 
-  void _applyGroupQuery(String query) {
+  void applyGroupQuery(String query) {
     setState(() {
-      _activeGroupQuery = query;
-      _searchQuery = '';
-      _selectedRuleIds.clear();
+      activeGroupQuery = query;
+      searchQuery = '';
+      selectedRuleIds.clear();
     });
-    if (_searchController.text.isNotEmpty) {
-      _searchController.clear();
+    if (searchController.text.isNotEmpty) {
+      searchController.clear();
     }
   }
 
-  void _recordViewError({
+  void recordViewError({
     required String node,
     required String message,
     required Object error,
@@ -456,21 +447,21 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     debugPrint('[replace-rule] $node failed: $error');
   }
 
-  Future<void> _showGroupManageSheet() {
+  Future<void> showGroupManageSheet() {
     return showReplaceRuleGroupManageSheet(
       context: context,
-      repo: _repo,
-      buildGroups: _buildGroups,
+      repo: repo,
+      buildGroups: buildGroups,
       showGroupInputDialog: ({required title, initialValue}) =>
-          _showGroupInputDialog(
+          showGroupInputDialog(
               title: title, initialValue: initialValue ?? ''),
-      addGroupToNoGroupRules: _addGroupToNoGroupRules,
-      renameGroup: _renameGroup,
-      removeGroup: _removeGroup,
+      addGroupToNoGroupRules: addGroupToNoGroupRules,
+      renameGroup: renameGroup,
+      removeGroup: removeGroup,
     );
   }
 
-  Future<String?> _showGroupInputDialog({
+  Future<String?> showGroupInputDialog({
     required String title,
     String initialValue = '',
   }) async {
@@ -506,11 +497,11 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     }
   }
 
-  Future<void> _addGroupToNoGroupRules(String group) async {
+  Future<void> addGroupToNoGroupRules(String group) async {
     final normalized = group.trim();
     if (normalized.isEmpty) return;
     try {
-      final updates = _repo
+      final updates = repo
           .getAllRules()
           .where((rule) {
             final raw = rule.group;
@@ -519,9 +510,9 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
           .map((rule) => rule.copyWith(group: normalized))
           .toList(growable: false);
       if (updates.isEmpty) return;
-      await _repo.addRules(updates);
+      await repo.addRules(updates);
     } catch (error, stackTrace) {
-      _recordViewError(
+      recordViewError(
         node: 'replace_rule.group.add',
         message: '新增替换规则分组失败',
         error: error,
@@ -533,31 +524,31 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     }
   }
 
-  Future<void> _renameGroup({
+  Future<void> renameGroup({
     required String oldGroup,
     required String newGroup,
   }) async {
     final nextGroup = newGroup.trim();
     try {
       final updates = <ReplaceRule>[];
-      for (final rule in _repo.getAllRules()) {
+      for (final rule in repo.getAllRules()) {
         final raw = rule.group;
         if (raw == null || raw.isEmpty || !raw.contains(oldGroup)) {
           continue;
         }
-        final groups = _splitGroupsForGroupMutation(raw);
+        final groups = splitGroupsForGroupMutation(raw);
         if (!groups.remove(oldGroup)) {
           continue;
         }
         if (nextGroup.isNotEmpty) {
           groups.add(nextGroup);
         }
-        updates.add(rule.copyWith(group: _joinGroupsForGroupMutation(groups)));
+        updates.add(rule.copyWith(group: joinGroupsForGroupMutation(groups)));
       }
       if (updates.isEmpty) return;
-      await _repo.addRules(updates);
+      await repo.addRules(updates);
     } catch (error, stackTrace) {
-      _recordViewError(
+      recordViewError(
         node: 'replace_rule.group.rename',
         message: '重命名替换规则分组失败',
         error: error,
@@ -570,11 +561,11 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     }
   }
 
-  Future<void> _removeGroup(String group) async {
-    await _renameGroup(oldGroup: group, newGroup: '');
+  Future<void> removeGroup(String group) async {
+    await renameGroup(oldGroup: group, newGroup: '');
   }
 
-  Set<String> _splitGroupsForGroupMutation(String rawGroup) {
+  Set<String> splitGroupsForGroupMutation(String rawGroup) {
     final groups = <String>{};
     for (final part in rawGroup.split(_groupSplitPattern)) {
       final group = part.trim();
@@ -586,44 +577,44 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     return groups;
   }
 
-  String _joinGroupsForGroupMutation(Set<String> groups) {
+  String joinGroupsForGroupMutation(Set<String> groups) {
     if (groups.isEmpty) {
       return '';
     }
     return groups.join(',');
   }
 
-  Widget _empty() {
+  Widget empty() {
     return AppEmptyState(
       illustration: const AppEmptyPlanetIllustration(size: 86),
       title: '暂无规则',
       message: '可通过新建或导入创建替换净化规则',
       action: CupertinoButton.filled(
-        onPressed: _createRule,
+        onPressed: createRule,
         child: const Text('新建规则'),
       ),
     );
   }
 
-  Widget _buildList(List<ReplaceRule> rules) {
+  Widget buildList(List<ReplaceRule> rules) {
     return ReplaceRuleListItems(
       rules: rules,
-      selectedRuleIds: _selectedRuleIds,
-      selectionMode: _selectionMode,
-      onToggleSelection: _toggleRuleSelection,
-      onUpdateRule: (r) => _repo.updateRule(r),
-      onEditRule: _editRule,
-      onShowRuleItemMenu: _showRuleItemMenu,
+      selectedRuleIds: selectedRuleIds,
+      selectionMode: selectionMode,
+      onToggleSelection: toggleRuleSelection,
+      onUpdateRule: (r) => repo.updateRule(r),
+      onEditRule: editRule,
+      onShowRuleItemMenu: showRuleItemMenu,
     );
   }
 
-  void _createRule() {
-    _editRule(ReplaceRule.create());
+  void createRule() {
+    editRule(ReplaceRule.create());
   }
 
   int _nextReplaceRuleOrder() {
     var maxOrder = ReplaceRule.unsetOrder;
-    for (final rule in _repo.getAllRules()) {
+    for (final rule in repo.getAllRules()) {
       if (rule.order > maxOrder) {
         maxOrder = rule.order;
       }
@@ -638,540 +629,20 @@ class _ReplaceRuleListViewState extends State<ReplaceRuleListView> {
     return rule.copyWith(order: _nextReplaceRuleOrder());
   }
 
-  void _editRule(ReplaceRule rule) {
+  void editRule(ReplaceRule rule) {
     Navigator.of(context).push(
       CupertinoPageRoute<void>(
         builder: (context) => ReplaceRuleEditView(
           initial: rule,
           onSave: (next) async {
-            await _repo.addRule(_normalizeRuleForSave(next));
+            await repo.addRule(_normalizeRuleForSave(next));
           },
         ),
       ),
     );
   }
 
-  Future<void> _showMoreMenu() async {
-    if (_menuBusy || !mounted) return;
-    final action = await showReplaceRuleTopMenu(
-      context: context,
-      anchorKey: _moreMenuKey,
-    );
-    if (!mounted || action == null) return;
-    switch (action) {
-      case ReplaceRuleTopMenuAction.create:
-        _createRule();
-      case ReplaceRuleTopMenuAction.importFile:
-        _importFromFile();
-      case ReplaceRuleTopMenuAction.importUrl:
-        _importFromUrl();
-      case ReplaceRuleTopMenuAction.importQr:
-        _importFromQr();
-      case ReplaceRuleTopMenuAction.help:
-        _showReplaceRuleHelp();
-    }
-  }
-
-  Future<void> _showRuleItemMenu(ReplaceRule rule) async {
-    final action = await showReplaceRuleItemMenu(context: context, rule: rule);
-    if (action == null || !mounted) return;
-    switch (action) {
-      case ReplaceRuleItemMenuAction.top:
-        await _moveRuleToTop(rule);
-      case ReplaceRuleItemMenuAction.bottom:
-        await _moveRuleToBottom(rule);
-      case ReplaceRuleItemMenuAction.delete:
-        if (_selectedRuleIds.remove(rule.id)) setState(() {});
-        await _confirmDeleteRule(rule);
-    }
-  }
-
-  Future<void> _confirmDeleteRule(ReplaceRule rule) async {
-    final confirmed = await showCupertinoBottomSheetDialog<bool>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('提醒'),
-        content: Text('是否确认删除？\n${rule.name}'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) {
-      return;
-    }
-    try {
-      await _repo.deleteRule(rule.id);
-    } catch (error, stackTrace) {
-      _recordViewError(
-        node: 'replace_rule.delete',
-        message: '删除替换规则失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'ruleId': rule.id,
-          'ruleName': rule.name,
-        },
-      );
-    }
-  }
-
-  Future<void> _confirmDeleteSelectedRules(
-      List<ReplaceRule> visibleRules) async {
-    final selectedRules = _selectedRulesByCurrentOrder(visibleRules);
-    if (selectedRules.isEmpty) return;
-    final confirmed = await showCupertinoBottomSheetDialog<bool>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('提醒'),
-        content: const Text('是否确认删除？'),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('取消'),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) {
-      return;
-    }
-    await _deleteSelectedRules(selectedRules);
-  }
-
-  Future<void> _deleteSelectedRules(List<ReplaceRule> selectedRules) async {
-    if (_deletingSelection || selectedRules.isEmpty) return;
-    setState(() => _deletingSelection = true);
-    try {
-      final targetIds = selectedRules.map((rule) => rule.id).toSet();
-      await _repo.deleteRulesByIds(targetIds);
-      _selectedRuleIds.removeWhere(targetIds.contains);
-    } catch (error, stackTrace) {
-      _recordViewError(
-        node: 'replace_rule.delete_selection',
-        message: '批量删除替换规则失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'count': selectedRules.length,
-        },
-      );
-    } finally {
-      if (!mounted) return;
-      setState(() => _deletingSelection = false);
-    }
-  }
-
-  Future<void> _moveRuleToTop(ReplaceRule rule) async {
-    try {
-      final allRules = _repo.getAllRules();
-      if (allRules.isEmpty) return;
-      var minOrder = allRules.first.order;
-      for (final current in allRules.skip(1)) {
-        if (current.order < minOrder) {
-          minOrder = current.order;
-        }
-      }
-      await _repo.addRule(rule.copyWith(order: minOrder - 1));
-    } catch (error, stackTrace) {
-      _recordViewError(
-        node: 'replace_rule.move_top',
-        message: '替换规则置顶失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'ruleId': rule.id,
-          'ruleName': rule.name,
-        },
-      );
-    }
-  }
-
-  Future<void> _moveRuleToBottom(ReplaceRule rule) async {
-    try {
-      final allRules = _repo.getAllRules();
-      if (allRules.isEmpty) return;
-      var maxOrder = allRules.first.order;
-      for (final current in allRules.skip(1)) {
-        if (current.order > maxOrder) {
-          maxOrder = current.order;
-        }
-      }
-      await _repo.addRule(rule.copyWith(order: maxOrder + 1));
-    } catch (error, stackTrace) {
-      _recordViewError(
-        node: 'replace_rule.move_bottom',
-        message: '替换规则置底失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'ruleId': rule.id,
-          'ruleName': rule.name,
-        },
-      );
-    }
-  }
-
-  Future<void> _showSelectionMoreMenu(List<ReplaceRule> visibleRules) async {
-    if (_menuBusy || _selectedCountIn(visibleRules) == 0) return;
-    final selected = await showReplaceRuleSelectionPopoverMenu(
-      context: context,
-      anchorKey: _moreMenuKey,
-    );
-    if (selected == null) return;
-    switch (selected) {
-      case ReplaceRuleSelectionMenuAction.enableSelection:
-        await _enableSelectedRules(visibleRules);
-      case ReplaceRuleSelectionMenuAction.disableSelection:
-        await _disableSelectedRules(visibleRules);
-      case ReplaceRuleSelectionMenuAction.topSelection:
-        await _topSelectedRules(visibleRules);
-      case ReplaceRuleSelectionMenuAction.bottomSelection:
-        await _bottomSelectedRules(visibleRules);
-      case ReplaceRuleSelectionMenuAction.exportSelection:
-        await _exportSelectedRules(visibleRules);
-    }
-  }
-
-  List<ReplaceRule> _selectedRulesByCurrentOrder(
-      List<ReplaceRule> visibleRules) {
-    if (visibleRules.isEmpty) return const <ReplaceRule>[];
-    return visibleRules
-        .where((rule) => _selectedRuleIds.contains(rule.id))
-        .toList(growable: false);
-  }
-
-  Future<void> _exportSelectedRules(List<ReplaceRule> visibleRules) async {
-    if (_exportingSelection) return;
-    final selectedRules = _selectedRulesByCurrentOrder(visibleRules);
-    if (selectedRules.isEmpty) return;
-    setState(() => _exportingSelection = true);
-    try {
-      final jsonText = LegadoJson.encode(
-        selectedRules.map((rule) => rule.toJson()).toList(growable: false),
-      );
-      final outputPath = await saveFileWithTextCompat(
-        dialogTitle: '导出所选',
-        fileName: 'exportReplaceRule.json',
-        allowedExtensions: const ['json'],
-        text: jsonText,
-      );
-      if (outputPath == null || outputPath.trim().isEmpty) {
-        return;
-      }
-      final normalizedPath = outputPath.trim();
-      if (!mounted) return;
-      await _showExportPathDialog(normalizedPath);
-    } catch (error, stackTrace) {
-      _recordViewError(
-        node: 'replace_rule.export_selection',
-        message: '导出所选替换规则失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{
-          'count': selectedRules.length,
-        },
-      );
-      if (!mounted) return;
-      await _showMessageDialog(
-        title: '导出所选',
-        message: '导出失败：$error',
-      );
-    } finally {
-      if (!mounted) return;
-      setState(() => _exportingSelection = false);
-    }
-  }
-
-  Future<void> _enableSelectedRules(List<ReplaceRule> visibleRules) async {
-    if (_enablingSelection) return;
-    final selectedRules = _selectedRulesByCurrentOrder(visibleRules);
-    if (selectedRules.isEmpty) return;
-    setState(() => _enablingSelection = true);
-    try {
-      await enableSelectedReplaceRules(
-          repo: _repo, selectedRules: selectedRules);
-    } catch (error, stackTrace) {
-      _recordViewError(
-        node: 'replace_rule.enable_selection',
-        message: '批量启用替换规则失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{'count': selectedRules.length},
-      );
-    } finally {
-      if (!mounted) return;
-      setState(() => _enablingSelection = false);
-    }
-  }
-
-  Future<void> _disableSelectedRules(List<ReplaceRule> visibleRules) async {
-    if (_disablingSelection) return;
-    final selectedRules = _selectedRulesByCurrentOrder(visibleRules);
-    if (selectedRules.isEmpty) return;
-    setState(() => _disablingSelection = true);
-    try {
-      await disableSelectedReplaceRules(
-          repo: _repo, selectedRules: selectedRules);
-    } catch (error, stackTrace) {
-      _recordViewError(
-        node: 'replace_rule.disable_selection',
-        message: '批量禁用替换规则失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{'count': selectedRules.length},
-      );
-    } finally {
-      if (!mounted) return;
-      setState(() => _disablingSelection = false);
-    }
-  }
-
-  Future<void> _topSelectedRules(List<ReplaceRule> visibleRules) async {
-    if (_toppingSelection) return;
-    final selectedRules = _selectedRulesByCurrentOrder(visibleRules);
-    if (selectedRules.isEmpty) return;
-    setState(() => _toppingSelection = true);
-    try {
-      await topSelectedReplaceRules(
-          repo: _repo, selectedRules: selectedRules);
-    } catch (error, stackTrace) {
-      _recordViewError(
-        node: 'replace_rule.top_selection',
-        message: '批量置顶替换规则失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{'count': selectedRules.length},
-      );
-    } finally {
-      if (!mounted) return;
-      setState(() => _toppingSelection = false);
-    }
-  }
-
-  Future<void> _bottomSelectedRules(List<ReplaceRule> visibleRules) async {
-    if (_bottomingSelection) return;
-    final selectedRules = _selectedRulesByCurrentOrder(visibleRules);
-    if (selectedRules.isEmpty) return;
-    setState(() => _bottomingSelection = true);
-    try {
-      await bottomSelectedReplaceRules(
-          repo: _repo, selectedRules: selectedRules);
-    } catch (error, stackTrace) {
-      _recordViewError(
-        node: 'replace_rule.bottom_selection',
-        message: '批量置底替换规则失败',
-        error: error,
-        stackTrace: stackTrace,
-        context: <String, dynamic>{'count': selectedRules.length},
-      );
-    } finally {
-      if (!mounted) return;
-      setState(() => _bottomingSelection = false);
-    }
-  }
-
-
-
-  // --- from replace_rule_list_view_import.dart ---
-  Future<void> _importFromFile() async {
-    if (_importingLocal) return;
-    setState(() => _importingLocal = true);
-    try {
-      final localText = await pickLocalReplaceRuleImportText();
-      if (localText == null) {
-        return;
-      }
-      await _importRulesFromInput(localText);
-    } catch (error, stackTrace) {
-      _recordViewError(
-        node: 'replace_rule.import_local',
-        message: '本地导入替换规则失败',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      if (!mounted) return;
-      await _showMessageDialog(
-        title: '导入替换规则',
-        message: formatReplaceRuleImportError(error),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _importingLocal = false);
-      }
-    }
-  }
-
-  Future<void> _importFromUrl() async {
-    if (_importingOnline) return;
-    setState(() => _importingOnline = true);
-    try {
-      final rawInput = await _showOnlineImportInputSheet();
-      final normalizedInput = sanitizeReplaceRuleImportInput(rawInput ?? '');
-      if (normalizedInput.isEmpty) {
-        return;
-      }
-      if (isReplaceRuleHttpUrl(normalizedInput)) {
-        await _pushOnlineImportHistory(normalizedInput);
-      }
-      await _importRulesFromInput(normalizedInput);
-    } catch (error, stackTrace) {
-      _recordViewError(
-        node: 'replace_rule.import_online',
-        message: '网络导入替换规则失败',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      if (!mounted) return;
-      await _showMessageDialog(
-        title: '导入替换规则',
-        message: formatReplaceRuleImportError(error),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _importingOnline = false);
-      }
-    }
-  }
-
-  Future<void> _importFromQr() async {
-    if (_importingQr) return;
-    setState(() => _importingQr = true);
-    try {
-      final text = await QrScanService.scanText(
-        context,
-        title: '二维码导入',
-      );
-      final normalizedInput = sanitizeReplaceRuleImportInput(text ?? '');
-      if (normalizedInput.isEmpty) {
-        return;
-      }
-      await _importRulesFromInput(normalizedInput);
-    } catch (error, stackTrace) {
-      _recordViewError(
-        node: 'replace_rule.import_qr',
-        message: '二维码导入替换规则失败',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      if (!mounted) return;
-      await _showMessageDialog(
-        title: '导入替换规则',
-        message: formatReplaceRuleImportError(error),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _importingQr = false);
-      }
-    }
-  }
-
-  Future<void> _importRulesFromInput(String rawInput) async {
-    final importedRules = await parseReplaceRuleImportRulesFromInput(
-        io: _io, input: rawInput, depth: 0);
-    final candidates = buildReplaceRuleImportCandidates(
-      importedRules: importedRules,
-      localRules: _repo.getAllRules(),
-    );
-    if (candidates.isEmpty) {
-      await _showMessageDialog(
-        title: '导入替换规则',
-        message: 'ImportError:格式不对',
-      );
-      return;
-    }
-    if (!mounted) return;
-    final selectionDecision = await _showImportSelectionSheet(candidates);
-    if (selectionDecision == null ||
-        selectionDecision.selectedIndexes.isEmpty) {
-      return;
-    }
-    if (!mounted) return;
-    await _runImportingTask(() async {
-      final selectedRules = <ReplaceRule>[];
-      final sortedIndexes = selectionDecision.selectedIndexes.toList()..sort();
-      for (final index in sortedIndexes) {
-        if (index < 0 || index >= candidates.length) continue;
-        selectedRules.add(
-          applyReplaceRuleImportGroupPolicy(
-            rule: candidates[index].rule,
-            policy: selectionDecision.groupPolicy,
-          ),
-        );
-      }
-      await _repo.addRules(selectedRules);
-    });
-  }
-
-  Future<String?> _showOnlineImportInputSheet() {
-    return showReplaceRuleOnlineImportSheet(
-      context: context,
-      loadHistory: _loadOnlineImportHistory,
-      saveHistory: _saveOnlineImportHistory,
-    );
-  }
-
-  Future<List<String>> _loadOnlineImportHistory() async {
-    return _onlineImportHistoryStore.load(_ReplaceRuleListViewState._onlineImportHistoryKey);
-  }
-
-  Future<void> _saveOnlineImportHistory(List<String> history) async {
-    await _onlineImportHistoryStore.save(_ReplaceRuleListViewState._onlineImportHistoryKey, history);
-  }
-
-  Future<void> _pushOnlineImportHistory(String url) async {
-    await _onlineImportHistoryStore.push(_ReplaceRuleListViewState._onlineImportHistoryKey, url);
-  }
-
-  Future<void> _showExportPathDialog(String outputPath) =>
-      showReplaceRuleExportPathDialog(
-          context: context, outputPath: outputPath);
-
-  Future<void> _showReplaceRuleHelp() => showReplaceRuleHelp(context);
-
-  Future<ReplaceRuleImportSelectionDecision?> _showImportSelectionSheet(
-    List<ReplaceRuleImportCandidate> candidates,
-  ) =>
-      showReplaceRuleImportSelectionSheet(
-        context: context,
-        candidates: candidates,
-      );
-
-
-  Future<void> _runImportingTask(Future<void> Function() task) async {
-    final navigator = Navigator.of(context, rootNavigator: true);
-    showCupertinoBottomSheetDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => const CupertinoAlertDialog(
-        content: AppBlockingProgress(text: '导入中...'),
-      ),
-    );
-    await Future<void>.delayed(Duration.zero);
-    try {
-      await task();
-    } finally {
-      if (navigator.canPop()) {
-        navigator.pop();
-      }
-    }
-  }
-
-
-  Future<void> _showMessageDialog({
+  Future<void> showMessageDialog({
     required String title,
     required String message,
   }) =>
