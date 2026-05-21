@@ -21,8 +21,8 @@ class DiscoverySearchHeader extends StatelessWidget {
   static const double _shellHorizontalPadding = 10;
   static const double _shellBottomPadding = 8;
   static const double _shellRevealOffset = 10;
-  static const double _shadowDarkAlpha = 0.18;
-  static const double _shadowLightAlpha = 0.08;
+  static const double _shadowDarkAlpha = 0.08;
+  static const double _shadowLightAlpha = 0.03;
   static const double _cancelButtonHorizontalPadding = 10;
 
   final TextEditingController controller;
@@ -56,8 +56,9 @@ class DiscoverySearchHeader extends StatelessWidget {
 
   _DiscoveryHeaderShellStyle _resolveShellStyle(AppUiTokens uiTokens) {
     final isDark = uiTokens.isDark;
-    final shadow = (isDark ? CupertinoColors.black : AppDesignTokens.shadowLight)
-        .withValues(alpha: isDark ? _shadowDarkAlpha : _shadowLightAlpha);
+    final shadow =
+        (isDark ? CupertinoColors.black : AppDesignTokens.shadowLight)
+            .withValues(alpha: isDark ? _shadowDarkAlpha : _shadowLightAlpha);
     return _DiscoveryHeaderShellStyle(
       background: uiTokens.colors.sectionBackground,
       border: uiTokens.colors.separator,
@@ -74,6 +75,10 @@ class DiscoverySearchHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: shell.background,
         borderRadius: BorderRadius.circular(SourceUiTokens.radiusCard),
+        border: Border.all(
+          color: shell.border,
+          width: SourceUiTokens.borderWidth,
+        ),
         boxShadow: [
           BoxShadow(
             color: shell.shadow,
@@ -114,7 +119,7 @@ class DiscoverySearchHeader extends StatelessWidget {
           child: AppManageSearchField(
             controller: controller,
             focusNode: searchFocusNode,
-            placeholder: '请输入关键字搜索书源...',
+            placeholder: '搜索书源',
           ),
         ),
         AnimatedSwitcher(

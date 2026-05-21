@@ -106,12 +106,16 @@ class AppUiColors {
 class AppUiRadii {
   final double control;
   final double card;
+  final double cover;
+  final double badge;
   final double popover;
   final double sheet;
 
   const AppUiRadii({
     this.control = AppDesignTokens.radiusControl,
     this.card = AppDesignTokens.radiusCard,
+    this.cover = AppDesignTokens.radiusControl,
+    this.badge = 9,
     this.popover = AppDesignTokens.radiusPopup,
     this.sheet = AppDesignTokens.radiusSheet,
   });
@@ -121,9 +125,23 @@ class AppUiRadii {
 class AppUiSpacings {
   /// 管理页常用 ListView/Column 外层 padding（全仓最高频）。
   final EdgeInsets pageListPadding;
+  final double pageHorizontalPadding;
+  final double cardGap;
+  final double gridHorizontalPadding;
+  final double gridCrossAxisGap;
+  final double gridMainAxisGap;
+  final EdgeInsets bookshelfGridPadding;
+  final EdgeInsets bookshelfGridItemPadding;
 
   const AppUiSpacings({
     this.pageListPadding = const EdgeInsets.only(top: 8, bottom: 20),
+    this.pageHorizontalPadding = 12,
+    this.cardGap = 8,
+    this.gridHorizontalPadding = 12,
+    this.gridCrossAxisGap = 8,
+    this.gridMainAxisGap = 10,
+    this.bookshelfGridPadding = const EdgeInsets.fromLTRB(12, 8, 12, 16),
+    this.bookshelfGridItemPadding = const EdgeInsets.fromLTRB(6, 8, 6, 4),
   });
 }
 
@@ -149,16 +167,26 @@ class AppUiIconSizes {
 class AppUiSizes {
   /// 交互最小热区（iOS 人体工学）。
   final double minTapSize;
+  final double navIconButtonSize;
 
   /// 紧凑控件的最小热区（用于 chip/popover row 等高密度场景）。
   final double compactTapSize;
+  final double badgeMinSize;
+  final double bookshelfTitleFontSize;
+  final double bookshelfTitleLineHeight;
+  final double bookshelfTitleMaxHeight;
 
   /// 分隔线高度（iOS 细分隔线）。
   final double dividerThickness;
 
   const AppUiSizes({
     this.minTapSize = kMinInteractiveDimensionCupertino,
+    this.navIconButtonSize = kMinInteractiveDimensionCupertino,
     this.compactTapSize = 32,
+    this.badgeMinSize = 18,
+    this.bookshelfTitleFontSize = 12,
+    this.bookshelfTitleLineHeight = 1.25,
+    this.bookshelfTitleMaxHeight = 30,
     this.dividerThickness = 0.5,
   });
 

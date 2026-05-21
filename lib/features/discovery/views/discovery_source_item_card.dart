@@ -77,31 +77,38 @@ class DiscoverySourceItemCard extends StatelessWidget {
     required String groupText,
     required Color secondaryLabel,
   }) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onToggle,
-      onLongPress: onLongPress,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: SourceUiTokens.minTapSize),
-        child: Row(
-          children: [
-            Expanded(
-              child: _buildInfoBlock(
-                theme: theme,
-                uiTokens: uiTokens,
-                groupText: groupText,
-                secondaryLabel: secondaryLabel,
+    final stateLabel = expanded ? '已展开' : '已收起';
+    return Semantics(
+      button: true,
+      label: '$stateLabel，书源 ${source.bookSourceName}',
+      hint: '双击展开或收起发现入口，长按打开书源菜单',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onToggle,
+        onLongPress: onLongPress,
+        child: ConstrainedBox(
+          constraints:
+              const BoxConstraints(minHeight: SourceUiTokens.minTapSize),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildInfoBlock(
+                  theme: theme,
+                  uiTokens: uiTokens,
+                  groupText: groupText,
+                  secondaryLabel: secondaryLabel,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              expanded
-                  ? CupertinoIcons.chevron_down
-                  : CupertinoIcons.chevron_forward,
-              size: 15,
-              color: uiTokens.colors.tertiaryLabel,
-            ),
-          ],
+              const SizedBox(width: 8),
+              Icon(
+                expanded
+                    ? CupertinoIcons.chevron_down
+                    : CupertinoIcons.chevron_forward,
+                size: 15,
+                color: uiTokens.colors.tertiaryLabel,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -278,6 +285,7 @@ class DiscoverySourceItemCard extends StatelessWidget {
       uiTokens: uiTokens,
       backgroundColor: backgroundColor,
       borderColor: resolvedBorderColor,
+      semanticLabel: isError ? '发现入口解析失败' : '打开发现入口 $title',
       onTap: isEnabled ? () => onOpenKind(kind) : null,
       child: Text(
         title,
@@ -314,6 +322,7 @@ class _DiscoveryKindPill extends StatelessWidget {
     required this.backgroundColor,
     required this.borderColor,
     required this.uiTokens,
+    required this.semanticLabel,
     required this.onTap,
   });
 
@@ -321,34 +330,41 @@ class _DiscoveryKindPill extends StatelessWidget {
   final Color backgroundColor;
   final Color borderColor;
   final AppUiTokens uiTokens;
+  final String semanticLabel;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null;
     final tapHandler = onTap == null
         ? null
         : () {
             HapticFeedback.lightImpact();
             onTap!();
           };
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: tapHandler,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(uiTokens.radii.control),
-          border: Border.all(
-            color: borderColor,
-            width: SourceUiTokens.borderWidth,
+    return Semantics(
+      button: enabled,
+      enabled: enabled,
+      label: semanticLabel,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: tapHandler,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(uiTokens.radii.control),
+            border: Border.all(
+              color: borderColor,
+              width: SourceUiTokens.borderWidth,
+            ),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: SourceUiTokens.discoveryChipHorizontalPadding,
-            vertical: SourceUiTokens.discoveryChipVerticalPadding,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: SourceUiTokens.discoveryChipHorizontalPadding,
+              vertical: SourceUiTokens.discoveryChipVerticalPadding,
+            ),
+            child: ExcludeSemantics(child: child),
           ),
-          child: child,
         ),
       ),
     );

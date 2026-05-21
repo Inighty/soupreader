@@ -100,181 +100,188 @@ class ReaderTopMenu extends StatelessWidget {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
-        key: _readerTopMenuPanelKey,
-        padding: EdgeInsets.only(
-          top: mediaQuery.padding.top + 8,
-          left: horizontalPadding,
-          right: horizontalPadding,
-          bottom: 10,
-        ),
-        decoration: BoxDecoration(
-          color: style.panelBackground.withValues(alpha: 0.85),
-          border: Border(
-            bottom: BorderSide(
-              color: style.borderColor.withValues(alpha: 0.5),
-              width: 0.5,
+          key: _readerTopMenuPanelKey,
+          padding: EdgeInsets.only(
+            top: mediaQuery.padding.top + 8,
+            left: horizontalPadding,
+            right: horizontalPadding,
+            bottom: 10,
+          ),
+          decoration: BoxDecoration(
+            color: style.panelBackground.withValues(alpha: 0.85),
+            border: Border(
+              bottom: BorderSide(
+                color: style.borderColor.withValues(alpha: 0.5),
+                width: 0.5,
+              ),
             ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                _buildBackButton(
-                  onTap: onBack ?? () => Navigator.pop(context),
-                  color: style.primaryText,
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onOpenBookInfo,
-                    child: Text(
-                      bookTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: style.primaryText,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.3,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  _buildBackButton(
+                    onTap: onBack ?? () => Navigator.pop(context),
+                    color: style.primaryText,
+                  ),
+                  Expanded(
+                    child: _buildSemanticTapTarget(
+                      semanticLabel: '打开书籍详情，$bookTitle',
+                      onTap: onOpenBookInfo,
+                      child: Text(
+                        bookTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: style.primaryText,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.3,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                if (showChangeSourceAction && onChangeSource != null) ...[
-                  _buildNavButton(
-                    key: _readerTopMenuChangeSourceKey,
-                    icon: CupertinoIcons.arrow_right_arrow_left,
-                    onTap: onChangeSource,
-                    onLongPress: onChangeSourceLongPress,
-                    color: style.primaryText,
-                  ),
-                ],
-                if (showRefreshAction && onRefresh != null) ...[
-                  _buildNavButton(
-                    key: _readerTopMenuRefreshKey,
-                    icon: CupertinoIcons.refresh,
-                    onTap: onRefresh,
-                    onLongPress: onRefreshLongPress,
-                    color: style.primaryText,
-                  ),
-                ],
-                if (showDownloadAction && onOfflineCache != null) ...[
-                  _buildNavButton(
-                    key: _readerTopMenuOfflineCacheKey,
-                    icon: CupertinoIcons.cloud_download,
-                    onTap: onOfflineCache,
-                    color: style.primaryText,
-                  ),
-                ],
-                if (showTocRuleAction && onTocRule != null) ...[
-                  _buildNavButton(
-                    key: _readerTopMenuTocRuleKey,
-                    icon: CupertinoIcons.list_bullet,
-                    onTap: onTocRule,
-                    color: style.primaryText,
-                  ),
-                ],
-                if (showSetCharsetAction && onSetCharset != null) ...[
-                  _buildNavButton(
-                    key: _readerTopMenuSetCharsetKey,
-                    icon: CupertinoIcons.textformat,
-                    onTap: onSetCharset,
-                    color: style.primaryText,
-                  ),
-                ],
-                _buildNavButton(
-                  icon: CupertinoIcons.ellipsis_circle,
-                  onTap: onShowMoreMenu,
-                  color: style.primaryText,
-                ),
-              ],
-            ),
-            if (showTitleAddition) ...[
-              const SizedBox(height: 6),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final compactInfo =
-                            narrowScreen || constraints.maxWidth < 340;
-                        final showUrl = showTitleAddition &&
-                            showChapterLink &&
-                            chapterUrlLabel.isNotEmpty &&
-                            !compactInfo;
-                        final chapterFontSize = compactInfo ? 12.0 : 12.5;
-                        final urlFontSize = compactInfo ? 10.5 : 11.0;
-                        final sourceMaxWidth = compactInfo ? 96.0 : 120.0;
-
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTap: onOpenChapterLink,
-                                    onLongPress: onToggleChapterLinkOpenMode,
-                                    child: Text(
-                                      chapterLabel,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: style.secondaryText,
-                                        fontSize: chapterFontSize,
-                                      ),
-                                    ),
-                                  ),
-                                  if (showUrl) ...[
-                                    const SizedBox(height: 1),
-                                    GestureDetector(
-                                      behavior: HitTestBehavior.opaque,
-                                      onTap: onOpenChapterLink,
-                                      onLongPress: onToggleChapterLinkOpenMode,
-                                      child: Text(
-                                        chapterUrlLabel,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: style.tertiaryText,
-                                          fontSize: urlFontSize,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            if (showSourceAction) ...[
-                              const SizedBox(width: 8),
-                              _buildSourceActionChip(
-                                label: sourceActionLabel,
-                                onTap: onShowSourceActions,
-                                textColor: style.primaryText,
-                                backgroundColor: style.controlBackground,
-                                borderColor: style.controlBorder,
-                                maxWidth: sourceMaxWidth,
-                              ),
-                            ],
-                          ],
-                        );
-                      },
+                  const SizedBox(width: 4),
+                  if (showChangeSourceAction && onChangeSource != null) ...[
+                    _buildNavButton(
+                      key: _readerTopMenuChangeSourceKey,
+                      icon: CupertinoIcons.arrow_right_arrow_left,
+                      semanticLabel: '切换书源',
+                      onTap: onChangeSource,
+                      onLongPress: onChangeSourceLongPress,
+                      color: style.primaryText,
                     ),
+                  ],
+                  if (showRefreshAction && onRefresh != null) ...[
+                    _buildNavButton(
+                      key: _readerTopMenuRefreshKey,
+                      icon: CupertinoIcons.refresh,
+                      semanticLabel: '刷新当前章节',
+                      onTap: onRefresh,
+                      onLongPress: onRefreshLongPress,
+                      color: style.primaryText,
+                    ),
+                  ],
+                  if (showDownloadAction && onOfflineCache != null) ...[
+                    _buildNavButton(
+                      key: _readerTopMenuOfflineCacheKey,
+                      icon: CupertinoIcons.cloud_download,
+                      semanticLabel: '离线缓存',
+                      onTap: onOfflineCache,
+                      color: style.primaryText,
+                    ),
+                  ],
+                  if (showTocRuleAction && onTocRule != null) ...[
+                    _buildNavButton(
+                      key: _readerTopMenuTocRuleKey,
+                      icon: CupertinoIcons.list_bullet,
+                      semanticLabel: '目录规则',
+                      onTap: onTocRule,
+                      color: style.primaryText,
+                    ),
+                  ],
+                  if (showSetCharsetAction && onSetCharset != null) ...[
+                    _buildNavButton(
+                      key: _readerTopMenuSetCharsetKey,
+                      icon: CupertinoIcons.textformat,
+                      semanticLabel: '设置字符编码',
+                      onTap: onSetCharset,
+                      color: style.primaryText,
+                    ),
+                  ],
+                  _buildNavButton(
+                    icon: CupertinoIcons.ellipsis_circle,
+                    semanticLabel: '更多操作',
+                    onTap: onShowMoreMenu,
+                    color: style.primaryText,
                   ),
                 ],
               ),
+              if (showTitleAddition) ...[
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compactInfo =
+                              narrowScreen || constraints.maxWidth < 340;
+                          final showUrl = showTitleAddition &&
+                              showChapterLink &&
+                              chapterUrlLabel.isNotEmpty &&
+                              !compactInfo;
+                          final chapterFontSize = compactInfo ? 12.0 : 12.5;
+                          final urlFontSize = compactInfo ? 10.5 : 11.0;
+                          final sourceMaxWidth = compactInfo ? 96.0 : 120.0;
+
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildSemanticTapTarget(
+                                      semanticLabel: '打开章节链接，$chapterLabel',
+                                      onTap: onOpenChapterLink,
+                                      onLongPress: onToggleChapterLinkOpenMode,
+                                      child: Text(
+                                        chapterLabel,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: style.secondaryText,
+                                          fontSize: chapterFontSize,
+                                        ),
+                                      ),
+                                    ),
+                                    if (showUrl) ...[
+                                      const SizedBox(height: 1),
+                                      _buildSemanticTapTarget(
+                                        semanticLabel: '打开章节地址',
+                                        onTap: onOpenChapterLink,
+                                        onLongPress:
+                                            onToggleChapterLinkOpenMode,
+                                        child: Text(
+                                          chapterUrlLabel,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: style.tertiaryText,
+                                            fontSize: urlFontSize,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              if (showSourceAction) ...[
+                                const SizedBox(width: 8),
+                                _buildSourceActionChip(
+                                  label: sourceActionLabel,
+                                  onTap: onShowSourceActions,
+                                  textColor: style.primaryText,
+                                  backgroundColor: style.controlBackground,
+                                  borderColor: style.controlBorder,
+                                  maxWidth: sourceMaxWidth,
+                                ),
+                              ],
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
-    ),
     );
 
     if (slideAnim != null && fadeAnim != null) {
@@ -295,19 +302,43 @@ class ReaderTopMenu extends StatelessWidget {
     );
   }
 
+  Widget _buildSemanticTapTarget({
+    required String semanticLabel,
+    required Widget child,
+    required VoidCallback onTap,
+    VoidCallback? onLongPress,
+  }) {
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: ExcludeSemantics(child: child),
+      ),
+    );
+  }
+
   Widget _buildBackButton({
     required VoidCallback onTap,
     required Color color,
   }) {
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
-      onPressed: onTap,
-      child: SizedBox(
-        width: 44,
-        height: 44,
-        child: Center(
-          child: Icon(CupertinoIcons.back, color: color, size: 24),
+    return Semantics(
+      button: true,
+      label: '返回',
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        onPressed: onTap,
+        child: ExcludeSemantics(
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Center(
+              child: Icon(CupertinoIcons.back, color: color, size: 24),
+            ),
+          ),
         ),
       ),
     );
@@ -316,25 +347,33 @@ class ReaderTopMenu extends StatelessWidget {
   Widget _buildNavButton({
     Key? key,
     required IconData icon,
+    required String semanticLabel,
     required VoidCallback? onTap,
     VoidCallback? onLongPress,
     required Color color,
   }) {
-    return CupertinoButton(
-      key: key,
-      padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
-      onPressed: onTap,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onLongPress: onLongPress,
-        child: SizedBox(
-          width: 44,
-          height: 44,
-          child: Icon(
-            icon,
-            color: color,
-            size: 22,
+    return Semantics(
+      button: true,
+      enabled: onTap != null,
+      label: semanticLabel,
+      child: CupertinoButton(
+        key: key,
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        onPressed: onTap,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onLongPress: onLongPress,
+          child: ExcludeSemantics(
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Icon(
+                icon,
+                color: color,
+                size: 22,
+              ),
+            ),
           ),
         ),
       ),
@@ -349,43 +388,49 @@ class ReaderTopMenu extends StatelessWidget {
     required Color borderColor,
     required double maxWidth,
   }) {
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
-      onPressed: onTap,
-      child: Container(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(AppDesignTokens.radiusControl),
-          border: Border.all(color: borderColor, width: 0.5),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
+    return Semantics(
+      button: true,
+      label: '选择书源，$label',
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        onPressed: onTap,
+        child: ExcludeSemantics(
+          child: Container(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius:
+                  BorderRadius.circular(AppDesignTokens.radiusControl),
+              border: Border.all(color: borderColor, width: 0.5),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 3),
+                Icon(
+                  CupertinoIcons.chevron_down,
+                  size: 10,
+                  color: textColor.withValues(alpha: 0.6),
+                ),
+              ],
             ),
-            const SizedBox(width: 3),
-            Icon(
-              CupertinoIcons.chevron_down,
-              size: 10,
-              color: textColor.withValues(alpha: 0.6),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
-
