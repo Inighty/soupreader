@@ -369,7 +369,33 @@ class ReaderCoordinator {
     // 否则切过去会显示空白。
     if (old.pageTurnMode != normalized.pageTurnMode) {
       postFrameCallback(() => requestRepaginate(restoreOffset: true));
+      return;
     }
+    // 字号/行距/字距/段距/缩进/字体/边距等影响排版的设置变更后，
+    // 需要重新分页，否则页面边界仍按旧设置计算，UI 看起来"没生效"。
+    if (_needsRepaginationOnSettingsChange(old, normalized)) {
+      postFrameCallback(() => requestRepaginate(restoreOffset: true));
+    }
+  }
+
+  static bool _needsRepaginationOnSettingsChange(
+    ReadingSettings a,
+    ReadingSettings b,
+  ) {
+    return a.fontSize != b.fontSize ||
+        a.lineHeight != b.lineHeight ||
+        a.letterSpacing != b.letterSpacing ||
+        a.paragraphSpacing != b.paragraphSpacing ||
+        a.fontFamilyIndex != b.fontFamilyIndex ||
+        a.paragraphIndent != b.paragraphIndent ||
+        a.underline != b.underline ||
+        a.textBold != b.textBold ||
+        a.titleMode != b.titleMode ||
+        a.paddingLeft != b.paddingLeft ||
+        a.paddingRight != b.paddingRight ||
+        a.paddingTop != b.paddingTop ||
+        a.paddingBottom != b.paddingBottom ||
+        a.paddingDisplayCutouts != b.paddingDisplayCutouts;
   }
 
   void toggleMenu() => ui.toggleMenu(!ui.showMenu);

@@ -104,11 +104,7 @@ class UiState extends ChangeNotifier {
 /// 阅读设置 + 主题
 class SettingsState extends ChangeNotifier {
   ReadingSettings settings = const ReadingSettings();
-  ReaderThemeResolver themeResolver = ReaderThemeResolver(
-    settings: const ReadingSettings(),
-    themeMode: ReaderThemeMode.day,
-    readStyleConfigs: const [],
-  );
+  ReaderThemeMode themeMode = ReaderThemeMode.day;
   int? bookPageAnimOverride;
   bool useReplaceRule = true;
   bool reSegment = false;
@@ -120,13 +116,24 @@ class SettingsState extends ChangeNotifier {
   ui.Image? bgUiImage;
   String? bgUiImageKey;
 
+  /// 阅读主题解析器：始终基于当前 [settings] / [themeMode] / [customFontFamily]
+  /// 实时构造，避免缓存导致设置变更不生效。
+  ReaderThemeResolver get themeResolver => ReaderThemeResolver(
+        settings: settings,
+        themeMode: themeMode,
+        readStyleConfigs: settings.readStyleConfigs,
+        customFontFamily: customFontFamily,
+      );
+
   void update(ReadingSettings newSettings) {
     settings = newSettings;
     notifyListeners();
   }
 
-  void syncTheme(ReaderThemeResolver resolver) {
-    themeResolver = resolver;
+  /// 切换阅读器日/夜/EInk 主题模式（不修改 [settings]）。
+  void updateThemeMode(ReaderThemeMode mode) {
+    if (mode == themeMode) return;
+    themeMode = mode;
     notifyListeners();
   }
 
