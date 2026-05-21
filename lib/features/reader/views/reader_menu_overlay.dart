@@ -148,9 +148,10 @@ class ReaderMenuOverlay extends StatelessWidget {
                 ));
               },
               onShowInterfaceSettings: () {
+                final routeContext = Navigator.of(context).context;
                 coordinator.closeMenu();
                 ReaderDialogHelpers.showStyleQuickSheet(
-                  context: context,
+                  context: routeContext,
                   settings: settings.settings,
                   themes: settings.themeResolver.activeStyles,
                   styleConfigs: settings.settings.readStyleConfigs,
@@ -158,8 +159,9 @@ class ReaderMenuOverlay extends StatelessWidget {
                 );
               },
               onShowBehaviorSettings: () {
+                final routeContext = Navigator.of(context).context;
                 coordinator.closeMenu();
-                ReaderDialogHelpers.showBehaviorSettings(context);
+                ReaderDialogHelpers.showBehaviorSettings(routeContext);
               },
               onToggleAutoPage: () {
                 coordinator.closeMenu();
