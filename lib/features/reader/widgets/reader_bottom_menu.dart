@@ -222,7 +222,6 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             Expanded(
               child: _buildQuickActionItem(
                 icon: CupertinoIcons.search,
-                semanticLabel: '搜索正文',
                 foreground: foreground,
                 onTap: widget.onSearchContent!,
               ),
@@ -233,7 +232,6 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 icon: widget.autoPageRunning
                     ? CupertinoIcons.timer_fill
                     : CupertinoIcons.timer,
-                semanticLabel: widget.autoPageRunning ? '停止自动翻页' : '开始自动翻页',
                 foreground: foreground,
                 active: widget.autoPageRunning,
                 activeColor: accent,
@@ -244,7 +242,6 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
             Expanded(
               child: _buildQuickActionItem(
                 icon: CupertinoIcons.wand_stars,
-                semanticLabel: '切换净化规则',
                 foreground: foreground,
                 onTap: widget.onToggleReplaceRule!,
               ),
@@ -255,7 +252,6 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
                 icon: widget.isNightMode
                     ? CupertinoIcons.moon_fill
                     : CupertinoIcons.sun_max,
-                semanticLabel: widget.isNightMode ? '切换到日间模式' : '切换到夜间模式',
                 foreground: foreground,
                 active: widget.isNightMode,
                 activeColor: accent,
@@ -269,24 +265,17 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
 
   Widget _buildQuickActionItem({
     required IconData icon,
-    required String semanticLabel,
     required Color foreground,
     required VoidCallback onTap,
     bool active = false,
     Color? activeColor,
   }) {
     final color = active ? (activeColor ?? foreground) : foreground;
-    return Semantics(
-      button: true,
-      label: semanticLabel,
-      child: CupertinoButton(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        minimumSize: Size.zero,
-        onPressed: onTap,
-        child: ExcludeSemantics(
-          child: Icon(icon, size: 22, color: color),
-        ),
-      ),
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: Icon(icon, size: 22, color: color),
     );
   }
 
@@ -348,44 +337,37 @@ class _ReaderBottomMenuNewState extends State<ReaderBottomMenuNew> {
     Color? activeColor,
   }) {
     final contentColor = active ? (activeColor ?? foreground) : foreground;
-    return Semantics(
-      button: true,
-      enabled: onTap != null,
-      label: active ? '$label，已开启' : label,
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        minimumSize: Size.zero,
-        onPressed: onTap,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onLongPress: onLongPress,
-          child: ExcludeSemantics(
-            child: SizedBox(
-              width: double.infinity,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      icon,
-                      size: 24,
-                      color: contentColor,
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: contentColor,
-                        fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                      ),
-                    ),
-                  ],
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onTap,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPress: onLongPress,
+        child: SizedBox(
+          width: double.infinity,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 24,
+                  color: contentColor,
                 ),
-              ),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: contentColor,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
