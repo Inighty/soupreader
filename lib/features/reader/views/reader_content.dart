@@ -80,6 +80,9 @@ class _ReaderPagedContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = settings.themeResolver;
     final readingSettings = settings.settings;
+    // 渲染层 TextStyle 必须与分页 (ReaderPageAgent.paginateContent) 使用的
+    // TextStyle 字段完全一致，否则相同段文本在两边会计算出不同的换行/行数，
+    // 导致页面边界与渲染行数错位 —— 表现为翻页时正文断续、有遗漏。
     return KeyedSubtree(
       key: pagedContentKey,
       child: PagedReaderWidget(
@@ -90,7 +93,10 @@ class _ReaderPagedContent extends StatelessWidget {
           height: readingSettings.lineHeight,
           letterSpacing: readingSettings.letterSpacing,
           color: theme.currentTheme.text,
-          fontFamily: settings.customFontFamily,
+          fontFamily: theme.fontFamily,
+          fontFamilyFallback: theme.fontFamilyFallback,
+          fontWeight: theme.fontWeight,
+          decoration: theme.textDecoration,
         ),
         backgroundColor: theme.backgroundColor,
         backgroundUiImage: settings.bgUiImage,
@@ -192,7 +198,10 @@ class _ReaderScrollContent extends StatelessWidget {
                     height: settings.settings.lineHeight,
                     letterSpacing: settings.settings.letterSpacing,
                     color: settings.themeResolver.currentTheme.text,
-                    fontFamily: settings.customFontFamily,
+                    fontFamily: settings.themeResolver.fontFamily,
+                    fontFamilyFallback: settings.themeResolver.fontFamilyFallback,
+                    fontWeight: settings.themeResolver.fontWeight,
+                    decoration: settings.themeResolver.textDecoration,
                   ),
                 ),
               );

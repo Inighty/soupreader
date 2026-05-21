@@ -371,6 +371,12 @@ class ReaderCoordinator {
       postFrameCallback(() => requestRepaginate(restoreOffset: true));
       return;
     }
+    if (!_needsRepaginationOnSettingsChange(old, normalized)) return;
+
+    if (normalized.pageTurnMode == PageTurnMode.scroll) {
+      postFrameCallback(() => requestRepaginate(restoreOffset: true));
+      return;
+    }
     // 字号/行距/字距/段距/缩进/字体/边距等影响排版的设置变更后，
     // 需要重新分页，否则页面边界仍按旧设置计算，UI 看起来"没生效"。
     //
@@ -379,27 +385,22 @@ class ReaderCoordinator {
     // 被弹回到旧的保存点（表现为正文不连续，中间内容被跳过）。
     // 这里在旧分页下计算"当前位置"作为 targetProgress，重新分页后跳到
     // 最接近的页面，确保连续阅读体验。
-    if (_needsRepaginationOnSettingsChange(old, normalized)) {
-      if (normalized.pageTurnMode == PageTurnMode.scroll) {
-        postFrameCallback(() => requestRepaginate(restoreOffset: true));
-        return;
-      }
-      final currentProgress = ChapterProgressUtils.pageProgressFromIndex(
-        pageIndex: paged.pageFactory.currentPageIndex,
-        totalPages: paged.pageFactory.totalPages,
+    final currentProgress = ChapterProgressUtils.pageProgressFromIndex(
+      pageIndex: paged.pageFactory.currentPageIndex,
+      totalPages: paged.pageFactory.totalPages,
+    );
+    postFrameCallback(() {
+      if (chapter.chapters.isEmpty) return;
+      _paginateAndJump(
+        chapterIndex: chapter.currentIndex,
+        goToLastPage: false,
+        restoreOffset: false,
+        targetProgress: currentProgress,
       );
-      postFrameCallback(() {
-        if (chapter.chapters.isEmpty) return;
-        _paginateAndJump(
-          chapterIndex: chapter.currentIndex,
-          goToLastPage: false,
-          restoreOffset: false,
-          targetProgress: currentProgress,
-        );
-      });
-    }
+    });
   }
 
+  /// 仅当下列影响 *分页布局* 的字段变更时返回 true。
   static bool _needsRepaginationOnSettingsChange(
     ReadingSettings a,
     ReadingSettings b,
@@ -412,7 +413,12 @@ class ReaderCoordinator {
         a.paragraphIndent != b.paragraphIndent ||
         a.underline != b.underline ||
         a.textBold != b.textBold ||
+        a.textFullJustify != b.textFullJustify ||
+        a.textBottomJustify != b.textBottomJustify ||
         a.titleMode != b.titleMode ||
+        a.titleSize != b.titleSize ||
+        a.titleTopSpacing != b.titleTopSpacing ||
+        a.titleBottomSpacing != b.titleBottomSpacing ||
         a.paddingLeft != b.paddingLeft ||
         a.paddingRight != b.paddingRight ||
         a.paddingTop != b.paddingTop ||

@@ -106,9 +106,11 @@ void paginateAndJumpReaderPages({
   pageFactory.setChapters(chapterDataList, chapterIndex);
 
   final s = settings.settings;
+  final theme = settings.themeResolver;
   final contentW = contentSize.width - s.paddingLeft - s.paddingRight;
   final contentH = contentSize.height - s.paddingTop - s.paddingBottom;
   if (contentW > 50 && contentH > 100) {
+    final titleFontSize = (s.fontSize + s.titleSize).clamp(10.0, 72.0);
     pageFactory.setLayoutParams(
       contentHeight: contentH,
       contentWidth: contentW,
@@ -116,9 +118,19 @@ void paginateAndJumpReaderPages({
       lineHeight: s.lineHeight,
       letterSpacing: s.letterSpacing,
       paragraphSpacing: s.paragraphSpacing,
-      fontFamily: settings.customFontFamily,
-      paragraphIndent: s.paragraphIndent,
+      // 字体/字重/下划线/对齐方式/标题样式必须与渲染层 (ReaderContent.textStyle)
+      // 完全一致，否则分页换行位置和渲染换行位置错位，会出现"翻页正文不连续、
+      // 中间内容缺失"的现象。
+      fontFamily: theme.fontFamily,
+      fontFamilyFallback: theme.fontFamilyFallback,
+      fontWeight: theme.fontWeight,
       underline: s.underline,
+      paragraphIndent: s.paragraphIndent,
+      textAlign: theme.bodyTextAlign,
+      titleFontSize: titleFontSize.toDouble(),
+      titleAlign: theme.titleTextAlign,
+      titleTopSpacing: s.titleTopSpacing,
+      titleBottomSpacing: s.titleBottomSpacing,
       showTitle: s.titleMode != 2,
       legacyImageStyle: settings.imageStyle,
     );
