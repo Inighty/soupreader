@@ -373,8 +373,30 @@ class ReaderCoordinator {
     }
     // 字号/行距/字距/段距/缩进/字体/边距等影响排版的设置变更后，
     // 需要重新分页，否则页面边界仍按旧设置计算，UI 看起来"没生效"。
+    //
+    // 注意：不能直接 requestRepaginate(restoreOffset: true)，那会读取
+    // SharedPreferences 里"上次保存"的章节进度，导致用户从当前阅读位置
+    // 被弹回到旧的保存点（表现为正文不连续，中间内容被跳过）。
+    // 这里在旧分页下计算"当前位置"作为 targetProgress，重新分页后跳到
+    // 最接近的页面，确保连续阅读体验。
     if (_needsRepaginationOnSettingsChange(old, normalized)) {
-      postFrameCallback(() => requestRepaginate(restoreOffset: true));
+      if (normalized.pageTurnMode == PageTurnMode.scroll) {
+        postFrameCallback(() => requestRepaginate(restoreOffset: true));
+        return;
+      }
+      final currentProgress = ChapterProgressUtils.pageProgressFromIndex(
+        pageIndex: paged.pageFactory.currentPageIndex,
+        totalPages: paged.pageFactory.totalPages,
+      );
+      postFrameCallback(() {
+        if (chapter.chapters.isEmpty) return;
+        _paginateAndJump(
+          chapterIndex: chapter.currentIndex,
+          goToLastPage: false,
+          restoreOffset: false,
+          targetProgress: currentProgress,
+        );
+      });
     }
   }
 

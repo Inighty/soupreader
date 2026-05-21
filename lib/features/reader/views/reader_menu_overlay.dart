@@ -156,6 +156,21 @@ class ReaderMenuOverlay extends StatelessWidget {
                   themes: settings.themeResolver.activeStyles,
                   styleConfigs: settings.settings.readStyleConfigs,
                   onSettingsChanged: coordinator.updateSettings,
+                  onOpenPaddingSettings: () {
+                    unawaited(ReaderDialogHelpers.showPaddingQuickSheet(
+                      context: routeContext,
+                      settings: settings.settings,
+                      onSettingsChanged: coordinator.updateSettings,
+                      isDarkMode: settings.themeResolver.isDark,
+                    ));
+                  },
+                  onOpenTipSettings: () {
+                    ReaderDialogHelpers.showInfoBarQuickSheet(
+                      context: routeContext,
+                      settings: settings.settings,
+                      onSettingsChanged: coordinator.updateSettings,
+                    );
+                  },
                 );
               },
               onShowBehaviorSettings: () {

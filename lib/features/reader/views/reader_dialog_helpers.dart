@@ -16,7 +16,9 @@ import '../services/reader_image_request_parser.dart';
 import '../services/reader_image_resolver.dart';
 import '../widgets/reader_catalog_sheet.dart';
 import '../widgets/reader_image_preview_page.dart';
+import '../widgets/reader_info_bar_quick_sheet.dart';
 import '../widgets/reader_more_config_sheet.dart';
+import '../widgets/reader_padding_config_dialog.dart';
 import '../widgets/reader_style_quick_sheet.dart';
 import 'reader_dialog_more_actions.dart';
 
@@ -159,6 +161,8 @@ class ReaderDialogHelpers {
     required List<ReadingThemeColors> themes,
     required List<ReadStyleConfig> styleConfigs,
     required ValueChanged<ReadingSettings> onSettingsChanged,
+    VoidCallback? onOpenPaddingSettings,
+    VoidCallback? onOpenTipSettings,
   }) {
     showCupertinoBottomSheetDialog<void>(
       context: context,
@@ -166,6 +170,38 @@ class ReaderDialogHelpers {
         settings: settings,
         themes: themes,
         styleConfigs: styleConfigs,
+        onSettingsChanged: onSettingsChanged,
+        onOpenPaddingSettings: onOpenPaddingSettings,
+        onOpenTipSettings: onOpenTipSettings,
+      ),
+    );
+  }
+
+  /// 打开「边距」快捷设置（页眉/正文/页脚边距 + 分割线）。
+  static Future<void> showPaddingQuickSheet({
+    required BuildContext context,
+    required ReadingSettings settings,
+    required ValueChanged<ReadingSettings> onSettingsChanged,
+    required bool isDarkMode,
+  }) {
+    return showReaderPaddingConfigDialog(
+      context,
+      settings: settings,
+      onSettingsChanged: onSettingsChanged,
+      isDarkMode: isDarkMode,
+    );
+  }
+
+  /// 打开「信息栏」快捷设置（页眉/页脚显示 + 状态栏元素开关）。
+  static void showInfoBarQuickSheet({
+    required BuildContext context,
+    required ReadingSettings settings,
+    required ValueChanged<ReadingSettings> onSettingsChanged,
+  }) {
+    showCupertinoBottomSheetDialog<void>(
+      context: context,
+      builder: (sheetContext) => ReaderInfoBarQuickSheet(
+        settings: settings,
         onSettingsChanged: onSettingsChanged,
       ),
     );
